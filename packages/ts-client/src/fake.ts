@@ -3,6 +3,7 @@ import type { Backend } from "./backend";
 import type {
   ConflictDto,
   EntryDto,
+  FileInfoDto,
   JobDto,
   JobKindDto,
   Loaded,
@@ -10,6 +11,7 @@ import type {
   UserDirsDto,
   VolumeDto,
 } from "./generated/bindings";
+import { globMatch } from "./glob";
 import defaultConfigJson from "./generated/default-config.json";
 
 /** Rust가 만든 내장 기본 설정(무경고, 사용자 바인딩 없음). */
@@ -49,6 +51,10 @@ export class FakeBackend implements Backend {
     { name: "/", mountPoint: "/" },
     { name: "USB", mountPoint: "/Volumes/USB" },
   ];
+  /** 클립보드에 쓴 텍스트, 파일 관리자로 보여 준 경로, 편집기로 연 경로 묶음. */
+  readonly clipboard: string[] = [];
+  readonly revealed: string[] = [];
+  readonly edited: string[][] = [];
   readonly unmounted: string[] = [];
   readonly ejected: string[] = [];
   userDirsValue: UserDirsDto = {
@@ -182,6 +188,47 @@ export class FakeBackend implements Backend {
     }
   }
 
+  async fileInfo(path: string): Promise<FileInfoDto> {
+    const n = this.need(path);
+    const prefix = path === "/" ? "/" : `${path}/`;
+    const children = [...this.nodes.keys()].filter(
+      (k) => k !== path && k.startsWith(prefix) && !k.slice(prefix.length).includes("/"),
+    ).length;
+    return {
+      name: baseName(path) || "/",
+      path,
+      kind: n.kind,
+      size: n.content.length,
+      createdMs: n.createdMs ?? 0,
+      modifiedMs: n.modifiedMs ?? 0,
+      accessedMs: n.modifiedMs ?? 0,
+      mode: n.kind === "dir" ? 0o755 : 0o644,
+      linkTarget: null,
+      childCount: n.kind === "dir" ? children : null,
+    };
+  }
+
+  async globFilter(pattern: string, names: string[]) {
+    return names.flatMap((n, i) => (globMatch(pattern, n) ? [i] : []));
+  }
+
+  async copyText(text: string) {
+    this.clipboard.push(text);
+  }
+
+  async revealPath(path: string) {
+    this.need(path);
+    this.revealed.push(path);
+  }
+
+  async editPaths(paths: string[]) {
+    if (!this.loaded.config.environment.text_editor.trim()) {
+      throw new BackendError("환경 설정 [environment] text_editor가 비어 있습니다");
+    }
+    paths.forEach((p) => this.need(p));
+    this.edited.push(paths);
+  }
+
   async listVolumes() {
     return this.volumes.map((v) => ({ ...v }));
   }
@@ -254,6 +301,9 @@ export class FakeBackend implements Backend {
       case "move":
         await this.move(item.src, item.destDir!, item.policy);
         break;
+      case "duplicate":
+        this.duplicate(item.src);
+        break;
       case "trash":
         await this.trash(item.src);
         break;
@@ -261,6 +311,22 @@ export class FakeBackend implements Backend {
         await this.deletePermanent(item.src);
         break;
     }
+  }
+
+  /** Rust `td_ops::duplicate_name`과 같은 규칙: `a.txt` → `a copy.txt` → `a copy 2.txt`. */
+  private duplicate(src: string) {
+    this.need(src);
+    const name = baseName(src);
+    const dir = parentPath(src) ?? "/";
+    const dot = name.lastIndexOf(".");
+    const [stem, ext] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, ""];
+    let dest: string;
+    for (let n = 1; ; n++) {
+      dest = joinPath(dir, n === 1 ? `${stem} copy${ext}` : `${stem} copy ${n}${ext}`);
+      if (!this.nodes.has(dest)) break;
+    }
+    for (const k of this.subtree(src)) this.nodes.set(dest + k.slice(src.length), { ...this.nodes.get(k)! });
+    this.notify(dir);
   }
 
   private finish(job: FakeJob) {

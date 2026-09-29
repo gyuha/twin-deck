@@ -28,6 +28,20 @@ pub type Result<T> = std::result::Result<T, WatchError>;
 /// 감시 대상: 정규화된 경로 -> 호출자가 넘긴 원래 경로.
 type Dirs = Arc<Mutex<HashMap<PathBuf, PathBuf>>>;
 
+/// OS 이벤트의 경로들 중 어느 감시 디렉터리의 변경인지 고른다(정규화된 감시 경로로 돌려준다).
+/// 감시 디렉터리의 직속 항목, 또는 감시 디렉터리 자신의 변경만 해당한다. 더 깊은 하위와 다른 디렉터리는 무시한다.
+pub fn route_event<'a>(dirs: &'a HashMap<PathBuf, PathBuf>, paths: &[PathBuf]) -> Vec<&'a PathBuf> {
+    paths
+        .iter()
+        .filter_map(|p| {
+            p.parent()
+                .and_then(|d| dirs.get_key_value(d))
+                .or_else(|| dirs.get_key_value(p.as_path()))
+                .map(|(canon, _)| canon)
+        })
+        .collect()
+}
+
 pub struct DirWatcher {
     watcher: RecommendedWatcher,
     dirs: Dirs,
@@ -44,15 +58,8 @@ impl DirWatcher {
         let watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
             let Ok(event) = res else { return };
             let dirs = cb_dirs.lock().unwrap();
-            for p in &event.paths {
-                // 항목의 부모 디렉터리, 또는 감시 디렉터리 자신의 변경.
-                let hit = p
-                    .parent()
-                    .filter(|d| dirs.contains_key(*d))
-                    .or_else(|| dirs.contains_key(p).then_some(p.as_path()));
-                if let Some(d) = hit {
-                    let _ = raw_tx.send(d.to_path_buf());
-                }
+            for d in route_event(&dirs, &event.paths) {
+                let _ = raw_tx.send(d.clone());
             }
         })?;
 

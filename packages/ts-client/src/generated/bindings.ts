@@ -8,6 +8,39 @@ export const commands = {
 async getConfig() : Promise<Loaded> {
     return await TAURI_INVOKE("get_config");
 },
+async fileInfo(path: string) : Promise<Result<FileInfoDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("file_info", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * `pattern`과 일치하는 이름의 인덱스를 돌려준다 (Select Group).
+ */
+async globFilter(pattern: string, names: string[]) : Promise<number[]> {
+    return await TAURI_INVOKE("glob_filter", { pattern, names });
+},
+async revealPath(path: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("reveal_path", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 설정의 `environment.text_editor`로 항목을 연다.
+ */
+async editPaths(paths: string[]) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("edit_paths", { paths }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async listVolumes() : Promise<VolumeDto[]> {
     return await TAURI_INVOKE("list_volumes");
 },
@@ -196,9 +229,17 @@ export type Environment = { text_editor: string; terminal: string }
  */
 export type FavoriteDto = { kind: string; name: string | null; path: string | null; items?: FavoriteLeaf[] }
 export type FavoriteLeaf = { name: string; path: string }
+/**
+ * 파일 정보 대화상자용 (OP-14). 시각은 epoch 밀리초, 모르면 null.
+ */
+export type FileInfoDto = { name: string; path: string; kind: KindDto; size: number; createdMs: number | null; modifiedMs: number | null; accessedMs: number | null; mode: number | null; linkTarget: string | null; 
+/**
+ * 폴더의 바로 아래 항목 수.
+ */
+childCount: number | null }
 export type JobDto = { id: number; kind: JobKindDto; status: JobStatusDto; total: number; completed: number; current: string | null; errors: JobErrorDto[] }
 export type JobErrorDto = { path: string; message: string }
-export type JobKindDto = "copy" | "move" | "trash" | "delete"
+export type JobKindDto = "copy" | "move" | "trash" | "delete" | "duplicate"
 export type JobStatusDto = "queued" | "running" | "paused" | "done" | "failed" | "aborted"
 export type KindDto = "file" | "dir" | "symlink"
 export type LayoutConfig = { action_bar: string[] }

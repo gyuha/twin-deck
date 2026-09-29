@@ -5,13 +5,17 @@ use specta::Type;
 use tauri::State;
 use tauri_specta::{collect_commands, collect_events, Builder, Event};
 use td_config::Loaded;
+use td_launch::{Launch, SystemLauncher};
 use td_ops::SystemTrash;
 use td_volumes::{SystemUnmounter, Volumes};
 
-use crate::service::{EntryDto, JobDto, JobKindDto, QueueItemDto, Service, ServiceResult};
+use crate::service::{
+    edit, reveal, EntryDto, FileInfoDto, JobDto, JobKindDto, QueueItemDto, Service, ServiceResult,
+};
 
 pub type AppService = Service<SystemTrash>;
 pub type AppVolumes = Volumes<SystemUnmounter>;
+pub type AppLaunch = Launch<SystemLauncher>;
 
 /// 감시 중인 디렉터리의 내용이 바뀌었다.
 #[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
@@ -134,6 +138,37 @@ pub fn add_favorite(
 
 #[tauri::command]
 #[specta::specta]
+pub fn file_info(svc: State<'_, AppService>, path: String) -> ServiceResult<FileInfoDto> {
+    svc.file_info(&path)
+}
+
+/// `pattern`과 일치하는 이름의 인덱스를 돌려준다 (Select Group).
+#[tauri::command]
+#[specta::specta]
+pub fn glob_filter(svc: State<'_, AppService>, pattern: String, names: Vec<String>) -> Vec<u32> {
+    svc.glob_filter(&pattern, &names)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn reveal_path(launch: State<'_, AppLaunch>, path: String) -> ServiceResult<()> {
+    reveal(&launch, &path)
+}
+
+/// 설정의 `environment.text_editor`로 항목을 연다.
+#[tauri::command]
+#[specta::specta]
+pub fn edit_paths(
+    launch: State<'_, AppLaunch>,
+    config: State<'_, ConfigState>,
+    paths: Vec<String>,
+) -> ServiceResult<()> {
+    let editor = config.current().config.environment.text_editor;
+    edit(&launch, &editor, &paths)
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn get_config(state: State<'_, ConfigState>) -> Loaded {
     state.current()
 }
@@ -233,6 +268,10 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new()
         .commands(collect_commands![
             get_config,
+            file_info,
+            glob_filter,
+            reveal_path,
+            edit_paths,
             list_volumes,
             unmount_volume,
             eject_volume,

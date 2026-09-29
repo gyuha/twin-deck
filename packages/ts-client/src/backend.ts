@@ -1,4 +1,4 @@
-import type { EntryDto, JobDto, JobKindDto, Loaded, QueueItemDto, UserDirsDto, VolumeDto } from "./generated/bindings";
+import type { EntryDto, FileInfoDto, JobDto, JobKindDto, Loaded, QueueItemDto, UserDirsDto, VolumeDto } from "./generated/bindings";
 
 /** Rust 쪽이 돌려준 오류 문자열을 감싼 예외. */
 export class BackendError extends Error {}
@@ -23,6 +23,16 @@ export interface Backend {
   queueAbort(id: number): Promise<void>;
   /** 끝난 작업을 목록에서 지운다. */
   queueClearFinished(): Promise<void>;
+  /** 파일 정보 대화상자용 상세 정보. */
+  fileInfo(path: string): Promise<FileInfoDto>;
+  /** glob 패턴과 일치하는 이름의 인덱스 (Select Group). */
+  globFilter(pattern: string, names: string[]): Promise<number[]>;
+  /** 클립보드에 텍스트를 쓴다. */
+  copyText(text: string): Promise<void>;
+  /** 파일 관리자에서 항목을 보여 준다. */
+  revealPath(path: string): Promise<void>;
+  /** 설정한 편집기로 항목을 연다. */
+  editPaths(paths: string[]): Promise<void>;
   /** 마운트된 볼륨. 루트가 첫 항목이다. */
   listVolumes(): Promise<VolumeDto[]>;
   /** 언마운트/추출. 루트나 목록에 없는 경로는 거부된다. */

@@ -343,6 +343,7 @@ where
                     &ctl,
                 )
                 .map(|_| ()),
+            JobKind::Duplicate => ops.duplicate_with(&item.src, &ctl).map(|_| ()),
             JobKind::Trash => ops.trash(&item.src),
             JobKind::Delete => ops.delete(&item.src),
         };

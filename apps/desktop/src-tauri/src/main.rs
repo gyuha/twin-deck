@@ -7,7 +7,8 @@ use tauri_specta::Event;
 use td_ops::SystemTrash;
 
 use commands::{
-    specta_builder, AppService, AppVolumes, ConfigChanged, ConfigState, DirChanged, QueueChanged,
+    specta_builder, AppLaunch, AppService, AppVolumes, ConfigChanged, ConfigState, DirChanged,
+    QueueChanged,
 };
 use tauri::Manager;
 
@@ -18,7 +19,12 @@ fn main() {
 
     tauri::Builder::default()
         .invoke_handler(builder.invoke_handler())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .manage(service)
+        .manage(AppLaunch::new(
+            td_launch::SystemLauncher,
+            td_launch::Os::current(),
+        ))
         .manage(AppVolumes::new(td_volumes::SystemUnmounter))
         .setup(move |app| {
             builder.mount_events(app);

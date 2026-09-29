@@ -22,10 +22,17 @@ export async function renderApp(
   backend = seedBackend(),
   platform: "linux" | "mac" = "linux",
   paths: { left: string; right: string } = { left: "/home/a", right: "/home/b" },
+  opts: { emptyLeft?: boolean } = {},
 ) {
   const user = userEvent.setup();
   render(<App backend={backend} platform={platform} leftPath={paths.left} rightPath={paths.right} />);
-  await waitFor(() => expect(within(list("left")).queryAllByRole("option").length).toBeGreaterThan(0));
+  if (opts.emptyLeft) {
+    // 왼쪽이 빈 폴더: 첫 목록 조회가 끝날 시간을 준다(가짜 백엔드는 곧바로 응답한다).
+    await new Promise((r) => setTimeout(r, 50));
+    expect(within(list("left")).queryAllByRole("option")).toHaveLength(0);
+  } else {
+    await waitFor(() => expect(within(list("left")).queryAllByRole("option").length).toBeGreaterThan(0));
+  }
   return { user, backend };
 }
 

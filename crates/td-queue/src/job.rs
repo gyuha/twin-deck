@@ -9,6 +9,8 @@ pub enum JobKind {
     Move,
     Trash,
     Delete,
+    /// 같은 폴더에 접미사를 붙여 복사 (OP-08).
+    Duplicate,
 }
 
 #[derive(Debug, Clone)]

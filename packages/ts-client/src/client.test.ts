@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { FakeBackend, baseName, expandPath, joinPath, parentPath } from "./index";
+import { FakeBackend, baseName, expandPath, globMatch, joinPath, parentPath } from "./index";
 
 const fs = () =>
   new FakeBackend().seed({
@@ -132,5 +132,70 @@ describe("FakeBackend 볼륨", () => {
     await b.unmountVolume("/Volumes/USB");
     expect(b.unmounted).toEqual(["/Volumes/USB"]);
     expect((await b.listVolumes()).map((v) => v.mountPoint)).toEqual(["/"]);
+  });
+});
+
+// Rust `glob_group_match`(crates/td-vfs/tests/info_glob.rs)와 같은 케이스 표. 한쪽을 고치면 다른 쪽도 고친다.
+const GLOB_CASES: [string, string, boolean][] = [
+  ["*", "anything", true],
+  ["*", "", true],
+  ["*.txt", "a.txt", true],
+  ["*.txt", "A.TXT", true],
+  ["*.txt", "a.txt.bak", false],
+  ["a?c", "abc", true],
+  ["a?c", "ac", false],
+  ["a?c", "abbc", false],
+  ["[abc].md", "b.md", true],
+  ["[abc].md", "d.md", false],
+  ["[a-c]*", "beta", true],
+  ["[a-c]*", "delta", false],
+  ["[!a-c]*", "delta", true],
+  ["[^a-c]*", "beta", false],
+  ["file[0-9][0-9]", "file07", true],
+  ["file[0-9][0-9]", "file7", false],
+  ["*a*b*", "xxaxxbxx", true],
+  ["*a*b*", "xxbxxaxx", false],
+  ["**", "x", true],
+  ["a*", "a", true],
+  ["[abc", "[abc", true],
+  ["[]a]x", "]x", true],
+  ["", "", true],
+  ["", "a", false],
+  ["*.tar.gz", "backup.tar.gz", true],
+  ["한*", "한글.txt", true],
+];
+
+describe("globMatch는 Rust와 같은 결과를 낸다", () => {
+  it.each(GLOB_CASES)("%j vs %j → %s", (pattern, name, want) => {
+    expect(globMatch(pattern, name)).toBe(want);
+  });
+  it("NFD 이름과 병적인 패턴", () => {
+    expect(globMatch("한*", "한글.txt".normalize("NFD"))).toBe(true);
+    expect(globMatch("a*".repeat(50) + "b", "a".repeat(5000))).toBe(false);
+  });
+});
+
+describe("FakeBackend 복제/정보/열기", () => {
+  it("복제는 Rust와 같은 이름 규칙을 쓴다", async () => {
+    const b = fs().seed({ "/a/.env": "e", "/a/z.tar.gz": "z" });
+    await b.enqueue("duplicate", ["x.txt", "x.txt", "dir", ".env", "z.tar.gz"].map((n) => ({ src: `/a/${n}`, destDir: null, policy: "skip" as const })));
+    for (const want of ["x copy.txt", "x copy 2.txt", "dir copy", ".env copy", "z.tar copy.gz"]) {
+      expect(b.exists(`/a/${want}`), want).toBe(true);
+    }
+    expect(b.exists("/a/dir copy/inner.txt")).toBe(true);
+  });
+  it("정보/클립보드/열기", async () => {
+    const b = fs();
+    expect(await b.fileInfo("/a/dir")).toMatchObject({ kind: "dir", childCount: 1 });
+    expect(await b.fileInfo("/a/x.txt")).toMatchObject({ kind: "file", size: 1, childCount: null });
+    await b.copyText("hello");
+    expect(b.clipboard).toEqual(["hello"]);
+    await b.revealPath("/a/x.txt");
+    expect(b.revealed).toEqual(["/a/x.txt"]);
+    await expect(b.editPaths(["/a/x.txt"])).rejects.toThrow(/text_editor/);
+    b.setConfig((l) => (l.config.environment.text_editor = "code"));
+    await b.editPaths(["/a/x.txt"]);
+    expect(b.edited).toEqual([["/a/x.txt"]]);
+    expect(await b.globFilter("*.txt", ["x.txt", "y.md"])).toEqual([0]);
   });
 });

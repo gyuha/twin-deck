@@ -3,6 +3,12 @@ use std::time::Duration;
 
 use td_config::{append_favorite, load_dir, load_from_strs, ConfigStore, Platform};
 
+/// 파일 이벤트가 조용해질 때까지(500ms 무이벤트, 최대 10초) 비운다. 고정 sleep은 늦게 오는 이벤트에 취약하다.
+fn settle(rx: &std::sync::mpsc::Receiver<td_config::Loaded>) {
+    let end = std::time::Instant::now() + Duration::from_secs(10);
+    while rx.recv_timeout(Duration::from_millis(500)).is_ok() && std::time::Instant::now() < end {}
+}
+
 fn load(config: &str) -> td_config::Loaded {
     load_from_strs(Some(config), None, Platform::Linux)
 }
@@ -179,8 +185,7 @@ fn config_watch_reload() {
     .unwrap();
     let (store, rx) = ConfigStore::start(dir.path(), Platform::Linux).unwrap();
     assert!(!store.current().config.core.confirm.trash);
-    std::thread::sleep(Duration::from_millis(400));
-    while rx.try_recv().is_ok() {}
+    settle(&rx);
 
     // 파일을 고치면 재로딩된다
     fs::write(
@@ -200,8 +205,7 @@ fn config_watch_reload() {
     assert!(store.current().config.core.confirm.trash);
 
     // 문법 오류: 이전 유효 설정을 유지하고 경고만 남긴다
-    std::thread::sleep(Duration::from_millis(400));
-    while rx.try_recv().is_ok() {}
+    settle(&rx);
     fs::write(dir.path().join("config.toml"), "[core.confirm\ntrash = ").unwrap();
     let broken = loop {
         let l = rx
@@ -215,8 +219,7 @@ fn config_watch_reload() {
     assert!(broken.warnings[0].line.is_some());
 
     // 키바인딩 파일이 새로 생겨도 반영된다
-    std::thread::sleep(Duration::from_millis(400));
-    while rx.try_recv().is_ok() {}
+    settle(&rx);
     fs::write(dir.path().join("config.toml"), "").unwrap();
     fs::write(
         dir.path().join("keybindings.toml"),

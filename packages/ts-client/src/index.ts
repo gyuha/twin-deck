@@ -4,6 +4,7 @@ export type {
   ConflictDto,
   DirChanged,
   EntryDto,
+  FileInfoDto,
   JobDto,
   JobKindDto,
   JobStatusDto,
@@ -20,3 +21,4 @@ export type {
 export * from "./backend";
 export { TauriBackend } from "./tauri";
 export { FakeBackend, defaultLoaded } from "./fake";
+export { globMatch } from "./glob";

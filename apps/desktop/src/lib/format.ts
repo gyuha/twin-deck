@@ -93,6 +93,11 @@ export function formatDate(ms: number | null, display: Display, now = Date.now()
   return strftime(display.date_format, d);
 }
 
+/** 상대 표기 없이 날짜와 시각을 모두 보여 주는 형식 (파일 정보용). */
+export function formatDateTime(ms: number | null, display: Display): string {
+  return ms === null ? "—" : strftime(`${display.date_format} ${display.time_format}`, new Date(ms));
+}
+
 /** 권한 비트를 `rwxr-xr-x`로. */
 export function formatPermissions(mode: number | null): string {
   if (mode === null) return "";

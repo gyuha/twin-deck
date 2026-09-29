@@ -241,3 +241,29 @@ fn queue_delete_and_trash_jobs() {
     assert!(!a.src.join("x").as_path().exists());
     assert!(a.src.join("y").as_path().exists());
 }
+
+#[test]
+fn queue_duplicate_job() {
+    let a = dirs(&["x.txt"]);
+    let (q, rx) = Queue::new(ops());
+    let id = q.enqueue(JobSpec {
+        kind: JobKind::Duplicate,
+        items: vec![Item {
+            src: a.src.join("x.txt"),
+            dest_dir: None,
+            policy: ConflictPolicy::Skip,
+        }],
+    });
+    wait_for(&rx, |e| {
+        matches!(
+            e,
+            QueueEvent::Finished {
+                status: JobStatus::Done,
+                ..
+            }
+        )
+    });
+    assert_eq!(q.job(id).unwrap().completed, 1);
+    assert!(a.src.join("x copy.txt").as_path().exists());
+    assert!(a.src.join("x.txt").as_path().exists());
+}

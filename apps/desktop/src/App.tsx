@@ -30,6 +30,7 @@ export function detectPlatform(): Platform {
 function StatusBar() {
   const selected = useApp((s) => activeTab(s).selection.size);
   const notice = useApp((s) => s.notice);
+  const flash = useApp((s) => s.flash);
   const fileWarnings = useApp((s) => s.loaded.warnings.length);
   const keymapWarnings = useApp((s) => s.keymapWarnings.length);
   const { api } = useAppStore();
@@ -37,6 +38,7 @@ function StatusBar() {
   return (
     <footer role="status" aria-label="상태 표시줄" className="border-t border-neutral-300 px-2 py-0.5 text-xs">
       선택 {selected}개
+      {flash && <span className="ml-4 text-green-800">{flash}</span>}
       {warnings > 0 && (
         <button type="button" tabIndex={-1} onClick={() => void api.showConfigWarnings()} className="ml-4 text-amber-700">
           ⚠ 설정 경고 {warnings}개

@@ -1,6 +1,6 @@
 use std::fs;
 
-use crate::{Entry, EntryKind, ListOptions, Result, Vfs, VfsError, VfsPath};
+use crate::{Entry, EntryKind, Info, ListOptions, Result, Vfs, VfsError, VfsPath};
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct LocalFs;
@@ -105,6 +105,29 @@ impl Vfs for LocalFs {
 
     fn copy_file(&self, from: &VfsPath, to: &VfsPath) -> Result<u64> {
         fs::copy(from.as_path(), to.as_path()).map_err(|e| VfsError::io(from, e))
+    }
+
+    fn info(&self, path: &VfsPath) -> Result<Info> {
+        let meta = fs::symlink_metadata(path.as_path()).map_err(|e| VfsError::io(path, e))?;
+        let entry = to_entry(path, &meta);
+        let link_target = meta
+            .file_type()
+            .is_symlink()
+            .then(|| fs::read_link(path.as_path()).ok().map(VfsPath::new))
+            .flatten();
+        let child_count = (entry.kind == EntryKind::Dir)
+            .then(|| {
+                fs::read_dir(path.as_path())
+                    .ok()
+                    .map(|rd| rd.count() as u64)
+            })
+            .flatten();
+        Ok(Info {
+            accessed: meta.accessed().ok(),
+            link_target,
+            child_count,
+            entry,
+        })
     }
 
     fn read_link(&self, path: &VfsPath) -> Result<VfsPath> {

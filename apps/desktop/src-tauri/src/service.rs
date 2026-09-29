@@ -7,6 +7,7 @@ use std::time::UNIX_EPOCH;
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
+use td_launch::{Launch, Launcher};
 use td_ops::{ConflictPolicy, Ops, Trasher};
 use td_queue::{Item, JobInfo, JobKind, JobSpec, JobStatus, Queue, QueueEvent};
 use td_vfs::{sort_entries, Entry, EntryKind, ListOptions, LocalFs, Vfs, VfsPath};
@@ -87,6 +88,47 @@ pub enum JobKindDto {
     Move,
     Trash,
     Delete,
+    Duplicate,
+}
+
+/// 파일 정보 대화상자용 (OP-14). 시각은 epoch 밀리초, 모르면 null.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct FileInfoDto {
+    pub name: String,
+    pub path: String,
+    pub kind: KindDto,
+    pub size: f64,
+    pub created_ms: Option<f64>,
+    pub modified_ms: Option<f64>,
+    pub accessed_ms: Option<f64>,
+    pub mode: Option<u32>,
+    pub link_target: Option<String>,
+    /// 폴더의 바로 아래 항목 수.
+    pub child_count: Option<f64>,
+}
+
+fn ms(t: Option<std::time::SystemTime>) -> Option<f64> {
+    t.and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as f64)
+}
+
+impl From<&td_vfs::Info> for FileInfoDto {
+    fn from(i: &td_vfs::Info) -> Self {
+        let e = EntryDto::from(&i.entry);
+        FileInfoDto {
+            name: e.name,
+            path: e.path,
+            kind: e.kind,
+            size: e.size,
+            created_ms: e.created_ms,
+            modified_ms: e.modified_ms,
+            accessed_ms: ms(i.accessed),
+            mode: e.mode,
+            link_target: i.link_target.as_ref().map(|p| p.to_string()),
+            child_count: i.child_count.map(|n| n as f64),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -134,6 +176,7 @@ impl From<JobKindDto> for JobKind {
             JobKindDto::Move => JobKind::Move,
             JobKindDto::Trash => JobKind::Trash,
             JobKindDto::Delete => JobKind::Delete,
+            JobKindDto::Duplicate => JobKind::Duplicate,
         }
     }
 }
@@ -147,6 +190,7 @@ impl From<&JobInfo> for JobDto {
                 JobKind::Move => JobKindDto::Move,
                 JobKind::Trash => JobKindDto::Trash,
                 JobKind::Delete => JobKindDto::Delete,
+                JobKind::Duplicate => JobKindDto::Duplicate,
             },
             status: match j.status {
                 JobStatus::Queued => JobStatusDto::Queued,
@@ -254,6 +298,23 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
         Ok(entries.iter().map(EntryDto::from).collect())
     }
 
+    pub fn file_info(&self, path: &str) -> ServiceResult<FileInfoDto> {
+        LocalFs
+            .info(&vp(path))
+            .map(|i| FileInfoDto::from(&i))
+            .map_err(|e| e.to_string())
+    }
+
+    /// `pattern`과 일치하는 이름의 인덱스 (Select Group).
+    pub fn glob_filter(&self, pattern: &str, names: &[String]) -> Vec<u32> {
+        names
+            .iter()
+            .enumerate()
+            .filter(|(_, n)| td_vfs::glob_match(pattern, n))
+            .map(|(i, _)| i as u32)
+            .collect()
+    }
+
     pub fn mkdir(&self, path: &str) -> ServiceResult<()> {
         self.ops.mkdir(&vp(path)).map_err(|e| e.to_string())
     }
@@ -290,6 +351,20 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
             .unwatch(Path::new(path))
             .map_err(|e| e.to_string())
     }
+}
+
+/// 파일 관리자에서 보기 (OP-16). 없는 경로는 실행하지 않는다.
+pub fn reveal<L: Launcher>(launch: &Launch<L>, path: &str) -> ServiceResult<()> {
+    let meta = std::fs::symlink_metadata(path).map_err(|e| format!("{path}: {e}"))?;
+    launch.reveal(path, meta.is_dir())
+}
+
+/// 설정한 편집기로 열기 (OP-09). 없는 경로가 하나라도 있으면 실행하지 않는다.
+pub fn edit<L: Launcher>(launch: &Launch<L>, editor: &str, paths: &[String]) -> ServiceResult<()> {
+    for p in paths {
+        std::fs::symlink_metadata(p).map_err(|e| format!("{p}: {e}"))?;
+    }
+    launch.edit(editor, paths)
 }
 
 #[cfg(test)]
@@ -416,6 +491,69 @@ mod tests {
         assert_eq!(job.errors.len(), 1);
         svc.queue_clear_finished();
         assert!(svc.queue_jobs().is_empty());
+    }
+
+    #[test]
+    fn file_info_and_glob_filter() {
+        let (_t, svc, _ch, root) = setup();
+        svc.touch(&format!("{root}/a.txt")).unwrap();
+        std::fs::write(format!("{root}/a.txt"), "hello").unwrap();
+        svc.mkdir(&format!("{root}/d")).unwrap();
+        svc.touch(&format!("{root}/d/x")).unwrap();
+        let f = svc.file_info(&format!("{root}/a.txt")).unwrap();
+        assert_eq!(
+            (f.name.as_str(), f.kind, f.size),
+            ("a.txt", KindDto::File, 5.0)
+        );
+        assert!(f.modified_ms.is_some() && f.accessed_ms.is_some());
+        let d = svc.file_info(&format!("{root}/d")).unwrap();
+        assert_eq!((d.kind, d.child_count), (KindDto::Dir, Some(1.0)));
+        assert!(svc.file_info(&format!("{root}/nope")).is_err());
+
+        let names: Vec<String> = ["a.txt", "b.md", "C.TXT", "d"].map(String::from).to_vec();
+        assert_eq!(svc.glob_filter("*.txt", &names), [0, 2]);
+        assert_eq!(svc.glob_filter("nothing*", &names), Vec::<u32>::new());
+    }
+
+    #[test]
+    fn reveal_and_edit_check_paths_before_launching() {
+        use std::cell::RefCell;
+        use std::rc::Rc;
+        struct Rec(Rc<RefCell<Vec<td_launch::Command>>>);
+        impl Launcher for Rec {
+            fn run(&self, c: &td_launch::Command) -> Result<(), String> {
+                self.0.borrow_mut().push(c.clone());
+                Ok(())
+            }
+        }
+        let (_t, svc, _ch, root) = setup();
+        svc.touch(&format!("{root}/a.txt")).unwrap();
+        svc.mkdir(&format!("{root}/d")).unwrap();
+        let log = Rc::new(RefCell::new(Vec::new()));
+        let launch = Launch::new(Rec(log.clone()), td_launch::Os::Linux);
+
+        reveal(&launch, &format!("{root}/a.txt")).unwrap();
+        reveal(&launch, &format!("{root}/d")).unwrap();
+        assert!(reveal(&launch, &format!("{root}/missing")).is_err());
+        edit(&launch, "code", &[format!("{root}/a.txt")]).unwrap();
+        assert!(edit(
+            &launch,
+            "code",
+            &[format!("{root}/a.txt"), format!("{root}/missing")]
+        )
+        .is_err());
+        assert!(edit(&launch, "", &[format!("{root}/a.txt")]).is_err());
+
+        let log = log.borrow();
+        assert_eq!(
+            log.len(),
+            3,
+            "존재하지 않는 경로/빈 편집기는 실행기까지 가지 않는다"
+        );
+        assert_eq!(log[0].program, "xdg-open");
+        assert_eq!(log[0].args, [root.clone()]); // 파일이면 부모 폴더
+        assert_eq!(log[1].args, [format!("{root}/d")]);
+        assert_eq!((log[2].program.as_str(), log[2].args.len()), ("code", 1));
     }
 
     #[test]

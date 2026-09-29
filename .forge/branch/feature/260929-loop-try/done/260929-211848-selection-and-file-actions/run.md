@@ -1,0 +1,10 @@
+# RUN — selection-and-file-actions
+- S1 SEL-03/04 — ✅ `core.select.invert`/`invert_current`(커서 이동 없음), `core.select.group`/`core.deselect.group`(패턴 다이얼로그). glob 매처는 Rust(`td_vfs::glob_match`, IPC `glob_filter`가 이름 배열에서 일치하는 인덱스를 돌려줌)가 원본이고 TS `globMatch`(FakeBackend용)는 같은 26개 케이스 표로 양쪽에서 테스트(`glob_group_match`). 문법: `*` `?` `[abc]` `[a-z]` `[!abc]`, 대소문자 무시, NFC. Marta의 패턴 문법은 확인하지 못했다.
+- S2 OP-08/OP-10 — ✅ 복제(`core.duplicate` Mod+D): `td_ops::duplicate_name`(`a.txt`→`a copy.txt`→`a copy 2.txt`, `.env`→`.env copy`, `archive.tar.gz`→`archive.tar copy.gz`), 큐 작업 종류 `Duplicate`(폴더 재귀). `core.copy.to_inactive`/`core.move.to_inactive`는 기본 키 없음.
+  ⚠ F5/F6 자체도 대상 경로 확인 대화상자 없이 비활성 패널로 바로 보낸다(docs/07 §6의 "대상 경로를 수정할 수 있는 복사/이동 확인 대화상자"는 만들지 않았다). 그래서 `*.to_inactive`는 F5/F6과 같은 동작의 별칭이다.
+- S3 OP-14/15/16/09 — ✅ 파일 정보(`td_vfs::Vfs::info`: 접근 시각, 링크 대상, 폴더 항목 수; 재귀 크기는 계산하지 않음) `file_info_fields`; 경로 복사(F12 / Mod+F12, 상태 표시줄에 3초 알림); 파일 관리자에서 보기(`core.reveal`, 키 없음); 편집(F4)/폴더 편집(Shift+F4, `environment.text_editor`). 새 crate `td-launch`: 명령 조립은 순수 함수(`reveal_command`, `editor_command`)라 mac/windows/linux 결과를 모두 테스트(`launch_reveal_args`, `launch_editor_args`), 셸을 거치지 않고 인수 배열로 실행, 존재하지 않는 경로/빈 편집기는 실행기 전에 거부. 클립보드는 Tauri 플러그인(`clipboard-manager`, capability 추가 — `capabilities_cover_plugins`가 검사).
+- S4 OP-13 — ✅ td-config 태스크에서 이미 연결됨(삭제/휴지통 확인 on/off 테스트 포함).
+⚠ fake만 검증: 클립보드 쓰기(`TauriBackend.copyText`는 플러그인 호출이지만 실제 클립보드를 써 보지 않음), 파일 관리자 열기, 외부 편집기 실행(Rust는 기록용 Launcher fake, TS는 FakeBackend). `SystemLauncher`가 실제로 프로세스를 띄우는 것은 실행하지 않았다.
+⚠ 알려진 사항: F12는 개발 빌드 웹뷰에서 개발자 도구 단축키와 겹칠 수 있다(웹뷰 키 수신 실험은 미수행).
+DoD: cargo — td-vfs 6, td-ops 14, td-queue 6, td-launch 3, desktop 9; ts-client 40; desktop vitest 130.
+⚠ 봉인 게이트가 잡은 간헐 실패(td-watch): `watch_only_reports_watched_dir`가 25회 중 6회 실패. OS 수준에서 "이벤트가 오지 않음"을 단정하는 테스트라 원리상 레이스다(FSEvents는 감시 시작 직전의 일, 예: 디렉터리 생성을 늦게 전달할 수 있다). 앱에는 무해한 추가 갱신이다. 대응: 라우팅 규칙을 순수 함수 `route_event`로 분리해 결정적으로 테스트(`watch_routes_only_watched_dirs`)하고, OS 수준 테스트는 "도착"만 단정하도록 바꿨다. td-watch/td-config의 고정 400ms 대기를 "500ms 무이벤트까지 비우기"로 교체. 수정 후 25회 반복 실패 0.

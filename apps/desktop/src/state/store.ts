@@ -5,6 +5,7 @@ import type { ActionContext } from "@twin-deck/actions";
 import type { Scope } from "@twin-deck/keybinds";
 import { quickMatch } from "../lib/names";
 import { parseColumns } from "../lib/columns";
+import { formatDateTime, formatOctal, formatPermissions, formatSize } from "../lib/format";
 import { DEFAULT_SORT, SORT_KEYS, sortEntries, sortFromColumns } from "../lib/sort";
 import type { SortKey, SortState } from "../lib/sort";
 
@@ -73,6 +74,8 @@ export interface AppState {
   loaded: Loaded;
   /** 키바인딩 병합 중 나온 경고 (App이 채운다). */
   keymapWarnings: string[];
+  /** 성공 알림 (경로 복사 등). 몇 초 뒤 사라진다. */
+  flash: string | null;
   /** 마지막 작업 오류. 다음 작업이 시작되면 지워진다. */
   notice: string | null;
 }
@@ -154,6 +157,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     queueCursor: 0,
     loaded: defaultLoaded(),
     keymapWarnings: [],
+    flash: null,
     notice: null,
   }));
   const { getState: get, setState: set } = store;
@@ -229,6 +233,12 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       set({ dialog });
     });
   }
+  let flashTimer: ReturnType<typeof setTimeout> | undefined;
+  const flash = (message: string) => {
+    set({ flash: message });
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => set({ flash: null }), 3000);
+  };
   const fail = (e: unknown) => set({ notice: String(e instanceof Error ? e.message : e) });
 
   // 작업 상태가 바뀌면(진행/완료) 목록을 다시 읽는다.
@@ -262,6 +272,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     },
 
     dispose() {
+      clearTimeout(flashTimer);
       unsubscribeBackend();
       unsubscribeQueue();
       unsubscribeConfig();
@@ -400,6 +411,51 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     },
     setCursor(index: number) {
       patchActive((t) => ({ cursor: clamp(index, t.entries.length) }));
+    },
+    /** 선택 반전 (SEL-03): 모든 항목의 선택 상태를 뒤집는다. */
+    invertSelection() {
+      patchActive((t) => ({ selection: new Set(t.entries.filter((e) => !t.selection.has(e.path)).map((e) => e.path)) }));
+    },
+    /** 현재 항목 선택 반전 (SEL-03): 커서는 움직이지 않는다. */
+    invertCurrent() {
+      patchActive((t) => {
+        const c = t.entries[t.cursor];
+        if (!c) return {};
+        const sel = new Set(t.selection);
+        if (sel.has(c.path)) sel.delete(c.path);
+        else sel.add(c.path);
+        return { selection: sel };
+      });
+    },
+    /** Select/Deselect Group (SEL-04): glob 패턴과 일치하는 항목을 선택하거나 선택 해제한다. */
+    async selectGroup(select: boolean) {
+      const pattern = await ask<string>({
+        kind: "name",
+        title: select ? "패턴으로 선택" : "패턴으로 선택 해제",
+        value: "*",
+        error: null,
+        selectStem: false,
+      });
+      if (pattern === null) return;
+      const tab = activeTab(get());
+      set({ notice: null });
+      let hits: number[];
+      try {
+        hits = await backend.globFilter(pattern.trim(), tab.entries.map((e) => e.name));
+      } catch (e) {
+        return fail(e);
+      }
+      if (hits.length === 0) return fail(`'${pattern.trim()}'와 일치하는 항목이 없습니다`);
+      patchTab(get().activePane, tab.id, (t) => {
+        const sel = new Set(t.selection);
+        for (const i of hits) {
+          const path = tab.entries[i]?.path;
+          if (path === undefined) continue;
+          if (select) sel.add(path);
+          else sel.delete(path);
+        }
+        return { selection: sel };
+      });
     },
     switchPane() {
       set((s) => ({ activePane: other(s.activePane) }));
@@ -582,6 +638,95 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       await backend.enqueue("trash", targets.map((t) => ({ src: t.path, destDir: null, policy: "skip" })));
       await reloadAll();
     },
+    /** 복제 (OP-08): 같은 폴더에 접미사를 붙여 복사한다. */
+    async duplicateTargets() {
+      const targets = targetsOf(activeTab(get()));
+      if (targets.length === 0) return;
+      set({ notice: null });
+      patchActive({ selection: new Set() });
+      await backend.enqueue("duplicate", targets.map((t) => ({ src: t.path, destDir: null, policy: "skip" })));
+      await reloadAll();
+    },
+    /** 파일 정보 (OP-14): 커서 항목의 상세 정보를 대화상자로 보여 준다. */
+    async showFileInfo() {
+      const entry = cursorEntry(activeTab(get()));
+      if (!entry) return;
+      set({ notice: null });
+      let info;
+      try {
+        info = await backend.fileInfo(entry.path);
+      } catch (e) {
+        return fail(e);
+      }
+      const display = cfg().display;
+      const kind = { file: "파일", dir: "폴더", symlink: "심볼릭 링크" }[info.kind];
+      const lines = [
+        `이름: ${info.name}`,
+        `경로: ${info.path}`,
+        `종류: ${kind}`,
+        info.kind === "dir"
+          ? `항목 수: ${info.childCount ?? "알 수 없음"}`
+          : `크기: ${formatSize(info.size, display.size_format)} (${info.size} B)`,
+        `생성: ${formatDateTime(info.createdMs, display)}`,
+        `수정: ${formatDateTime(info.modifiedMs, display)}`,
+        `접근: ${formatDateTime(info.accessedMs, display)}`,
+        ...(info.mode === null ? [] : [`권한: ${formatPermissions(info.mode)} (${formatOctal(info.mode)})`]),
+        ...(info.linkTarget ? [`링크 대상: ${info.linkTarget}`] : []),
+      ];
+      await ask<boolean>({ kind: "info", title: `정보: ${info.name}`, lines });
+    },
+    /** 폴더 경로 복사 (OP-15, F12). */
+    async copyFolderPath() {
+      const path = activeTab(get()).path;
+      try {
+        await backend.copyText(path);
+        flash(`폴더 경로를 복사했습니다: ${path}`);
+      } catch (e) {
+        fail(e);
+      }
+    },
+    /** 파일 경로 복사 (OP-15, Mod+F12): 대상 항목의 경로를 줄바꿈으로 이어 복사한다. */
+    async copyFilePaths() {
+      const targets = targetsOf(activeTab(get()));
+      if (targets.length === 0) return;
+      try {
+        await backend.copyText(targets.map((t) => t.path).join("\n"));
+        flash(`${targets.length}개 경로를 복사했습니다`);
+      } catch (e) {
+        fail(e);
+      }
+    },
+    /** 파일 관리자에서 보기 (OP-16): 커서 항목, 없으면 현재 폴더. */
+    async revealCursor() {
+      const tab = activeTab(get());
+      set({ notice: null });
+      try {
+        await backend.revealPath(cursorEntry(tab)?.path ?? tab.path);
+      } catch (e) {
+        fail(e);
+      }
+    },
+    /** 편집 (OP-09, F4): 대상 항목을 설정한 편집기로 연다. */
+    async editTargets() {
+      const targets = targetsOf(activeTab(get()));
+      if (targets.length === 0) return;
+      set({ notice: null });
+      try {
+        await backend.editPaths(targets.map((t) => t.path));
+      } catch (e) {
+        fail(e);
+      }
+    },
+    /** 폴더 편집 (OP-09, Shift+F4): 현재 폴더를 편집기로 연다. */
+    async editFolder() {
+      set({ notice: null });
+      try {
+        await backend.editPaths([activeTab(get()).path]);
+      } catch (e) {
+        fail(e);
+      }
+    },
+
     /** 대상 이름을 보여 주는 확인 다이얼로그. 확인하면 true. */
     async confirmTargets(title: string, targets: EntryDto[]): Promise<boolean> {
       const ok = await ask<boolean>({

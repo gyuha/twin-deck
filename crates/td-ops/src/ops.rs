@@ -61,6 +61,25 @@ fn numbered(name: &str, n: u32) -> String {
     }
 }
 
+/// 복제 이름 규칙(자체 정의, Marta의 실제 접미사는 확인하지 못했다): `a.txt` → `a copy.txt` → `a copy 2.txt`.
+/// 확장자는 마지막 점 뒤이고, 맨 앞 점(`.env`)은 확장자로 보지 않는다. `taken`이 true인 이름은 건너뛴다.
+pub fn duplicate_name(name: &str, taken: impl Fn(&str) -> bool) -> String {
+    let (stem, ext) = match name.rfind('.') {
+        Some(i) if i > 0 => (&name[..i], &name[i..]),
+        _ => (name, ""),
+    };
+    (1..)
+        .map(|n| {
+            if n == 1 {
+                format!("{stem} copy{ext}")
+            } else {
+                format!("{stem} copy {n}{ext}")
+            }
+        })
+        .find(|c| !taken(c))
+        .expect("무한 반복자")
+}
+
 impl<V: Vfs, T: Trasher> Ops<V, T> {
     pub fn new(vfs: V, trasher: T) -> Self {
         Self { vfs, trasher }
@@ -191,6 +210,24 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
         let entry = self.vfs.stat(src)?;
         self.copy_entry(&entry, &dest, ctl)?;
         Ok(Outcome::Done(dest))
+    }
+
+    /// 복제 (OP-08): 같은 폴더에 접미사를 붙여 복사한다. 만들어진 경로를 돌려준다.
+    pub fn duplicate(&self, src: &VfsPath) -> Result<VfsPath> {
+        self.duplicate_with(src, &NoControl)
+    }
+
+    pub fn duplicate_with(&self, src: &VfsPath, ctl: &dyn Control) -> Result<VfsPath> {
+        let name = src
+            .file_name()
+            .ok_or_else(|| OpsError::InvalidName(src.to_string()))?;
+        let dir = src
+            .parent()
+            .ok_or_else(|| OpsError::InvalidName(src.to_string()))?;
+        let entry = self.vfs.stat(src)?;
+        let dest = dir.join(&duplicate_name(&name, |c| self.exists(&dir.join(c))));
+        self.copy_entry(&entry, &dest, ctl)?;
+        Ok(dest)
     }
 
     /// 이동 (OP-04). 같은 볼륨이면 rename, 실패하면 복사 후 삭제.

@@ -2,12 +2,16 @@
 
 mod entry;
 mod error;
+mod glob;
+mod info;
 mod local;
 mod names;
 mod path;
 
 pub use entry::{Entry, EntryKind, ListOptions};
 pub use error::{Result, VfsError};
+pub use glob::glob_match;
+pub use info::Info;
 pub use local::LocalFs;
 pub use names::{compare_names, matches_prefix, normalize_name, sort_entries};
 pub use path::VfsPath;
@@ -25,6 +29,8 @@ pub trait Vfs {
     fn remove_dir_all(&self, path: &VfsPath) -> Result<()>;
     /// 파일 하나를 복사하고 복사한 바이트 수를 돌려준다.
     fn copy_file(&self, from: &VfsPath, to: &VfsPath) -> Result<u64>;
+    /// 파일 정보 대화상자용 상세 정보.
+    fn info(&self, path: &VfsPath) -> Result<Info>;
     /// 심볼릭 링크가 가리키는 대상을 읽는다.
     fn read_link(&self, path: &VfsPath) -> Result<VfsPath>;
     /// `link` 위치에 `target`을 가리키는 심볼릭 링크를 만든다. `target_is_dir`은 Windows에서만 쓰인다.

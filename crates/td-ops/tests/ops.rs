@@ -169,3 +169,45 @@ fn copy_with_control_reports_items_and_can_stop() {
     assert!(matches!(err, td_ops::OpsError::Aborted));
     assert_eq!(ctl.0.get(), 2, "폴더 1개 + 파일 1개까지만 처리");
 }
+
+#[test]
+fn duplicate_suffix() {
+    use td_ops::duplicate_name;
+    let none = |_: &str| false;
+    assert_eq!(duplicate_name("a.txt", none), "a copy.txt");
+    assert_eq!(
+        duplicate_name("archive.tar.gz", none),
+        "archive.tar copy.gz"
+    );
+    assert_eq!(duplicate_name("dir", none), "dir copy");
+    assert_eq!(
+        duplicate_name(".env", none),
+        ".env copy",
+        "맨 앞 점은 확장자가 아니다"
+    );
+    assert_eq!(duplicate_name("noext.", none), "noext copy.");
+    let taken = |c: &str| c == "a copy.txt" || c == "a copy 2.txt";
+    assert_eq!(duplicate_name("a.txt", taken), "a copy 3.txt");
+
+    // 실제 복제: 파일, 반복, 폴더(재귀)
+    let f = fixture();
+    write(&f.a.join("a.txt"), "data");
+    assert_eq!(
+        f.ops.duplicate(&f.a.join("a.txt")).unwrap(),
+        f.a.join("a copy.txt")
+    );
+    assert_eq!(
+        f.ops.duplicate(&f.a.join("a.txt")).unwrap(),
+        f.a.join("a copy 2.txt")
+    );
+    assert_eq!(read(&f.a.join("a copy 2.txt")), "data");
+    assert_eq!(read(&f.a.join("a.txt")), "data", "원본은 그대로");
+
+    f.ops.mkdir(&f.a.join("d/sub")).unwrap();
+    write(&f.a.join("d/sub/x"), "x");
+    let dup = f.ops.duplicate(&f.a.join("d")).unwrap();
+    assert_eq!(dup, f.a.join("d copy"));
+    assert_eq!(read(&dup.join("sub/x")), "x");
+
+    assert!(f.ops.duplicate(&f.a.join("missing")).is_err());
+}
