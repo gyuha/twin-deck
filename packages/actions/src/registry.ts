@@ -5,6 +5,8 @@ export type ActionCategory = "File" | "Navigation" | "View" | "Selection" | "Tab
 export interface Action<C> {
   id: string;
   title: string;
+  /** Action Bar 버튼처럼 좁은 곳에 쓰는 짧은 이름. */
+  shortTitle?: string;
   category: ActionCategory;
   scopes: Scope[];
   /** 현재 컨텍스트에서 실행 가능한지 (ACT-02). 없으면 항상 가능. */

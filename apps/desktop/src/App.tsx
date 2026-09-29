@@ -1,16 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { useStore } from "zustand";
 import { createDefaultRegistry, defaultBindingsFor, mergeUserBindings } from "@twin-deck/actions";
+import { formatKey } from "@twin-deck/keybinds";
 import { Keymap } from "@twin-deck/keybinds";
 import type { Platform } from "@twin-deck/keybinds";
 import type { Backend } from "@twin-deck/ts-client";
 import { allHandlers } from "./actions";
 import { StoreContext, useApp, useAppStore } from "./state/context";
-import { activeTab, createAppStore } from "./state/store";
+import { actionContext, activeTab, createAppStore } from "./state/store";
+import { ActionBar, useBarIds } from "./ui/ActionBar";
+import { ActionsPalette } from "./ui/ActionsPalette";
 import { Dialog } from "./ui/Dialog";
 import { Pane } from "./ui/Pane";
 import { PopupMenu } from "./ui/PopupMenu";
 import { QueueIndicator, QueuePopup } from "./ui/Queue";
+import { UiContext } from "./ui/uiContext";
 import { useKeyboard } from "./ui/useKeyboard";
 
 export interface AppProps {
@@ -53,6 +57,17 @@ function StatusBar() {
   );
 }
 
+/** 설정의 Action Bar에 있는 알 수 없는 액션 ID를 경고에 더한다(Rust는 액션 ID를 모른다). */
+function BarWarnings({ base }: { base: string[] }) {
+  const { unknown } = useBarIds();
+  const { api } = useAppStore();
+  useEffect(() => {
+    const extra = unknown.length ? [`config.toml: layout.action_bar의 알 수 없는 액션 ID를 무시합니다: ${unknown.join(", ")}`] : [];
+    api.setKeymapWarnings([...base, ...extra]);
+  }, [api, base, unknown]);
+  return null;
+}
+
 export function App({ backend, platform, leftPath, rightPath }: AppProps) {
   const [app] = useState(() => createAppStore(backend, leftPath, rightPath));
   const registry = useMemo(() => createDefaultRegistry(allHandlers(app)), [app]);
@@ -72,8 +87,29 @@ export function App({ backend, platform, leftPath, rightPath }: AppProps) {
         : [];
     return { keymap: km, warnings: [...merged.warnings, ...km.warnings, ...extra] };
   }, [platform, loaded, registry]);
-  useEffect(() => app.api.setKeymapWarnings(warnings), [app, warnings]);
   useKeyboard({ app, keymap, registry });
+
+  // Actions Panel이 쓰는 액션 목록(제목, 분류, 현재 키, 실행 가능 여부)과 실행기.
+  useEffect(() => {
+    app.api.attachPalette(
+      () => {
+        const ctx = actionContext(app.store.getState());
+        return registry
+          .list()
+          .filter((a) => a.scopes.includes("pane") || a.scopes.includes("global"))
+          .map((a) => {
+            return {
+              id: a.id,
+              title: a.title,
+              category: a.category,
+              keys: keymap.keysFor(a.id).map((k) => formatKey(k, platform)).join(" · "),
+              applicable: registry.isApplicable(a.id, ctx),
+            };
+          });
+      },
+      (id) => registry.dispatch(id, actionContext(app.store.getState())),
+    );
+  }, [app, registry, keymap, platform]);
 
   useEffect(() => {
     void app.api.init();
@@ -82,17 +118,22 @@ export function App({ backend, platform, leftPath, rightPath }: AppProps) {
 
   return (
     <StoreContext.Provider value={app}>
+      <UiContext.Provider value={{ registry, keymap, platform }}>
+      <BarWarnings base={warnings} />
       <main className="flex h-screen flex-col">
         <div className="flex min-h-0 flex-1">
           <Pane pane="left" />
           <Pane pane="right" />
         </div>
         <StatusBar />
+        <ActionBar />
+        <ActionsPalette />
         <PopupMenu />
         <QueueIndicator />
         <QueuePopup />
         <Dialog />
       </main>
+      </UiContext.Provider>
     </StoreContext.Provider>
   );
 }

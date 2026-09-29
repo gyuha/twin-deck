@@ -22,6 +22,7 @@ const hasTarget = (c: ActionContext) => c.selectedCount > 0 || c.hasCursorItem;
 interface Meta {
   id: string;
   title: string;
+  shortTitle?: string;
   category: ActionCategory;
   scopes: Action<ActionContext>["scopes"];
   isApplicable?: (c: ActionContext) => boolean;
@@ -29,13 +30,13 @@ interface Meta {
 
 /** M1(P0) 내장 액션. ID는 docs/05 카탈로그를 따른다. */
 export const DEFAULT_ACTION_META = [
-  { id: "core.copy", title: "복사", category: "File", scopes: ["pane"], isApplicable: hasTarget },
-  { id: "core.move", title: "이동", category: "File", scopes: ["pane"], isApplicable: hasTarget },
+  { id: "core.copy", title: "복사", shortTitle: "복사", category: "File", scopes: ["pane"], isApplicable: hasTarget },
+  { id: "core.move", title: "이동", shortTitle: "이동", category: "File", scopes: ["pane"], isApplicable: hasTarget },
   { id: "core.rename", title: "이름 변경", category: "File", scopes: ["pane"], isApplicable: (c) => c.hasCursorItem },
-  { id: "core.file.new_folder", title: "새 폴더", category: "File", scopes: ["pane"] },
+  { id: "core.file.new_folder", title: "새 폴더", shortTitle: "새 폴더", category: "File", scopes: ["pane"] },
   { id: "core.file.new_file", title: "새 파일", category: "File", scopes: ["pane"] },
-  { id: "core.trash", title: "휴지통으로 이동", category: "File", scopes: ["pane"], isApplicable: hasTarget },
-  { id: "core.delete", title: "영구 삭제", category: "File", scopes: ["pane"], isApplicable: hasTarget },
+  { id: "core.trash", title: "휴지통으로 이동", shortTitle: "휴지통", category: "File", scopes: ["pane"], isApplicable: hasTarget },
+  { id: "core.delete", title: "영구 삭제", shortTitle: "삭제", category: "File", scopes: ["pane"], isApplicable: hasTarget },
   { id: "core.copy.to_inactive", title: "비활성 패널로 복사 (대화상자 없음)", category: "File", scopes: ["pane"], isApplicable: hasTarget },
   { id: "core.move.to_inactive", title: "비활성 패널로 이동 (대화상자 없음)", category: "File", scopes: ["pane"], isApplicable: hasTarget },
   { id: "core.duplicate", title: "복제", category: "File", scopes: ["pane"], isApplicable: hasTarget },
@@ -43,7 +44,7 @@ export const DEFAULT_ACTION_META = [
   { id: "core.path.copy_folder", title: "폴더 경로 복사", category: "File", scopes: ["pane"] },
   { id: "core.path.copy_files", title: "파일 경로 복사", category: "File", scopes: ["pane"], isApplicable: hasTarget },
   { id: "core.reveal", title: "파일 관리자에서 보기", category: "File", scopes: ["pane"] },
-  { id: "core.edit", title: "편집", category: "File", scopes: ["pane"], isApplicable: hasTarget },
+  { id: "core.edit", title: "편집", shortTitle: "편집", category: "File", scopes: ["pane"], isApplicable: hasTarget },
   { id: "core.edit.folder", title: "폴더 편집", category: "File", scopes: ["pane"] },
   { id: "core.select.invert", title: "선택 반전", category: "Selection", scopes: ["pane"] },
   { id: "core.select.invert_current", title: "현재 항목 선택 반전", category: "Selection", scopes: ["pane"], isApplicable: (c) => c.hasCursorItem },
@@ -89,6 +90,12 @@ export const DEFAULT_ACTION_META = [
   { id: "core.recent.clear", title: "최근 위치 비우기", category: "Navigation", scopes: ["panel"] },
   { id: "core.favorites.add", title: "현재 폴더를 즐겨찾기에 추가", category: "Navigation", scopes: ["pane"] },
   { id: "core.go.path", title: "경로로 이동", category: "Navigation", scopes: ["pane"] },
+  { id: "core.actions.panel", title: "Actions Panel", category: "View", scopes: ["global"] },
+  { id: "core.palette.up", title: "Actions Panel: 위로", category: "Navigation", scopes: ["palette"] },
+  { id: "core.palette.down", title: "Actions Panel: 아래로", category: "Navigation", scopes: ["palette"] },
+  { id: "core.palette.run", title: "Actions Panel: 실행", category: "Navigation", scopes: ["palette"] },
+  { id: "core.palette.close", title: "Actions Panel: 닫기", category: "Navigation", scopes: ["palette"] },
+  { id: "core.open.directory", title: "폴더 열기 (인수: src)", category: "Navigation", scopes: ["pane"] },
   { id: "core.queue.open", title: "작업 큐 열기/닫기", category: "View", scopes: ["global"] },
   { id: "core.queue.up", title: "큐: 위로", category: "Navigation", scopes: ["queue"] },
   { id: "core.queue.down", title: "큐: 아래로", category: "Navigation", scopes: ["queue"] },
@@ -189,6 +196,11 @@ export const DEFAULT_BINDINGS: Binding[] = [
   b("panel", "core.volume.unmount", "U"),
   b("panel", "core.volume.eject", "E"),
   b("panel", "core.recent.clear", "C"),
+  b("global", "core.actions.panel", "Mod+Shift+P"),
+  b("palette", "core.palette.up", "Up"),
+  b("palette", "core.palette.down", "Down"),
+  b("palette", "core.palette.run", "Return"),
+  b("palette", "core.palette.close", "Escape"),
   b("global", "core.queue.open", "="),
   b("queue", "core.queue.up", "Up"),
   b("queue", "core.queue.down", "Down", "Space"),

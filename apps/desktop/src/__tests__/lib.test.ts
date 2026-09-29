@@ -128,3 +128,28 @@ describe("정렬", () => {
     expect(list.map((e) => e.name)).toEqual(before);
   });
 });
+
+describe("퍼지 검색 (ACT-01)", () => {
+  it("부분 수열이면 일치하고 아니면 null", async () => {
+    const { fuzzyScore } = await import("../lib/fuzzy");
+    expect(fuzzyScore("cpy", "core.copy")).not.toBeNull();
+    expect(fuzzyScore("복사", "복사")).not.toBeNull();
+    expect(fuzzyScore("xyz", "core.copy")).toBeNull();
+    expect(fuzzyScore("", "anything")).toBe(0);
+    expect(fuzzyScore("c p y", "core.copy")).not.toBeNull(); // 공백 무시
+    expect(fuzzyScore("COPY", "core.copy")).not.toBeNull(); // 대소문자 무시
+  });
+  it("연속 일치와 단어 시작, 짧은 문자열을 선호한다", async () => {
+    const { fuzzyScore, rankBy } = await import("../lib/fuzzy");
+    // 연속 일치가 흩어진 일치보다 낫다(탐욕적 매칭이 core의 c를 잡아도 core.copy의 연속 일치를 찾는다)
+    expect(fuzzyScore("copy", "core.copy")!).toBeGreaterThan(fuzzyScore("copy", "core.c_o_p_y_x")!);
+    expect(fuzzyScore("copy", "copy.x")!).toBeGreaterThan(fuzzyScore("copy", "x.copy")!); // 앞쪽/맨 앞
+    expect(fuzzyScore("cp", "core.copy")!).toBeGreaterThan(0); // 흩어진 일치도 일치
+    const ids = ["core.copy.to_inactive", "core.path.copy_folder", "core.path.copy_files", "core.copy", "core.recent.clear"];
+    expect(rankBy(ids, "copy", (s) => [s])[0]).toBe("core.copy");
+    expect(rankBy(ids, "copy", (s) => [s])).not.toContain("core.recent.clear");
+    // 연속 일치가 부분 수열 일치보다 앞선다
+    expect(rankBy(["c_o_p_y", "xcopyx"], "copy", (s) => [s])[0]).toBe("xcopyx");
+    expect(rankBy(ids, "", (s) => [s])).toEqual(ids); // 빈 질의는 원래 순서
+  });
+});

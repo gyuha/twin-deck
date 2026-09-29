@@ -35,6 +35,7 @@ export function useKeyboard({ app, keymap, registry }: Options) {
         api.quickInput(" ");
         return;
       }
+      if (top === "palette" && e.key === "Alt") api.paletteShowIds(true);
       // Go To Path: Tab으로 폴더 이름을 완성한다(포커스 이동 대신).
       if (top === "dialog" && s.dialog?.kind === "name" && s.dialog.goto && e.key === "Tab" && plain) {
         e.preventDefault();
@@ -81,7 +82,15 @@ export function useKeyboard({ app, keymap, registry }: Options) {
         api.quickInput(e.key);
       }
     };
+    // Actions Panel: Alt를 누르고 있는 동안 액션 ID를 보여 준다.
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === "Alt") store.getState().palette && api.paletteShowIds(false);
+    };
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+    };
   }, [app, keymap, registry]);
 }

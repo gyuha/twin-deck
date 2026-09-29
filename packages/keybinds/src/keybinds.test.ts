@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Keymap, chordFromEvent, chordId, parseChord } from "./index";
+import { Keymap, chordFromEvent, chordId, formatKey, parseChord } from "./index";
 import type { KeyEventLike } from "./index";
 
 const ev = (o: Partial<KeyEventLike> & { key: string }): KeyEventLike => ({
@@ -100,5 +100,35 @@ describe("바인딩 검증 (05 §7)", () => {
   it("알 수 없는 키 이름은 무시하고 경고한다", () => {
     const km = new Keymap("mac", [{ scope: "pane", keys: ["Nope"], actionId: "a" }]);
     expect(km.warnings.length).toBe(1);
+  });
+});
+
+describe("키 표기 (Action Bar)", () => {
+  it("keysFor: 액션에 걸린 키를 등록 순서로, 덮어써진 바인딩은 제외", () => {
+    const km = new Keymap("linux", [
+      { scope: "pane", keys: ["F5", "Mod+C"], actionId: "core.copy" },
+      { scope: "pane", keys: ["F6"], actionId: "core.move" },
+      { scope: "pane", keys: ["F5"], actionId: "core.move" }, // F5를 이동이 가져간다
+    ]);
+    expect(km.keysFor("core.copy")).toEqual(["Mod+C"]);
+    expect(km.keysFor("core.move")).toEqual(["F6", "F5"]);
+    expect(km.keysFor("nope")).toEqual([]);
+  });
+  it("formatKey: 플랫폼별 표기", () => {
+    expect(formatKey("Mod+Shift+P", "mac")).toBe("Cmd+Shift+P");
+    expect(formatKey("Mod+Shift+P", "linux")).toBe("Ctrl+Shift+P");
+    expect(formatKey("Alt+Mod+Right", "mac")).toBe("Opt+Cmd+Right");
+    expect(formatKey("Alt+1", "windows")).toBe("Alt+1");
+    expect(formatKey("Escape", "mac")).toBe("Esc");
+    expect(formatKey("Return", "linux")).toBe("Enter");
+    expect(formatKey("F5", "mac")).toBe("F5");
+  });
+  it("palette 스코프는 모달이라 아래 스코프 바인딩을 막는다", () => {
+    const km = new Keymap("linux", [
+      { scope: "palette", keys: ["Escape"], actionId: "core.palette.close" },
+      { scope: "global", keys: ["="], actionId: "core.queue.open" },
+    ]);
+    expect(km.resolve(ev({ key: "Escape" }), ["palette", "global"])).toBe("core.palette.close");
+    expect(km.resolve(ev({ key: "=", code: "Equal" }), ["palette", "global"])).toBeUndefined();
   });
 });

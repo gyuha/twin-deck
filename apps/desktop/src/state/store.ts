@@ -5,6 +5,7 @@ import type { ActionContext } from "@twin-deck/actions";
 import type { Scope } from "@twin-deck/keybinds";
 import { quickMatch } from "../lib/names";
 import { parseColumns } from "../lib/columns";
+import { rankBy } from "../lib/fuzzy";
 import { formatDateTime, formatOctal, formatPermissions, formatSize } from "../lib/format";
 import { DEFAULT_SORT, SORT_KEYS, sortEntries, sortFromColumns } from "../lib/sort";
 import type { SortKey, SortState } from "../lib/sort";
@@ -58,11 +59,38 @@ export interface MenuState {
   cursor: number;
 }
 
+/** Actions Panel에 나열되는 액션 한 줄. App이 레지스트리와 키맵에서 만든다. */
+export interface CatalogItem {
+  id: string;
+  title: string;
+  category: string;
+  /** 사용자에게 보일 키 표기(없으면 빈 문자열). */
+  keys: string;
+  /** 지금 컨텍스트에서 실행할 수 있는가. */
+  applicable: boolean;
+}
+
+export interface PaletteState {
+  query: string;
+  cursor: number;
+  /** Alt를 누르고 있는 동안 액션 ID를 보여 준다 (ACT-01). */
+  showIds: boolean;
+}
+
+/** 질의로 걸러 정렬한 Actions Panel 목록. 제목, ID, 분류에서 찾는다. */
+export function filterCatalog(items: readonly CatalogItem[], query: string): CatalogItem[] {
+  return rankBy(items, query, (i) => [i.title, i.id, `${i.category} ${i.title}`]);
+}
+
 export interface AppState {
   panes: Record<PaneId, PaneState>;
   activePane: PaneId;
   showHidden: boolean;
   dialog: DialogState | null;
+  /** 열려 있는 Actions Panel. */
+  palette: PaletteState | null;
+  /** 마지막 검색어. 다시 열면 이어서 보이고, 재시작 복원의 대상이다 (PANE-05). */
+  lastPaletteQuery: string;
   /** 열려 있는 팝업 메뉴 (Volumes/Favorites/Recent/Hierarchy). */
   menu: MenuState | null;
   userDirs: UserDirsDto;
@@ -120,6 +148,8 @@ export function actionContext(s: AppState): ActionContext {
 
 export function scopeStack(s: AppState): Scope[] {
   if (s.dialog) return ["dialog", "pane", "global"];
+  // Actions Panel은 입력창이 있는 모달이다(palette 스코프).
+  if (s.palette) return ["palette", "global"];
   // 팝업 메뉴는 모달이다(panel 스코프).
   if (s.menu) return ["panel", "global"];
   // 큐 팝업이 열려 있으면 패널 키는 받지 않는다.
@@ -150,6 +180,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     activePane: "left",
     showHidden: false,
     dialog: null,
+    palette: null,
+    lastPaletteQuery: "",
     menu: null,
     userDirs: { home: null, downloads: null, documents: null, desktop: null, pictures: null, music: null, movies: null },
     queue: [],
@@ -261,6 +293,24 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     void reloadAll();
   });
   const cfg = () => get().loaded.config;
+
+  // Actions Panel이 쓰는 액션 목록과 실행기. App이 레지스트리/키맵을 만든 뒤 붙인다.
+  let catalogFn: () => CatalogItem[] = () => [];
+  let runFn: (id: string) => Promise<unknown> = async () => undefined;
+
+  /** 경로 문자열(`~`, `${user.*}` 포함)로 이동한다. 없는 경로는 알리고 이동하지 않는다. */
+  async function navigateToPath(raw: string) {
+    const dest = expandPath(raw.trim(), get().userDirs);
+    if (dest === null) return fail("사용자 폴더를 알 수 없어 경로를 확장하지 못했습니다");
+    const clean = dest.length > 1 ? dest.replace(/\/+$/, "") : dest;
+    set({ notice: null });
+    try {
+      await backend.listDir(clean, true);
+    } catch (e) {
+      return fail(e);
+    }
+    await api.navigate(clean);
+  }
 
   const api = {
     async init() {
@@ -896,16 +946,13 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         goto: true,
       });
       if (value === null) return;
-      const dest = expandPath(value.trim(), get().userDirs);
-      if (dest === null) return fail("사용자 폴더를 알 수 없어 경로를 확장하지 못했습니다");
-      const clean = dest.length > 1 ? dest.replace(/\/+$/, "") : dest;
-      set({ notice: null });
-      try {
-        await backend.listDir(clean, true);
-      } catch (e) {
-        return fail(e);
-      }
-      await api.navigate(clean);
+      await navigateToPath(value);
+    },
+    /** `core.open.directory` (ACT-03): 인수 `src`의 폴더로 이동한다. `~`와 `${user.*}`를 확장한다. */
+    async openDirectory(args?: Record<string, unknown>) {
+      const src = args?.src;
+      if (typeof src !== "string" || src.trim() === "") return fail("core.open.directory에는 문자열 인수 src가 필요합니다");
+      await navigateToPath(src);
     },
     async gotoComplete() {
       const d = get().dialog;
@@ -929,6 +976,41 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         common = common.slice(0, i);
       }
       api.dialogSetValue(joinPath(dir, common) + (names.length === 1 ? "/" : ""));
+    },
+
+    /** Actions Panel에 액션 목록과 실행기를 연결한다. */
+    attachPalette(catalog: () => CatalogItem[], run: (id: string) => Promise<unknown>) {
+      catalogFn = catalog;
+      runFn = run;
+    },
+    /** 현재 검색어로 걸러 정렬한 목록. */
+    paletteView(): CatalogItem[] {
+      return filterCatalog(catalogFn(), get().palette?.query ?? "");
+    },
+    paletteOpen() {
+      set({ palette: { query: get().lastPaletteQuery, cursor: 0, showIds: false } });
+    },
+    paletteSetQuery(query: string) {
+      set((s) => (s.palette ? { palette: { ...s.palette, query, cursor: 0 }, lastPaletteQuery: query } : {}));
+    },
+    paletteMove(delta: 1 | -1) {
+      const n = api.paletteView().length;
+      set((s) => (s.palette ? { palette: { ...s.palette, cursor: clamp(s.palette.cursor + delta, n) } } : {}));
+    },
+    paletteShowIds(showIds: boolean) {
+      set((s) => (s.palette && s.palette.showIds !== showIds ? { palette: { ...s.palette, showIds } } : {}));
+    },
+    paletteClose() {
+      set({ palette: null });
+    },
+    /** 커서 항목을 실행한다. 지금 실행할 수 없는 액션은 패널을 닫지 않고 아무것도 하지 않는다. */
+    async paletteRun() {
+      const p = get().palette;
+      if (!p) return;
+      const item = api.paletteView()[p.cursor];
+      if (!item?.applicable) return;
+      set({ palette: null });
+      await runFn(item.id);
     },
 
     /** 작업 큐 팝업 열기/닫기 (`=`). 닫을 때 끝난 작업을 지운다. */

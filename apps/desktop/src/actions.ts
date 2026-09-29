@@ -5,7 +5,7 @@ import { PAGE_SIZE } from "./state/store";
 /** 탐색, 선택, 탭, 보기, Quick Select 액션의 실행 핸들러. */
 /** 화면 조작 액션의 실행 핸들러(탐색, 선택, 탭, 보기, Quick Select, 파일 작업, 다이얼로그). */
 export function allHandlers(app: AppStore): ActionHandlers {
-  return { ...navigationHandlers(app), ...fileOpHandlers(app), ...queueHandlers(app), ...menuHandlers(app) } as ActionHandlers;
+  return { ...navigationHandlers(app), ...fileOpHandlers(app), ...queueHandlers(app), ...menuHandlers(app), ...paletteHandlers(app) } as ActionHandlers;
 }
 
 export function navigationHandlers({ api }: AppStore): Partial<ActionHandlers> {
@@ -97,5 +97,17 @@ export function menuHandlers({ api }: AppStore): Partial<ActionHandlers> {
     "core.recent.clear": () => api.menuClearRecent(),
     "core.favorites.add": () => api.addFavoriteHere(),
     "core.go.path": () => api.gotoPath(),
+  };
+}
+
+/** Actions Panel과 인수를 받는 액션(`core.open.directory`)의 실행 핸들러. */
+export function paletteHandlers({ api }: AppStore): Partial<ActionHandlers> {
+  return {
+    "core.actions.panel": () => api.paletteOpen(),
+    "core.palette.up": () => api.paletteMove(-1),
+    "core.palette.down": () => api.paletteMove(1),
+    "core.palette.run": () => api.paletteRun(),
+    "core.palette.close": () => api.paletteClose(),
+    "core.open.directory": (_ctx, args) => api.openDirectory(args),
   };
 }

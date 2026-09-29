@@ -1,0 +1,60 @@
+import { useEffect, useRef } from "react";
+import { useApp, useAppStore } from "../state/context";
+
+/** Actions Panel (ACT-01): 액션 이름을 퍼지 검색해서 실행한다. Alt를 누르고 있으면 액션 ID를 보여 준다. */
+export function ActionsPalette() {
+  const palette = useApp((s) => s.palette);
+  const { api } = useAppStore();
+  const input = useRef<HTMLInputElement>(null);
+  const open = palette !== null;
+
+  // 열릴 때 입력창에 포커스하고 이전 검색어를 선택해 두어 바로 덮어쓸 수 있게 한다.
+  useEffect(() => {
+    if (open) {
+      input.current?.focus();
+      input.current?.select();
+    } else {
+      (document.activeElement as HTMLElement | null)?.blur?.();
+    }
+  }, [open]);
+
+  if (!palette) return null;
+  const items = api.paletteView();
+  return (
+    <div className="fixed inset-0 flex items-start justify-center bg-black/20 pt-16">
+      <div role="dialog" aria-label="Actions Panel" className="w-[34rem] max-w-full rounded border border-neutral-400 bg-white p-3 text-sm shadow-lg">
+        <input
+          ref={input}
+          aria-label="액션 검색"
+          value={palette.query}
+          onChange={(e) => api.paletteSetQuery(e.target.value)}
+          placeholder="액션 이름 또는 ID"
+          className="mb-2 w-full border border-neutral-400 px-1 py-0.5"
+        />
+        {items.length === 0 ? (
+          <p className="text-neutral-500">일치하는 액션 없음</p>
+        ) : (
+          <div role="listbox" aria-label="액션 목록" className="max-h-80 overflow-auto">
+            {items.slice(0, 50).map((it, i) => (
+              <div
+                key={it.id}
+                role="option"
+                aria-selected={i === palette.cursor}
+                aria-disabled={!it.applicable}
+                className={[
+                  "flex justify-between gap-2 border-l-4 px-2 py-0.5",
+                  i === palette.cursor ? "border-blue-600 bg-blue-50" : "border-transparent",
+                  it.applicable ? "" : "opacity-40",
+                ].join(" ")}
+              >
+                <span>{it.title}</span>
+                <span className="font-mono text-xs text-neutral-500">{palette.showIds ? it.id : it.keys}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <p className="mt-2 text-xs text-neutral-500">↑↓ 이동 · Enter 실행 · Alt 누르는 동안 ID · Esc 닫기</p>
+      </div>
+    </div>
+  );
+}

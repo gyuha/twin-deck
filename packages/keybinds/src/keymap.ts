@@ -9,12 +9,13 @@ export type Scope =
   | "preview"
   | "terminal"
   | "dialog"
-  | "panel";
+  | "panel"
+  | "palette";
 
 /** 열려 있으면 바깥 스코프의 바인딩을 무시하는 스코프. */
-const MODAL_SCOPES: ReadonlySet<Scope> = new Set(["dialog", "panel"]);
+const MODAL_SCOPES: ReadonlySet<Scope> = new Set(["dialog", "panel", "palette"]);
 /** 수정자 없는 문자 키를 허용하는 스코프(3.2절). */
-const PLAIN_CHAR_SCOPES: ReadonlySet<Scope> = new Set(["queue", "preview", "dialog", "panel"]);
+const PLAIN_CHAR_SCOPES: ReadonlySet<Scope> = new Set(["queue", "preview", "dialog", "panel", "palette"]);
 
 export interface Binding {
   scope: Scope;
@@ -33,6 +34,8 @@ export interface Resolved {
 
 export class Keymap {
   private table = new Map<string, Resolved>();
+  /** 슬롯 -> 사용자에게 보여 줄 키 표기(`Mod+D`). */
+  private texts = new Map<string, { actionId: string; text: string }>();
   readonly warnings: string[] = [];
 
   constructor(
@@ -72,7 +75,14 @@ export class Keymap {
         this.warnings.push(`${binding.scope} ${text}: ${prev.actionId} → ${binding.actionId} (나중 정의가 이김)`);
       }
       this.table.set(slot, { actionId: binding.actionId, args: binding.args });
+      this.texts.delete(slot); // 덮어쓴 바인딩은 유효한 등록 순서의 맨 뒤로
+      this.texts.set(slot, { actionId: binding.actionId, text });
     }
+  }
+
+  /** 액션에 지금 걸려 있는 키 표기들(OS 중립 표기, 등록 순서). 덮어써진 바인딩은 빠진다. */
+  keysFor(actionId: string): string[] {
+    return [...this.texts.values()].filter((t) => t.actionId === actionId).map((t) => t.text);
   }
 
   /**
@@ -93,4 +103,26 @@ export class Keymap {
     }
     return undefined;
   }
+}
+
+/** OS 중립 표기(`Mod+Shift+D`)를 화면에 보일 문자열로: mac은 Cmd/Opt, 나머지는 Ctrl/Alt. */
+export function formatKey(text: string, platform: Platform): string {
+  return text
+    .split("+")
+    .map((part) => {
+      switch (part.toLowerCase()) {
+        case "mod":
+          return platform === "mac" ? "Cmd" : "Ctrl";
+        case "alt":
+          return platform === "mac" ? "Opt" : "Alt";
+        case "escape":
+        case "esc":
+          return "Esc";
+        case "return":
+          return "Enter";
+        default:
+          return part;
+      }
+    })
+    .join("+");
 }
