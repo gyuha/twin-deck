@@ -1,0 +1,17 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "twin-deck",
+  "version": "0.1.0",
+  "identifier": "dev.twindeck.app",
+  "build": {
+    "beforeDevCommand": "bun run dev",
+    "beforeBuildCommand": "bun run build",
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [{ "title": "twin-deck", "width": 1200, "height": 760 }],
+    "security": { "csp": null }
+  },
+  "bundle": { "active": false }
+}

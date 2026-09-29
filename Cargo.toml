@@ -1,0 +1,13 @@
+[workspace]
+resolver = "2"
+members = ["apps/desktop/src-tauri"]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.88"
+license = "UNLICENSED"
+
+[workspace.dependencies]
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+tempfile = "3"
