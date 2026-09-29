@@ -35,6 +35,23 @@ export function useKeyboard({ app, keymap, registry }: Options) {
         api.quickInput(" ");
         return;
       }
+      // 충돌 다이얼로그: 방향키로 고르고 O/S/R로 바로 확정한다.
+      if (top === "dialog" && s.dialog?.kind === "conflict" && plain) {
+        const d = s.dialog;
+        const step = { ArrowUp: -1, ArrowLeft: -1, ArrowDown: 1, ArrowRight: 1 }[e.key];
+        if (step) {
+          e.preventDefault();
+          api.dialogSetChoice(d.selected + step);
+          return;
+        }
+        const shortcut = { o: 0, s: 1, r: 2 }[e.key.toLowerCase()];
+        if (shortcut !== undefined && e.key.length === 1) {
+          e.preventDefault();
+          api.dialogSetChoice(shortcut);
+          api.dialogConfirm();
+          return;
+        }
+      }
       // Quick Select 입력 중의 Backspace는 상위 이동이 아니라 글자 지우기다.
       if (top === "quickSelect" && e.key === "Backspace" && plain) {
         e.preventDefault();

@@ -1,5 +1,6 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { expect } from "vitest";
 import { FakeBackend } from "@twin-deck/ts-client";
 import { App } from "../App";
 
@@ -20,7 +21,7 @@ export function seedBackend() {
 export async function renderApp(backend = seedBackend(), platform: "linux" | "mac" = "linux") {
   const user = userEvent.setup();
   render(<App backend={backend} platform={platform} leftPath="/home/a" rightPath="/home/b" />);
-  await screen.findByRole("option", { name: /a\.txt/ });
+  await waitFor(() => expect(within(list("left")).queryAllByRole("option").length).toBeGreaterThan(0));
   return { user, backend };
 }
 
@@ -31,6 +32,12 @@ export const names = (pane: "left" | "right") =>
   within(list(pane))
     .queryAllByRole("option")
     .map((o) => o.textContent ?? "");
+
+/** 이름 칸만. */
+export const entryNames = (pane: "left" | "right") =>
+  within(list(pane))
+    .queryAllByRole("option")
+    .map((o) => o.querySelectorAll("span")[1]?.textContent ?? "");
 
 /** 커서 행의 텍스트에서 이름 칸만 뽑는다. */
 export function cursorName(pane: "left" | "right"): string {
