@@ -1,7 +1,7 @@
 import { BackendError } from "./backend";
 import type { Backend } from "./backend";
 import { commands, events } from "./generated/bindings";
-import type { Result } from "./generated/bindings";
+import type { JobDto, JobKindDto, QueueItemDto, Result } from "./generated/bindings";
 
 function unwrap<T>(r: Result<T, string>): T {
   if (r.status === "error") throw new BackendError(r.error);
@@ -22,26 +22,38 @@ export class TauriBackend implements Backend {
   detectConflict(src: string, destDir: string) {
     return commands.detectConflict(src, destDir);
   }
-  async copy(src: string, destDir: string, policy: Parameters<Backend["copy"]>[2]) {
-    return unwrap(await commands.copyEntry(src, destDir, policy));
-  }
-  async move(src: string, destDir: string, policy: Parameters<Backend["move"]>[2]) {
-    return unwrap(await commands.moveEntry(src, destDir, policy));
-  }
   async rename(path: string, newName: string) {
     return unwrap(await commands.renameEntry(path, newName));
   }
-  async trash(path: string) {
-    unwrap(await commands.trashEntry(path));
+  enqueue(kind: JobKindDto, items: QueueItemDto[]) {
+    return commands.enqueueJob(kind, items);
   }
-  async deletePermanent(path: string) {
-    unwrap(await commands.deleteEntry(path));
+  queueJobs() {
+    return commands.queueJobs();
+  }
+  async queuePause(id: number) {
+    await commands.queuePause(id);
+  }
+  async queueResume(id: number) {
+    await commands.queueResume(id);
+  }
+  async queueAbort(id: number) {
+    await commands.queueAbort(id);
+  }
+  async queueClearFinished() {
+    await commands.queueClearFinished();
   }
   async watch(path: string) {
     unwrap(await commands.watchDir(path));
   }
   async unwatch(path: string) {
     unwrap(await commands.unwatchDir(path));
+  }
+  onQueueChanged(callback: (jobs: JobDto[]) => void) {
+    const unlisten = events.queueChanged.listen((e) => callback(e.payload.jobs));
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
   }
   onDirChanged(callback: (path: string) => void) {
     const unlisten = events.dirChanged.listen((e) => callback(e.payload.path));

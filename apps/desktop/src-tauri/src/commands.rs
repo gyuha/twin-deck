@@ -6,7 +6,7 @@ use tauri::State;
 use tauri_specta::{collect_commands, collect_events, Builder, Event};
 use td_ops::SystemTrash;
 
-use crate::service::{ConflictDto, EntryDto, OutcomeDto, Service, ServiceResult};
+use crate::service::{EntryDto, JobDto, JobKindDto, QueueItemDto, Service, ServiceResult};
 
 pub type AppService = Service<SystemTrash>;
 
@@ -14,6 +14,12 @@ pub type AppService = Service<SystemTrash>;
 #[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
 pub struct DirChanged {
     pub path: String,
+}
+
+/// 작업 큐의 상태가 바뀔 때마다 전체 스냅샷을 보낸다.
+#[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
+pub struct QueueChanged {
+    pub jobs: Vec<JobDto>,
 }
 
 #[tauri::command]
@@ -48,26 +54,41 @@ pub fn detect_conflict(
     svc.detect_conflict(&src, &dest_dir)
 }
 
+/// 복사/이동/휴지통/삭제를 작업 큐에 넣는다. 작업 id를 돌려준다.
 #[tauri::command]
 #[specta::specta]
-pub fn copy_entry(
-    svc: State<'_, AppService>,
-    src: String,
-    dest_dir: String,
-    policy: ConflictDto,
-) -> ServiceResult<OutcomeDto> {
-    svc.copy(&src, &dest_dir, policy)
+pub fn enqueue_job(svc: State<'_, AppService>, kind: JobKindDto, items: Vec<QueueItemDto>) -> u32 {
+    svc.enqueue(kind, items)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn move_entry(
-    svc: State<'_, AppService>,
-    src: String,
-    dest_dir: String,
-    policy: ConflictDto,
-) -> ServiceResult<OutcomeDto> {
-    svc.move_to(&src, &dest_dir, policy)
+pub fn queue_jobs(svc: State<'_, AppService>) -> Vec<JobDto> {
+    svc.queue_jobs()
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn queue_pause(svc: State<'_, AppService>, id: u32) {
+    svc.queue_pause(id);
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn queue_resume(svc: State<'_, AppService>, id: u32) {
+    svc.queue_resume(id);
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn queue_abort(svc: State<'_, AppService>, id: u32) {
+    svc.queue_abort(id);
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn queue_clear_finished(svc: State<'_, AppService>) {
+    svc.queue_clear_finished();
 }
 
 #[tauri::command]
@@ -78,18 +99,6 @@ pub fn rename_entry(
     new_name: String,
 ) -> ServiceResult<String> {
     svc.rename(&path, &new_name)
-}
-
-#[tauri::command]
-#[specta::specta]
-pub fn trash_entry(svc: State<'_, AppService>, path: String) -> ServiceResult<()> {
-    svc.trash(&path)
-}
-
-#[tauri::command]
-#[specta::specta]
-pub fn delete_entry(svc: State<'_, AppService>, path: String) -> ServiceResult<()> {
-    svc.delete_permanent(&path)
 }
 
 #[tauri::command]
@@ -111,15 +120,17 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             mkdir,
             touch,
             detect_conflict,
-            copy_entry,
-            move_entry,
+            enqueue_job,
+            queue_jobs,
+            queue_pause,
+            queue_resume,
+            queue_abort,
+            queue_clear_finished,
             rename_entry,
-            trash_entry,
-            delete_entry,
             watch_dir,
             unwatch_dir
         ])
-        .events(collect_events![DirChanged])
+        .events(collect_events![DirChanged, QueueChanged])
 }
 
 #[cfg(test)]

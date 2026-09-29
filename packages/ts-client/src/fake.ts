@@ -1,6 +1,9 @@
 import { BackendError, baseName, joinPath, parentPath } from "./backend";
 import type { Backend } from "./backend";
-import type { ConflictDto, EntryDto, OutcomeDto } from "./generated/bindings";
+import type { ConflictDto, EntryDto, JobDto, JobKindDto, QueueItemDto } from "./generated/bindings";
+
+/** FakeBackend 내부의 복사/이동 결과. */
+type OutcomeDto = { type: "done"; path: string } | { type: "skipped" };
 
 interface Node {
   kind: "file" | "dir";
@@ -9,6 +12,11 @@ interface Node {
 
 const TRASH = "/.trash";
 
+interface FakeJob {
+  dto: JobDto;
+  items: QueueItemDto[];
+}
+
 /** 인메모리 파일시스템. UI 테스트용이며 Rust 쪽 충돌 정책과 같은 규칙을 따른다. */
 export class FakeBackend implements Backend {
   private nodes = new Map<string, Node>([["/", { kind: "dir", content: "" }]]);
@@ -16,6 +24,14 @@ export class FakeBackend implements Backend {
   private listeners = new Set<(path: string) => void>();
   /** 휴지통으로 간 원래 경로들. */
   readonly trashed: string[] = [];
+  /**
+   * `instant`: 큐에 넣는 즉시 모두 실행한다(기본).
+   * `manual`: `advance()`를 부를 때마다 항목 하나씩 실행한다(진행/일시정지/중단 테스트용).
+   */
+  queueMode: "instant" | "manual" = "instant";
+  private jobs = new Map<number, FakeJob>();
+  private nextJobId = 1;
+  private queueListeners = new Set<(jobs: JobDto[]) => void>();
 
   /** 테스트 준비용: 경로에 폴더(끝이 `/`) 또는 파일을 만든다. 부모는 자동 생성. */
   seed(entries: Record<string, string | null>): this {
@@ -123,6 +139,117 @@ export class FakeBackend implements Backend {
     if (this.need(src).kind === "dir" && (destDir === src || destDir.startsWith(`${src}/`))) {
       throw new BackendError(`대상이 원본 자신이거나 그 하위입니다: ${destDir}`);
     }
+  }
+
+  private snapshot(): JobDto[] {
+    return [...this.jobs.values()].map((j) => ({ ...j.dto, errors: [...j.dto.errors] }));
+  }
+
+  private notifyQueue() {
+    const snap = this.snapshot();
+    this.queueListeners.forEach((l) => l(snap));
+  }
+
+  private async runItem(kind: JobKindDto, item: QueueItemDto) {
+    switch (kind) {
+      case "copy":
+        await this.copy(item.src, item.destDir!, item.policy);
+        break;
+      case "move":
+        await this.move(item.src, item.destDir!, item.policy);
+        break;
+      case "trash":
+        await this.trash(item.src);
+        break;
+      case "delete":
+        await this.deletePermanent(item.src);
+        break;
+    }
+  }
+
+  private finish(job: FakeJob) {
+    job.dto.current = null;
+    job.dto.status = job.dto.errors.length ? "failed" : "done";
+  }
+
+  /** 수동 모드: 실행할 수 있는 가장 오래된 작업의 항목 하나를 실행한다. 실행했으면 true. */
+  async advance(): Promise<boolean> {
+    const job = [...this.jobs.values()].find((j) => ["queued", "running"].includes(j.dto.status));
+    if (!job) return false;
+    job.dto.status = "running";
+    const item = job.items[job.dto.completed];
+    job.dto.current = item.src;
+    try {
+      await this.runItem(job.dto.kind, item);
+    } catch (e) {
+      job.dto.errors.push({ path: item.src, message: e instanceof Error ? e.message : String(e) });
+    }
+    job.dto.completed += 1;
+    if (job.dto.completed >= job.dto.total) this.finish(job);
+    this.notifyQueue();
+    return true;
+  }
+
+  async enqueue(kind: JobKindDto, items: QueueItemDto[]) {
+    const id = this.nextJobId++;
+    const job: FakeJob = {
+      items,
+      dto: { id, kind, status: "queued", total: items.length, completed: 0, current: null, errors: [] },
+    };
+    this.jobs.set(id, job);
+    this.notifyQueue();
+    if (this.queueMode === "instant") {
+      job.dto.status = "running";
+      for (const item of items) {
+        job.dto.current = item.src;
+        try {
+          await this.runItem(kind, item);
+        } catch (e) {
+          job.dto.errors.push({ path: item.src, message: e instanceof Error ? e.message : String(e) });
+        }
+        job.dto.completed += 1;
+      }
+      this.finish(job);
+      this.notifyQueue();
+    }
+    return id;
+  }
+
+  async queueJobs() {
+    return this.snapshot();
+  }
+
+  async queuePause(id: number) {
+    const j = this.jobs.get(id);
+    if (j && ["queued", "running"].includes(j.dto.status)) j.dto.status = "paused";
+    this.notifyQueue();
+  }
+
+  async queueResume(id: number) {
+    const j = this.jobs.get(id);
+    if (j?.dto.status === "paused") j.dto.status = j.dto.completed > 0 ? "running" : "queued";
+    this.notifyQueue();
+  }
+
+  async queueAbort(id: number) {
+    const j = this.jobs.get(id);
+    if (j && !["done", "failed", "aborted"].includes(j.dto.status)) {
+      j.dto.status = "aborted";
+      j.dto.current = null;
+    }
+    this.notifyQueue();
+  }
+
+  async queueClearFinished() {
+    for (const [id, j] of this.jobs) {
+      if (["done", "failed", "aborted"].includes(j.dto.status)) this.jobs.delete(id);
+    }
+    this.notifyQueue();
+  }
+
+  onQueueChanged(callback: (jobs: JobDto[]) => void) {
+    this.queueListeners.add(callback);
+    return () => void this.queueListeners.delete(callback);
   }
 
   async copy(src: string, destDir: string, policy: ConflictDto): Promise<OutcomeDto> {

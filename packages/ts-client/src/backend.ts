@@ -1,4 +1,4 @@
-import type { ConflictDto, EntryDto, OutcomeDto } from "./generated/bindings";
+import type { EntryDto, JobDto, JobKindDto, QueueItemDto } from "./generated/bindings";
 
 /** Rust 쪽이 돌려준 오류 문자열을 감싼 예외. */
 export class BackendError extends Error {}
@@ -14,11 +14,17 @@ export interface Backend {
   touch(path: string): Promise<void>;
   /** `destDir`에 `src`와 같은 이름이 이미 있으면 그 경로. */
   detectConflict(src: string, destDir: string): Promise<string | null>;
-  copy(src: string, destDir: string, policy: ConflictDto): Promise<OutcomeDto>;
-  move(src: string, destDir: string, policy: ConflictDto): Promise<OutcomeDto>;
   rename(path: string, newName: string): Promise<string>;
-  trash(path: string): Promise<void>;
-  deletePermanent(path: string): Promise<void>;
+  /** 복사/이동/휴지통/삭제를 작업 큐에 넣는다. 작업 id를 돌려준다. */
+  enqueue(kind: JobKindDto, items: QueueItemDto[]): Promise<number>;
+  queueJobs(): Promise<JobDto[]>;
+  queuePause(id: number): Promise<void>;
+  queueResume(id: number): Promise<void>;
+  queueAbort(id: number): Promise<void>;
+  /** 끝난 작업을 목록에서 지운다. */
+  queueClearFinished(): Promise<void>;
+  /** 큐 상태가 바뀔 때마다 전체 스냅샷과 함께 호출된다. */
+  onQueueChanged(callback: (jobs: JobDto[]) => void): () => void;
   watch(path: string): Promise<void>;
   unwatch(path: string): Promise<void>;
   /** 감시 중인 디렉터리가 바뀌면 호출된다. 구독 해제 함수를 돌려준다. */

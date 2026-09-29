@@ -3865,6 +3865,7 @@ dependencies = [
  "tauri-build",
  "tauri-specta",
  "td-ops",
+ "td-queue",
  "td-vfs",
  "td-watch",
  "tempfile",

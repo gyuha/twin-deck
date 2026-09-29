@@ -6,11 +6,13 @@ mod service;
 use tauri_specta::Event;
 use td_ops::SystemTrash;
 
-use commands::{specta_builder, AppService, DirChanged};
+use commands::{specta_builder, AppService, DirChanged, QueueChanged};
+use tauri::Manager;
 
 fn main() {
     let builder = specta_builder();
-    let (service, changes) = AppService::new(SystemTrash).expect("서비스 초기화 실패");
+    let (service, channels) = AppService::new(SystemTrash).expect("서비스 초기화 실패");
+    let (changes, queue_events) = (channels.dir_changes, channels.queue_events);
 
     tauri::Builder::default()
         .invoke_handler(builder.invoke_handler())
@@ -24,6 +26,15 @@ fn main() {
                         path: dir.to_string_lossy().into_owned(),
                     }
                     .emit(&handle);
+                }
+            });
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                // 큐 이벤트가 오면 최신 스냅샷을 UI로 보낸다.
+                while queue_events.recv().is_ok() {
+                    while queue_events.try_recv().is_ok() {}
+                    let jobs = handle.state::<AppService>().queue_jobs();
+                    let _ = QueueChanged { jobs }.emit(&handle);
                 }
             });
             Ok(())

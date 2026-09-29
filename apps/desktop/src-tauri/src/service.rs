@@ -7,7 +7,8 @@ use std::time::UNIX_EPOCH;
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
-use td_ops::{ConflictPolicy, Ops, Outcome, Trasher};
+use td_ops::{ConflictPolicy, Ops, Trasher};
+use td_queue::{Item, JobInfo, JobKind, JobSpec, JobStatus, Queue, QueueEvent};
 use td_vfs::{sort_entries, Entry, EntryKind, ListOptions, LocalFs, Vfs, VfsPath};
 use td_watch::DirWatcher;
 
@@ -40,13 +41,6 @@ pub enum ConflictDto {
     Rename,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
-#[serde(tag = "type", rename_all = "camelCase")]
-pub enum OutcomeDto {
-    Done { path: String },
-    Skipped,
-}
-
 impl From<ConflictDto> for ConflictPolicy {
     fn from(c: ConflictDto) -> Self {
         match c {
@@ -77,13 +71,93 @@ impl From<&Entry> for EntryDto {
     }
 }
 
-impl From<Outcome> for OutcomeDto {
-    fn from(o: Outcome) -> Self {
-        match o {
-            Outcome::Done(p) => OutcomeDto::Done {
-                path: p.to_string(),
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "lowercase")]
+pub enum JobKindDto {
+    Copy,
+    Move,
+    Trash,
+    Delete,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "lowercase")]
+pub enum JobStatusDto {
+    Queued,
+    Running,
+    Paused,
+    Done,
+    Failed,
+    Aborted,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct QueueItemDto {
+    pub src: String,
+    /// 복사/이동의 대상 폴더. 휴지통/삭제에서는 null.
+    pub dest_dir: Option<String>,
+    pub policy: ConflictDto,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct JobErrorDto {
+    pub path: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct JobDto {
+    pub id: u32,
+    pub kind: JobKindDto,
+    pub status: JobStatusDto,
+    pub total: u32,
+    pub completed: u32,
+    pub current: Option<String>,
+    pub errors: Vec<JobErrorDto>,
+}
+
+impl From<JobKindDto> for JobKind {
+    fn from(k: JobKindDto) -> Self {
+        match k {
+            JobKindDto::Copy => JobKind::Copy,
+            JobKindDto::Move => JobKind::Move,
+            JobKindDto::Trash => JobKind::Trash,
+            JobKindDto::Delete => JobKind::Delete,
+        }
+    }
+}
+
+impl From<&JobInfo> for JobDto {
+    fn from(j: &JobInfo) -> Self {
+        JobDto {
+            id: j.id as u32,
+            kind: match j.kind {
+                JobKind::Copy => JobKindDto::Copy,
+                JobKind::Move => JobKindDto::Move,
+                JobKind::Trash => JobKindDto::Trash,
+                JobKind::Delete => JobKindDto::Delete,
             },
-            Outcome::Skipped => OutcomeDto::Skipped,
+            status: match j.status {
+                JobStatus::Queued => JobStatusDto::Queued,
+                JobStatus::Running => JobStatusDto::Running,
+                JobStatus::Paused => JobStatusDto::Paused,
+                JobStatus::Done => JobStatusDto::Done,
+                JobStatus::Failed => JobStatusDto::Failed,
+                JobStatus::Aborted => JobStatusDto::Aborted,
+            },
+            total: j.total as u32,
+            completed: j.completed as u32,
+            current: j.current.clone(),
+            errors: j
+                .errors
+                .iter()
+                .map(|(path, message)| JobErrorDto {
+                    path: path.clone(),
+                    message: message.clone(),
+                })
+                .collect(),
         }
     }
 }
@@ -94,23 +168,72 @@ fn vp(p: &str) -> VfsPath {
     VfsPath::new(PathBuf::from(p))
 }
 
-/// 파일 작업과 감시를 묶은 서비스. 앱 상태로 보관한다.
+/// 서비스가 밖으로 내보내는 수신기들.
+pub struct Channels {
+    /// 변경된 디렉터리 경로.
+    pub dir_changes: Receiver<PathBuf>,
+    pub queue_events: Receiver<QueueEvent>,
+}
+
+/// 파일 작업과 감시, 작업 큐를 묶은 서비스. 앱 상태로 보관한다.
 pub struct Service<T: Trasher> {
+    /// 즉시 실행하는 짧은 작업(폴더/파일 만들기, 이름 변경, 충돌 확인).
     ops: Ops<LocalFs, T>,
+    queue: Queue,
     watcher: Mutex<DirWatcher>,
 }
 
-impl<T: Trasher> Service<T> {
-    /// 서비스와, 변경된 디렉터리 경로를 받는 수신기를 돌려준다.
-    pub fn new(trasher: T) -> ServiceResult<(Self, Receiver<PathBuf>)> {
-        let (watcher, rx) = DirWatcher::new().map_err(|e| e.to_string())?;
+impl<T: Trasher + Clone + Send + 'static> Service<T> {
+    pub fn new(trasher: T) -> ServiceResult<(Self, Channels)> {
+        let (watcher, dir_changes) = DirWatcher::new().map_err(|e| e.to_string())?;
+        let (queue, queue_events) = Queue::new(Ops::new(LocalFs, trasher.clone()));
         Ok((
             Self {
                 ops: Ops::new(LocalFs, trasher),
+                queue,
                 watcher: Mutex::new(watcher),
             },
-            rx,
+            Channels {
+                dir_changes,
+                queue_events,
+            },
         ))
+    }
+
+    /// 복사/이동/휴지통/삭제를 큐에 넣는다. 작업 id를 돌려준다.
+    pub fn enqueue(&self, kind: JobKindDto, items: Vec<QueueItemDto>) -> u32 {
+        let items = items
+            .into_iter()
+            .map(|i| Item {
+                src: vp(&i.src),
+                dest_dir: i.dest_dir.as_deref().map(vp),
+                policy: i.policy.into(),
+            })
+            .collect();
+        self.queue.enqueue(JobSpec {
+            kind: kind.into(),
+            items,
+        }) as u32
+    }
+
+    pub fn queue_jobs(&self) -> Vec<JobDto> {
+        self.queue.jobs().iter().map(JobDto::from).collect()
+    }
+
+    pub fn queue_pause(&self, id: u32) {
+        self.queue.pause(id.into());
+    }
+
+    pub fn queue_resume(&self, id: u32) {
+        self.queue.resume(id.into());
+    }
+
+    pub fn queue_abort(&self, id: u32) {
+        self.queue.abort(id.into());
+    }
+
+    pub fn queue_clear_finished(&self) {
+        self.queue.clear_finished();
     }
 
     /// 폴더 먼저, 이름순으로 정렬해서 돌려준다.
@@ -136,43 +259,11 @@ impl<T: Trasher> Service<T> {
             .map(|p| p.to_string())
     }
 
-    pub fn copy(
-        &self,
-        src: &str,
-        dest_dir: &str,
-        policy: ConflictDto,
-    ) -> ServiceResult<OutcomeDto> {
-        self.ops
-            .copy(&vp(src), &vp(dest_dir), policy.into())
-            .map(Into::into)
-            .map_err(|e| e.to_string())
-    }
-
-    pub fn move_to(
-        &self,
-        src: &str,
-        dest_dir: &str,
-        policy: ConflictDto,
-    ) -> ServiceResult<OutcomeDto> {
-        self.ops
-            .move_to(&vp(src), &vp(dest_dir), policy.into())
-            .map(Into::into)
-            .map_err(|e| e.to_string())
-    }
-
     pub fn rename(&self, path: &str, new_name: &str) -> ServiceResult<String> {
         self.ops
             .rename(&vp(path), new_name)
             .map(|p| p.to_string())
             .map_err(|e| e.to_string())
-    }
-
-    pub fn trash(&self, path: &str) -> ServiceResult<()> {
-        self.ops.trash(&vp(path)).map_err(|e| e.to_string())
-    }
-
-    pub fn delete_permanent(&self, path: &str) -> ServiceResult<()> {
-        self.ops.delete(&vp(path)).map_err(|e| e.to_string())
     }
 
     pub fn watch(&self, path: &str) -> ServiceResult<()> {
@@ -195,8 +286,9 @@ impl<T: Trasher> Service<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
+    use std::time::{Duration, Instant};
 
+    #[derive(Clone)]
     struct FakeTrash(PathBuf);
     impl Trasher for FakeTrash {
         fn trash(&self, path: &Path) -> td_ops::Result<()> {
@@ -205,25 +297,43 @@ mod tests {
         }
     }
 
-    fn setup() -> (
-        tempfile::TempDir,
-        Service<FakeTrash>,
-        Receiver<PathBuf>,
-        String,
-    ) {
+    fn setup() -> (tempfile::TempDir, Service<FakeTrash>, Channels, String) {
         let tmp = tempfile::tempdir().unwrap();
         let bin = tmp.path().join("bin");
         std::fs::create_dir(&bin).unwrap();
         let root = tmp.path().join("root");
         std::fs::create_dir(&root).unwrap();
-        let (svc, rx) = Service::new(FakeTrash(bin)).unwrap();
+        let (svc, channels) = Service::new(FakeTrash(bin)).unwrap();
         let root = root.to_string_lossy().into_owned();
-        (tmp, svc, rx, root)
+        (tmp, svc, channels, root)
+    }
+
+    fn wait_finished(svc: &Service<FakeTrash>, id: u32) -> JobDto {
+        let end = Instant::now() + Duration::from_secs(5);
+        loop {
+            let job = svc.queue_jobs().into_iter().find(|j| j.id == id).unwrap();
+            if !matches!(
+                job.status,
+                JobStatusDto::Queued | JobStatusDto::Running | JobStatusDto::Paused
+            ) {
+                return job;
+            }
+            assert!(Instant::now() < end, "작업이 끝나지 않았다");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+
+    fn item(src: &str, dest: Option<&str>, policy: ConflictDto) -> QueueItemDto {
+        QueueItemDto {
+            src: src.to_string(),
+            dest_dir: dest.map(str::to_string),
+            policy,
+        }
     }
 
     #[test]
     fn list_dir_sorts_dirs_first_and_filters_hidden() {
-        let (_t, svc, _rx, root) = setup();
+        let (_t, svc, _ch, root) = setup();
         svc.mkdir(&format!("{root}/zdir")).unwrap();
         svc.touch(&format!("{root}/a.txt")).unwrap();
         svc.touch(&format!("{root}/.hidden")).unwrap();
@@ -237,44 +347,76 @@ mod tests {
     }
 
     #[test]
-    fn ops_delegate_and_report_errors_as_strings() {
-        let (_t, svc, _rx, root) = setup();
+    fn short_ops_report_errors_as_strings() {
+        let (_t, svc, _ch, root) = setup();
         let a = format!("{root}/a.txt");
         svc.touch(&a).unwrap();
         assert!(svc.touch(&a).is_err());
         svc.mkdir(&format!("{root}/dest")).unwrap();
         assert_eq!(svc.detect_conflict(&a, &root), Some(a.clone()));
-        let out = svc
-            .copy(&a, &format!("{root}/dest"), ConflictDto::Skip)
-            .unwrap();
-        assert_eq!(
-            out,
-            OutcomeDto::Done {
-                path: format!("{root}/dest/a.txt")
-            }
+        let renamed = svc.rename(&a, "b.txt").unwrap();
+        assert!(renamed.ends_with("root/b.txt"));
+        assert!(svc.rename(&renamed, "x/y").is_err());
+    }
+
+    #[test]
+    fn queue_runs_copy_move_trash_delete_jobs() {
+        let (_t, svc, ch, root) = setup();
+        let dest = format!("{root}/dest");
+        svc.mkdir(&dest).unwrap();
+        for n in ["a", "b", "c", "d"] {
+            svc.touch(&format!("{root}/{n}")).unwrap();
+        }
+        let copy = svc.enqueue(
+            JobKindDto::Copy,
+            vec![item(&format!("{root}/a"), Some(&dest), ConflictDto::Skip)],
         );
-        assert_eq!(
-            svc.copy(&a, &format!("{root}/dest"), ConflictDto::Skip)
-                .unwrap(),
-            OutcomeDto::Skipped
+        assert_eq!(wait_finished(&svc, copy).status, JobStatusDto::Done);
+        assert!(Path::new(&format!("{dest}/a")).exists());
+        assert!(Path::new(&format!("{root}/a")).exists());
+
+        let mv = svc.enqueue(
+            JobKindDto::Move,
+            vec![item(&format!("{root}/b"), Some(&dest), ConflictDto::Skip)],
         );
-        let renamed = svc.rename(&format!("{root}/dest/a.txt"), "b.txt").unwrap();
-        assert!(renamed.ends_with("dest/b.txt"));
-        svc.move_to(&renamed, &root, ConflictDto::Rename).unwrap();
-        assert!(Path::new(&format!("{root}/b.txt")).exists());
-        svc.trash(&format!("{root}/b.txt")).unwrap();
-        svc.delete_permanent(&a).unwrap();
-        assert!(svc.delete_permanent(&a).is_err());
+        assert_eq!(wait_finished(&svc, mv).status, JobStatusDto::Done);
+        assert!(!Path::new(&format!("{root}/b")).exists());
+
+        let trash = svc.enqueue(
+            JobKindDto::Trash,
+            vec![item(&format!("{root}/c"), None, ConflictDto::Skip)],
+        );
+        assert_eq!(wait_finished(&svc, trash).status, JobStatusDto::Done);
+        let del = svc.enqueue(
+            JobKindDto::Delete,
+            vec![item(&format!("{root}/d"), None, ConflictDto::Skip)],
+        );
+        assert_eq!(wait_finished(&svc, del).status, JobStatusDto::Done);
+        assert!(!Path::new(&format!("{root}/d")).exists());
+
+        // 이벤트가 흘러나온다.
+        assert!(ch.queue_events.try_iter().count() > 0);
+
+        // 실패 작업은 오류 요약을 가지고, 끝난 작업은 지울 수 있다.
+        let bad = svc.enqueue(
+            JobKindDto::Delete,
+            vec![item(&format!("{root}/nope"), None, ConflictDto::Skip)],
+        );
+        let job = wait_finished(&svc, bad);
+        assert_eq!(job.status, JobStatusDto::Failed);
+        assert_eq!(job.errors.len(), 1);
+        svc.queue_clear_finished();
+        assert!(svc.queue_jobs().is_empty());
     }
 
     #[test]
     fn watch_forwards_directory_changes() {
-        let (_t, svc, rx, root) = setup();
+        let (_t, svc, ch, root) = setup();
         svc.watch(&root).unwrap();
         std::thread::sleep(Duration::from_millis(400));
-        while rx.try_recv().is_ok() {}
+        while ch.dir_changes.try_recv().is_ok() {}
         svc.touch(&format!("{root}/x")).unwrap();
-        let got = rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        let got = ch.dir_changes.recv_timeout(Duration::from_secs(5)).unwrap();
         assert_eq!(got, PathBuf::from(&root));
         svc.unwatch(&root).unwrap();
     }

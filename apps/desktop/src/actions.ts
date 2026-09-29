@@ -5,7 +5,7 @@ import { PAGE_SIZE } from "./state/store";
 /** 탐색, 선택, 탭, 보기, Quick Select 액션의 실행 핸들러. */
 /** 화면 조작 액션의 실행 핸들러(탐색, 선택, 탭, 보기, Quick Select, 파일 작업, 다이얼로그). */
 export function allHandlers(app: AppStore): ActionHandlers {
-  return { ...navigationHandlers(app), ...fileOpHandlers(app) } as ActionHandlers;
+  return { ...navigationHandlers(app), ...fileOpHandlers(app), ...queueHandlers(app) } as ActionHandlers;
 }
 
 export function navigationHandlers({ api }: AppStore): Partial<ActionHandlers> {
@@ -44,5 +44,17 @@ export function fileOpHandlers({ api }: AppStore): Partial<ActionHandlers> {
     "core.delete": () => api.deleteTargets(),
     "core.dialog.confirm": () => api.dialogConfirm(),
     "core.dialog.cancel": () => api.dialogCancel(),
+  };
+}
+
+/** 작업 큐 팝업 액션의 실행 핸들러. */
+export function queueHandlers({ api }: AppStore): Partial<ActionHandlers> {
+  return {
+    "core.queue.open": () => api.toggleQueue(),
+    "core.queue.close": () => api.toggleQueue(),
+    "core.queue.up": () => api.queueMove(-1),
+    "core.queue.down": () => api.queueMove(1),
+    "core.queue.pause": () => api.queuePauseToggle(),
+    "core.queue.abort": () => api.queueAbortSelected(),
   };
 }

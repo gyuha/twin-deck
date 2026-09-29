@@ -32,41 +32,30 @@ async touch(path: string) : Promise<Result<null, string>> {
 async detectConflict(src: string, destDir: string) : Promise<string | null> {
     return await TAURI_INVOKE("detect_conflict", { src, destDir });
 },
-async copyEntry(src: string, destDir: string, policy: ConflictDto) : Promise<Result<OutcomeDto, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("copy_entry", { src, destDir, policy }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
+/**
+ * 복사/이동/휴지통/삭제를 작업 큐에 넣는다. 작업 id를 돌려준다.
+ */
+async enqueueJob(kind: JobKindDto, items: QueueItemDto[]) : Promise<number> {
+    return await TAURI_INVOKE("enqueue_job", { kind, items });
 },
-async moveEntry(src: string, destDir: string, policy: ConflictDto) : Promise<Result<OutcomeDto, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("move_entry", { src, destDir, policy }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
+async queueJobs() : Promise<JobDto[]> {
+    return await TAURI_INVOKE("queue_jobs");
+},
+async queuePause(id: number) : Promise<void> {
+    await TAURI_INVOKE("queue_pause", { id });
+},
+async queueResume(id: number) : Promise<void> {
+    await TAURI_INVOKE("queue_resume", { id });
+},
+async queueAbort(id: number) : Promise<void> {
+    await TAURI_INVOKE("queue_abort", { id });
+},
+async queueClearFinished() : Promise<void> {
+    await TAURI_INVOKE("queue_clear_finished");
 },
 async renameEntry(path: string, newName: string) : Promise<Result<string, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("rename_entry", { path, newName }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async trashEntry(path: string) : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("trash_entry", { path }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async deleteEntry(path: string) : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("delete_entry", { path }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -94,9 +83,11 @@ async unwatchDir(path: string) : Promise<Result<null, string>> {
 
 
 export const events = __makeEvents__<{
-dirChanged: DirChanged
+dirChanged: DirChanged,
+queueChanged: QueueChanged
 }>({
-dirChanged: "dir-changed"
+dirChanged: "dir-changed",
+queueChanged: "queue-changed"
 })
 
 /** user-defined constants **/
@@ -119,8 +110,20 @@ size: number;
  * 수정 시각(epoch 밀리초). 알 수 없으면 null.
  */
 modifiedMs: number | null; hidden: boolean }
+export type JobDto = { id: number; kind: JobKindDto; status: JobStatusDto; total: number; completed: number; current: string | null; errors: JobErrorDto[] }
+export type JobErrorDto = { path: string; message: string }
+export type JobKindDto = "copy" | "move" | "trash" | "delete"
+export type JobStatusDto = "queued" | "running" | "paused" | "done" | "failed" | "aborted"
 export type KindDto = "file" | "dir" | "symlink"
-export type OutcomeDto = { type: "done"; path: string } | { type: "skipped" }
+/**
+ * 작업 큐의 상태가 바뀔 때마다 전체 스냅샷을 보낸다.
+ */
+export type QueueChanged = { jobs: JobDto[] }
+export type QueueItemDto = { src: string; 
+/**
+ * 복사/이동의 대상 폴더. 휴지통/삭제에서는 null.
+ */
+destDir: string | null; policy: ConflictDto }
 
 /** tauri-specta globals **/
 

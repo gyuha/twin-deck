@@ -195,6 +195,16 @@ impl Queue {
         self.shared.cv.notify_all();
     }
 
+    /// 끝난 작업을 목록에서 지운다.
+    pub fn clear_finished(&self) {
+        self.shared
+            .state
+            .lock()
+            .unwrap()
+            .jobs
+            .retain(|_, j| !j.info.status.is_finished());
+    }
+
     pub fn jobs(&self) -> Vec<JobInfo> {
         self.shared
             .state

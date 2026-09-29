@@ -8,6 +8,7 @@ import { StoreContext, useApp } from "./state/context";
 import { activeTab, createAppStore } from "./state/store";
 import { Dialog } from "./ui/Dialog";
 import { Pane } from "./ui/Pane";
+import { QueueIndicator, QueuePopup } from "./ui/Queue";
 import { useKeyboard } from "./ui/useKeyboard";
 
 export interface AppProps {
@@ -58,6 +59,8 @@ export function App({ backend, platform, leftPath, rightPath }: AppProps) {
           <Pane pane="right" />
         </div>
         <StatusBar />
+        <QueueIndicator />
+        <QueuePopup />
         <Dialog />
       </main>
     </StoreContext.Provider>

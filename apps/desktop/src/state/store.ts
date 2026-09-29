@@ -1,6 +1,6 @@
 import { createStore } from "zustand/vanilla";
 import { baseName, joinPath, parentPath } from "@twin-deck/ts-client";
-import type { Backend, ConflictDto, EntryDto } from "@twin-deck/ts-client";
+import type { Backend, ConflictDto, EntryDto, JobDto, QueueItemDto } from "@twin-deck/ts-client";
 import type { ActionContext } from "@twin-deck/actions";
 import type { Scope } from "@twin-deck/keybinds";
 import { quickMatch } from "../lib/names";
@@ -37,12 +37,18 @@ export interface AppState {
   activePane: PaneId;
   showHidden: boolean;
   dialog: DialogState | null;
+  /** 작업 큐 스냅샷 (끝난 작업은 팝업을 닫을 때까지 남는다). */
+  queue: JobDto[];
+  queueOpen: boolean;
+  queueCursor: number;
   /** 마지막 작업 오류. 다음 작업이 시작되면 지워진다. */
   notice: string | null;
 }
 
 export const PAGE_SIZE = 10;
 const other = (p: PaneId): PaneId => (p === "left" ? "right" : "left");
+
+export const isActiveJob = (j: JobDto) => ["queued", "running", "paused"].includes(j.status);
 
 export function activeTab(s: AppState, pane: PaneId = s.activePane): TabState {
   const p = s.panes[pane];
@@ -73,6 +79,8 @@ export function actionContext(s: AppState): ActionContext {
 
 export function scopeStack(s: AppState): Scope[] {
   if (s.dialog) return ["dialog", "pane", "global"];
+  // 큐 팝업이 열려 있으면 패널 키는 받지 않는다.
+  if (s.queueOpen) return ["queue", "global"];
   return activeTab(s).quick !== null ? ["quickSelect", "pane", "global"] : ["pane", "global"];
 }
 
@@ -97,6 +105,9 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     activePane: "left",
     showHidden: false,
     dialog: null,
+    queue: [],
+    queueOpen: false,
+    queueCursor: 0,
     notice: null,
   }));
   const { getState: get, setState: set } = store;
@@ -173,14 +184,31 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
   }
   const fail = (e: unknown) => set({ notice: String(e instanceof Error ? e.message : e) });
 
+  // 작업 상태가 바뀌면(진행/완료) 목록을 다시 읽는다.
+  let lastSignature = "";
+  const applyQueue = (jobs: JobDto[]) => {
+    set((s) => ({
+      queue: jobs,
+      queueCursor: Math.min(s.queueCursor, Math.max(jobs.length - 1, 0)),
+    }));
+    const signature = jobs.map((j) => `${j.id}:${j.status}:${j.completed}`).join("|");
+    if (signature !== lastSignature) {
+      lastSignature = signature;
+      void reloadAll();
+    }
+  };
+  const unsubscribeQueue = backend.onQueueChanged(applyQueue);
+
   const api = {
     async init() {
       await reloadAll();
       await syncWatches();
+      applyQueue(await backend.queueJobs());
     },
 
     dispose() {
       unsubscribeBackend();
+      unsubscribeQueue();
       for (const p of watched) void backend.unwatch(p);
       watched.clear();
     },
@@ -395,13 +423,14 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         fail(e);
       }
     },
-    /** 비활성 패널로 복사/이동 (OP-03, OP-04). 이름이 겹치면 항목마다 물어본다. */
+    /** 비활성 패널로 복사/이동 (OP-03, OP-04). 이름이 겹치면 항목마다 물어본 뒤 작업 큐에 넣는다. */
     async copyOrMove(kind: "copy" | "move") {
       const s = get();
       const targets = targetsOf(activeTab(s));
       if (targets.length === 0) return;
       const destDir = api.inactivePath();
       set({ notice: null });
+      const items: QueueItemDto[] = [];
       for (const t of targets) {
         try {
           let policy: ConflictDto = "skip";
@@ -413,32 +442,26 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
               existing,
               selected: CONFLICT_CHOICES.indexOf("rename"),
             });
-            if (choice === null) break;
+            if (choice === null) break; // 취소: 지금까지 정한 항목만 실행한다
             policy = choice;
           }
-          if (kind === "copy") await backend.copy(t.path, destDir, policy);
-          else await backend.move(t.path, destDir, policy);
+          items.push({ src: t.path, destDir, policy });
         } catch (e) {
           fail(e);
           break;
         }
       }
       patchTab(s.activePane, activeTab(s).id, { selection: new Set() });
+      if (items.length > 0) await backend.enqueue(kind, items);
       await reloadAll();
     },
     /** 휴지통으로 이동 (OP-06). 기본 설정에서는 확인하지 않는다. */
     async trashTargets() {
       const targets = targetsOf(activeTab(get()));
+      if (targets.length === 0) return;
       set({ notice: null });
-      for (const t of targets) {
-        try {
-          await backend.trash(t.path);
-        } catch (e) {
-          fail(e);
-          break;
-        }
-      }
       patchActive({ selection: new Set() });
+      await backend.enqueue("trash", targets.map((t) => ({ src: t.path, destDir: null, policy: "skip" })));
       await reloadAll();
     },
     /** 영구 삭제 (OP-07). 확인 다이얼로그를 거친다. */
@@ -452,16 +475,36 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       });
       if (!ok) return;
       set({ notice: null });
-      for (const t of targets) {
-        try {
-          await backend.deletePermanent(t.path);
-        } catch (e) {
-          fail(e);
-          break;
-        }
-      }
       patchActive({ selection: new Set() });
+      await backend.enqueue("delete", targets.map((t) => ({ src: t.path, destDir: null, policy: "skip" })));
       await reloadAll();
+    },
+
+    /** 작업 큐 팝업 열기/닫기 (`=`). 닫을 때 끝난 작업을 지운다. */
+    toggleQueue() {
+      if (get().queueOpen) {
+        set({ queueOpen: false });
+        void backend.queueClearFinished();
+      } else {
+        set({ queueOpen: true, queueCursor: 0 });
+      }
+    },
+    queueMove(delta: number) {
+      set((s) => ({ queueCursor: clamp(s.queueCursor + delta, s.queue.length) }));
+    },
+    /** 선택한 작업을 일시정지하거나 재개한다 (P). */
+    async queuePauseToggle() {
+      const s = get();
+      const job = s.queue[s.queueCursor];
+      if (!job) return;
+      if (job.status === "paused") await backend.queueResume(job.id);
+      else if (isActiveJob(job)) await backend.queuePause(job.id);
+    },
+    /** 선택한 작업을 중단한다 (A/D). */
+    async queueAbortSelected() {
+      const s = get();
+      const job = s.queue[s.queueCursor];
+      if (job && isActiveJob(job)) await backend.queueAbort(job.id);
     },
 
     reload: (pane: PaneId, tabId: number, focusName?: string) => reload(pane, tabId, focusName),
