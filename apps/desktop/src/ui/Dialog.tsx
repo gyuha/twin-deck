@@ -52,7 +52,7 @@ export function Dialog() {
             )}
           </>
         )}
-        {dialog.kind === "confirm" && (
+        {(dialog.kind === "confirm" || dialog.kind === "info") && (
           <ul className="mb-1 list-inside list-disc">
             {dialog.lines.map((l) => (
               <li key={l}>{l}</li>

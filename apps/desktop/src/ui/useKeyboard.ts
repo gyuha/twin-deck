@@ -58,10 +58,10 @@ export function useKeyboard({ app, keymap, registry }: Options) {
         api.quickBackspace();
         return;
       }
-      const id = keymap.resolve(e, stack);
-      if (id) {
+      const hit = keymap.resolveBinding(e, stack);
+      if (hit) {
         e.preventDefault();
-        void registry.dispatch(id, actionContext(s));
+        void registry.dispatch(hit.actionId, actionContext(s), hit.args);
         return;
       }
       if ((top === "pane" || top === "quickSelect") && isPlainChar(e)) {

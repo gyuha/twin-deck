@@ -3,7 +3,9 @@ export function normalizeName(name: string): string {
   return name.normalize("NFC").toLowerCase();
 }
 
-/** Quick Select 기본 규칙: 부분 일치 (docs/07 §4.4). */
-export function quickMatch(name: string, input: string): boolean {
-  return normalizeName(name).includes(normalizeName(input));
+/** Quick Select 규칙: 기본은 부분 일치, `match_only_prefix`면 접두 일치 (docs/07 §4.4). */
+export function quickMatch(name: string, input: string, prefixOnly = false): boolean {
+  const n = normalizeName(name);
+  const i = normalizeName(input);
+  return prefixOnly ? n.startsWith(i) : n.includes(i);
 }

@@ -1,7 +1,7 @@
 import { BackendError } from "./backend";
 import type { Backend } from "./backend";
 import { commands, events } from "./generated/bindings";
-import type { JobDto, JobKindDto, QueueItemDto, Result } from "./generated/bindings";
+import type { JobDto, JobKindDto, Loaded, QueueItemDto, Result } from "./generated/bindings";
 
 function unwrap<T>(r: Result<T, string>): T {
   if (r.status === "error") throw new BackendError(r.error);
@@ -48,6 +48,15 @@ export class TauriBackend implements Backend {
   }
   async unwatch(path: string) {
     unwrap(await commands.unwatchDir(path));
+  }
+  getConfig() {
+    return commands.getConfig();
+  }
+  onConfigChanged(callback: (loaded: Loaded) => void) {
+    const unlisten = events.configChanged.listen((e) => callback(e.payload.loaded));
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
   }
   onQueueChanged(callback: (jobs: JobDto[]) => void) {
     const unlisten = events.queueChanged.listen((e) => callback(e.payload.jobs));

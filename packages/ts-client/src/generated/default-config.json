@@ -1,0 +1,60 @@
+{
+  "config": {
+    "behavior": {
+      "theme": "light",
+      "table": {
+        "icon_size": 16,
+        "circular_selection": false,
+        "right_click_select": false
+      },
+      "quick_select": {
+        "match_only_prefix": false,
+        "activate_on_any_character": true
+      },
+      "selection": {
+        "shift_mode": "invert"
+      },
+      "layout": {
+        "show_action_bar": true
+      }
+    },
+    "display": {
+      "relative_date": true,
+      "date_format": "%-d %b %Y",
+      "time_format": "%H:%M",
+      "size_format": "adaptive"
+    },
+    "environment": {
+      "text_editor": "",
+      "terminal": "default"
+    },
+    "core": {
+      "confirm": {
+        "delete": true,
+        "trash": false
+      }
+    },
+    "layout": {
+      "action_bar": [
+        "core.edit",
+        "core.copy",
+        "core.move",
+        "core.file.new_folder",
+        "core.trash",
+        "core.delete"
+      ]
+    },
+    "view": {
+      "table": {
+        "columns": [
+          "name",
+          "size",
+          "modified"
+        ]
+      }
+    },
+    "favorites": []
+  },
+  "bindings": [],
+  "warnings": []
+}

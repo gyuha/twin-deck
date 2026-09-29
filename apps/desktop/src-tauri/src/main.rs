@@ -6,7 +6,7 @@ mod service;
 use tauri_specta::Event;
 use td_ops::SystemTrash;
 
-use commands::{specta_builder, AppService, DirChanged, QueueChanged};
+use commands::{specta_builder, AppService, ConfigChanged, ConfigState, DirChanged, QueueChanged};
 use tauri::Manager;
 
 fn main() {
@@ -28,6 +28,36 @@ fn main() {
                     .emit(&handle);
                 }
             });
+            // 설정: 앱 설정 디렉터리를 감시하고, 바뀌면 UI로 알린다.
+            let config_dir = app.path().app_config_dir().ok();
+            let started = config_dir
+                .as_deref()
+                .map(|d| td_config::ConfigStore::start(d, td_config::Platform::current()));
+            let (store, config_rx, startup_warning) = match started {
+                Some(Ok((s, rx))) => (Some(s), Some(rx), None),
+                Some(Err(e)) => (
+                    None,
+                    None,
+                    Some(format!("설정 디렉터리를 열지 못해 기본값을 씁니다: {e}")),
+                ),
+                None => (
+                    None,
+                    None,
+                    Some("설정 디렉터리를 알 수 없어 기본값을 씁니다".to_string()),
+                ),
+            };
+            app.manage(ConfigState {
+                store,
+                startup_warning,
+            });
+            if let Some(rx) = config_rx {
+                let handle = app.handle().clone();
+                std::thread::spawn(move || {
+                    while let Ok(loaded) = rx.recv() {
+                        let _ = ConfigChanged { loaded }.emit(&handle);
+                    }
+                });
+            }
             let handle = app.handle().clone();
             std::thread::spawn(move || {
                 // 큐 이벤트가 오면 최신 스냅샷을 UI로 보낸다.

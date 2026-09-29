@@ -7,7 +7,7 @@ dev:
     bun run --cwd apps/desktop tauri dev
 
 gen-types:
-    UPDATE_BINDINGS=1 cargo test -p twin-deck-desktop bindings_are_up_to_date
+    UPDATE_BINDINGS=1 cargo test -p twin-deck-desktop up_to_date
 
 test:
     cargo test --workspace

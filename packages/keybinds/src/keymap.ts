@@ -21,10 +21,18 @@ export interface Binding {
   /** OS 중립 표기. `Mod`는 mac=Cmd, 그 외=Ctrl. */
   keys: string[];
   actionId: string;
+  /** 액션 인수 (예: `core.open.directory`의 `src`). */
+  args?: Record<string, string>;
+}
+
+/** 키 입력이 풀린 결과. */
+export interface Resolved {
+  actionId: string;
+  args?: Record<string, string>;
 }
 
 export class Keymap {
-  private table = new Map<string, string>();
+  private table = new Map<string, Resolved>();
   readonly warnings: string[] = [];
 
   constructor(
@@ -60,10 +68,10 @@ export class Keymap {
       }
       const slot = Keymap.slot(binding.scope, chordId(chord));
       const prev = this.table.get(slot);
-      if (prev && prev !== binding.actionId) {
-        this.warnings.push(`${binding.scope} ${text}: ${prev} → ${binding.actionId} (나중 정의가 이김)`);
+      if (prev && prev.actionId !== binding.actionId) {
+        this.warnings.push(`${binding.scope} ${text}: ${prev.actionId} → ${binding.actionId} (나중 정의가 이김)`);
       }
-      this.table.set(slot, binding.actionId);
+      this.table.set(slot, { actionId: binding.actionId, args: binding.args });
     }
   }
 
@@ -72,6 +80,11 @@ export class Keymap {
    * 모달 스코프를 만나면 그 스코프까지만 검색한다.
    */
   resolve(event: KeyEventLike, scopeStack: Scope[]): string | undefined {
+    return this.resolveBinding(event, scopeStack)?.actionId;
+  }
+
+  /** `resolve`와 같지만 인수까지 돌려준다. */
+  resolveBinding(event: KeyEventLike, scopeStack: Scope[]): Resolved | undefined {
     const id = chordId(chordFromEvent(event));
     for (const scope of scopeStack) {
       const hit = this.table.get(Keymap.slot(scope, id));

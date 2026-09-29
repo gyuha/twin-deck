@@ -1,6 +1,6 @@
 import { createStore } from "zustand/vanilla";
-import { baseName, joinPath, parentPath } from "@twin-deck/ts-client";
-import type { Backend, ConflictDto, EntryDto, JobDto, QueueItemDto } from "@twin-deck/ts-client";
+import { baseName, defaultLoaded, joinPath, parentPath } from "@twin-deck/ts-client";
+import type { Backend, ConflictDto, EntryDto, JobDto, Loaded, QueueItemDto } from "@twin-deck/ts-client";
 import type { ActionContext } from "@twin-deck/actions";
 import type { Scope } from "@twin-deck/keybinds";
 import { quickMatch } from "../lib/names";
@@ -30,7 +30,8 @@ export const CONFLICT_CHOICES: readonly ConflictDto[] = ["overwrite", "skip", "r
 export type DialogState =
   | { kind: "name"; title: string; value: string; error: string | null; selectStem: boolean }
   | { kind: "confirm"; title: string; lines: string[] }
-  | { kind: "conflict"; title: string; existing: string; selected: number };
+  | { kind: "conflict"; title: string; existing: string; selected: number }
+  | { kind: "info"; title: string; lines: string[] };
 
 export interface AppState {
   panes: Record<PaneId, PaneState>;
@@ -41,6 +42,10 @@ export interface AppState {
   queue: JobDto[];
   queueOpen: boolean;
   queueCursor: number;
+  /** 설정 파일에서 읽은 설정·키바인딩·경고. 로딩 전에는 내장 기본값. */
+  loaded: Loaded;
+  /** 키바인딩 병합 중 나온 경고 (App이 채운다). */
+  keymapWarnings: string[];
   /** 마지막 작업 오류. 다음 작업이 시작되면 지워진다. */
   notice: string | null;
 }
@@ -108,6 +113,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     queue: [],
     queueOpen: false,
     queueCursor: 0,
+    loaded: defaultLoaded(),
+    keymapWarnings: [],
     notice: null,
   }));
   const { getState: get, setState: set } = store;
@@ -198,17 +205,21 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     }
   };
   const unsubscribeQueue = backend.onQueueChanged(applyQueue);
+  const unsubscribeConfig = backend.onConfigChanged((loaded) => set({ loaded }));
+  const cfg = () => get().loaded.config;
 
   const api = {
     async init() {
       await reloadAll();
       await syncWatches();
       applyQueue(await backend.queueJobs());
+      set({ loaded: await backend.getConfig() });
     },
 
     dispose() {
       unsubscribeBackend();
       unsubscribeQueue();
+      unsubscribeConfig();
       for (const p of watched) void backend.unwatch(p);
       watched.clear();
     },
@@ -240,7 +251,15 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     },
 
     moveCursor(delta: number) {
-      patchActive((t) => ({ cursor: clamp(t.cursor + delta, t.entries.length) }));
+      const circular = cfg().behavior.table.circular_selection;
+      patchActive((t) => {
+        const len = t.entries.length;
+        if (len === 0) return {};
+        let next = t.cursor + delta;
+        // 순환 선택(NAV-06)은 한 칸 이동에만 적용한다.
+        if (circular && Math.abs(delta) === 1) next = (next + len) % len;
+        return { cursor: clamp(next, len) };
+      });
     },
     cursorHome() {
       patchActive({ cursor: 0 });
@@ -329,15 +348,22 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
 
     /** 수정자 없는 문자 입력: Quick Select를 시작/확장하고 일치 항목으로 커서를 옮긴다 (SEL-05). */
     quickInput(char: string) {
+      const q = cfg().behavior.quick_select;
       patchActive((t) => {
+        // 아무 문자로나 시작하지 않는 설정이면 `core.quickselect.start`로만 시작한다.
+        if (t.quick === null && !q.activate_on_any_character) return {};
         const text = (t.quick ?? "") + char;
-        return { quick: text, ...quickCursor(t, text) };
+        return { quick: text, ...quickCursor(t, text, q.match_only_prefix) };
       });
     },
+    quickStart() {
+      patchActive((t) => (t.quick === null ? { quick: "" } : {}));
+    },
     quickBackspace() {
+      const prefix = cfg().behavior.quick_select.match_only_prefix;
       patchActive((t) => {
         const text = (t.quick ?? "").slice(0, -1);
-        return { quick: text, ...quickCursor(t, text) };
+        return { quick: text, ...quickCursor(t, text, prefix) };
       });
     },
     quickAccept() {
@@ -459,25 +485,53 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     async trashTargets() {
       const targets = targetsOf(activeTab(get()));
       if (targets.length === 0) return;
+      if (cfg().core.confirm.trash && !(await api.confirmTargets(`${targets.length}개 항목을 휴지통으로 보낼까요?`, targets))) return;
       set({ notice: null });
       patchActive({ selection: new Set() });
       await backend.enqueue("trash", targets.map((t) => ({ src: t.path, destDir: null, policy: "skip" })));
       await reloadAll();
     },
-    /** 영구 삭제 (OP-07). 확인 다이얼로그를 거친다. */
+    /** 대상 이름을 보여 주는 확인 다이얼로그. 확인하면 true. */
+    async confirmTargets(title: string, targets: EntryDto[]): Promise<boolean> {
+      const ok = await ask<boolean>({
+        kind: "confirm",
+        title,
+        lines: targets.slice(0, 5).map((t) => t.name).concat(targets.length > 5 ? [`… 외 ${targets.length - 5}개`] : []),
+      });
+      return ok === true;
+    },
+    /** 영구 삭제 (OP-07). `core.confirm.delete`가 켜져 있으면 확인을 거친다 (OP-13). */
     async deleteTargets() {
       const targets = targetsOf(activeTab(get()));
       if (targets.length === 0) return;
-      const ok = await ask<boolean>({
-        kind: "confirm",
-        title: `${targets.length}개 항목을 영구 삭제할까요?`,
-        lines: targets.slice(0, 5).map((t) => t.name).concat(targets.length > 5 ? [`… 외 ${targets.length - 5}개`] : []),
-      });
-      if (!ok) return;
+      if (cfg().core.confirm.delete && !(await api.confirmTargets(`${targets.length}개 항목을 영구 삭제할까요?`, targets))) return;
       set({ notice: null });
       patchActive({ selection: new Set() });
       await backend.enqueue("delete", targets.map((t) => ({ src: t.path, destDir: null, policy: "skip" })));
       await reloadAll();
+    },
+
+    /** 마우스 오른쪽 클릭 선택 (`right_click_select`): 커서는 그대로 두고 그 행의 선택만 토글. */
+    toggleSelectAt(index: number) {
+      patchActive((t) => {
+        const e = t.entries[index];
+        if (!e) return {};
+        const sel = new Set(t.selection);
+        if (sel.has(e.path)) sel.delete(e.path);
+        else sel.add(e.path);
+        return { selection: sel, cursor: index };
+      });
+    },
+    setKeymapWarnings(keymapWarnings: string[]) {
+      set({ keymapWarnings });
+    },
+    /** 설정 경고 목록을 보여 준다. */
+    async showConfigWarnings() {
+      const s = get();
+      const lines = s.loaded.warnings
+        .map((w) => `${w.file}${w.line ? `:${w.line}` : ""}: ${w.message}`)
+        .concat(s.keymapWarnings);
+      await ask<boolean>({ kind: "info", title: lines.length ? `설정 경고 ${lines.length}개` : "설정 경고 없음", lines });
     },
 
     /** 작업 큐 팝업 열기/닫기 (`=`). 닫을 때 끝난 작업을 지운다. */
@@ -524,9 +578,9 @@ function clamp(i: number, len: number): number {
   return Math.min(Math.max(i, 0), Math.max(len - 1, 0));
 }
 
-function quickCursor(t: TabState, text: string): Partial<TabState> {
+function quickCursor(t: TabState, text: string, prefixOnly: boolean): Partial<TabState> {
   if (!text) return {};
-  const idx = t.entries.findIndex((e) => quickMatch(e.name, text));
+  const idx = t.entries.findIndex((e) => quickMatch(e.name, text, prefixOnly));
   return idx >= 0 ? { cursor: idx } : {};
 }
 

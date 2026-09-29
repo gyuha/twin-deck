@@ -27,6 +27,8 @@ export function navigationHandlers({ api }: AppStore): Partial<ActionHandlers> {
     "core.tab.next": () => api.cycleTab(1),
     "core.tab.prev": () => api.cycleTab(-1),
     "core.view.hidden": () => api.toggleHidden(),
+    "core.quickselect.start": () => api.quickStart(),
+    "core.config.warnings": () => api.showConfigWarnings(),
     "core.quickselect.accept": () => api.quickAccept(),
     "core.quickselect.cancel": () => api.quickCancel(),
   };

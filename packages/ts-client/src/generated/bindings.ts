@@ -5,6 +5,9 @@
 
 
 export const commands = {
+async getConfig() : Promise<Loaded> {
+    return await TAURI_INVOKE("get_config");
+},
 async listDir(path: string, showHidden: boolean) : Promise<Result<EntryDto[], string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("list_dir", { path, showHidden }) };
@@ -83,9 +86,11 @@ async unwatchDir(path: string) : Promise<Result<null, string>> {
 
 
 export const events = __makeEvents__<{
+configChanged: ConfigChanged,
 dirChanged: DirChanged,
 queueChanged: QueueChanged
 }>({
+configChanged: "config-changed",
 dirChanged: "dir-changed",
 queueChanged: "queue-changed"
 })
@@ -96,11 +101,45 @@ queueChanged: "queue-changed"
 
 /** user-defined types **/
 
+export type Behavior = { theme: string; table: BehaviorTable; quick_select: QuickSelect; selection: SelectionConfig; layout: BehaviorLayout }
+export type BehaviorLayout = { show_action_bar: boolean }
+export type BehaviorTable = { icon_size: number; 
+/**
+ * 끝에서 처음으로 순환 (NAV-06).
+ */
+circular_selection: boolean; right_click_select: boolean }
+/**
+ * 사용자 키바인딩 한 줄. `action`이 None이면 기본 바인딩 해제(`"F5" = "none"`).
+ */
+export type BindingSpec = { key: string; action: string | null; 
+/**
+ * 액션 인수. 값은 문자열로 전달한다.
+ */
+args: Partial<{ [key in string]: string }>; 
+/**
+ * 스코프를 강제로 지정할 때만 값이 있다.
+ */
+scope: string | null }
+export type Config = { behavior: Behavior; display: Display; environment: Environment; core: CoreConfig; layout: LayoutConfig; view: ViewConfig; 
+/**
+ * 병합 후 항목별로 검증해서 채운다(잘못된 항목은 경고와 함께 빠진다).
+ */
+favorites?: FavoriteDto[] }
+/**
+ * 설정이 바뀌었다(파일 감시). 문법 오류가 있으면 이전 유효 설정과 경고가 온다.
+ */
+export type ConfigChanged = { loaded: Loaded }
+/**
+ * 삭제/휴지통 확인 대화상자 on/off (OP-13).
+ */
+export type ConfirmConfig = { delete: boolean; trash: boolean }
 export type ConflictDto = "overwrite" | "skip" | "rename"
+export type CoreConfig = { confirm: ConfirmConfig }
 /**
  * 감시 중인 디렉터리의 내용이 바뀌었다.
  */
 export type DirChanged = { path: string }
+export type Display = { relative_date: boolean; date_format: string; time_format: string; size_format: string }
 export type EntryDto = { name: string; path: string; kind: KindDto; 
 /**
  * 바이트 수. JS 숫자로 전달한다.
@@ -110,11 +149,19 @@ size: number;
  * 수정 시각(epoch 밀리초). 알 수 없으면 null.
  */
 modifiedMs: number | null; hidden: boolean }
+export type Environment = { text_editor: string; terminal: string }
+/**
+ * 즐겨찾기 항목. `kind`는 "item" | "separator" | "group". 그룹은 한 단계까지 지원한다.
+ */
+export type FavoriteDto = { kind: string; name: string | null; path: string | null; items?: FavoriteLeaf[] }
+export type FavoriteLeaf = { name: string; path: string }
 export type JobDto = { id: number; kind: JobKindDto; status: JobStatusDto; total: number; completed: number; current: string | null; errors: JobErrorDto[] }
 export type JobErrorDto = { path: string; message: string }
 export type JobKindDto = "copy" | "move" | "trash" | "delete"
 export type JobStatusDto = "queued" | "running" | "paused" | "done" | "failed" | "aborted"
 export type KindDto = "file" | "dir" | "symlink"
+export type LayoutConfig = { action_bar: string[] }
+export type Loaded = { config: Config; bindings: BindingSpec[]; warnings: Warning[] }
 /**
  * 작업 큐의 상태가 바뀔 때마다 전체 스냅샷을 보낸다.
  */
@@ -124,6 +171,26 @@ export type QueueItemDto = { src: string;
  * 복사/이동의 대상 폴더. 휴지통/삭제에서는 null.
  */
 destDir: string | null; policy: ConflictDto }
+export type QuickSelect = { match_only_prefix: boolean; activate_on_any_character: boolean }
+export type SelectionConfig = { 
+/**
+ * "invert" | "extend"
+ */
+shift_mode: string }
+export type TableView = { 
+/**
+ * 컬럼 명세 `[<|>]이름[:너비]`.
+ */
+columns: string[] }
+export type ViewConfig = { table: TableView }
+/**
+ * 설정을 읽다가 만난 문제. 앱 동작을 막지 않는다.
+ */
+export type Warning = { file: string; message: string; 
+/**
+ * TOML 문법 오류의 위치(1부터).
+ */
+line: number | null }
 
 /** tauri-specta globals **/
 

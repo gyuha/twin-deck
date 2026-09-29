@@ -14,9 +14,9 @@ tasks:
       - bun run --cwd apps/desktop tauri dev
 
   gen-types:
-    desc: Rust 타입에서 TS 바인딩(bindings.ts) 재생성
+    desc: Rust 타입에서 TS 바인딩(bindings.ts)과 기본 설정 fixture 재생성
     cmds:
-      - cargo test -p twin-deck-desktop bindings_are_up_to_date
+      - cargo test -p twin-deck-desktop up_to_date
     env:
       UPDATE_BINDINGS: "1"
 

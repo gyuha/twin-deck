@@ -3451,6 +3451,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "td-config"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "specta",
+ "td-watch",
+ "tempfile",
+ "toml 0.8.2",
+]
+
+[[package]]
 name = "td-ops"
 version = "0.1.0"
 dependencies = [
@@ -3864,6 +3875,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-specta",
+ "td-config",
  "td-ops",
  "td-queue",
  "td-vfs",

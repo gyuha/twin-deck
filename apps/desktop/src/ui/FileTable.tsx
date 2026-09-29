@@ -21,6 +21,7 @@ export function FileTable({ pane }: { pane: PaneId }) {
   const { api } = useAppStore();
   const tab = useApp((s) => activeTab(s, pane));
   const isActive = useApp((s) => s.activePane === pane);
+  const rightClickSelect = useApp((s) => s.loaded.config.behavior.table.right_click_select);
   const rowId = (i: number) => `${pane}-${tab.id}-row-${i}`;
 
   useEffect(() => {
@@ -79,6 +80,12 @@ export function FileTable({ pane }: { pane: PaneId }) {
                 activate();
                 api.setCursor(i);
                 void api.open();
+              }}
+              onContextMenu={(ev) => {
+                if (!rightClickSelect) return;
+                ev.preventDefault();
+                activate();
+                api.toggleSelectAt(i);
               }}
               className={[
                 "grid cursor-default grid-cols-[1.25rem_1fr_6rem_8rem] px-2 py-0.5",

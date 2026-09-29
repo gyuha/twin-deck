@@ -1,6 +1,10 @@
 import { BackendError, baseName, joinPath, parentPath } from "./backend";
 import type { Backend } from "./backend";
-import type { ConflictDto, EntryDto, JobDto, JobKindDto, QueueItemDto } from "./generated/bindings";
+import type { ConflictDto, EntryDto, JobDto, JobKindDto, Loaded, QueueItemDto } from "./generated/bindings";
+import defaultConfigJson from "./generated/default-config.json";
+
+/** Rust가 만든 내장 기본 설정(무경고, 사용자 바인딩 없음). */
+export const defaultLoaded = (): Loaded => structuredClone(defaultConfigJson) as Loaded;
 
 /** FakeBackend 내부의 복사/이동 결과. */
 type OutcomeDto = { type: "done"; path: string } | { type: "skipped" };
@@ -29,6 +33,8 @@ export class FakeBackend implements Backend {
    * `manual`: `advance()`를 부를 때마다 항목 하나씩 실행한다(진행/일시정지/중단 테스트용).
    */
   queueMode: "instant" | "manual" = "instant";
+  private loaded: Loaded = defaultLoaded();
+  private configListeners = new Set<(l: Loaded) => void>();
   private jobs = new Map<number, FakeJob>();
   private nextJobId = 1;
   private queueListeners = new Set<(jobs: JobDto[]) => void>();
@@ -139,6 +145,22 @@ export class FakeBackend implements Backend {
     if (this.need(src).kind === "dir" && (destDir === src || destDir.startsWith(`${src}/`))) {
       throw new BackendError(`대상이 원본 자신이거나 그 하위입니다: ${destDir}`);
     }
+  }
+
+  async getConfig() {
+    return structuredClone(this.loaded);
+  }
+
+  /** 테스트용: 설정을 고치고 구독자에게 알린다(파일 감시 재로딩을 흉내 낸다). */
+  setConfig(change: (l: Loaded) => void) {
+    change(this.loaded);
+    const snap = structuredClone(this.loaded);
+    this.configListeners.forEach((l) => l(snap));
+  }
+
+  onConfigChanged(callback: (loaded: Loaded) => void) {
+    this.configListeners.add(callback);
+    return () => void this.configListeners.delete(callback);
   }
 
   private snapshot(): JobDto[] {

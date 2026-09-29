@@ -1,0 +1,43 @@
+# 내장 기본값. 사용자 config.toml이 이 위에 덮어써진다.
+
+# 최상위 키는 테이블([...]) 앞에 와야 한다.
+favorites = []
+
+[behavior]
+theme = "light"
+
+[behavior.table]
+icon_size = 16
+circular_selection = false
+right_click_select = false
+
+[behavior.quick_select]
+match_only_prefix = false
+activate_on_any_character = true
+
+[behavior.selection]
+shift_mode = "invert"
+
+[behavior.layout]
+show_action_bar = true
+
+[display]
+relative_date = true
+date_format = "%-d %b %Y"
+time_format = "%H:%M"
+size_format = "adaptive"
+
+[environment]
+text_editor = ""
+terminal = "default"
+
+[core.confirm]
+delete = true
+trash = false
+
+[layout]
+action_bar = ["core.edit", "core.copy", "core.move", "core.file.new_folder", "core.trash", "core.delete"]
+
+[view.table]
+columns = ["name", "size", "modified"]
+

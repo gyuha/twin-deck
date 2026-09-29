@@ -1,6 +1,7 @@
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
+import { defaultLoaded } from "@twin-deck/ts-client";
 import { start } from "../bootstrap";
 
 const entry = (name: string, kind: "file" | "dir") => ({
@@ -32,6 +33,7 @@ describe("앱 부팅 (Tauri IPC 모킹)", () => {
         if (cmd === "plugin:path|resolve_directory") return "/home/me";
         if (cmd === "list_dir") return [entry("docs", "dir"), entry("a.txt", "file")];
         if (cmd === "queue_jobs") return [];
+        if (cmd === "get_config") return defaultLoaded();
         return null;
       },
       { shouldMockEvents: true },
@@ -45,6 +47,7 @@ describe("앱 부팅 (Tauri IPC 모킹)", () => {
     expect(calls).toContain("list_dir");
     expect(calls).toContain("watch_dir");
     expect(calls).toContain("queue_jobs");
+    expect(calls).toContain("get_config");
   });
 
   it("IPC가 거부되면 빈 화면 대신 시작 실패 문구를 보여 준다", async () => {

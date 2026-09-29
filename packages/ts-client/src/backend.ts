@@ -1,4 +1,4 @@
-import type { EntryDto, JobDto, JobKindDto, QueueItemDto } from "./generated/bindings";
+import type { EntryDto, JobDto, JobKindDto, Loaded, QueueItemDto } from "./generated/bindings";
 
 /** Rust 쪽이 돌려준 오류 문자열을 감싼 예외. */
 export class BackendError extends Error {}
@@ -23,6 +23,10 @@ export interface Backend {
   queueAbort(id: number): Promise<void>;
   /** 끝난 작업을 목록에서 지운다. */
   queueClearFinished(): Promise<void>;
+  /** 현재 설정(기본값 병합 결과)과 키바인딩, 경고. */
+  getConfig(): Promise<Loaded>;
+  /** 설정 파일이 바뀔 때마다 호출된다. 문법 오류면 이전 유효 설정과 경고가 온다. */
+  onConfigChanged(callback: (loaded: Loaded) => void): () => void;
   /** 큐 상태가 바뀔 때마다 전체 스냅샷과 함께 호출된다. */
   onQueueChanged(callback: (jobs: JobDto[]) => void): () => void;
   watch(path: string): Promise<void>;
