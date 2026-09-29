@@ -21,6 +21,8 @@ type OutcomeDto = { type: "done"; path: string } | { type: "skipped" };
 interface Node {
   kind: "file" | "dir";
   content: string;
+  modifiedMs?: number;
+  createdMs?: number;
 }
 
 const TRASH = "/.trash";
@@ -118,16 +120,24 @@ export class FakeBackend implements Backend {
       const name = baseName(p);
       const hidden = name.startsWith(".");
       if (hidden && !showHidden) continue;
-      out.push({ name, path: p, kind: n.kind, size: n.content.length, modifiedMs: 0, hidden });
+      out.push({
+        name,
+        path: p,
+        kind: n.kind,
+        size: n.content.length,
+        modifiedMs: n.modifiedMs ?? 0,
+        createdMs: n.createdMs ?? 0,
+        mode: n.kind === "dir" ? 0o755 : 0o644,
+        hidden,
+      });
     }
-    out.sort((a, b) => {
-      if ((a.kind === "dir") !== (b.kind === "dir")) return a.kind === "dir" ? -1 : 1;
-      // Rust의 compare_names와 같은 규칙: NFC + 소문자 후 코드 순서 비교.
-      const ka = a.name.normalize("NFC").toLowerCase();
-      const kb = b.name.normalize("NFC").toLowerCase();
-      return ka < kb ? -1 : ka > kb ? 1 : 0;
+    // Rust의 compare_names와 같은 규칙: NFC + 소문자 후 코드 순서 비교. 키는 한 번만 계산한다.
+    const keyed = out.map((e) => ({ e, k: e.name.normalize("NFC").toLowerCase() }));
+    keyed.sort((a, b) => {
+      if ((a.e.kind === "dir") !== (b.e.kind === "dir")) return a.e.kind === "dir" ? -1 : 1;
+      return a.k < b.k ? -1 : a.k > b.k ? 1 : 0;
     });
-    return out;
+    return keyed.map((x) => x.e);
   }
 
   async mkdir(path: string) {
@@ -208,6 +218,11 @@ export class FakeBackend implements Backend {
 
   async getConfig() {
     return structuredClone(this.loaded);
+  }
+
+  /** 테스트용: 파일의 수정·생성 시각을 지정한다. */
+  setTimes(path: string, times: { modifiedMs?: number; createdMs?: number }) {
+    Object.assign(this.need(path), times);
   }
 
   /** 테스트용: 설정을 고치고 구독자에게 알린다(파일 감시 재로딩을 흉내 낸다). */

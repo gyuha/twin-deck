@@ -4,11 +4,19 @@ import type { Backend, ConflictDto, EntryDto, JobDto, Loaded, QueueItemDto, User
 import type { ActionContext } from "@twin-deck/actions";
 import type { Scope } from "@twin-deck/keybinds";
 import { quickMatch } from "../lib/names";
+import { parseColumns } from "../lib/columns";
+import { DEFAULT_SORT, SORT_KEYS, sortEntries, sortFromColumns } from "../lib/sort";
+import type { SortKey, SortState } from "../lib/sort";
 
 export type PaneId = "left" | "right";
 
+export type ViewMode = { mode: "table" } | { mode: "columns"; count: 1 | 2 | 3 };
+
 export interface TabState {
   id: number;
+  /** 탭별 정렬. null이면 설정의 컬럼 명세(`>extension` 등)를 따른다. */
+  sort: SortState | null;
+  view: ViewMode;
   path: string;
   /** 방문한 경로 이력 (이 탭). */
   history: string[];
@@ -70,6 +78,11 @@ export interface AppState {
 }
 
 export const PAGE_SIZE = 10;
+
+/** 탭의 실제 정렬: 탭 설정 > 컬럼 명세의 정렬 표시 > 이름 오름차순. */
+export function effectiveSort(tab: TabState, columns: readonly string[]): SortState {
+  return tab.sort ?? sortFromColumns(parseColumns(columns)) ?? DEFAULT_SORT;
+}
 const other = (p: PaneId): PaneId => (p === "left" ? "right" : "left");
 
 export const isActiveJob = (j: JobDto) => ["queued", "running", "paused"].includes(j.status);
@@ -98,6 +111,7 @@ export function actionContext(s: AppState): ActionContext {
     tabCount: s.panes[s.activePane].tabs.length,
     canGoUp: parentPath(tab.path) !== null,
     cursorIsDir: cursorEntry(tab)?.kind === "dir",
+    multiColumn: tab.view.mode === "columns",
   };
 }
 
@@ -114,6 +128,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
   let nextTabId = 1;
   const newTab = (path: string): TabState => ({
     id: nextTabId++,
+    sort: null,
+    view: { mode: "table" },
     path,
     history: [path],
     entries: [],
@@ -159,8 +175,9 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     if (!tab) return;
     const keepName = focusName ?? cursorEntry(tab)?.name;
     try {
-      const entries = await backend.listDir(tab.path, get().showHidden);
+      const listed = await backend.listDir(tab.path, get().showHidden);
       patchTab(pane, tabId, (t) => {
+        const entries = sortEntries(listed, effectiveSort(t, cfg().view.table.columns));
         const idx = keepName ? entries.findIndex((e) => e.name === keepName) : -1;
         const paths = new Set(entries.map((e) => e.path));
         return {
@@ -228,15 +245,20 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     }
   };
   const unsubscribeQueue = backend.onQueueChanged(applyQueue);
-  const unsubscribeConfig = backend.onConfigChanged((loaded) => set({ loaded }));
+  // 설정이 바뀌면 컬럼 명세(정렬 표시)나 표시 옵션이 달라질 수 있으니 목록을 다시 정렬한다.
+  const unsubscribeConfig = backend.onConfigChanged((loaded) => {
+    set({ loaded });
+    void reloadAll();
+  });
   const cfg = () => get().loaded.config;
 
   const api = {
     async init() {
+      // 설정(컬럼 명세의 정렬 표시 등)을 먼저 읽고 첫 목록을 만든다.
+      set({ loaded: await backend.getConfig(), userDirs: await backend.userDirs() });
       await reloadAll();
       await syncWatches();
       applyQueue(await backend.queueJobs());
-      set({ loaded: await backend.getConfig(), userDirs: await backend.userDirs() });
     },
 
     dispose() {
@@ -283,6 +305,52 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         if (circular && Math.abs(delta) === 1) next = (next + len) % len;
         return { cursor: clamp(next, len) };
       });
+    },
+    /** 반 페이지 이동 (NAV-02). */
+    moveHalfPage(dir: 1 | -1) {
+      api.moveCursor(dir * Math.floor(PAGE_SIZE / 2));
+    },
+    /** 다중 컬럼 모드에서 이전/다음 컬럼으로 (NAV-05). 컬럼은 위에서 아래로 채워진다. */
+    moveColumn(dir: 1 | -1) {
+      patchActive((t) => {
+        if (t.view.mode !== "columns" || t.entries.length === 0) return {};
+        const rows = Math.ceil(t.entries.length / t.view.count);
+        return { cursor: clamp(t.cursor + dir * rows, t.entries.length) };
+      });
+    },
+    /** 정렬 변경 (`core.view.order`). 같은 키를 다시 고르면 방향을 뒤집는다. `dir`로 방향을 지정할 수 있다. */
+    setOrder(args?: Record<string, unknown>) {
+      const s = get();
+      const tab = activeTab(s);
+      const current = effectiveSort(tab, cfg().view.table.columns);
+      const by = typeof args?.by === "string" ? args.by : current.key;
+      if (!(SORT_KEYS as readonly string[]).includes(by)) return fail(`알 수 없는 정렬 기준: ${by}`);
+      const key = by as SortKey;
+      const asked = args?.dir;
+      const dir =
+        asked === "asc" || asked === "desc" ? asked : key === current.key ? (current.dir === "asc" ? "desc" : "asc") : "asc";
+      const sort: SortState = { key, dir };
+      patchActive((t) => {
+        const cursorPath = t.entries[t.cursor]?.path;
+        const entries = sortEntries(t.entries, sort);
+        const idx = cursorPath ? entries.findIndex((e) => e.path === cursorPath) : -1;
+        return { sort, entries, cursor: idx >= 0 ? idx : 0 };
+      });
+    },
+    /** 표시 모드 변경 (`core.view.mode`). 인수가 없으면 table → columns-1 → 2 → 3 → table 순환. */
+    setViewMode(args?: Record<string, unknown>) {
+      const order = ["table", "columns-1", "columns-2", "columns-3"] as const;
+      const t = activeTab(get());
+      const now = t.view.mode === "table" ? "table" : (`columns-${t.view.count}` as const);
+      const asked = typeof args?.mode === "string" ? args.mode : order[(order.indexOf(now) + 1) % order.length];
+      const view: ViewMode | null =
+        asked === "table"
+          ? { mode: "table" }
+          : asked === "columns-1" || asked === "columns-2" || asked === "columns-3"
+            ? { mode: "columns", count: Number(asked.slice(-1)) as 1 | 2 | 3 }
+            : null;
+      if (!view) return fail(`알 수 없는 표시 모드: ${asked}`);
+      patchActive({ view });
     },
     cursorHome() {
       patchActive({ cursor: 0 });

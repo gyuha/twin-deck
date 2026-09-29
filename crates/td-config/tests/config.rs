@@ -281,3 +281,43 @@ fn favorite_append_refuses_and_keeps_file_when_unsafe() {
     assert!(append_favorite(dir.path(), "x", "/x").is_err());
     assert_eq!(fs::read_to_string(&file).unwrap(), "[broken\n");
 }
+
+#[test]
+fn columns_spec_parse() {
+    use td_config::{parse_column, SortMarker};
+    let c = parse_column("name").unwrap();
+    assert_eq!((c.name.as_str(), c.sort, c.width), ("name", None, None));
+    let c = parse_column(">extension:50").unwrap();
+    assert_eq!(
+        (c.name.as_str(), c.sort, c.width),
+        ("extension", Some(SortMarker::Desc), Some(50))
+    );
+    let c = parse_column("<modified").unwrap();
+    assert_eq!(
+        (c.name.as_str(), c.sort, c.width),
+        ("modified", Some(SortMarker::Asc), None)
+    );
+    let c = parse_column("size:120").unwrap();
+    assert_eq!((c.sort, c.width), (None, Some(120)));
+    for name in td_config::COLUMN_NAMES {
+        assert!(parse_column(name).is_ok(), "{name}");
+    }
+
+    for bad in [
+        "", "<", "colour", ">nope:5", "size:abc", "size:0", "size:-3", "size:", ":5", "<>name",
+        "Name",
+    ] {
+        assert!(parse_column(bad).is_err(), "'{bad}'는 오류여야 한다");
+    }
+
+    // 설정 로딩: 잘못된 항목은 경고하고 빠지며 name은 항상 있다
+    let l = load("[view.table]\ncolumns = [\"size\", \"colour\", \">extension:50\", \"size:x\"]\n");
+    assert_eq!(
+        l.config.view.table.columns,
+        ["name", "size", ">extension:50"]
+    );
+    assert_eq!(l.warnings.len(), 2, "{:?}", l.warnings);
+    assert!(l.warnings.iter().any(|w| w.message.contains("colour")));
+    let l = load("[view.table]\ncolumns = []\n");
+    assert_eq!(l.config.view.table.columns, ["name"]);
+}

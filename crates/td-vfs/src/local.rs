@@ -20,6 +20,19 @@ fn is_hidden(name: &str, meta: &fs::Metadata) -> bool {
     }
 }
 
+fn mode_of(meta: &fs::Metadata) -> Option<u32> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        Some(meta.permissions().mode() & 0o7777)
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = meta;
+        None
+    }
+}
+
 fn to_entry(path: &VfsPath, meta: &fs::Metadata) -> Entry {
     let name = path.file_name().unwrap_or_default();
     let ft = meta.file_type();
@@ -37,6 +50,8 @@ fn to_entry(path: &VfsPath, meta: &fs::Metadata) -> Entry {
         kind,
         size: meta.len(),
         modified: meta.modified().ok(),
+        created: meta.created().ok(),
+        mode: mode_of(meta),
     }
 }
 

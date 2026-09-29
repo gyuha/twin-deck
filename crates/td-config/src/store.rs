@@ -1,8 +1,10 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::mpsc::RecvTimeoutError;
 use std::sync::mpsc::{self, Receiver};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::{Duration, SystemTime};
 
 use td_watch::DirWatcher;
 
@@ -14,6 +16,19 @@ pub struct ConfigStore {
     current: Arc<Mutex<Loaded>>,
     dir: PathBuf,
     _watcher: DirWatcher,
+}
+
+/// 파일 이벤트가 늦거나 유실돼도 설정이 반영되도록, 이 주기로 파일 상태를 직접 비교한다.
+const POLL: Duration = Duration::from_secs(1);
+
+type Signature = [Option<(SystemTime, u64)>; 2];
+
+/// `config.toml`, `keybindings.toml`의 (수정 시각, 크기). 없으면 None.
+fn signature(dir: &Path) -> Signature {
+    ["config.toml", "keybindings.toml"].map(|name| {
+        let meta = fs::metadata(dir.join(name)).ok()?;
+        Some((meta.modified().ok()?, meta.len()))
+    })
 }
 
 /// 문법 오류로 읽기에 실패한 파일이 있는지 (그 파일의 내용은 이전 값을 유지해야 한다).
@@ -37,8 +52,21 @@ impl ConfigStore {
         let (tx, rx) = mpsc::channel();
         let (cur, d) = (Arc::clone(&current), dir.to_path_buf());
         thread::spawn(move || {
-            while changes.recv().is_ok() {
-                while changes.try_recv().is_ok() {}
+            let mut last = signature(&d);
+            loop {
+                let by_event = match changes.recv_timeout(POLL) {
+                    Ok(_) => {
+                        while changes.try_recv().is_ok() {}
+                        true
+                    }
+                    Err(RecvTimeoutError::Timeout) => false,
+                    Err(RecvTimeoutError::Disconnected) => return,
+                };
+                let now = signature(&d);
+                if !by_event && now == last {
+                    continue;
+                }
+                last = now;
                 let mut fresh = load_dir(&d, platform);
                 let mut guard = cur.lock().unwrap();
                 if has_syntax_error(&fresh) {

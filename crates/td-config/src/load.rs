@@ -248,6 +248,16 @@ pub fn load_from_strs(
     };
     config.favorites = favorites;
 
+    // 컬럼 명세 검증: 잘못된 항목은 빼고 경고, name 컬럼은 항상 앞에 있다.
+    let (columns, bad) = crate::columns::normalize_columns(&config.view.table.columns);
+    for (spec, why) in bad {
+        warnings.push(Warning::new(
+            "config.toml",
+            format!("view.table.columns '{spec}': {why}"),
+        ));
+    }
+    config.view.table.columns = columns;
+
     let mut bindings = Vec::new();
     if let Some(src) = keybindings {
         match src.parse::<Table>() {

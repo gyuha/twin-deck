@@ -17,6 +17,7 @@ const ctx = (o: Partial<ActionContext> = {}): ActionContext => ({
   tabCount: 1,
   canGoUp: true,
   cursorIsDir: false,
+  multiColumn: false,
   ...o,
 });
 

@@ -18,9 +18,13 @@ export function seedBackend() {
   });
 }
 
-export async function renderApp(backend = seedBackend(), platform: "linux" | "mac" = "linux") {
+export async function renderApp(
+  backend = seedBackend(),
+  platform: "linux" | "mac" = "linux",
+  paths: { left: string; right: string } = { left: "/home/a", right: "/home/b" },
+) {
   const user = userEvent.setup();
-  render(<App backend={backend} platform={platform} leftPath="/home/a" rightPath="/home/b" />);
+  render(<App backend={backend} platform={platform} leftPath={paths.left} rightPath={paths.right} />);
   await waitFor(() => expect(within(list("left")).queryAllByRole("option").length).toBeGreaterThan(0));
   return { user, backend };
 }

@@ -13,6 +13,8 @@ export interface ActionContext {
   canGoUp: boolean;
   /** 커서 항목이 폴더인지. */
   cursorIsDir: boolean;
+  /** 활성 탭이 다중 컬럼 표시 모드인지. */
+  multiColumn: boolean;
 }
 
 const hasTarget = (c: ActionContext) => c.selectedCount > 0 || c.hasCursorItem;
@@ -42,6 +44,12 @@ export const DEFAULT_ACTION_META = [
   { id: "core.move.page_down", title: "페이지 아래로", category: "Navigation", scopes: ["pane"] },
   { id: "core.move.home", title: "처음으로", category: "Navigation", scopes: ["pane"] },
   { id: "core.move.end", title: "끝으로", category: "Navigation", scopes: ["pane"] },
+  { id: "core.move.half_page_up", title: "반 페이지 위로", category: "Navigation", scopes: ["pane"] },
+  { id: "core.move.half_page_down", title: "반 페이지 아래로", category: "Navigation", scopes: ["pane"] },
+  { id: "core.move.left", title: "이전 컬럼", category: "Navigation", scopes: ["pane"], isApplicable: (c) => c.multiColumn },
+  { id: "core.move.right", title: "다음 컬럼", category: "Navigation", scopes: ["pane"], isApplicable: (c) => c.multiColumn },
+  { id: "core.view.order", title: "정렬 (인수: by, dir)", category: "View", scopes: ["pane"] },
+  { id: "core.view.mode", title: "표시 모드 (인수: mode)", category: "View", scopes: ["pane"] },
   { id: "core.pane.switch", title: "활성 패널 전환", category: "Navigation", scopes: ["pane"] },
   { id: "core.select.all", title: "전체 선택", category: "Selection", scopes: ["pane"] },
   { id: "core.select.none", title: "선택 해제", category: "Selection", scopes: ["pane"], isApplicable: (c) => c.selectedCount > 0 },
@@ -101,6 +109,14 @@ const b = (scope: Binding["scope"], actionId: DefaultActionId, ...keys: string[]
   keys,
 });
 
+/** 인수가 있는 기본 바인딩. */
+const ba = (
+  scope: Binding["scope"],
+  actionId: DefaultActionId,
+  args: Record<string, string>,
+  ...keys: string[]
+): Binding => ({ scope, actionId, keys, args });
+
 /** M1 기본 키맵 (OS 중립 표기). macOS와 Windows/Linux가 다른 항목은 `DEFAULT_BINDINGS_BY_PLATFORM`에서 덮는다. */
 export const DEFAULT_BINDINGS: Binding[] = [
   b("pane", "core.copy", "F5"),
@@ -119,6 +135,20 @@ export const DEFAULT_BINDINGS: Binding[] = [
   b("pane", "core.move.home", "Home"),
   b("pane", "core.move.end", "End"),
   b("pane", "core.pane.switch", "Tab"),
+  b("pane", "core.move.half_page_up", "Alt+PageUp"),
+  b("pane", "core.move.half_page_down", "Alt+PageDown"),
+  b("pane", "core.move.left", "Left"),
+  b("pane", "core.move.right", "Right"),
+  // 정렬/표시 모드의 기본 키는 twin-deck 자체 정의다(docs/05에 기본 키가 없다). 같은 정렬 키를 다시 누르면 방향이 바뀐다.
+  ba("pane", "core.view.order", { by: "name" }, "Alt+Shift+N"),
+  ba("pane", "core.view.order", { by: "size" }, "Alt+Shift+S"),
+  ba("pane", "core.view.order", { by: "modified" }, "Alt+Shift+M"),
+  ba("pane", "core.view.order", { by: "created" }, "Alt+Shift+C"),
+  ba("pane", "core.view.order", { by: "extension" }, "Alt+Shift+E"),
+  ba("pane", "core.view.mode", { mode: "table" }, "Mod+Alt+0"),
+  ba("pane", "core.view.mode", { mode: "columns-1" }, "Mod+Alt+1"),
+  ba("pane", "core.view.mode", { mode: "columns-2" }, "Mod+Alt+2"),
+  ba("pane", "core.view.mode", { mode: "columns-3" }, "Mod+Alt+3"),
   b("pane", "core.select.all", "Mod+A"),
   b("pane", "core.select.none", "Escape"),
   b("pane", "core.select.toggle", "Space", "Insert"),

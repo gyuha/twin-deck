@@ -10,6 +10,8 @@ const entry = (name: string, kind: "file" | "dir") => ({
   kind,
   size: 1,
   modifiedMs: null,
+  createdMs: null,
+  mode: null,
   hidden: false,
 });
 

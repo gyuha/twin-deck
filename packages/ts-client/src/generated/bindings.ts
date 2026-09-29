@@ -181,7 +181,15 @@ size: number;
 /**
  * 수정 시각(epoch 밀리초). 알 수 없으면 null.
  */
-modifiedMs: number | null; hidden: boolean }
+modifiedMs: number | null; 
+/**
+ * 생성 시각(epoch 밀리초). 파일시스템이 지원하지 않으면 null.
+ */
+createdMs: number | null; 
+/**
+ * 유닉스 권한 비트. Windows에서는 null.
+ */
+mode: number | null; hidden: boolean }
 export type Environment = { text_editor: string; terminal: string }
 /**
  * 즐겨찾기 항목. `kind`는 "item" | "separator" | "group". 그룹은 한 단계까지 지원한다.

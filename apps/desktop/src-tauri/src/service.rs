@@ -30,6 +30,10 @@ pub struct EntryDto {
     pub size: f64,
     /// 수정 시각(epoch 밀리초). 알 수 없으면 null.
     pub modified_ms: Option<f64>,
+    /// 생성 시각(epoch 밀리초). 파일시스템이 지원하지 않으면 null.
+    pub created_ms: Option<f64>,
+    /// 유닉스 권한 비트. Windows에서는 null.
+    pub mode: Option<u32>,
     pub hidden: bool,
 }
 
@@ -66,6 +70,11 @@ impl From<&Entry> for EntryDto {
                 .modified
                 .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
                 .map(|d| d.as_millis() as f64),
+            created_ms: e
+                .created
+                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                .map(|d| d.as_millis() as f64),
+            mode: e.mode,
             hidden: e.hidden,
         }
     }
