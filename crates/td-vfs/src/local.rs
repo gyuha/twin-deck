@@ -91,4 +91,25 @@ impl Vfs for LocalFs {
     fn copy_file(&self, from: &VfsPath, to: &VfsPath) -> Result<u64> {
         fs::copy(from.as_path(), to.as_path()).map_err(|e| VfsError::io(from, e))
     }
+
+    fn read_link(&self, path: &VfsPath) -> Result<VfsPath> {
+        fs::read_link(path.as_path())
+            .map(VfsPath::new)
+            .map_err(|e| VfsError::io(path, e))
+    }
+
+    fn symlink(&self, target: &VfsPath, link: &VfsPath, target_is_dir: bool) -> Result<()> {
+        #[cfg(unix)]
+        let result = {
+            let _ = target_is_dir;
+            std::os::unix::fs::symlink(target.as_path(), link.as_path())
+        };
+        #[cfg(windows)]
+        let result = if target_is_dir {
+            std::os::windows::fs::symlink_dir(target.as_path(), link.as_path())
+        } else {
+            std::os::windows::fs::symlink_file(target.as_path(), link.as_path())
+        };
+        result.map_err(|e| VfsError::io(link, e))
+    }
 }

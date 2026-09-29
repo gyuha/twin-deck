@@ -25,4 +25,8 @@ pub trait Vfs {
     fn remove_dir_all(&self, path: &VfsPath) -> Result<()>;
     /// 파일 하나를 복사하고 복사한 바이트 수를 돌려준다.
     fn copy_file(&self, from: &VfsPath, to: &VfsPath) -> Result<u64>;
+    /// 심볼릭 링크가 가리키는 대상을 읽는다.
+    fn read_link(&self, path: &VfsPath) -> Result<VfsPath>;
+    /// `link` 위치에 `target`을 가리키는 심볼릭 링크를 만든다. `target_is_dir`은 Windows에서만 쓰인다.
+    fn symlink(&self, target: &VfsPath, link: &VfsPath, target_is_dir: bool) -> Result<()>;
 }
