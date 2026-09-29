@@ -60,13 +60,18 @@ export const DEFAULT_ACTION_META = [
 export type DefaultActionId = (typeof DEFAULT_ACTION_META)[number]["id"];
 export type ActionHandlers = Record<DefaultActionId, Action<ActionContext>["run"]>;
 
-/** 모든 M1 액션에 실행 핸들러를 강제(컴파일 타임)하고 레지스트리를 만든다. */
-export function createDefaultRegistry(handlers: ActionHandlers): ActionRegistry<ActionContext> {
+/** 핸들러가 주어진 M1 액션만 등록한다. 누락된 기본 액션은 `missingHandlers`로 확인한다. */
+export function createDefaultRegistry(handlers: Partial<ActionHandlers>): ActionRegistry<ActionContext> {
   const registry = new ActionRegistry<ActionContext>();
   for (const meta of DEFAULT_ACTION_META as readonly Meta[]) {
-    registry.register({ ...meta, run: handlers[meta.id as DefaultActionId] });
+    const run = handlers[meta.id as DefaultActionId];
+    if (run) registry.register({ ...meta, run });
   }
   return registry;
+}
+
+export function missingHandlers(handlers: Partial<ActionHandlers>): DefaultActionId[] {
+  return DEFAULT_ACTION_META.map((m) => m.id).filter((id) => !handlers[id]);
 }
 
 const b = (scope: Binding["scope"], actionId: DefaultActionId, ...keys: string[]): Binding => ({

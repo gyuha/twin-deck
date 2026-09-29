@@ -75,7 +75,10 @@ export class FakeBackend implements Backend {
     }
     out.sort((a, b) => {
       if ((a.kind === "dir") !== (b.kind === "dir")) return a.kind === "dir" ? -1 : 1;
-      return a.name.normalize("NFC").toLowerCase().localeCompare(b.name.normalize("NFC").toLowerCase());
+      // Rust의 compare_names와 같은 규칙: NFC + 소문자 후 코드 순서 비교.
+      const ka = a.name.normalize("NFC").toLowerCase();
+      const kb = b.name.normalize("NFC").toLowerCase();
+      return ka < kb ? -1 : ka > kb ? 1 : 0;
     });
     return out;
   }

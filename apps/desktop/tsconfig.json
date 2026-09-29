@@ -6,7 +6,7 @@
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
     "strict": true,
-    "noUnusedLocals": true,
+    "noUnusedLocals": false, // tauri-specta 생성 파일(packages/ts-client)에 미사용 import가 있다
     "noUnusedParameters": true,
     "skipLibCheck": true,
     "isolatedModules": true,

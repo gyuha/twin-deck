@@ -11,7 +11,12 @@
   },
   "dependencies": {
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "zustand": "^5.0.0",
+    "@twin-deck/actions": "workspace:*",
+    "@twin-deck/keybinds": "workspace:*",
+    "@twin-deck/ts-client": "workspace:*",
+    "@tauri-apps/api": "^2.1.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.0",

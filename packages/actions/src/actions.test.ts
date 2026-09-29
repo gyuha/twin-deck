@@ -4,6 +4,7 @@ import {
   ActionRegistry,
   DEFAULT_ACTION_META,
   createDefaultRegistry,
+  missingHandlers,
   defaultBindingsFor,
 } from "./index";
 import type { ActionContext, ActionHandlers } from "./index";
@@ -72,6 +73,16 @@ describe("ACT-02 컨텍스트 조건부 활성", () => {
   it("조건 없는 액션(새 폴더)은 항상 활성", () => {
     const r = createDefaultRegistry(handlers());
     expect(r.isApplicable("core.file.new_folder", ctx())).toBe(true);
+  });
+});
+
+describe("핸들러 누락 검사", () => {
+  it("일부만 주면 그 액션만 등록되고 누락 목록을 알 수 있다", () => {
+    const r = createDefaultRegistry({ "core.copy": () => {} });
+    expect(r.has("core.copy")).toBe(true);
+    expect(r.has("core.move")).toBe(false);
+    expect(missingHandlers({ "core.copy": () => {} })).toContain("core.move");
+    expect(missingHandlers(handlers())).toEqual([]);
   });
 });
 
