@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["apps/desktop/src-tauri", "crates/td-vfs", "crates/td-ops"]
+members = ["apps/desktop/src-tauri", "crates/td-vfs", "crates/td-ops", "crates/td-watch"]
 
 [workspace.package]
 edition = "2021"

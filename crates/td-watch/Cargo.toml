@@ -1,0 +1,13 @@
+[package]
+name = "td-watch"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+notify = "8"
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
