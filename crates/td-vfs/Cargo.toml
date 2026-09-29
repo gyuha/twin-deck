@@ -1,0 +1,15 @@
+[package]
+name = "td-vfs"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+serde.workspace = true
+unicode-normalization = "0.1"
+
+[dev-dependencies]
+unicode-normalization = "0.1"
+tempfile.workspace = true

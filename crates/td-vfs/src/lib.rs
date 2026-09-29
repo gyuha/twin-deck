@@ -1,0 +1,28 @@
+//! 로컬 파일시스템과 (이후) 아카이브를 같은 인터페이스로 다루는 VFS 계층.
+
+mod entry;
+mod error;
+mod local;
+mod names;
+mod path;
+
+pub use entry::{Entry, EntryKind, ListOptions};
+pub use error::{Result, VfsError};
+pub use local::LocalFs;
+pub use names::{compare_names, matches_prefix, normalize_name, sort_entries};
+pub use path::VfsPath;
+
+/// 파일시스템 추상화. 지금은 `LocalFs`만 구현한다.
+pub trait Vfs {
+    fn list(&self, dir: &VfsPath, opts: &ListOptions) -> Result<Vec<Entry>>;
+    fn stat(&self, path: &VfsPath) -> Result<Entry>;
+    /// 중첩 경로를 포함해 폴더를 만든다.
+    fn mkdir(&self, path: &VfsPath) -> Result<()>;
+    /// 0바이트 파일을 만든다. 이미 있으면 오류.
+    fn create_file(&self, path: &VfsPath) -> Result<()>;
+    fn rename(&self, from: &VfsPath, to: &VfsPath) -> Result<()>;
+    fn remove_file(&self, path: &VfsPath) -> Result<()>;
+    fn remove_dir_all(&self, path: &VfsPath) -> Result<()>;
+    /// 파일 하나를 복사하고 복사한 바이트 수를 돌려준다.
+    fn copy_file(&self, from: &VfsPath, to: &VfsPath) -> Result<u64>;
+}
