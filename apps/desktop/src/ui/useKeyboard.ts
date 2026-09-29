@@ -35,6 +35,18 @@ export function useKeyboard({ app, keymap, registry }: Options) {
         api.quickInput(" ");
         return;
       }
+      // Go To Path: Tab으로 폴더 이름을 완성한다(포커스 이동 대신).
+      if (top === "dialog" && s.dialog?.kind === "name" && s.dialog.goto && e.key === "Tab" && plain) {
+        e.preventDefault();
+        void api.gotoComplete();
+        return;
+      }
+      // 팝업 메뉴: 숫자키로 항목을 고른다.
+      if (top === "panel" && plain && /^[0-9]$/.test(e.key)) {
+        e.preventDefault();
+        void api.menuSelectNth(Number(e.key));
+        return;
+      }
       // 충돌 다이얼로그: 방향키로 고르고 O/S/R로 바로 확정한다.
       if (top === "dialog" && s.dialog?.kind === "conflict" && plain) {
         const d = s.dialog;

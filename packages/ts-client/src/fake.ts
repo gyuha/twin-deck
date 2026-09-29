@@ -1,6 +1,15 @@
 import { BackendError, baseName, joinPath, parentPath } from "./backend";
 import type { Backend } from "./backend";
-import type { ConflictDto, EntryDto, JobDto, JobKindDto, Loaded, QueueItemDto } from "./generated/bindings";
+import type {
+  ConflictDto,
+  EntryDto,
+  JobDto,
+  JobKindDto,
+  Loaded,
+  QueueItemDto,
+  UserDirsDto,
+  VolumeDto,
+} from "./generated/bindings";
 import defaultConfigJson from "./generated/default-config.json";
 
 /** Rust가 만든 내장 기본 설정(무경고, 사용자 바인딩 없음). */
@@ -33,6 +42,22 @@ export class FakeBackend implements Backend {
    * `manual`: `advance()`를 부를 때마다 항목 하나씩 실행한다(진행/일시정지/중단 테스트용).
    */
   queueMode: "instant" | "manual" = "instant";
+  /** 테스트에서 바꿀 수 있는 볼륨 목록. 언마운트하면 목록에서 빠진다. */
+  volumes: VolumeDto[] = [
+    { name: "/", mountPoint: "/" },
+    { name: "USB", mountPoint: "/Volumes/USB" },
+  ];
+  readonly unmounted: string[] = [];
+  readonly ejected: string[] = [];
+  userDirsValue: UserDirsDto = {
+    home: "/home/a",
+    downloads: "/home/a/docs",
+    documents: null,
+    desktop: null,
+    pictures: null,
+    music: null,
+    movies: null,
+  };
   private loaded: Loaded = defaultLoaded();
   private configListeners = new Set<(l: Loaded) => void>();
   private jobs = new Map<number, FakeJob>();
@@ -145,6 +170,40 @@ export class FakeBackend implements Backend {
     if (this.need(src).kind === "dir" && (destDir === src || destDir.startsWith(`${src}/`))) {
       throw new BackendError(`대상이 원본 자신이거나 그 하위입니다: ${destDir}`);
     }
+  }
+
+  async listVolumes() {
+    return this.volumes.map((v) => ({ ...v }));
+  }
+
+  private checkVolume(mountPoint: string) {
+    if (mountPoint === "/") throw new BackendError("루트 볼륨은 언마운트할 수 없습니다");
+    if (!this.volumes.some((v) => v.mountPoint === mountPoint)) {
+      throw new BackendError(`마운트된 볼륨이 아닙니다: ${mountPoint}`);
+    }
+  }
+
+  async unmountVolume(mountPoint: string) {
+    this.checkVolume(mountPoint);
+    this.unmounted.push(mountPoint);
+    this.volumes = this.volumes.filter((v) => v.mountPoint !== mountPoint);
+  }
+
+  async ejectVolume(mountPoint: string) {
+    this.checkVolume(mountPoint);
+    this.ejected.push(mountPoint);
+    this.volumes = this.volumes.filter((v) => v.mountPoint !== mountPoint);
+  }
+
+  async userDirs() {
+    return { ...this.userDirsValue };
+  }
+
+  /** 실제 구현처럼 config.toml에 덧붙인 뒤 재로딩되는 것을 흉내 낸다. */
+  async addFavorite(name: string, path: string) {
+    this.setConfig((l) => {
+      (l.config.favorites ??= []).push({ kind: "item", name, path, items: [] });
+    });
   }
 
   async getConfig() {

@@ -1,6 +1,6 @@
 import { createStore } from "zustand/vanilla";
-import { baseName, defaultLoaded, joinPath, parentPath } from "@twin-deck/ts-client";
-import type { Backend, ConflictDto, EntryDto, JobDto, Loaded, QueueItemDto } from "@twin-deck/ts-client";
+import { baseName, defaultLoaded, expandPath, joinPath, parentPath } from "@twin-deck/ts-client";
+import type { Backend, ConflictDto, EntryDto, JobDto, Loaded, QueueItemDto, UserDirsDto } from "@twin-deck/ts-client";
 import type { ActionContext } from "@twin-deck/actions";
 import type { Scope } from "@twin-deck/keybinds";
 import { quickMatch } from "../lib/names";
@@ -28,16 +28,35 @@ export interface PaneState {
 export const CONFLICT_CHOICES: readonly ConflictDto[] = ["overwrite", "skip", "rename"];
 
 export type DialogState =
-  | { kind: "name"; title: string; value: string; error: string | null; selectStem: boolean }
+  | { kind: "name"; title: string; value: string; error: string | null; selectStem: boolean; goto?: boolean }
   | { kind: "confirm"; title: string; lines: string[] }
   | { kind: "conflict"; title: string; existing: string; selected: number }
   | { kind: "info"; title: string; lines: string[] };
+
+export type MenuKind = "volumes" | "favorites" | "recent" | "hierarchy";
+
+export interface MenuItem {
+  label: string;
+  /** 이동할 경로. 없으면 머리글/구분선이라 고를 수 없다. */
+  path?: string;
+  separator?: boolean;
+}
+
+export interface MenuState {
+  kind: MenuKind;
+  title: string;
+  items: MenuItem[];
+  cursor: number;
+}
 
 export interface AppState {
   panes: Record<PaneId, PaneState>;
   activePane: PaneId;
   showHidden: boolean;
   dialog: DialogState | null;
+  /** 열려 있는 팝업 메뉴 (Volumes/Favorites/Recent/Hierarchy). */
+  menu: MenuState | null;
+  userDirs: UserDirsDto;
   /** 작업 큐 스냅샷 (끝난 작업은 팝업을 닫을 때까지 남는다). */
   queue: JobDto[];
   queueOpen: boolean;
@@ -84,6 +103,8 @@ export function actionContext(s: AppState): ActionContext {
 
 export function scopeStack(s: AppState): Scope[] {
   if (s.dialog) return ["dialog", "pane", "global"];
+  // 팝업 메뉴는 모달이다(panel 스코프).
+  if (s.menu) return ["panel", "global"];
   // 큐 팝업이 열려 있으면 패널 키는 받지 않는다.
   if (s.queueOpen) return ["queue", "global"];
   return activeTab(s).quick !== null ? ["quickSelect", "pane", "global"] : ["pane", "global"];
@@ -110,6 +131,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     activePane: "left",
     showHidden: false,
     dialog: null,
+    menu: null,
+    userDirs: { home: null, downloads: null, documents: null, desktop: null, pictures: null, music: null, movies: null },
     queue: [],
     queueOpen: false,
     queueCursor: 0,
@@ -213,7 +236,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       await reloadAll();
       await syncWatches();
       applyQueue(await backend.queueJobs());
-      set({ loaded: await backend.getConfig() });
+      set({ loaded: await backend.getConfig(), userDirs: await backend.userDirs() });
     },
 
     dispose() {
@@ -532,6 +555,167 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         .map((w) => `${w.file}${w.line ? `:${w.line}` : ""}: ${w.message}`)
         .concat(s.keymapWarnings);
       await ask<boolean>({ kind: "info", title: lines.length ? `설정 경고 ${lines.length}개` : "설정 경고 없음", lines });
+    },
+
+    /** Volumes/Favorites/Recent/Hierarchy 메뉴를 연다 (NAV-07~10). */
+    async openMenu(kind: MenuKind) {
+      const s = get();
+      const tab = activeTab(s);
+      let title = "";
+      let items: MenuItem[] = [];
+      set({ notice: null });
+      try {
+        if (kind === "volumes") {
+          title = "볼륨";
+          items = (await backend.listVolumes()).map((v) => ({
+            label: v.name === v.mountPoint ? v.name : `${v.name} — ${v.mountPoint}`,
+            path: v.mountPoint,
+          }));
+        } else if (kind === "favorites") {
+          title = "즐겨찾기";
+          const dirs = s.userDirs;
+          const resolve = (name: string, path: string, indent = ""): MenuItem[] => {
+            const real = expandPath(path, dirs);
+            return real ? [{ label: `${indent}${name}`, path: real }] : [];
+          };
+          for (const f of s.loaded.config.favorites ?? []) {
+            if (f.kind === "separator") items.push({ label: "", separator: true });
+            else if (f.kind === "group") {
+              items.push({ label: f.name ?? "" });
+              for (const leaf of f.items ?? []) items.push(...resolve(leaf.name, leaf.path, "  "));
+            } else items.push(...resolve(f.name ?? f.path ?? "", f.path ?? ""));
+          }
+        } else if (kind === "recent") {
+          title = "최근 위치";
+          const seen = new Set<string>([tab.path]);
+          for (const p of [...tab.history].reverse()) {
+            if (seen.has(p)) continue;
+            seen.add(p);
+            items.push({ label: p, path: p });
+            if (items.length >= 20) break;
+          }
+        } else {
+          title = "상위 폴더";
+          for (let p: string | null = tab.path; p !== null; p = parentPath(p)) {
+            items.push({ label: p, path: p });
+          }
+        }
+      } catch (e) {
+        fail(e);
+        return;
+      }
+      const first = items.findIndex((i) => i.path !== undefined);
+      set({ menu: { kind, title, items, cursor: Math.max(first, 0) } });
+    },
+    menuMove(delta: 1 | -1) {
+      set((s) => {
+        const m = s.menu;
+        if (!m) return {};
+        const n = m.items.length;
+        for (let i = m.cursor + delta; i >= 0 && i < n; i += delta) {
+          if (m.items[i].path !== undefined) return { menu: { ...m, cursor: i } };
+        }
+        return {};
+      });
+    },
+    menuClose() {
+      set({ menu: null });
+    },
+    /** 커서 항목으로 이동하고 메뉴를 닫는다. */
+    async menuSelect(index?: number) {
+      const m = get().menu;
+      if (!m) return;
+      const item = m.items[index ?? m.cursor];
+      if (!item?.path) return;
+      set({ menu: null });
+      await api.navigate(item.path);
+    },
+    /** 숫자키: n번째로 고를 수 있는 항목 (1~9, 0은 10번째). */
+    async menuSelectNth(n: number) {
+      const m = get().menu;
+      if (!m) return;
+      const selectable = m.items.map((it, i) => (it.path !== undefined ? i : -1)).filter((i) => i >= 0);
+      const idx = selectable[n === 0 ? 9 : n - 1];
+      if (idx !== undefined) await api.menuSelect(idx);
+    },
+    /** Volumes 메뉴에서 커서 볼륨을 언마운트/추출한다. */
+    async menuVolumeAction(kind: "unmount" | "eject") {
+      const m = get().menu;
+      const item = m?.kind === "volumes" ? m.items[m.cursor] : undefined;
+      if (!m || !item?.path) return;
+      set({ notice: null });
+      try {
+        if (kind === "unmount") await backend.unmountVolume(item.path);
+        else await backend.ejectVolume(item.path);
+      } catch (e) {
+        fail(e);
+        return;
+      }
+      set({ menu: null });
+      await api.openMenu("volumes");
+    },
+    /** Recent 메뉴에서 이 탭의 최근 위치를 비운다. */
+    menuClearRecent() {
+      const m = get().menu;
+      if (m?.kind !== "recent") return;
+      patchActive((t) => ({ history: [t.path] }));
+      set({ menu: { ...m, items: [], cursor: 0 } });
+    },
+    /** 현재 폴더를 즐겨찾기에 추가한다. */
+    async addFavoriteHere() {
+      const tab = activeTab(get());
+      set({ notice: null });
+      try {
+        await backend.addFavorite(baseName(tab.path) || tab.path, tab.path);
+      } catch (e) {
+        fail(e);
+      }
+    },
+    /** Go To Path (NAV-11): 경로를 입력해 이동한다. Tab으로 폴더 이름을 완성한다. */
+    async gotoPath() {
+      const tab = activeTab(get());
+      const value = await ask<string>({
+        kind: "name",
+        title: "경로로 이동",
+        value: tab.path.endsWith("/") ? tab.path : `${tab.path}/`,
+        error: null,
+        selectStem: false,
+        goto: true,
+      });
+      if (value === null) return;
+      const dest = expandPath(value.trim(), get().userDirs);
+      if (dest === null) return fail("사용자 폴더를 알 수 없어 경로를 확장하지 못했습니다");
+      const clean = dest.length > 1 ? dest.replace(/\/+$/, "") : dest;
+      set({ notice: null });
+      try {
+        await backend.listDir(clean, true);
+      } catch (e) {
+        return fail(e);
+      }
+      await api.navigate(clean);
+    },
+    async gotoComplete() {
+      const d = get().dialog;
+      if (d?.kind !== "name" || !d.goto) return;
+      const raw = expandPath(d.value, get().userDirs) ?? d.value;
+      const cut = raw.lastIndexOf("/");
+      const dir = cut <= 0 ? "/" : raw.slice(0, cut);
+      const prefix = raw.slice(cut + 1);
+      let names: string[];
+      try {
+        names = (await backend.listDir(dir, true)).filter((e) => e.kind === "dir" && quickMatch(e.name, prefix, true)).map((e) => e.name);
+      } catch {
+        return;
+      }
+      if (names.length === 0) return;
+      let common = names[0].normalize("NFC");
+      for (const n of names.slice(1)) {
+        const nn = n.normalize("NFC");
+        let i = 0;
+        while (i < common.length && i < nn.length && common[i] === nn[i]) i++;
+        common = common.slice(0, i);
+      }
+      api.dialogSetValue(joinPath(dir, common) + (names.length === 1 ? "/" : ""));
     },
 
     /** 작업 큐 팝업 열기/닫기 (`=`). 닫을 때 끝난 작업을 지운다. */

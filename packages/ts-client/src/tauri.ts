@@ -49,6 +49,21 @@ export class TauriBackend implements Backend {
   async unwatch(path: string) {
     unwrap(await commands.unwatchDir(path));
   }
+  listVolumes() {
+    return commands.listVolumes();
+  }
+  async unmountVolume(mountPoint: string) {
+    unwrap(await commands.unmountVolume(mountPoint));
+  }
+  async ejectVolume(mountPoint: string) {
+    unwrap(await commands.ejectVolume(mountPoint));
+  }
+  userDirs() {
+    return commands.userDirs();
+  }
+  async addFavorite(name: string, path: string) {
+    unwrap(await commands.addFavorite(name, path));
+  }
   getConfig() {
     return commands.getConfig();
   }

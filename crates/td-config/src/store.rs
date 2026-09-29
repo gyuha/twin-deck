@@ -71,3 +71,35 @@ impl ConfigStore {
         &self.dir
     }
 }
+
+/// `config.toml` 끝에 `[[favorites]]` 항목을 덧붙인다. 기존 내용과 주석은 그대로 두고,
+/// 결과가 올바른 TOML이 아니면(예: 이미 `favorites = [...]`로 정의됨) 파일을 건드리지 않고 오류를 돌려준다.
+pub fn append_favorite(dir: &Path, name: &str, path: &str) -> Result<(), String> {
+    let file = dir.join("config.toml");
+    let existing = match fs::read_to_string(&file) {
+        Ok(s) => s,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(e) => return Err(format!("config.toml을 읽지 못했습니다: {e}")),
+    };
+    if existing.parse::<toml::Table>().is_err() {
+        return Err("config.toml에 문법 오류가 있어 즐겨찾기를 추가하지 않았습니다".into());
+    }
+    let quote = |s: &str| toml::Value::String(s.to_string()).to_string();
+    let sep = if existing.is_empty() || existing.ends_with('\n') {
+        ""
+    } else {
+        "\n"
+    };
+    let updated = format!(
+        "{existing}{sep}\n[[favorites]]\nname = {}\npath = {}\n",
+        quote(name),
+        quote(path)
+    );
+    if updated.parse::<toml::Table>().is_err() {
+        return Err("favorites가 이미 다른 형식으로 정의되어 있어 추가하지 못했습니다".into());
+    }
+    fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    let tmp = dir.join("config.toml.tmp");
+    fs::write(&tmp, updated).map_err(|e| e.to_string())?;
+    fs::rename(&tmp, &file).map_err(|e| e.to_string())
+}

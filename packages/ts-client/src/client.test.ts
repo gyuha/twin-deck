@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { FakeBackend, baseName, joinPath, parentPath } from "./index";
+import { FakeBackend, baseName, expandPath, joinPath, parentPath } from "./index";
 
 const fs = () =>
   new FakeBackend().seed({
@@ -106,5 +106,31 @@ describe("FakeBackend는 Backend 포트를 만족하고 Rust 규칙을 따른다
     off();
     await b.touch("/b/other");
     expect(cb).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("expandPath", () => {
+  const dirs = { home: "/home/me", downloads: "/home/me/Downloads", documents: null, desktop: null, pictures: null, music: null, movies: null };
+  it("~ 와 ${user.*} 를 확장한다", () => {
+    expect(expandPath("~", dirs)).toBe("/home/me");
+    expect(expandPath("~/work", dirs)).toBe("/home/me/work");
+    expect(expandPath("${user.downloads}", dirs)).toBe("/home/me/Downloads");
+    expect(expandPath("${user.downloads}/x", dirs)).toBe("/home/me/Downloads/x");
+    expect(expandPath("/abs/path", dirs)).toBe("/abs/path");
+  });
+  it("알 수 없는 폴더는 null", () => {
+    expect(expandPath("${user.documents}", dirs)).toBeNull();
+    expect(expandPath("~/x", { ...dirs, home: null })).toBeNull();
+  });
+});
+
+describe("FakeBackend 볼륨", () => {
+  it("루트와 목록 밖은 거부하고 성공하면 목록에서 빠진다", async () => {
+    const b = fs();
+    await expect(b.unmountVolume("/")).rejects.toThrow();
+    await expect(b.ejectVolume("/nope")).rejects.toThrow();
+    await b.unmountVolume("/Volumes/USB");
+    expect(b.unmounted).toEqual(["/Volumes/USB"]);
+    expect((await b.listVolumes()).map((v) => v.mountPoint)).toEqual(["/"]);
   });
 });

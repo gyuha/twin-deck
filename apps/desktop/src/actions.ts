@@ -5,7 +5,7 @@ import { PAGE_SIZE } from "./state/store";
 /** 탐색, 선택, 탭, 보기, Quick Select 액션의 실행 핸들러. */
 /** 화면 조작 액션의 실행 핸들러(탐색, 선택, 탭, 보기, Quick Select, 파일 작업, 다이얼로그). */
 export function allHandlers(app: AppStore): ActionHandlers {
-  return { ...navigationHandlers(app), ...fileOpHandlers(app), ...queueHandlers(app) } as ActionHandlers;
+  return { ...navigationHandlers(app), ...fileOpHandlers(app), ...queueHandlers(app), ...menuHandlers(app) } as ActionHandlers;
 }
 
 export function navigationHandlers({ api }: AppStore): Partial<ActionHandlers> {
@@ -58,5 +58,24 @@ export function queueHandlers({ api }: AppStore): Partial<ActionHandlers> {
     "core.queue.down": () => api.queueMove(1),
     "core.queue.pause": () => api.queuePauseToggle(),
     "core.queue.abort": () => api.queueAbortSelected(),
+  };
+}
+
+/** 탐색 보조 메뉴(Volumes/Favorites/Recent/Hierarchy)와 Go To Path의 실행 핸들러. */
+export function menuHandlers({ api }: AppStore): Partial<ActionHandlers> {
+  return {
+    "core.menu.volumes": () => api.openMenu("volumes"),
+    "core.menu.favorites": () => api.openMenu("favorites"),
+    "core.menu.recent": () => api.openMenu("recent"),
+    "core.menu.hierarchy": () => api.openMenu("hierarchy"),
+    "core.menu.up": () => api.menuMove(-1),
+    "core.menu.down": () => api.menuMove(1),
+    "core.menu.select": () => api.menuSelect(),
+    "core.menu.close": () => api.menuClose(),
+    "core.volume.unmount": () => api.menuVolumeAction("unmount"),
+    "core.volume.eject": () => api.menuVolumeAction("eject"),
+    "core.recent.clear": () => api.menuClearRecent(),
+    "core.favorites.add": () => api.addFavoriteHere(),
+    "core.go.path": () => api.gotoPath(),
   };
 }

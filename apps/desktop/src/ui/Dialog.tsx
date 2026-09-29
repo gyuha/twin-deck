@@ -78,7 +78,7 @@ export function Dialog() {
             </div>
           </>
         )}
-        <p className="mt-3 text-xs text-neutral-500">Return 확인 · Esc 취소</p>
+        <p className="mt-3 text-xs text-neutral-500">Return 확인 · Esc 취소{dialog.kind === "name" && dialog.goto ? " · Tab 완성" : ""}</p>
       </div>
     </div>
   );

@@ -13,7 +13,7 @@ pub use config::{
 };
 pub use keybindings::BindingSpec;
 pub use load::{load_dir, load_from_strs, Loaded, Platform, Warning};
-pub use store::ConfigStore;
+pub use store::{append_favorite, ConfigStore};
 
 /// 내장 기본값(TOML).
 pub const DEFAULTS: &str = include_str!("default.toml");

@@ -3491,6 +3491,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "td-volumes"
+version = "0.1.0"
+dependencies = [
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "td-watch"
 version = "0.1.0"
 dependencies = [
@@ -3879,6 +3886,7 @@ dependencies = [
  "td-ops",
  "td-queue",
  "td-vfs",
+ "td-volumes",
  "td-watch",
  "tempfile",
 ]

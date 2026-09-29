@@ -1,7 +1,7 @@
 use std::fs;
 use std::time::Duration;
 
-use td_config::{load_dir, load_from_strs, ConfigStore, Platform};
+use td_config::{append_favorite, load_dir, load_from_strs, ConfigStore, Platform};
 
 fn load(config: &str) -> td_config::Loaded {
     load_from_strs(Some(config), None, Platform::Linux)
@@ -232,4 +232,52 @@ fn config_watch_reload() {
         }
     }
     assert_eq!(load_dir(dir.path(), Platform::Linux).bindings.len(), 1);
+}
+
+#[test]
+fn favorite_append_roundtrip() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("config.toml");
+    fs::write(&file, "# 내 설정\n[core.confirm]\ntrash = true").unwrap(); // 끝 개행 없음
+
+    append_favorite(dir.path(), "Work \"A\"", "/home/me/work").unwrap();
+    append_favorite(dir.path(), "Tmp", "C:\\temp").unwrap();
+    let text = fs::read_to_string(&file).unwrap();
+    assert!(
+        text.starts_with("# 내 설정\n[core.confirm]\ntrash = true"),
+        "기존 내용과 주석 보존"
+    );
+    let l = load_dir(dir.path(), Platform::Linux);
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert!(l.config.core.confirm.trash);
+    assert_eq!(l.config.favorites.len(), 2);
+    assert_eq!(l.config.favorites[0].name.as_deref(), Some("Work \"A\""));
+    assert_eq!(l.config.favorites[1].path.as_deref(), Some("C:\\temp"));
+
+    // 파일이 없어도 만들어진다
+    let empty = tempfile::tempdir().unwrap();
+    append_favorite(empty.path(), "Home", "~").unwrap();
+    assert_eq!(
+        load_dir(empty.path(), Platform::Linux)
+            .config
+            .favorites
+            .len(),
+        1
+    );
+}
+
+#[test]
+fn favorite_append_refuses_and_keeps_file_when_unsafe() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("config.toml");
+    // 이미 인라인 배열로 정의됨 -> [[favorites]]를 덧붙이면 TOML이 깨진다
+    let inline = "favorites = [ { name = \"a\", path = \"/a\" } ]\n";
+    fs::write(&file, inline).unwrap();
+    assert!(append_favorite(dir.path(), "x", "/x").is_err());
+    assert_eq!(fs::read_to_string(&file).unwrap(), inline, "파일은 그대로");
+
+    // 문법 오류가 있는 파일도 건드리지 않는다
+    fs::write(&file, "[broken\n").unwrap();
+    assert!(append_favorite(dir.path(), "x", "/x").is_err());
+    assert_eq!(fs::read_to_string(&file).unwrap(), "[broken\n");
 }

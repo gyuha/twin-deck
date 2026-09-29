@@ -19,6 +19,7 @@ td-vfs = { path = "../../../crates/td-vfs" }
 td-config = { path = "../../../crates/td-config" }
 td-ops = { path = "../../../crates/td-ops" }
 td-queue = { path = "../../../crates/td-queue" }
+td-volumes = { path = "../../../crates/td-volumes" }
 td-watch = { path = "../../../crates/td-watch" }
 
 [dev-dependencies]

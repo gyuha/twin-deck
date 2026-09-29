@@ -34,6 +34,8 @@ describe("앱 부팅 (Tauri IPC 모킹)", () => {
         if (cmd === "list_dir") return [entry("docs", "dir"), entry("a.txt", "file")];
         if (cmd === "queue_jobs") return [];
         if (cmd === "get_config") return defaultLoaded();
+        if (cmd === "user_dirs")
+          return { home: "/home/me", downloads: null, documents: null, desktop: null, pictures: null, music: null, movies: null };
         return null;
       },
       { shouldMockEvents: true },
@@ -48,6 +50,7 @@ describe("앱 부팅 (Tauri IPC 모킹)", () => {
     expect(calls).toContain("watch_dir");
     expect(calls).toContain("queue_jobs");
     expect(calls).toContain("get_config");
+    expect(calls).toContain("user_dirs");
   });
 
   it("IPC가 거부되면 빈 화면 대신 시작 실패 문구를 보여 준다", async () => {

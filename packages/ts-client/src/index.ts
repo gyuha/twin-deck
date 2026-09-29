@@ -14,6 +14,8 @@ export type {
   KindDto,
   QueueChanged,
   QueueItemDto,
+  UserDirsDto,
+  VolumeDto,
 } from "./generated/bindings";
 export * from "./backend";
 export { TauriBackend } from "./tauri";

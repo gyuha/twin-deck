@@ -8,6 +8,39 @@ export const commands = {
 async getConfig() : Promise<Loaded> {
     return await TAURI_INVOKE("get_config");
 },
+async listVolumes() : Promise<VolumeDto[]> {
+    return await TAURI_INVOKE("list_volumes");
+},
+async unmountVolume(mountPoint: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("unmount_volume", { mountPoint }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async ejectVolume(mountPoint: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("eject_volume", { mountPoint }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async userDirs() : Promise<UserDirsDto> {
+    return await TAURI_INVOKE("user_dirs");
+},
+/**
+ * 현재 폴더 등을 즐겨찾기로 `config.toml`에 덧붙인다. 파일 감시가 재로딩한다.
+ */
+async addFavorite(name: string, path: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("add_favorite", { name, path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async listDir(path: string, showHidden: boolean) : Promise<Result<EntryDto[], string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("list_dir", { path, showHidden }) };
@@ -182,7 +215,12 @@ export type TableView = {
  * 컬럼 명세 `[<|>]이름[:너비]`.
  */
 columns: string[] }
+/**
+ * 경로 변수(`${user.downloads}` 등)와 `~` 확장에 쓰는 사용자 폴더. 알 수 없으면 null.
+ */
+export type UserDirsDto = { home: string | null; downloads: string | null; documents: string | null; desktop: string | null; pictures: string | null; music: string | null; movies: string | null }
 export type ViewConfig = { table: TableView }
+export type VolumeDto = { name: string; mountPoint: string }
 /**
  * 설정을 읽다가 만난 문제. 앱 동작을 막지 않는다.
  */

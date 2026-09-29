@@ -6,10 +6,12 @@ use tauri::State;
 use tauri_specta::{collect_commands, collect_events, Builder, Event};
 use td_config::Loaded;
 use td_ops::SystemTrash;
+use td_volumes::{SystemUnmounter, Volumes};
 
 use crate::service::{EntryDto, JobDto, JobKindDto, QueueItemDto, Service, ServiceResult};
 
 pub type AppService = Service<SystemTrash>;
+pub type AppVolumes = Volumes<SystemUnmounter>;
 
 /// 감시 중인 디렉터리의 내용이 바뀌었다.
 #[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
@@ -52,6 +54,82 @@ impl ConfigState {
             }
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct VolumeDto {
+    pub name: String,
+    pub mount_point: String,
+}
+
+/// 경로 변수(`${user.downloads}` 등)와 `~` 확장에 쓰는 사용자 폴더. 알 수 없으면 null.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct UserDirsDto {
+    pub home: Option<String>,
+    pub downloads: Option<String>,
+    pub documents: Option<String>,
+    pub desktop: Option<String>,
+    pub pictures: Option<String>,
+    pub music: Option<String>,
+    pub movies: Option<String>,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn list_volumes(volumes: State<'_, AppVolumes>) -> Vec<VolumeDto> {
+    volumes
+        .list()
+        .into_iter()
+        .map(|v| VolumeDto {
+            name: v.name,
+            mount_point: v.mount_point,
+        })
+        .collect()
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn unmount_volume(volumes: State<'_, AppVolumes>, mount_point: String) -> ServiceResult<()> {
+    volumes.unmount(&mount_point).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn eject_volume(volumes: State<'_, AppVolumes>, mount_point: String) -> ServiceResult<()> {
+    volumes.eject(&mount_point).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn user_dirs(app: tauri::AppHandle) -> UserDirsDto {
+    use tauri::Manager;
+    let p = app.path();
+    let s = |r: tauri::Result<std::path::PathBuf>| r.ok().map(|p| p.to_string_lossy().into_owned());
+    UserDirsDto {
+        home: s(p.home_dir()),
+        downloads: s(p.download_dir()),
+        documents: s(p.document_dir()),
+        desktop: s(p.desktop_dir()),
+        pictures: s(p.picture_dir()),
+        music: s(p.audio_dir()),
+        movies: s(p.video_dir()),
+    }
+}
+
+/// 현재 폴더 등을 즐겨찾기로 `config.toml`에 덧붙인다. 파일 감시가 재로딩한다.
+#[tauri::command]
+#[specta::specta]
+pub fn add_favorite(
+    config: State<'_, ConfigState>,
+    name: String,
+    path: String,
+) -> ServiceResult<()> {
+    let store = config
+        .store
+        .as_ref()
+        .ok_or("설정 디렉터리를 사용할 수 없습니다")?;
+    td_config::append_favorite(store.dir(), &name, &path)
 }
 
 #[tauri::command]
@@ -155,6 +233,11 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new()
         .commands(collect_commands![
             get_config,
+            list_volumes,
+            unmount_volume,
+            eject_volume,
+            user_dirs,
+            add_favorite,
             list_dir,
             mkdir,
             touch,
