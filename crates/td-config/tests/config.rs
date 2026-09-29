@@ -324,3 +324,21 @@ fn columns_spec_parse() {
     let l = load("[view.table]\ncolumns = []\n");
     assert_eq!(l.config.view.table.columns, ["name"]);
 }
+
+#[test]
+fn theme_setting_is_validated() {
+    assert_eq!(load("").config.behavior.theme, "light");
+    for t in ["light", "dark", "system"] {
+        let l = load(&format!("[behavior]\ntheme = \"{t}\"\n"));
+        assert!(l.warnings.is_empty(), "{t}: {:?}", l.warnings);
+        assert_eq!(l.config.behavior.theme, t);
+    }
+    // 아직 사용자 정의 테마(P3)는 없으므로 알 수 없는 이름은 경고하고 기본값
+    let l = load("[behavior]\ntheme = \"sakura\"\n");
+    assert_eq!(l.config.behavior.theme, "light");
+    assert!(
+        l.warnings.iter().any(|w| w.message.contains("theme")),
+        "{:?}",
+        l.warnings
+    );
+}

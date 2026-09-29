@@ -130,9 +130,9 @@ describe("SEL-02 Shift+이동은 지나간 범위의 선택을 반전", () => {
     expect(selectedNames("left")).toHaveLength(4);
   });
 
-  it("Space는 커서 항목을 토글하고 한 칸 내려간다", async () => {
+  it("Insert는 커서 항목을 토글하고 한 칸 내려간다", async () => {
     const { user } = await renderApp();
-    await user.keyboard(" ");
+    await user.keyboard("{Insert}");
     expect(selectedNames("left")).toEqual(["docs"]);
     expect(cursorName("left")).toBe("src");
   });

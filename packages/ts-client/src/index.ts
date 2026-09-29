@@ -9,6 +9,8 @@ export type {
   JobKindDto,
   JobStatusDto,
   Loaded,
+  PreviewDto,
+  PreviewKindDto,
   Warning,
   FavoriteDto,
   FavoriteLeaf,

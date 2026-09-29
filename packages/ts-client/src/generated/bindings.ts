@@ -16,6 +16,14 @@ async fileInfo(path: string) : Promise<Result<FileInfoDto, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+async previewFile(path: string) : Promise<Result<PreviewDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("preview_file", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 /**
  * `pattern`과 일치하는 이름의 인덱스를 돌려준다 (Select Group).
  */
@@ -244,6 +252,11 @@ export type JobStatusDto = "queued" | "running" | "paused" | "done" | "failed" |
 export type KindDto = "file" | "dir" | "symlink"
 export type LayoutConfig = { action_bar: string[] }
 export type Loaded = { config: Config; bindings: BindingSpec[]; warnings: Warning[] }
+/**
+ * 미리보기 (VIEW-01). 텍스트는 앞부분, 이미지는 data URL.
+ */
+export type PreviewDto = { kind: PreviewKindDto; text: string | null; truncated: boolean; size: number; dataUrl: string | null }
+export type PreviewKindDto = "text" | "image" | "directory" | "other"
 /**
  * 작업 큐의 상태가 바뀔 때마다 전체 스냅샷을 보낸다.
  */

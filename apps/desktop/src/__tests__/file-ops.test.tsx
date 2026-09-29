@@ -121,7 +121,7 @@ describe("OP-06 휴지통", () => {
 
   it("선택 항목이 여러 개면 모두 보낸다", async () => {
     const { user, backend } = await renderApp();
-    await user.keyboard("{ArrowDown}{ArrowDown} {F8}"); // a.txt 선택 후 커서는 b.txt
+    await user.keyboard("{ArrowDown}{ArrowDown}{Insert}{F8}"); // a.txt 선택 후 커서는 b.txt
     await waitFor(() => expect(backend.trashed).toEqual(["/home/a/a.txt"]));
   });
 });

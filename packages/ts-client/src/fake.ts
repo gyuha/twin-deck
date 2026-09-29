@@ -7,6 +7,7 @@ import type {
   JobDto,
   JobKindDto,
   Loaded,
+  PreviewDto,
   QueueItemDto,
   UserDirsDto,
   VolumeDto,
@@ -206,6 +207,19 @@ export class FakeBackend implements Backend {
       linkTarget: null,
       childCount: n.kind === "dir" ? children : null,
     };
+  }
+
+  /** Rust `read_preview`와 같은 규칙(확장자로 이미지 판별, NUL이 있으면 Other, 64KB 초과는 잘림)을 흉내 낸다. */
+  async preview(path: string): Promise<PreviewDto> {
+    const n = this.need(path);
+    const base = { text: null, truncated: false, size: n.content.length, dataUrl: null };
+    if (n.kind === "dir") return { ...base, kind: "directory" };
+    const ext = path.slice(path.lastIndexOf(".") + 1).toLowerCase();
+    const mime = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", svg: "image/svg+xml" }[ext];
+    if (mime) return { ...base, kind: "image", dataUrl: `data:${mime};base64,${btoa(n.content)}` };
+    if (n.content.includes("\u0000")) return { ...base, kind: "other" };
+    const limit = 64 * 1024;
+    return { ...base, kind: "text", text: n.content.slice(0, limit), truncated: n.content.length > limit };
   }
 
   async globFilter(pattern: string, names: string[]) {

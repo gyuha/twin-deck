@@ -91,6 +91,43 @@ pub enum JobKindDto {
     Duplicate,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "lowercase")]
+pub enum PreviewKindDto {
+    Text,
+    Image,
+    Directory,
+    Other,
+}
+
+/// 미리보기 (VIEW-01). 텍스트는 앞부분, 이미지는 data URL.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewDto {
+    pub kind: PreviewKindDto,
+    pub text: Option<String>,
+    pub truncated: bool,
+    pub size: f64,
+    pub data_url: Option<String>,
+}
+
+impl From<td_vfs::Preview> for PreviewDto {
+    fn from(p: td_vfs::Preview) -> Self {
+        PreviewDto {
+            kind: match p.kind {
+                td_vfs::PreviewKind::Text => PreviewKindDto::Text,
+                td_vfs::PreviewKind::Image => PreviewKindDto::Image,
+                td_vfs::PreviewKind::Directory => PreviewKindDto::Directory,
+                td_vfs::PreviewKind::Other => PreviewKindDto::Other,
+            },
+            text: p.text,
+            truncated: p.truncated,
+            size: p.size as f64,
+            data_url: p.data_url,
+        }
+    }
+}
+
 /// 파일 정보 대화상자용 (OP-14). 시각은 epoch 밀리초, 모르면 null.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -302,6 +339,12 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
         LocalFs
             .info(&vp(path))
             .map(|i| FileInfoDto::from(&i))
+            .map_err(|e| e.to_string())
+    }
+
+    pub fn preview(&self, path: &str) -> ServiceResult<PreviewDto> {
+        td_vfs::read_preview(&vp(path), td_vfs::PreviewLimits::default())
+            .map(PreviewDto::from)
             .map_err(|e| e.to_string())
     }
 
@@ -554,6 +597,28 @@ mod tests {
         assert_eq!(log[0].args, [root.clone()]); // 파일이면 부모 폴더
         assert_eq!(log[1].args, [format!("{root}/d")]);
         assert_eq!((log[2].program.as_str(), log[2].args.len()), ("code", 1));
+    }
+
+    #[test]
+    fn preview_dto_maps_kinds() {
+        let (_t, svc, _ch, root) = setup();
+        std::fs::write(format!("{root}/a.txt"), "hello").unwrap();
+        std::fs::write(format!("{root}/p.png"), [1u8, 2, 3]).unwrap();
+        std::fs::write(format!("{root}/b.bin"), [0u8, 1]).unwrap();
+        let t = svc.preview(&format!("{root}/a.txt")).unwrap();
+        assert_eq!(
+            (t.kind, t.text.as_deref(), t.truncated, t.size),
+            (PreviewKindDto::Text, Some("hello"), false, 5.0)
+        );
+        let i = svc.preview(&format!("{root}/p.png")).unwrap();
+        assert_eq!(i.kind, PreviewKindDto::Image);
+        assert!(i.data_url.unwrap().starts_with("data:image/png;base64,"));
+        assert_eq!(
+            svc.preview(&format!("{root}/b.bin")).unwrap().kind,
+            PreviewKindDto::Other
+        );
+        assert_eq!(svc.preview(&root).unwrap().kind, PreviewKindDto::Directory);
+        assert!(svc.preview(&format!("{root}/nope")).is_err());
     }
 
     #[test]

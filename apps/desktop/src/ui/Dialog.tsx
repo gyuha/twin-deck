@@ -33,7 +33,7 @@ export function Dialog() {
         role="dialog"
         aria-modal="true"
         aria-label={dialog.title}
-        className="w-96 max-w-full rounded border border-neutral-400 bg-white p-4 text-sm shadow-lg"
+        className="w-96 max-w-full rounded border border-neutral-400 bg-(--td-surface) p-4 text-sm shadow-lg"
       >
         <h2 className="mb-2 font-semibold">{dialog.title}</h2>
         {dialog.kind === "name" && (

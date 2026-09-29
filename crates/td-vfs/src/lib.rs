@@ -7,6 +7,7 @@ mod info;
 mod local;
 mod names;
 mod path;
+mod preview;
 
 pub use entry::{Entry, EntryKind, ListOptions};
 pub use error::{Result, VfsError};
@@ -15,6 +16,7 @@ pub use info::Info;
 pub use local::LocalFs;
 pub use names::{compare_names, matches_prefix, normalize_name, sort_entries};
 pub use path::VfsPath;
+pub use preview::{read_preview, Preview, PreviewKind, PreviewLimits};
 
 /// 파일시스템 추상화. 지금은 `LocalFs`만 구현한다.
 pub trait Vfs {

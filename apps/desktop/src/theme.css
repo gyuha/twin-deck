@@ -1,0 +1,38 @@
+/*
+ * 테마 토큰. 라이트가 기본이고(Tailwind 기본 색), 다크는 컴포넌트가 쓰는 색 변수를 덮어쓴다.
+ * 컴포넌트에서 새 색 유틸리티를 쓰면 아래 다크 블록에도 같은 변수를 추가해야 한다(theme.test.tsx가 검사한다).
+ * 흰 표면은 `bg-white` 대신 `bg-(--td-surface)`를 쓴다(다크에서 `text-white`가 어두워지면 안 되므로).
+ */
+:root {
+  --td-surface: #ffffff;
+  --td-fg: #171717;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --td-surface: #1e1f22;
+  --td-fg: #e4e6ea;
+
+  --color-neutral-50: #2b2d31;
+  --color-neutral-300: #4a4d55;
+  --color-neutral-400: #5c6068;
+  --color-neutral-500: #9aa0a8;
+  --color-neutral-600: #b5bac1;
+
+  --color-blue-50: #1d2f4f;
+  --color-blue-600: #2563eb;
+  --color-blue-800: #93c5fd;
+
+  --color-red-100: #4a1f24;
+  --color-red-700: #fca5a5;
+  --color-red-800: #fecaca;
+
+  --color-green-800: #86efac;
+  --color-amber-700: #fcd34d;
+  --color-yellow-50: #3b3320;
+}
+
+body {
+  background-color: var(--td-surface);
+  color: var(--td-fg);
+}

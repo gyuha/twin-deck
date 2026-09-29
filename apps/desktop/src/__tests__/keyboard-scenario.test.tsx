@@ -21,9 +21,9 @@ describe("키보드 전용 종단 시나리오", () => {
     await user.keyboard("{Enter}");
     await waitFor(() => expect(names("left").some((n) => n.includes("notes.md"))).toBe(true));
 
-    // 2) 파일 선택: Space로 두 파일을 고른다
-    await user.keyboard(" ");
-    await user.keyboard(" ");
+    // 2) 파일 선택: Insert로 두 파일을 고른다
+    await user.keyboard("{Insert}");
+    await user.keyboard("{Insert}");
     expect(screen.getByRole("status", { name: "상태 표시줄" })).toHaveTextContent("선택 2개");
 
     // 3) F5: 비활성 패널(/home/b)로 복사

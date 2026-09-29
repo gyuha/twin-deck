@@ -1,6 +1,6 @@
 import { createStore } from "zustand/vanilla";
 import { baseName, defaultLoaded, expandPath, joinPath, parentPath } from "@twin-deck/ts-client";
-import type { Backend, ConflictDto, EntryDto, JobDto, Loaded, QueueItemDto, UserDirsDto } from "@twin-deck/ts-client";
+import type { Backend, ConflictDto, EntryDto, JobDto, Loaded, PreviewDto, QueueItemDto, UserDirsDto } from "@twin-deck/ts-client";
 import type { ActionContext } from "@twin-deck/actions";
 import type { Scope } from "@twin-deck/keybinds";
 import { quickMatch } from "../lib/names";
@@ -82,11 +82,21 @@ export function filterCatalog(items: readonly CatalogItem[], query: string): Cat
   return rankBy(items, query, (i) => [i.title, i.id, `${i.category} ${i.title}`]);
 }
 
+export interface PreviewState {
+  path: string;
+  name: string;
+  status: "loading" | "ready" | "error";
+  data?: PreviewDto;
+  error?: string;
+}
+
 export interface AppState {
   panes: Record<PaneId, PaneState>;
   activePane: PaneId;
   showHidden: boolean;
   dialog: DialogState | null;
+  /** 열려 있는 미리보기 (VIEW-01). */
+  preview: PreviewState | null;
   /** 열려 있는 Actions Panel. */
   palette: PaletteState | null;
   /** 마지막 검색어. 다시 열면 이어서 보이고, 재시작 복원의 대상이다 (PANE-05). */
@@ -150,6 +160,8 @@ export function scopeStack(s: AppState): Scope[] {
   if (s.dialog) return ["dialog", "pane", "global"];
   // Actions Panel은 입력창이 있는 모달이다(palette 스코프).
   if (s.palette) return ["palette", "global"];
+  // 미리보기가 열려 있으면 패널 키는 받지 않는다(preview 스코프).
+  if (s.preview) return ["preview", "global"];
   // 팝업 메뉴는 모달이다(panel 스코프).
   if (s.menu) return ["panel", "global"];
   // 큐 팝업이 열려 있으면 패널 키는 받지 않는다.
@@ -180,6 +192,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     activePane: "left",
     showHidden: false,
     dialog: null,
+    preview: null,
     palette: null,
     lastPaletteQuery: "",
     menu: null,
@@ -293,6 +306,20 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     void reloadAll();
   });
   const cfg = () => get().loaded.config;
+
+  // 미리보기 요청 순번: 항목을 빠르게 넘길 때 늦게 온 이전 응답이 화면을 덮지 않게 한다.
+  let previewSeq = 0;
+  async function loadPreview(entry: EntryDto) {
+    const seq = ++previewSeq;
+    const base = { path: entry.path, name: entry.name };
+    set({ preview: { ...base, status: "loading" } });
+    try {
+      const data = await backend.preview(entry.path);
+      if (seq === previewSeq) set({ preview: { ...base, status: "ready", data } });
+    } catch (e) {
+      if (seq === previewSeq) set({ preview: { ...base, status: "error", error: String(e instanceof Error ? e.message : e) } });
+    }
+  }
 
   // Actions Panel이 쓰는 액션 목록과 실행기. App이 레지스트리/키맵을 만든 뒤 붙인다.
   let catalogFn: () => CatalogItem[] = () => [];
@@ -976,6 +1003,23 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         common = common.slice(0, i);
       }
       api.dialogSetValue(joinPath(dir, common) + (names.length === 1 ? "/" : ""));
+    },
+
+    /** 미리보기 열기/닫기 (Space, Mod+Y). 열려 있는 동안 ↑↓로 항목을 넘긴다. */
+    async previewToggle() {
+      if (get().preview) return api.previewClose();
+      const entry = cursorEntry(activeTab(get()));
+      if (entry) await loadPreview(entry);
+    },
+    previewClose() {
+      previewSeq++;
+      set({ preview: null });
+    },
+    /** 미리보기를 연 채 커서를 옮기고 새 항목을 보여 준다. */
+    async previewMove(delta: 1 | -1) {
+      api.moveCursor(delta);
+      const entry = cursorEntry(activeTab(get()));
+      if (entry) await loadPreview(entry);
     },
 
     /** Actions Panel에 액션 목록과 실행기를 연결한다. */

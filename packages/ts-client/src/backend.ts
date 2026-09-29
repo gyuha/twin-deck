@@ -1,4 +1,4 @@
-import type { EntryDto, FileInfoDto, JobDto, JobKindDto, Loaded, QueueItemDto, UserDirsDto, VolumeDto } from "./generated/bindings";
+import type { EntryDto, FileInfoDto, JobDto, JobKindDto, Loaded, PreviewDto, QueueItemDto, UserDirsDto, VolumeDto } from "./generated/bindings";
 
 /** Rust 쪽이 돌려준 오류 문자열을 감싼 예외. */
 export class BackendError extends Error {}
@@ -25,6 +25,8 @@ export interface Backend {
   queueClearFinished(): Promise<void>;
   /** 파일 정보 대화상자용 상세 정보. */
   fileInfo(path: string): Promise<FileInfoDto>;
+  /** 미리보기: 텍스트 앞부분, 이미지 data URL, 종류 판별. */
+  preview(path: string): Promise<PreviewDto>;
   /** glob 패턴과 일치하는 이름의 인덱스 (Select Group). */
   globFilter(pattern: string, names: string[]): Promise<number[]>;
   /** 클립보드에 텍스트를 쓴다. */

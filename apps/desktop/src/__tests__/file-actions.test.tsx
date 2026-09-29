@@ -31,7 +31,7 @@ describe("SEL-03 선택 반전", () => {
   it("선택 반전은 모든 항목의 선택 상태를 뒤집는다", async () => {
     const b = seed((l) => l.bindings.push(bind("F9", "core.select.invert")));
     const { user } = await renderApp(b);
-    await user.keyboard("{ArrowDown}{ArrowDown} "); // a.txt 선택
+    await user.keyboard("{ArrowDown}{ArrowDown}{Insert}"); // a.txt 선택
     expect(selectedNames("left")).toEqual(["a.txt"]);
     await user.keyboard("{F9}");
     expect(selectedNames("left")).toEqual(["docs", "src", "b.md", "c.TXT", "d.rs"]);
@@ -164,7 +164,7 @@ describe("OP-15 경로 복사", () => {
     await waitFor(() => expect(b.clipboard).toEqual(["/home/a"]));
     expect(await screen.findByText(/폴더 경로를 복사했습니다/)).toBeInTheDocument();
 
-    await user.keyboard("{ArrowDown}{ArrowDown}  "); // a.txt, b.md 선택 (Space는 선택 후 한 칸 내려간다)
+    await user.keyboard("{ArrowDown}{ArrowDown}{Insert}{Insert}"); // a.txt, b.md 선택 (선택 토글은 선택 후 한 칸 내려간다)
     await user.keyboard("{Control>}{F12}{/Control}");
     await waitFor(() => expect(b.clipboard.at(-1)).toBe("/home/a/a.txt\n/home/a/b.md"));
 
@@ -192,7 +192,7 @@ describe("OP-09 편집 / 폴더 편집", () => {
   it("F4는 대상 항목을, Shift+F4는 현재 폴더를 설정한 편집기로 연다", async () => {
     const b = seed((l) => (l.config.environment.text_editor = "code"));
     const { user } = await renderApp(b);
-    await user.keyboard("{ArrowDown}{ArrowDown}  {F4}"); // a.txt, b.md 선택
+    await user.keyboard("{ArrowDown}{ArrowDown}{Insert}{Insert}{F4}"); // a.txt, b.md 선택
     await waitFor(() => expect(b.edited).toEqual([["/home/a/a.txt", "/home/a/b.md"]]));
     await user.keyboard("{Shift>}{F4}{/Shift}");
     await waitFor(() => expect(b.edited.at(-1)).toEqual(["/home/a"]));

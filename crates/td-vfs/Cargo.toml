@@ -9,6 +9,7 @@ license.workspace = true
 thiserror.workspace = true
 serde.workspace = true
 unicode-normalization = "0.1"
+base64 = "0.22"
 
 [dev-dependencies]
 unicode-normalization = "0.1"

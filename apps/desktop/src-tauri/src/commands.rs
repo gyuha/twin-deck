@@ -10,7 +10,8 @@ use td_ops::SystemTrash;
 use td_volumes::{SystemUnmounter, Volumes};
 
 use crate::service::{
-    edit, reveal, EntryDto, FileInfoDto, JobDto, JobKindDto, QueueItemDto, Service, ServiceResult,
+    edit, reveal, EntryDto, FileInfoDto, JobDto, JobKindDto, PreviewDto, QueueItemDto, Service,
+    ServiceResult,
 };
 
 pub type AppService = Service<SystemTrash>;
@@ -142,6 +143,12 @@ pub fn file_info(svc: State<'_, AppService>, path: String) -> ServiceResult<File
     svc.file_info(&path)
 }
 
+#[tauri::command]
+#[specta::specta]
+pub fn preview_file(svc: State<'_, AppService>, path: String) -> ServiceResult<PreviewDto> {
+    svc.preview(&path)
+}
+
 /// `pattern`과 일치하는 이름의 인덱스를 돌려준다 (Select Group).
 #[tauri::command]
 #[specta::specta]
@@ -269,6 +276,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
         .commands(collect_commands![
             get_config,
             file_info,
+            preview_file,
             glob_filter,
             reveal_path,
             edit_paths,

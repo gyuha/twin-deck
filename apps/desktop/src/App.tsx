@@ -11,6 +11,7 @@ import { actionContext, activeTab, createAppStore } from "./state/store";
 import { ActionBar, useBarIds } from "./ui/ActionBar";
 import { ActionsPalette } from "./ui/ActionsPalette";
 import { Dialog } from "./ui/Dialog";
+import { Preview } from "./ui/Preview";
 import { Pane } from "./ui/Pane";
 import { PopupMenu } from "./ui/PopupMenu";
 import { QueueIndicator, QueuePopup } from "./ui/Queue";
@@ -29,6 +30,21 @@ export function detectPlatform(): Platform {
   if (p.includes("mac")) return "mac";
   if (p.includes("win")) return "windows";
   return "linux";
+}
+
+/** 설정 `behavior.theme`(light | dark | system)을 `<html data-theme>`에 반영한다. system은 OS 설정을 따른다. */
+function useTheme(theme: string) {
+  useEffect(() => {
+    const media = typeof window.matchMedia === "function" ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+    const apply = () => {
+      const dark = theme === "dark" || (theme === "system" && !!media?.matches);
+      document.documentElement.dataset.theme = dark ? "dark" : "light";
+    };
+    apply();
+    if (theme !== "system" || !media) return;
+    media.addEventListener("change", apply);
+    return () => media.removeEventListener("change", apply);
+  }, [theme]);
 }
 
 function StatusBar() {
@@ -88,6 +104,7 @@ export function App({ backend, platform, leftPath, rightPath }: AppProps) {
     return { keymap: km, warnings: [...merged.warnings, ...km.warnings, ...extra] };
   }, [platform, loaded, registry]);
   useKeyboard({ app, keymap, registry });
+  useTheme(loaded.config.behavior.theme);
 
   // Actions Panel이 쓰는 액션 목록(제목, 분류, 현재 키, 실행 가능 여부)과 실행기.
   useEffect(() => {
@@ -128,6 +145,7 @@ export function App({ backend, platform, leftPath, rightPath }: AppProps) {
         <StatusBar />
         <ActionBar />
         <ActionsPalette />
+        <Preview />
         <PopupMenu />
         <QueueIndicator />
         <QueuePopup />

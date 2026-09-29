@@ -7,7 +7,7 @@ export function PopupMenu() {
   let n = 0;
   return (
     <div className="fixed inset-0 flex items-start justify-center bg-black/20 pt-16">
-      <div role="dialog" aria-label={menu.title} className="w-[28rem] max-w-full rounded border border-neutral-400 bg-white p-3 text-sm shadow-lg">
+      <div role="dialog" aria-label={menu.title} className="w-[28rem] max-w-full rounded border border-neutral-400 bg-(--td-surface) p-3 text-sm shadow-lg">
         <h2 className="mb-2 font-semibold">{menu.title}</h2>
         {menu.items.length === 0 ? (
           <p className="text-neutral-500">항목 없음</p>

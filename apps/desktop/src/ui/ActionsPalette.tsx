@@ -22,7 +22,7 @@ export function ActionsPalette() {
   const items = api.paletteView();
   return (
     <div className="fixed inset-0 flex items-start justify-center bg-black/20 pt-16">
-      <div role="dialog" aria-label="Actions Panel" className="w-[34rem] max-w-full rounded border border-neutral-400 bg-white p-3 text-sm shadow-lg">
+      <div role="dialog" aria-label="Actions Panel" className="w-[34rem] max-w-full rounded border border-neutral-400 bg-(--td-surface) p-3 text-sm shadow-lg">
         <input
           ref={input}
           aria-label="액션 검색"
