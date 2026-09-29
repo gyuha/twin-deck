@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect } from "vitest";
 import { FakeBackend } from "@twin-deck/ts-client";
+import type { Snapshot } from "@twin-deck/ts-client";
 import { App } from "../App";
 
 export const NFD = (s: string) => s.normalize("NFD");
@@ -22,10 +23,17 @@ export async function renderApp(
   backend = seedBackend(),
   platform: "linux" | "mac" = "linux",
   paths: { left: string; right: string } = { left: "/home/a", right: "/home/b" },
-  opts: { emptyLeft?: boolean } = {},
+  opts: { emptyLeft?: boolean; snapshot?: Snapshot | null; stateWarning?: string | null } = {},
 ) {
   const user = userEvent.setup();
-  render(<App backend={backend} platform={platform} leftPath={paths.left} rightPath={paths.right} />);
+  render(<App
+      backend={backend}
+      platform={platform}
+      leftPath={paths.left}
+      rightPath={paths.right}
+      snapshot={opts.snapshot}
+      stateWarning={opts.stateWarning}
+    />);
   if (opts.emptyLeft) {
     // 왼쪽이 빈 폴더: 첫 목록 조회가 끝날 시간을 준다(가짜 백엔드는 곧바로 응답한다).
     await new Promise((r) => setTimeout(r, 50));

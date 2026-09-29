@@ -3694,6 +3694,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "td-state"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "specta",
+ "tempfile",
+]
+
+[[package]]
 name = "td-vfs"
 version = "0.1.0"
 dependencies = [
@@ -4126,6 +4136,7 @@ dependencies = [
  "td-launch",
  "td-ops",
  "td-queue",
+ "td-state",
  "td-vfs",
  "td-volumes",
  "td-watch",

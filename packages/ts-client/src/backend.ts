@@ -1,4 +1,4 @@
-import type { EntryDto, FileInfoDto, JobDto, JobKindDto, Loaded, PreviewDto, QueueItemDto, UserDirsDto, VolumeDto } from "./generated/bindings";
+import type { EntryDto, FileInfoDto, JobDto, JobKindDto, Loaded, LoadedState, PreviewDto, QueueItemDto, Snapshot, UserDirsDto, VolumeDto } from "./generated/bindings";
 
 /** Rust 쪽이 돌려준 오류 문자열을 감싼 예외. */
 export class BackendError extends Error {}
@@ -25,6 +25,13 @@ export interface Backend {
   queueClearFinished(): Promise<void>;
   /** 파일 정보 대화상자용 상세 정보. */
   fileInfo(path: string): Promise<FileInfoDto>;
+  /** 이 창이 마지막으로 저장한 상태 (PANE-05). 없거나 읽을 수 없으면 snapshot이 null이고 경고가 올 수 있다. */
+  loadState(): Promise<LoadedState>;
+  saveState(snapshot: Snapshot): Promise<void>;
+  /** 저장된 상태를 모두 지우고 앱을 종료한다. */
+  resetState(): Promise<void>;
+  /** 새 창을 열고 그 창의 레이블을 돌려준다 (PANE-03). */
+  newWindow(): Promise<string>;
   /** 미리보기: 텍스트 앞부분, 이미지 data URL, 종류 판별. */
   preview(path: string): Promise<PreviewDto>;
   /** glob 패턴과 일치하는 이름의 인덱스 (Select Group). */

@@ -1,6 +1,17 @@
 import { createStore } from "zustand/vanilla";
 import { baseName, defaultLoaded, expandPath, joinPath, parentPath } from "@twin-deck/ts-client";
-import type { Backend, ConflictDto, EntryDto, JobDto, Loaded, PreviewDto, QueueItemDto, UserDirsDto } from "@twin-deck/ts-client";
+import type {
+  Backend,
+  ConflictDto,
+  EntryDto,
+  JobDto,
+  Loaded,
+  PreviewDto,
+  QueueItemDto,
+  Snapshot,
+  TabSnap,
+  UserDirsDto,
+} from "@twin-deck/ts-client";
 import type { ActionContext } from "@twin-deck/actions";
 import type { Scope } from "@twin-deck/keybinds";
 import { quickMatch } from "../lib/names";
@@ -28,6 +39,8 @@ export interface TabState {
   error: string | null;
   /** Quick Select 입력 중이면 입력 문자열. */
   quick: string | null;
+  /** 복원한 커서 항목 이름. 첫 목록을 읽을 때 한 번 쓰고 지운다. */
+  restoreCursor?: string;
 }
 
 export interface PaneState {
@@ -119,6 +132,10 @@ export interface AppState {
 }
 
 export const PAGE_SIZE = 10;
+/** 상태 저장을 미루는 시간(디바운스). */
+export const SAVE_DELAY_MS = 400;
+/** 저장하는 선택 항목 수의 상한. 폴더 전체 선택(수만 개)이 스냅샷을 키우지 않게 한다. */
+export const SELECTION_SAVE_LIMIT = 5000;
 
 /** 탭의 실제 정렬: 탭 설정 > 컬럼 명세의 정렬 표시 > 이름 오름차순. */
 export function effectiveSort(tab: TabState, columns: readonly string[]): SortState {
@@ -169,7 +186,7 @@ export function scopeStack(s: AppState): Scope[] {
   return activeTab(s).quick !== null ? ["quickSelect", "pane", "global"] : ["pane", "global"];
 }
 
-export function createAppStore(backend: Backend, leftPath: string, rightPath: string) {
+export function createAppStore(backend: Backend, leftPath: string, rightPath: string, snapshot?: Snapshot | null) {
   let nextTabId = 1;
   const newTab = (path: string): TabState => ({
     id: nextTabId++,
@@ -184,17 +201,36 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     quick: null,
   });
 
+  /** 저장된 탭 하나를 탭 상태로 되살린다. 목록과 커서는 첫 조회 때 채워진다. */
+  const restoreTab = (t: TabSnap): TabState => ({
+    ...newTab(t.path),
+    selection: new Set(t.selection),
+    sort: t.sort && (SORT_KEYS as readonly string[]).includes(t.sort.key) && (t.sort.dir === "asc" || t.sort.dir === "desc")
+      ? { key: t.sort.key as SortKey, dir: t.sort.dir }
+      : null,
+    view:
+      t.view.mode === "columns" && [1, 2, 3].includes(t.view.count)
+        ? { mode: "columns", count: t.view.count as 1 | 2 | 3 }
+        : { mode: "table" },
+    restoreCursor: t.cursorName ?? undefined,
+  });
+
   const store = createStore<AppState>(() => ({
-    panes: {
-      left: { tabs: [newTab(leftPath)], active: 0 },
-      right: { tabs: [newTab(rightPath)], active: 0 },
-    },
-    activePane: "left",
-    showHidden: false,
+    panes: snapshot
+      ? {
+          left: { tabs: snapshot.left.tabs.map(restoreTab), active: snapshot.left.active },
+          right: { tabs: snapshot.right.tabs.map(restoreTab), active: snapshot.right.active },
+        }
+      : {
+          left: { tabs: [newTab(leftPath)], active: 0 },
+          right: { tabs: [newTab(rightPath)], active: 0 },
+        },
+    activePane: snapshot?.activePane === "right" ? "right" : "left",
+    showHidden: snapshot?.showHidden ?? false,
     dialog: null,
     preview: null,
     palette: null,
-    lastPaletteQuery: "",
+    lastPaletteQuery: snapshot?.paletteQuery ?? "",
     menu: null,
     userDirs: { home: null, downloads: null, documents: null, desktop: null, pictures: null, music: null, movies: null },
     queue: [],
@@ -222,7 +258,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
   async function reload(pane: PaneId, tabId: number, focusName?: string) {
     const tab = get().panes[pane].tabs.find((t) => t.id === tabId);
     if (!tab) return;
-    const keepName = focusName ?? cursorEntry(tab)?.name;
+    const keepName = focusName ?? tab.restoreCursor ?? cursorEntry(tab)?.name;
     try {
       const listed = await backend.listDir(tab.path, get().showHidden);
       patchTab(pane, tabId, (t) => {
@@ -232,6 +268,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         return {
           entries,
           error: null,
+          restoreCursor: undefined,
           cursor: idx >= 0 ? idx : Math.min(t.cursor, Math.max(entries.length - 1, 0)),
           selection: new Set([...t.selection].filter((p) => paths.has(p))),
         };
@@ -307,6 +344,78 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
   });
   const cfg = () => get().loaded.config;
 
+  /** 지금 화면 상태를 저장 형식으로 만든다. */
+  const toSnapshot = (): Snapshot => {
+    const s = get();
+    const pane = (p: PaneState) => ({
+      active: p.active,
+      tabs: p.tabs.map(
+        (t): TabSnap => ({
+          path: t.path,
+          cursorName: t.entries[t.cursor]?.name ?? t.restoreCursor ?? null,
+          selection: t.selection.size <= SELECTION_SAVE_LIMIT ? [...t.selection] : [],
+          sort: t.sort,
+          view: t.view.mode === "columns" ? { mode: "columns", count: t.view.count } : { mode: "table", count: 1 },
+        }),
+      ),
+    });
+    return {
+      version: 1,
+      activePane: s.activePane,
+      showHidden: s.showHidden,
+      paletteQuery: s.lastPaletteQuery,
+      left: pane(s.panes.left),
+      right: pane(s.panes.right),
+    };
+  };
+
+  // 자동 저장: 상태가 바뀌면 SAVE_DELAY_MS 뒤에 한 번, 실제로 달라졌을 때만 저장한다.
+  let saveTimer: ReturnType<typeof setTimeout> | undefined;
+  let lastSaved = "";
+  let saveEnabled = false;
+  async function saveNow() {
+    clearTimeout(saveTimer);
+    saveTimer = undefined;
+    if (!saveEnabled) return;
+    const snap = toSnapshot();
+    const json = JSON.stringify(snap);
+    if (json === lastSaved) return;
+    lastSaved = json;
+    try {
+      await backend.saveState(snap);
+    } catch (e) {
+      lastSaved = ""; // 다음 변경 때 다시 시도한다
+      fail(`상태를 저장하지 못했습니다: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+  const unsubscribeSave = store.subscribe(() => {
+    if (saveEnabled && saveTimer === undefined) saveTimer = setTimeout(() => void saveNow(), SAVE_DELAY_MS);
+  });
+
+  /** 저장된 폴더가 사라졌으면 가장 가까운 존재하는 상위 폴더로 옮긴다(docs/07 §10). 옮긴 탭 수를 돌려준다. */
+  async function relocateMissingTabs(): Promise<number> {
+    let moved = 0;
+    for (const pane of ["left", "right"] as const) {
+      for (const t of get().panes[pane].tabs) {
+        let p: string | null = t.path;
+        while (p !== null) {
+          try {
+            await backend.listDir(p, true);
+            break;
+          } catch {
+            p = parentPath(p);
+          }
+        }
+        const dest = p ?? "/";
+        if (dest !== t.path) {
+          moved++;
+          patchTab(pane, t.id, { path: dest, history: [dest], selection: new Set(), restoreCursor: undefined });
+        }
+      }
+    }
+    return moved;
+  }
+
   // 미리보기 요청 순번: 항목을 빠르게 넘길 때 늦게 온 이전 응답이 화면을 덮지 않게 한다.
   let previewSeq = 0;
   async function loadPreview(entry: EntryDto) {
@@ -343,13 +452,54 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     async init() {
       // 설정(컬럼 명세의 정렬 표시 등)을 먼저 읽고 첫 목록을 만든다.
       set({ loaded: await backend.getConfig(), userDirs: await backend.userDirs() });
+      const moved = snapshot ? await relocateMissingTabs() : 0;
       await reloadAll();
       await syncWatches();
       applyQueue(await backend.queueJobs());
+      if (moved > 0) fail(`저장된 폴더 ${moved}개가 없어져 가장 가까운 상위 폴더로 옮겼습니다`);
+      // 복원이 끝난 상태를 기준으로 삼아, 그 뒤에 달라진 것만 저장한다.
+      lastSaved = JSON.stringify(toSnapshot());
+      saveEnabled = true;
+    },
+    /** 저장을 미루지 않고 지금 저장한다(창을 닫기 직전 등). */
+    saveNow,
+    /** 시작할 때 저장된 상태를 읽지 못했다는 알림. */
+    reportStateWarning(message: string) {
+      fail(message);
+    },
+    /** 저장된 상태를 모두 지우고 앱을 종료한다 (`core.state.reset`). */
+    async resetState() {
+      const ok = await ask<boolean>({
+        kind: "confirm",
+        title: "저장된 상태를 모두 지우고 앱을 종료할까요?",
+        lines: ["열려 있던 탭, 폴더, 선택 항목, Actions Panel 검색어가 지워집니다. 설정 파일은 그대로입니다."],
+      });
+      if (!ok) return;
+      // 종료 직전에 다시 저장해서 방금 지운 상태가 되살아나지 않게 한다.
+      saveEnabled = false;
+      clearTimeout(saveTimer);
+      saveTimer = undefined; // 실패해서 저장을 다시 켤 때 예약이 막히지 않게 한다
+      try {
+        await backend.resetState();
+      } catch (e) {
+        saveEnabled = true;
+        fail(e);
+      }
+    },
+    /** 새 창 (PANE-03). 새 창은 자기 레이블의 상태를 따로 저장·복원한다. */
+    async newWindow() {
+      set({ notice: null });
+      try {
+        flash(`새 창을 열었습니다 (${await backend.newWindow()})`);
+      } catch (e) {
+        fail(e);
+      }
     },
 
     dispose() {
       clearTimeout(flashTimer);
+      clearTimeout(saveTimer);
+      unsubscribeSave();
       unsubscribeBackend();
       unsubscribeQueue();
       unsubscribeConfig();

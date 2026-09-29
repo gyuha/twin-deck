@@ -126,4 +126,32 @@ mod capability_tests {
             }
         }
     }
+
+    /// 새 창은 capability의 `windows` 패턴에 들어 있어야 한다. 빠지면 코어 명령이 거부되어 새 창이 빈 화면이 된다.
+    #[test]
+    fn capabilities_cover_new_windows() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("capabilities");
+        let mut patterns: Vec<String> = Vec::new();
+        for entry in fs::read_dir(&dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.extension().is_some_and(|e| e == "json") {
+                let json: serde_json::Value =
+                    serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+                for w in json["windows"].as_array().expect("windows 배열") {
+                    patterns.push(w.as_str().unwrap().to_string());
+                }
+            }
+        }
+        let covered = |label: &str| patterns.iter().any(|p| td_state::pattern_matches(p, label));
+        assert!(covered("main"), "main 창이 capability에 없다: {patterns:?}");
+        let mut existing = vec!["main".to_string()];
+        for _ in 0..12 {
+            let label = td_state::next_window_label(&existing);
+            assert!(
+                covered(&label),
+                "새 창 레이블 {label}이 capability windows {patterns:?}에 없다"
+            );
+            existing.push(label);
+        }
+    }
 }

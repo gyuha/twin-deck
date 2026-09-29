@@ -4,7 +4,7 @@ import { createDefaultRegistry, defaultBindingsFor, mergeUserBindings } from "@t
 import { formatKey } from "@twin-deck/keybinds";
 import { Keymap } from "@twin-deck/keybinds";
 import type { Platform } from "@twin-deck/keybinds";
-import type { Backend } from "@twin-deck/ts-client";
+import type { Backend, Snapshot } from "@twin-deck/ts-client";
 import { allHandlers } from "./actions";
 import { StoreContext, useApp, useAppStore } from "./state/context";
 import { actionContext, activeTab, createAppStore } from "./state/store";
@@ -23,6 +23,10 @@ export interface AppProps {
   platform: Platform;
   leftPath: string;
   rightPath: string;
+  /** 저장된 창 상태. 있으면 leftPath/rightPath보다 우선한다. */
+  snapshot?: Snapshot | null;
+  /** 저장된 상태를 읽지 못했을 때의 안내. */
+  stateWarning?: string | null;
 }
 
 export function detectPlatform(): Platform {
@@ -84,8 +88,8 @@ function BarWarnings({ base }: { base: string[] }) {
   return null;
 }
 
-export function App({ backend, platform, leftPath, rightPath }: AppProps) {
-  const [app] = useState(() => createAppStore(backend, leftPath, rightPath));
+export function App({ backend, platform, leftPath, rightPath, snapshot, stateWarning }: AppProps) {
+  const [app] = useState(() => createAppStore(backend, leftPath, rightPath, snapshot));
   const registry = useMemo(() => createDefaultRegistry(allHandlers(app)), [app]);
   const loaded = useStore(app.store, (s) => s.loaded);
   // 기본 키맵 위에 사용자 바인딩을 병합한다. 설정이 바뀌면 다시 만든다.
@@ -129,9 +133,17 @@ export function App({ backend, platform, leftPath, rightPath }: AppProps) {
   }, [app, registry, keymap, platform]);
 
   useEffect(() => {
-    void app.api.init();
-    return () => app.api.dispose();
-  }, [app]);
+    void app.api.init().then(() => {
+      if (stateWarning) app.api.reportStateWarning(stateWarning);
+    });
+    // 창이 닫히기 직전에는 미뤄 둔 저장을 바로 실행한다.
+    const flush = () => void app.api.saveNow();
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      app.api.dispose();
+    };
+  }, [app, stateWarning]);
 
   return (
     <StoreContext.Provider value={app}>

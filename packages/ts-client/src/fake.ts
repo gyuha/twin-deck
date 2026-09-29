@@ -7,8 +7,10 @@ import type {
   JobDto,
   JobKindDto,
   Loaded,
+  LoadedState,
   PreviewDto,
   QueueItemDto,
+  Snapshot,
   UserDirsDto,
   VolumeDto,
 } from "./generated/bindings";
@@ -56,6 +58,14 @@ export class FakeBackend implements Backend {
   readonly clipboard: string[] = [];
   readonly revealed: string[] = [];
   readonly edited: string[][] = [];
+  /** 저장된 창 상태(테스트가 미리 넣거나 앱이 저장한 것)와 저장 이력, 로드 경고. */
+  storedState: Snapshot | null = null;
+  readonly savedStates: Snapshot[] = [];
+  stateWarning: string | null = null;
+  /** `resetState`가 불렸는지(=앱이 종료되는 상황). */
+  stateReset = false;
+  readonly windowsOpened: string[] = [];
+  newWindowError: string | null = null;
   readonly unmounted: string[] = [];
   readonly ejected: string[] = [];
   userDirsValue: UserDirsDto = {
@@ -207,6 +217,30 @@ export class FakeBackend implements Backend {
       linkTarget: null,
       childCount: n.kind === "dir" ? children : null,
     };
+  }
+
+  async loadState(): Promise<LoadedState> {
+    return { snapshot: this.storedState ? structuredClone(this.storedState) : null, warning: this.stateWarning };
+  }
+
+  async saveState(snapshot: Snapshot) {
+    this.storedState = structuredClone(snapshot);
+    this.savedStates.push(structuredClone(snapshot));
+  }
+
+  async resetState() {
+    this.storedState = null;
+    this.stateReset = true;
+  }
+
+  /** Rust `next_window_label`과 같은 규칙: win-2, win-3, … 중 쓰이지 않은 가장 작은 것. */
+  async newWindow() {
+    if (this.newWindowError) throw new BackendError(this.newWindowError);
+    let n = 2;
+    while (this.windowsOpened.includes(`win-${n}`)) n++;
+    const label = `win-${n}`;
+    this.windowsOpened.push(label);
+    return label;
   }
 
   /** Rust `read_preview`와 같은 규칙(확장자로 이미지 판별, NUL이 있으면 Other, 64KB 초과는 잘림)을 흉내 낸다. */

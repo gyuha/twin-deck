@@ -35,6 +35,7 @@ describe("앱 부팅 (Tauri IPC 모킹)", () => {
         if (cmd === "plugin:path|resolve_directory") return "/home/me";
         if (cmd === "list_dir") return [entry("docs", "dir"), entry("a.txt", "file")];
         if (cmd === "queue_jobs") return [];
+        if (cmd === "load_state") return { snapshot: null, warning: null };
         if (cmd === "get_config") return defaultLoaded();
         if (cmd === "user_dirs")
           return { home: "/home/me", downloads: null, documents: null, desktop: null, pictures: null, music: null, movies: null };
@@ -51,6 +52,7 @@ describe("앱 부팅 (Tauri IPC 모킹)", () => {
     expect(calls).toContain("list_dir");
     expect(calls).toContain("watch_dir");
     expect(calls).toContain("queue_jobs");
+    expect(calls).toContain("load_state");
     expect(calls).toContain("get_config");
     expect(calls).toContain("user_dirs");
   });

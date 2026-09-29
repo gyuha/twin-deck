@@ -20,10 +20,19 @@ export function defaultDeps(): BootDeps {
 export async function start(rootEl: HTMLElement, deps: BootDeps = defaultDeps()): Promise<void> {
   const root = createRoot(rootEl);
   try {
+    // 이 창이 마지막으로 저장한 상태가 있으면 그것으로 시작한다. 읽지 못하면 기본 상태로 시작하고 안내한다.
+    const saved = await deps.backend.loadState().catch(() => ({ snapshot: null, warning: null }));
     const home = (await deps.getHome()).replace(/\/$/, "") || "/";
     root.render(
       <StrictMode>
-        <App backend={deps.backend} platform={deps.platform} leftPath={home} rightPath={home} />
+        <App
+          backend={deps.backend}
+          platform={deps.platform}
+          leftPath={home}
+          rightPath={home}
+          snapshot={saved.snapshot}
+          stateWarning={saved.warning}
+        />
       </StrictMode>,
     );
   } catch (e) {

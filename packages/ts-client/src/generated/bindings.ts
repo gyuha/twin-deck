@@ -8,6 +8,42 @@ export const commands = {
 async getConfig() : Promise<Loaded> {
     return await TAURI_INVOKE("get_config");
 },
+/**
+ * 이 창이 마지막으로 저장한 상태(PANE-05). 없거나 읽을 수 없으면 None(+경고).
+ */
+async loadState() : Promise<LoadedState> {
+    return await TAURI_INVOKE("load_state");
+},
+async saveState(snapshot: Snapshot) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("save_state", { snapshot }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 저장된 상태를 모두 지우고 앱을 종료한다 (`core.state.reset`).
+ */
+async resetState() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("reset_state") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 새 창을 연다 (PANE-03). 새 창의 상태는 창 레이블별로 따로 저장된다. 만든 창의 레이블을 돌려준다.
+ */
+async newWindow() : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("new_window") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async fileInfo(path: string) : Promise<Result<FileInfoDto, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("file_info", { path }) };
@@ -252,6 +288,12 @@ export type JobStatusDto = "queued" | "running" | "paused" | "done" | "failed" |
 export type KindDto = "file" | "dir" | "symlink"
 export type LayoutConfig = { action_bar: string[] }
 export type Loaded = { config: Config; bindings: BindingSpec[]; warnings: Warning[] }
+export type LoadedState = { snapshot: Snapshot | null; 
+/**
+ * 파일이 있었지만 읽을 수 없어 무시했다면 그 이유.
+ */
+warning: string | null }
+export type PaneSnap = { tabs: TabSnap[]; active: number }
 /**
  * 미리보기 (VIEW-01). 텍스트는 앞부분, 이미지는 data URL.
  */
@@ -272,6 +314,24 @@ export type SelectionConfig = {
  * "invert" | "extend"
  */
 shift_mode: string }
+/**
+ * 창 하나의 복원 상태: 두 패널의 탭들, 활성 패널, 숨김 표시, Actions Panel 검색어.
+ */
+export type Snapshot = { version: number; 
+/**
+ * "left" | "right"
+ */
+activePane: string; showHidden: boolean; paletteQuery: string; left: PaneSnap; right: PaneSnap }
+export type SortSnap = { key: string; dir: string }
+export type TabSnap = { path: string; 
+/**
+ * 커서가 있던 항목의 이름(복원 시 이름으로 찾는다).
+ */
+cursorName: string | null; 
+/**
+ * 선택했던 항목의 전체 경로.
+ */
+selection: string[]; sort: SortSnap | null; view: ViewSnap }
 export type TableView = { 
 /**
  * 컬럼 명세 `[<|>]이름[:너비]`.
@@ -282,6 +342,11 @@ columns: string[] }
  */
 export type UserDirsDto = { home: string | null; downloads: string | null; documents: string | null; desktop: string | null; pictures: string | null; music: string | null; movies: string | null }
 export type ViewConfig = { table: TableView }
+export type ViewSnap = { 
+/**
+ * "table" | "columns"
+ */
+mode: string; count: number }
 export type VolumeDto = { name: string; mountPoint: string }
 /**
  * 설정을 읽다가 만난 문제. 앱 동작을 막지 않는다.

@@ -7,6 +7,7 @@ use tauri_specta::{collect_commands, collect_events, Builder, Event};
 use td_config::Loaded;
 use td_launch::{Launch, SystemLauncher};
 use td_ops::SystemTrash;
+use td_state::{LoadedState, Snapshot, Spawner};
 use td_volumes::{SystemUnmounter, Volumes};
 
 use crate::service::{
@@ -174,6 +175,72 @@ pub fn edit_paths(
     edit(&launch, &editor, &paths)
 }
 
+fn config_dir(config: &ConfigState) -> ServiceResult<&std::path::Path> {
+    config
+        .store
+        .as_ref()
+        .map(|s| s.dir())
+        .ok_or_else(|| "설정 디렉터리를 사용할 수 없어 상태를 저장/복원하지 못합니다".to_string())
+}
+
+/// 이 창이 마지막으로 저장한 상태(PANE-05). 없거나 읽을 수 없으면 None(+경고).
+#[tauri::command]
+#[specta::specta]
+pub fn load_state(window: tauri::Window, config: State<'_, ConfigState>) -> LoadedState {
+    match config_dir(&config) {
+        Ok(dir) => td_state::load(dir, window.label()),
+        Err(_) => LoadedState {
+            snapshot: None,
+            warning: None,
+        },
+    }
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn save_state(
+    window: tauri::Window,
+    config: State<'_, ConfigState>,
+    snapshot: Snapshot,
+) -> ServiceResult<()> {
+    td_state::save(config_dir(&config)?, window.label(), &snapshot).map_err(|e| e.to_string())
+}
+
+/// 저장된 상태를 모두 지우고 앱을 종료한다 (`core.state.reset`).
+#[tauri::command]
+#[specta::specta]
+pub fn reset_state(app: tauri::AppHandle, config: State<'_, ConfigState>) -> ServiceResult<()> {
+    td_state::reset(config_dir(&config)?).map_err(|e| e.to_string())?;
+    app.exit(0);
+    Ok(())
+}
+
+struct TauriSpawner(tauri::AppHandle);
+
+impl Spawner for TauriSpawner {
+    fn spawn(&self, label: &str) -> Result<(), String> {
+        tauri::WebviewWindowBuilder::new(
+            &self.0,
+            label,
+            tauri::WebviewUrl::App("index.html".into()),
+        )
+        .title("twin-deck")
+        .inner_size(1200.0, 760.0)
+        .build()
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+    }
+}
+
+/// 새 창을 연다 (PANE-03). 새 창의 상태는 창 레이블별로 따로 저장된다. 만든 창의 레이블을 돌려준다.
+#[tauri::command]
+#[specta::specta]
+pub fn new_window(app: tauri::AppHandle) -> ServiceResult<String> {
+    use tauri::Manager;
+    let existing: Vec<String> = app.webview_windows().keys().cloned().collect();
+    td_state::open_new_window(&TauriSpawner(app), &existing)
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn get_config(state: State<'_, ConfigState>) -> Loaded {
@@ -275,6 +342,10 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new()
         .commands(collect_commands![
             get_config,
+            load_state,
+            save_state,
+            reset_state,
+            new_window,
             file_info,
             preview_file,
             glob_filter,

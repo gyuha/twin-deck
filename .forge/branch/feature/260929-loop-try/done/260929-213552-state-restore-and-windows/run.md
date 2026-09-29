@@ -1,0 +1,8 @@
+# RUN — state-restore-and-windows
+- S1 스냅샷 모델/저장/로드 — ✅ 새 crate `td-state`: `Snapshot`(탭·경로·커서 이름·선택·정렬·표시 모드·숨김·활성 패널·Actions Panel 검색어, 버전 1), 원자적 저장(tmp+rename), 창 레이블별 파일(`state.json` / `state-<레이블>.json`, 레이블은 파일 이름에 안전하게 치환), 파일 없음은 조용히 None / 깨짐·버전 불일치·구조 오류는 None+경고, `reset`은 상태 파일만 지움(설정 파일·접두어만 비슷한 파일은 보존). `state_snapshot_roundtrip`, `state_snapshot_bad_files_fall_back_with_warning`, `state_reset_removes_only_state_files`
+- S2 UI 복원과 초기화 — ✅ 시작 시 `loadState` → 스냅샷으로 탭 복원, 폴더가 사라졌으면 가장 가까운 상위로 옮기고 알림, 사라진 선택/커서 항목은 버림. 자동 저장: 상태가 바뀌면 400ms 뒤 한 번, JSON이 실제로 달라졌을 때만(복원 직후·변경 없음에는 저장하지 않음), `pagehide`에서 즉시 저장, 저장 실패는 알리고 다음 변경 때 재시도. 선택 항목은 5000개까지만 저장. `core.state.reset`(키 없음): 확인 → 저장 중단 → `resetState`(파일 삭제 후 앱 종료), 실패하면 알리고 저장을 다시 켬.
+  - 테스트가 잡은 버그: 초기화가 실패해 저장을 다시 켜도 옛 `saveTimer` 값이 남아 이후 저장이 영영 예약되지 않았음 → `clearTimeout` 뒤 `saveTimer = undefined`.
+- S3 새 창 — ✅ `core.window.new`(Mod+N) → `open_new_window`(레이블 `win-2`, `win-3`…, 닫힌 번호는 재사용) + `Spawner` trait. 새 창은 자기 레이블의 상태 파일을 따로 씀. capability `windows`에 `win-*`를 추가하고 `capabilities_cover_new_windows`로 "생성될 수 있는 모든 레이블이 capability 패턴에 들어 있음"을 검증(빠지면 새 창이 코어 명령 거부로 빈 화면이 되는 회귀 — `win-*`를 뺐을 때 테스트가 실패함을 확인하고 복원).
+⚠ fake만 검증: 실제 창 생성(`TauriSpawner`가 `WebviewWindowBuilder`로 만드는 것), 앱 종료(`app.exit(0)`), 여러 창이 동시에 떠 있을 때의 저장 경합(reset 후 다른 창이 종료 전에 다시 저장할 가능성). 상태 파일 입출력과 레이블/capability 규칙은 실제 파일·JSON으로 검증.
+⚠ 범위 밖/한계: 터미널 높이 복원(M3), 창 크기·위치 복원, 창 간 탭 이동. 새 창은 저장된 상태가 없으면 홈으로 시작한다(main의 상태를 물려받지 않음).
+DoD: td-state 5, desktop cargo 11(capabilities_cover_plugins, capabilities_cover_new_windows 포함), desktop vitest 186(restore-state 14).

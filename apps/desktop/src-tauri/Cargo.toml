@@ -21,6 +21,7 @@ td-config = { path = "../../../crates/td-config" }
 td-launch = { path = "../../../crates/td-launch" }
 td-ops = { path = "../../../crates/td-ops" }
 td-queue = { path = "../../../crates/td-queue" }
+td-state = { path = "../../../crates/td-state" }
 td-volumes = { path = "../../../crates/td-volumes" }
 td-watch = { path = "../../../crates/td-watch" }
 

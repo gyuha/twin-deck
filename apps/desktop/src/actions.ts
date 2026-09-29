@@ -103,6 +103,8 @@ export function menuHandlers({ api }: AppStore): Partial<ActionHandlers> {
 /** Actions Panel과 인수를 받는 액션(`core.open.directory`)의 실행 핸들러. */
 export function paletteHandlers({ api }: AppStore): Partial<ActionHandlers> {
   return {
+    "core.window.new": () => api.newWindow(),
+    "core.state.reset": () => api.resetState(),
     "core.preview": () => api.previewToggle(),
     "core.preview.close": () => api.previewClose(),
     "core.preview.prev": () => api.previewMove(-1),
