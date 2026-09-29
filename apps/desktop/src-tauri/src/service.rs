@@ -621,6 +621,42 @@ mod tests {
         assert!(svc.preview(&format!("{root}/nope")).is_err());
     }
 
+    /// 디스크 없이 메모리에서 10만 항목 DTO를 만들어 IPC로 나가는 JSON의 크기와 직렬화 시간을 잰다.
+    /// 값은 `cargo test -p twin-deck-desktop --release large_dir_100k_dto_json -- --nocapture`로 볼 수 있다.
+    /// 시간은 검사하지 않고(측정과 판정은 docs/m2-benchmark.md) 결과의 정확성만 확인한다.
+    #[test]
+    fn large_dir_100k_dto_json() {
+        const N: usize = 100_000;
+        let entries: Vec<EntryDto> = (0..N)
+            .map(|i| EntryDto {
+                name: format!("item-{i:06}"),
+                path: format!("/tmp/big/item-{i:06}"),
+                kind: if i % 100 == 0 {
+                    KindDto::Dir
+                } else {
+                    KindDto::File
+                },
+                size: (i * 37) as f64,
+                modified_ms: Some(1_780_000_000_000.0 + i as f64),
+                created_ms: Some(1_780_000_000_000.0),
+                mode: Some(0o644),
+                hidden: false,
+            })
+            .collect();
+        let t = std::time::Instant::now();
+        let json = serde_json::to_string(&entries).unwrap();
+        let ser_ms = t.elapsed().as_secs_f64() * 1000.0;
+        let t = std::time::Instant::now();
+        let back: Vec<EntryDto> = serde_json::from_str(&json).unwrap();
+        let de_ms = t.elapsed().as_secs_f64() * 1000.0;
+        eprintln!(
+            "large_dir_100k_dto_json: entries={N} json_bytes={} serialize={ser_ms:.0}ms deserialize={de_ms:.0}ms",
+            json.len()
+        );
+        assert_eq!(back.len(), N);
+        assert_eq!(back[12_345], entries[12_345]);
+    }
+
     #[test]
     fn watch_forwards_directory_changes() {
         let (_t, svc, ch, root) = setup();

@@ -23,13 +23,9 @@ pub fn matches_prefix(name: &str, input: &str) -> bool {
     key(name).starts_with(&key(input))
 }
 
-/// 폴더 먼저, 그다음 이름순.
+/// 폴더 먼저, 그다음 이름순(`compare_names`와 같은 규칙).
+/// 정렬 키(정규화+소문자)를 항목마다 한 번만 만든다. 비교할 때마다 만들면 10만 항목에서 문자열 할당이
+/// 수백만 번 일어나 10배 가까이 느렸다(docs/m2-benchmark.md).
 pub fn sort_entries(entries: &mut [Entry]) {
-    entries.sort_by(|a, b| {
-        let a_dir = a.kind == EntryKind::Dir;
-        let b_dir = b.kind == EntryKind::Dir;
-        b_dir
-            .cmp(&a_dir)
-            .then_with(|| compare_names(&a.name, &b.name))
-    });
+    entries.sort_by_cached_key(|e| (e.kind != EntryKind::Dir, key(&e.name)));
 }

@@ -90,3 +90,37 @@ fn nfd_korean_quick_select() {
     assert!(!list.iter().any(|e| matches_prefix(&e.name, "영어")));
     assert!(matches_prefix("README.md", "read"));
 }
+
+#[test]
+fn sort_entries_matches_compare_names_semantics() {
+    let (_t, root) = root();
+    let fs = LocalFs;
+    // 폴더 먼저, 대소문자 무시
+    // 대소문자만 다른 이름은 만들지 않는다(APFS 기본 설정은 대소문자를 구분하지 않는다).
+    for n in ["b.txt", "A.md", "zdir", "adir", "a.txt", "B.rs", "c"] {
+        if n.ends_with("dir") {
+            fs.mkdir(&root.join(n)).unwrap();
+        } else {
+            fs.create_file(&root.join(n)).unwrap();
+        }
+    }
+    let mut list = fs.list(&root, &ListOptions::default()).unwrap();
+    sort_entries(&mut list);
+    let names: Vec<String> = list.iter().map(|e| e.name.to_lowercase()).collect();
+    assert_eq!(
+        names,
+        ["adir", "zdir", "a.md", "a.txt", "b.rs", "b.txt", "c"]
+    );
+    // 같은 결과를 comparator 기반 정렬과도 대조한다
+    let mut by_cmp = fs.list(&root, &ListOptions::default()).unwrap();
+    by_cmp.sort_by(|a, b| {
+        (b.kind == EntryKind::Dir)
+            .cmp(&(a.kind == EntryKind::Dir))
+            .then_with(|| compare_names(&a.name, &b.name))
+    });
+    let mut cached = fs.list(&root, &ListOptions::default()).unwrap();
+    sort_entries(&mut cached);
+    let a: Vec<String> = by_cmp.iter().map(|e| e.name.to_lowercase()).collect();
+    let b: Vec<String> = cached.iter().map(|e| e.name.to_lowercase()).collect();
+    assert_eq!(a, b);
+}
