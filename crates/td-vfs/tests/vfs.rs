@@ -74,7 +74,7 @@ fn nfd_korean_sort() {
     assert_eq!(names, ["가", "나", "다"]);
     // 정규화 없는 비교는 NFD 자모가 완성형보다 앞서 순서가 깨진다.
     let raw_nfd = "다".nfd().collect::<String>();
-    assert!(raw_nfd < "나".to_string());
+    assert!(raw_nfd.as_str() < "나");
     assert_eq!(compare_names(&raw_nfd, "나"), std::cmp::Ordering::Greater);
 }
 
