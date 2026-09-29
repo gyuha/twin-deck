@@ -7,7 +7,7 @@ dev:
     bun run --cwd apps/desktop tauri dev
 
 gen-types:
-    @echo "타입 생성은 tauri-bridge 태스크에서 정의한다"
+    UPDATE_BINDINGS=1 cargo test -p twin-deck-desktop bindings_are_up_to_date
 
 test:
     cargo test --workspace
