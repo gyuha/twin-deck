@@ -3461,6 +3461,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "td-queue"
+version = "0.1.0"
+dependencies = [
+ "td-ops",
+ "td-vfs",
+ "tempfile",
+]
+
+[[package]]
 name = "td-vfs"
 version = "0.1.0"
 dependencies = [

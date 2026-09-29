@@ -5,5 +5,5 @@ mod ops;
 mod trasher;
 
 pub use error::{OpsError, Result};
-pub use ops::{ConflictPolicy, Ops, Outcome};
+pub use ops::{ConflictPolicy, Control, NoControl, Ops, Outcome};
 pub use trasher::{SystemTrash, Trasher};

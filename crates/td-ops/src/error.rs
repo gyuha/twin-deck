@@ -12,6 +12,8 @@ pub enum OpsError {
     InvalidName(String),
     #[error("휴지통 이동 실패: {0}")]
     Trash(String),
+    #[error("작업이 중단되었습니다")]
+    Aborted,
 }
 
 pub type Result<T> = std::result::Result<T, OpsError>;

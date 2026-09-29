@@ -142,3 +142,30 @@ fn permanent_delete() {
     assert!(!f.a.join("g").as_path().exists());
     assert!(f.bin.read_dir().unwrap().next().is_none());
 }
+
+struct StopAfter(std::cell::Cell<usize>);
+
+impl td_ops::Control for StopAfter {
+    fn on_item(&self, _p: &td_vfs::VfsPath) {
+        self.0.set(self.0.get() + 1);
+    }
+    fn should_stop(&self) -> bool {
+        self.0.get() >= 2
+    }
+}
+
+#[test]
+fn copy_with_control_reports_items_and_can_stop() {
+    let f = fixture();
+    f.ops.mkdir(&f.a.join("d")).unwrap();
+    for n in ["1", "2", "3", "4"] {
+        write(&f.a.join(&format!("d/{n}")), n);
+    }
+    let ctl = StopAfter(std::cell::Cell::new(0));
+    let err = f
+        .ops
+        .copy_with(&f.a.join("d"), &f.b, ConflictPolicy::Skip, &ctl)
+        .unwrap_err();
+    assert!(matches!(err, td_ops::OpsError::Aborted));
+    assert_eq!(ctl.0.get(), 2, "폴더 1개 + 파일 1개까지만 처리");
+}

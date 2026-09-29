@@ -16,6 +16,24 @@ pub enum Outcome {
     Skipped,
 }
 
+/// 긴 작업이 파일 단위로 진행을 알리고 중단 요청을 확인하는 지점.
+pub trait Control {
+    /// 파일/폴더 하나를 처리하기 직전에 호출된다.
+    fn on_item(&self, path: &VfsPath);
+    /// true이면 작업을 멈추고 `OpsError::Aborted`를 돌려준다.
+    fn should_stop(&self) -> bool;
+}
+
+/// 진행 알림도 중단도 없는 기본 제어.
+pub struct NoControl;
+
+impl Control for NoControl {
+    fn on_item(&self, _path: &VfsPath) {}
+    fn should_stop(&self) -> bool {
+        false
+    }
+}
+
 pub struct Ops<V: Vfs, T: Trasher> {
     vfs: V,
     trasher: T,
@@ -121,7 +139,11 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
         Ok(())
     }
 
-    fn copy_entry(&self, entry: &Entry, dest: &VfsPath) -> Result<()> {
+    fn copy_entry(&self, entry: &Entry, dest: &VfsPath, ctl: &dyn Control) -> Result<()> {
+        if ctl.should_stop() {
+            return Err(OpsError::Aborted);
+        }
+        ctl.on_item(&entry.path);
         match entry.kind {
             EntryKind::File => {
                 self.vfs.copy_file(&entry.path, dest)?;
@@ -137,7 +159,7 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
                 self.vfs.mkdir(dest)?;
                 let opts = ListOptions { show_hidden: true };
                 for child in self.vfs.list(&entry.path, &opts)? {
-                    self.copy_entry(&child, &dest.join(&child.name))?;
+                    self.copy_entry(&child, &dest.join(&child.name), ctl)?;
                 }
             }
         }
@@ -151,12 +173,23 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
         dest_dir: &VfsPath,
         policy: ConflictPolicy,
     ) -> Result<Outcome> {
+        self.copy_with(src, dest_dir, policy, &NoControl)
+    }
+
+    /// `copy`와 같지만 항목마다 `ctl`로 진행을 알리고 중단 요청을 확인한다.
+    pub fn copy_with(
+        &self,
+        src: &VfsPath,
+        dest_dir: &VfsPath,
+        policy: ConflictPolicy,
+        ctl: &dyn Control,
+    ) -> Result<Outcome> {
         self.check_not_inside(src, dest_dir)?;
         let Some(dest) = self.resolve_dest(src, dest_dir, policy)? else {
             return Ok(Outcome::Skipped);
         };
         let entry = self.vfs.stat(src)?;
-        self.copy_entry(&entry, &dest)?;
+        self.copy_entry(&entry, &dest, ctl)?;
         Ok(Outcome::Done(dest))
     }
 
@@ -166,6 +199,17 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
         src: &VfsPath,
         dest_dir: &VfsPath,
         policy: ConflictPolicy,
+    ) -> Result<Outcome> {
+        self.move_with(src, dest_dir, policy, &NoControl)
+    }
+
+    /// `move_to`와 같지만 항목마다 `ctl`로 진행을 알리고 중단 요청을 확인한다.
+    pub fn move_with(
+        &self,
+        src: &VfsPath,
+        dest_dir: &VfsPath,
+        policy: ConflictPolicy,
+        ctl: &dyn Control,
     ) -> Result<Outcome> {
         self.check_not_inside(src, dest_dir)?;
         if src.parent().as_ref() == Some(dest_dir) {
@@ -179,7 +223,7 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
             Ok(()) => {}
             Err(VfsError::Io { .. }) => {
                 let entry = self.vfs.stat(src)?;
-                self.copy_entry(&entry, &dest)?;
+                self.copy_entry(&entry, &dest, ctl)?;
                 self.remove_any(src)?;
             }
             Err(e) => return Err(e.into()),
