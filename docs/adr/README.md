@@ -30,5 +30,6 @@
 | [0009](0009-license-and-provenance.md) | 라이선스와 출처 추적 | Accepted |
 | [0010](0010-cross-platform-keymap.md) | 크로스플랫폼 키 매핑 | Accepted |
 | [0011](0011-specta-pinned-versions.md) | 타입 생성은 tauri-specta 업스트림 고정 버전 | Accepted |
+| [0012](0012-archive-path-notation.md) | 아카이브 안 경로 표기 `아카이브!/안/경로` | Accepted |
 
 Accepted는 2026-09-29에 사용자가 설계안을 승인한 결정이다. 세부 사항(버전, 라이브러리 선택)은 각 문서의 "미확인 과제"에 남아 있다.
