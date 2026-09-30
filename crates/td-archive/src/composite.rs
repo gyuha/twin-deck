@@ -1,22 +1,28 @@
 //! 경로에 따라 로컬 파일시스템과 아카이브(`outer.zip!/안`, ADR-0012)로 라우팅하는 `Vfs`.
 
+use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io;
 use std::path::Path;
+use std::sync::{Arc, RwLock};
 
 use td_vfs::{Entry, EntryKind, Info, ListOptions, LocalFs, Result, Vfs, VfsError, VfsPath};
 use unicode_normalization::UnicodeNormalization;
 
 use crate::archive::{Archive, EntryInfo};
 use crate::error::ArchiveError;
-use crate::path::{split_archive_path, ArchivePath};
-use crate::writer::{edit_in, Source, ZipEdit};
+use crate::kind::sniff_kind;
+use crate::path::{split_archive_path_with, ArchivePath};
+use crate::writer::{edit_in_with, Source, ZipEdit};
 
 /// 로컬 경로는 `LocalFs`로, `x.zip!/...` 경로는 아카이브로 보낸다.
+/// 복제본끼리 추가 ZIP 확장자 목록을 공유하므로, 큐가 가진 복제본도 설정 변경을 바로 따른다.
 #[derive(Debug, Default, Clone)]
 pub struct CompositeFs {
     local: LocalFs,
-    extra_zip_exts: Vec<String>,
+    extra_zip_exts: Arc<RwLock<Vec<String>>>,
+    /// "Open As"로 아카이브로 열기로 한 파일들(확장자와 무관). 세션 동안만 유지된다.
+    forced: Arc<RwLock<HashSet<String>>>,
 }
 
 enum Loc {
@@ -82,13 +88,45 @@ impl CompositeFs {
     pub fn new(extra_zip_exts: Vec<String>) -> Self {
         Self {
             local: LocalFs,
-            extra_zip_exts,
+            extra_zip_exts: Arc::new(RwLock::new(extra_zip_exts)),
+            forced: Arc::default(),
         }
+    }
+
+    /// 확장자와 무관하게 파일을 아카이브로 연다 (ARC-04). 내용(매직 바이트)이 아카이브가 아니면 오류.
+    /// 돌려주는 경로(`파일!`)가 아카이브 루트다.
+    pub fn open_as_archive(&self, path: &VfsPath) -> Result<VfsPath> {
+        let p = path.as_path();
+        if !p.is_file() {
+            return Err(VfsError::NotFound(path.clone()));
+        }
+        if sniff_kind(p).map_err(|e| io_err(path, e))?.is_none() {
+            return Err(other(path, "아카이브로 열 수 있는 형식이 아닙니다"));
+        }
+        self.forced
+            .write()
+            .unwrap()
+            .insert(p.to_string_lossy().into_owned());
+        Ok(VfsPath::new(format!("{}!", p.display())))
+    }
+
+    fn is_forced(&self, outer: &str) -> bool {
+        self.forced.read().unwrap().contains(outer)
+    }
+
+    /// 설정 `file_systems.zip.additional_extensions`가 바뀌면 부른다.
+    pub fn set_extra_zip_exts(&self, exts: Vec<String>) {
+        *self.extra_zip_exts.write().unwrap() = exts;
+    }
+
+    fn extra(&self) -> Vec<String> {
+        self.extra_zip_exts.read().unwrap().clone()
     }
 
     fn locate(&self, path: &VfsPath) -> Loc {
         let s = path.as_path().to_string_lossy();
-        match split_archive_path(&s, &self.extra_zip_exts, &|p| Path::new(p).is_file()) {
+        let forced = |p: &str| self.is_forced(p);
+        match split_archive_path_with(&s, &self.extra(), &|p| Path::new(p).is_file(), &forced) {
             Some(ap) => Loc::Archive(ap),
             None => Loc::Local,
         }
@@ -100,11 +138,19 @@ impl CompositeFs {
     }
 
     fn open(&self, path: &VfsPath, ap: &ArchivePath) -> Result<Archive> {
-        let mut a = Archive::open(Path::new(&ap.outer), &self.extra_zip_exts)
-            .map_err(|e| arc_err(path, e))?;
+        let outer = Path::new(&ap.outer);
+        let mut a = if self.is_forced(&ap.outer) {
+            let kind = sniff_kind(outer)
+                .map_err(|e| io_err(path, e))?
+                .ok_or_else(|| other(path, "아카이브로 열 수 있는 형식이 아닙니다"))?;
+            Archive::open_as(outer, kind)
+        } else {
+            Archive::open(outer, &self.extra())
+        }
+        .map_err(|e| arc_err(path, e))?;
         for n in &ap.nested {
             a = a
-                .open_nested(n, &self.extra_zip_exts)
+                .open_nested(n, &self.extra())
                 .map_err(|e| arc_err(path, e))?;
         }
         Ok(a)
@@ -116,8 +162,15 @@ impl CompositeFs {
         ap: &ArchivePath,
         f: &mut dyn FnMut(&mut ZipEdit),
     ) -> Result<()> {
-        edit_in(Path::new(&ap.outer), &ap.nested, &self.extra_zip_exts, f)
-            .map_err(|e| arc_err(path, e))
+        let outer_as_zip = self.is_forced(&ap.outer);
+        edit_in_with(
+            Path::new(&ap.outer),
+            outer_as_zip,
+            &ap.nested,
+            &self.extra(),
+            f,
+        )
+        .map_err(|e| arc_err(path, e))
     }
 
     fn root_name(ap: &ArchivePath) -> String {

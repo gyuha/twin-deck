@@ -42,6 +42,8 @@ export interface Backend {
   revealPath(path: string): Promise<void>;
   /** 설정한 편집기로 항목을 연다. */
   editPaths(paths: string[]): Promise<void>;
+  /** 확장자와 무관하게 파일을 아카이브로 연다 (ARC-04). 아카이브 루트 경로(`파일!`)를 돌려준다. */
+  openAsArchive(path: string): Promise<string>;
   /** 마운트된 볼륨. 루트가 첫 항목이다. */
   listVolumes(): Promise<VolumeDto[]>;
   /** 언마운트/추출. 루트나 목록에 없는 경로는 거부된다. */

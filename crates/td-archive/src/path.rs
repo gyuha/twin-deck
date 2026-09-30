@@ -31,9 +31,20 @@ pub fn split_archive_path(
     extra_zip_exts: &[String],
     outer_is_file: &dyn Fn(&str) -> bool,
 ) -> Option<ArchivePath> {
+    split_archive_path_with(path, extra_zip_exts, outer_is_file, &|_| false)
+}
+
+/// `split_archive_path`와 같지만, `forced_outer(p)`가 true인 경로는 확장자와 무관하게 바깥 아카이브로 본다("Open As", ARC-04).
+pub fn split_archive_path_with(
+    path: &str,
+    extra_zip_exts: &[String],
+    outer_is_file: &dyn Fn(&str) -> bool,
+    forced_outer: &dyn Fn(&str) -> bool,
+) -> Option<ArchivePath> {
     for (start, end) in boundaries(path) {
         let prefix = &path[..start];
-        if kind_for_name(base_name(prefix), extra_zip_exts).is_none() || !outer_is_file(prefix) {
+        let by_name = kind_for_name(base_name(prefix), extra_zip_exts).is_some();
+        if !(by_name || forced_outer(prefix)) || !outer_is_file(prefix) {
             continue;
         }
         let mut rest = &path[end..];

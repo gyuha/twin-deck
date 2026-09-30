@@ -247,12 +247,34 @@ pub fn edit_in(
     extra_zip_exts: &[String],
     f: &mut dyn FnMut(&mut ZipEdit),
 ) -> Result<()> {
+    edit_in_with(outer, false, nested, extra_zip_exts, f)
+}
+
+/// `edit_in`과 같지만 `outer_as_zip`이면 바깥 파일을 확장자와 무관하게 ZIP으로 고친다("Open As").
+pub fn edit_in_with(
+    outer: &Path,
+    outer_as_zip: bool,
+    nested: &[String],
+    extra_zip_exts: &[String],
+    f: &mut dyn FnMut(&mut ZipEdit),
+) -> Result<()> {
+    let open_edit = || {
+        if outer_as_zip {
+            ZipEdit::open_as_zip(outer)
+        } else {
+            ZipEdit::open(outer, extra_zip_exts)
+        }
+    };
     let Some((first, rest)) = nested.split_first() else {
-        let mut e = ZipEdit::open(outer, extra_zip_exts)?;
+        let mut e = open_edit()?;
         f(&mut e);
         return e.commit();
     };
-    let parent = Archive::open(outer, extra_zip_exts)?;
+    let parent = if outer_as_zip {
+        Archive::open_as(outer, Kind::Zip)?
+    } else {
+        Archive::open(outer, extra_zip_exts)?
+    };
     if !parent.kind().writable() {
         return Err(ArchiveError::ReadOnly(parent.kind().name()));
     }
@@ -262,7 +284,7 @@ pub fn edit_in(
         .join(first.rsplit('/').next().unwrap_or(first));
     parent.read_to(first, &mut File::create(&child)?)?;
     edit_in(&child, rest, extra_zip_exts, f)?;
-    let mut e = ZipEdit::open(outer, extra_zip_exts)?;
+    let mut e = open_edit()?;
     e.add_file(first, Source::Path(child));
     e.commit()
 }

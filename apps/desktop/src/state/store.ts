@@ -1,5 +1,15 @@
 import { createStore } from "zustand/vanilla";
-import { baseName, defaultLoaded, expandPath, joinPath, parentPath } from "@twin-deck/ts-client";
+import {
+  archiveFileName,
+  archiveRoot,
+  baseName,
+  defaultLoaded,
+  expandPath,
+  isArchiveName,
+  isArchivePath,
+  joinPath,
+  parentPath,
+} from "@twin-deck/ts-client";
 import type {
   Backend,
   ConflictDto,
@@ -522,15 +532,36 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       await syncWatches();
     },
 
+    /** 열기: 폴더는 들어가고, 아카이브 파일은 폴더처럼 연다 (ARC-01). */
     async open() {
       const c = cursorEntry(activeTab(get()));
       if (c?.kind === "dir") await api.navigate(c.path);
+      else if (c?.kind === "file" && isArchiveName(c.name, cfg().file_systems.zip.additional_extensions)) {
+        await api.navigate(archiveRoot(c.path));
+      }
     },
 
+    /** 확장자와 무관하게 커서의 파일을 아카이브로 연다 (ARC-04, `core.open.as_archive`). */
+    async openAsArchive() {
+      const c = cursorEntry(activeTab(get()));
+      if (!c) return;
+      if (c.kind !== "file") {
+        fail("파일만 아카이브로 열 수 있습니다");
+        return;
+      }
+      set({ notice: null });
+      try {
+        await api.navigate(await backend.openAsArchive(c.path));
+      } catch (e) {
+        fail(e);
+      }
+    },
+
+    /** 상위 폴더. 아카이브 루트에서는 아카이브가 들어 있는 폴더로 나가고 커서는 그 아카이브 파일에 놓인다. */
     async goUp() {
       const tab = activeTab(get());
       const parent = parentPath(tab.path);
-      if (parent !== null) await api.navigate(parent, baseName(tab.path));
+      if (parent !== null) await api.navigate(parent, archiveFileName(baseName(tab.path)));
     },
 
     moveCursor(delta: number) {
@@ -859,6 +890,10 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     async trashTargets() {
       const targets = targetsOf(activeTab(get()));
       if (targets.length === 0) return;
+      if (isArchivePath(activeTab(get()).path)) {
+        fail("아카이브 안에서는 휴지통을 쓸 수 없습니다. 영구 삭제(Shift+F8)를 사용하세요");
+        return;
+      }
       if (cfg().core.confirm.trash && !(await api.confirmTargets(`${targets.length}개 항목을 휴지통으로 보낼까요?`, targets))) return;
       set({ notice: null });
       patchActive({ selection: new Set() });

@@ -85,6 +85,17 @@ async editPaths(paths: string[]) : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * 확장자와 무관하게 파일을 아카이브로 연다 (ARC-04). 아카이브 루트 경로를 돌려준다.
+ */
+async openAsArchive(path: string) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("open_as_archive", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async listVolumes() : Promise<VolumeDto[]> {
     return await TAURI_INVOKE("list_volumes");
 },
@@ -230,7 +241,7 @@ args: Partial<{ [key in string]: string }>;
  * 스코프를 강제로 지정할 때만 값이 있다.
  */
 scope: string | null }
-export type Config = { behavior: Behavior; display: Display; environment: Environment; core: CoreConfig; layout: LayoutConfig; view: ViewConfig; 
+export type Config = { behavior: Behavior; display: Display; environment: Environment; core: CoreConfig; layout: LayoutConfig; view: ViewConfig; file_systems: FileSystemsConfig; 
 /**
  * 병합 후 항목별로 검증해서 채운다(잘못된 항목은 경고와 함께 빠진다).
  */
@@ -281,6 +292,7 @@ export type FileInfoDto = { name: string; path: string; kind: KindDto; size: num
  * 폴더의 바로 아래 항목 수.
  */
 childCount: number | null }
+export type FileSystemsConfig = { zip: ZipConfig }
 export type JobDto = { id: number; kind: JobKindDto; status: JobStatusDto; total: number; completed: number; current: string | null; errors: JobErrorDto[] }
 export type JobErrorDto = { path: string; message: string }
 export type JobKindDto = "copy" | "move" | "trash" | "delete" | "duplicate"
@@ -356,6 +368,10 @@ export type Warning = { file: string; message: string;
  * TOML 문법 오류의 위치(1부터).
  */
 line: number | null }
+/**
+ * ZIP으로도 열 확장자 (ARC-01). 점 없이 쓴다(`docx`).
+ */
+export type ZipConfig = { additional_extensions: string[] }
 
 /** tauri-specta globals **/
 

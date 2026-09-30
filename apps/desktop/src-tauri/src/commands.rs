@@ -163,15 +163,24 @@ pub fn reveal_path(launch: State<'_, AppLaunch>, path: String) -> ServiceResult<
     reveal(&launch, &path)
 }
 
+/// 확장자와 무관하게 파일을 아카이브로 연다 (ARC-04). 아카이브 루트 경로를 돌려준다.
+#[tauri::command]
+#[specta::specta]
+pub fn open_as_archive(svc: State<'_, AppService>, path: String) -> ServiceResult<String> {
+    svc.open_as_archive(&path)
+}
+
 /// 설정의 `environment.text_editor`로 항목을 연다.
 #[tauri::command]
 #[specta::specta]
 pub fn edit_paths(
+    svc: State<'_, AppService>,
     launch: State<'_, AppLaunch>,
     config: State<'_, ConfigState>,
     paths: Vec<String>,
 ) -> ServiceResult<()> {
     let editor = config.current().config.environment.text_editor;
+    let paths = svc.prepare_edit(&paths)?;
     edit(&launch, &editor, &paths)
 }
 
@@ -351,6 +360,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             glob_filter,
             reveal_path,
             edit_paths,
+            open_as_archive,
             list_volumes,
             unmount_volume,
             eject_volume,

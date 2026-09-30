@@ -38,6 +38,9 @@ trash = false
 [layout]
 action_bar = ["core.edit", "core.copy", "core.move", "core.file.new_folder", "core.trash", "core.delete"]
 
+[file_systems.zip]
+additional_extensions = []
+
 [view.table]
 columns = ["name", "size", "modified"]
 

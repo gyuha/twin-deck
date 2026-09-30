@@ -9,6 +9,7 @@ pub struct Config {
     pub core: CoreConfig,
     pub layout: LayoutConfig,
     pub view: ViewConfig,
+    pub file_systems: FileSystemsConfig,
     /// 병합 후 항목별로 검증해서 채운다(잘못된 항목은 경고와 함께 빠진다).
     #[serde(default)]
     pub favorites: Vec<FavoriteDto>,
@@ -72,6 +73,17 @@ pub struct CoreConfig {
 pub struct ConfirmConfig {
     pub delete: bool,
     pub trash: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct FileSystemsConfig {
+    pub zip: ZipConfig,
+}
+
+/// ZIP으로도 열 확장자 (ARC-01). 점 없이 쓴다(`docx`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct ZipConfig {
+    pub additional_extensions: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

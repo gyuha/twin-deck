@@ -51,6 +51,7 @@ export const DEFAULT_ACTION_META = [
   { id: "core.select.group", title: "패턴으로 선택", category: "Selection", scopes: ["pane"] },
   { id: "core.deselect.group", title: "패턴으로 선택 해제", category: "Selection", scopes: ["pane"] },
   { id: "core.open", title: "열기", category: "Navigation", scopes: ["pane"], isApplicable: (c) => c.hasCursorItem },
+  { id: "core.open.as_archive", title: "아카이브로 열기 (Open As)", category: "Navigation", scopes: ["pane"], isApplicable: (c) => c.hasCursorItem },
   { id: "core.go.up", title: "상위 폴더", category: "Navigation", scopes: ["pane"], isApplicable: (c) => c.canGoUp },
   { id: "core.move.up", title: "커서 위로", category: "Navigation", scopes: ["pane"] },
   { id: "core.move.down", title: "커서 아래로", category: "Navigation", scopes: ["pane"] },

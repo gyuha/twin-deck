@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { FakeBackend, baseName, expandPath, globMatch, joinPath, parentPath } from "./index";
+import { FakeBackend, archiveFileName, archiveRoot, baseName, expandPath, globMatch, isArchiveName, isArchivePath, joinPath, parentPath } from "./index";
 
 const fs = () =>
   new FakeBackend().seed({
@@ -197,5 +197,33 @@ describe("FakeBackend 복제/정보/열기", () => {
     await b.editPaths(["/a/x.txt"]);
     expect(b.edited).toEqual([["/a/x.txt"]]);
     expect(await b.globFilter("*.txt", ["x.txt", "y.md"])).toEqual([0]);
+  });
+});
+
+describe("archive helpers", () => {
+  it("isArchiveName: 기본 확장자, tar 계열, 추가 확장자, 대소문자", () => {
+    for (const n of ["a.zip", "A.ZIP", "x.jar", "x.war", "x.aar", "x.apk", "x.nupkg", "x.klib", "x.sublime-package", "a.tar", "a.tar.gz", "a.tgz", "a.tar.bz2", "a.tbz2", "a.tbz"]) {
+      expect(isArchiveName(n), n).toBe(true);
+    }
+    for (const n of ["zip", ".zip", "a.txt", "a.gz", "a.bz2", "notes", "tar", "a.docx"]) {
+      expect(isArchiveName(n), n).toBe(false);
+    }
+    expect(isArchiveName("m.docx", ["docx"])).toBe(true);
+    expect(isArchiveName("m.DOCX", [".docx"])).toBe(true);
+    expect(isArchiveName("m.odt", ["docx"])).toBe(false);
+  });
+
+  it("아카이브 경로: 루트, 판별, 상위 이동", () => {
+    expect(archiveRoot("/a/x.zip")).toBe("/a/x.zip!");
+    expect(isArchivePath("/a/x.zip!")).toBe(true);
+    expect(isArchivePath("/a/x.zip!/d/f")).toBe(true);
+    expect(isArchivePath("/a/x.zip")).toBe(false);
+    expect(isArchivePath("/a/hello!world")).toBe(false);
+    expect(parentPath("/a/x.zip!")).toBe("/a");
+    expect(parentPath("/a/x.zip!/d")).toBe("/a/x.zip!");
+    expect(parentPath("/a/x.zip!/inner.zip!")).toBe("/a/x.zip!");
+    expect(joinPath("/a/x.zip!", "d")).toBe("/a/x.zip!/d");
+    expect(archiveFileName(baseName("/a/x.zip!"))).toBe("x.zip");
+    expect(archiveFileName(baseName("/a/plain"))).toBe("plain");
   });
 });

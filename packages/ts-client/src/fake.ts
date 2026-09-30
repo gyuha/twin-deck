@@ -1,3 +1,4 @@
+import { archiveRoot, isArchivePath } from "./archive";
 import { BackendError, baseName, joinPath, parentPath } from "./backend";
 import type { Backend } from "./backend";
 import type {
@@ -116,7 +117,11 @@ export class FakeBackend implements Backend {
   }
 
   private subtree(path: string): string[] {
-    return [...this.nodes.keys()].filter((k) => k === path || k.startsWith(`${path}/`));
+    // 아카이브 파일(`x.zip`)은 안쪽 항목(`x.zip!/…`)과 한 덩어리로 움직인다.
+    const inArchive = this.nodes.get(path)?.kind === "file";
+    return [...this.nodes.keys()].filter(
+      (k) => k === path || k.startsWith(`${path}/`) || (inArchive && (k === `${path}!` || k.startsWith(`${path}!/`))),
+    );
   }
 
   /** 실제 상태 확인용. */
@@ -135,6 +140,8 @@ export class FakeBackend implements Backend {
     for (const [p, n] of this.nodes) {
       if (p === path || !p.startsWith(prefix) || p.slice(prefix.length).includes("/")) continue;
       const name = baseName(p);
+      // `x.zip!`는 아카이브 안쪽을 여는 가상 위치라서 부모 목록에는 나오지 않는다.
+      if (name.endsWith("!") && this.nodes.get(p.slice(0, -1))?.kind === "file") continue;
       const hidden = name.startsWith(".");
       if (hidden && !showHidden) continue;
       out.push({
@@ -275,6 +282,19 @@ export class FakeBackend implements Backend {
     }
     paths.forEach((p) => this.need(p));
     this.edited.push(paths);
+  }
+
+  /** Open As로 열기로 한 파일들. Rust 쪽의 세션 등록을 흉내 낸다. */
+  readonly openedAsArchive: string[] = [];
+
+  async openAsArchive(path: string) {
+    if (this.need(path).kind !== "file") throw new BackendError(`파일이 아님: ${path}`);
+    // 실제 구현은 매직 바이트로 판별한다. 여기서는 내용이 `PK`(zip 시그니처)로 시작하면 아카이브로 본다.
+    if (!this.need(path).content.startsWith("PK")) throw new BackendError(`${path}: 아카이브로 열 수 있는 형식이 아닙니다`);
+    this.openedAsArchive.push(path);
+    const root = archiveRoot(path);
+    if (!this.nodes.has(root)) this.nodes.set(root, { kind: "dir", content: "" });
+    return root;
   }
 
   async listVolumes() {
@@ -507,6 +527,7 @@ export class FakeBackend implements Backend {
 
   async trash(path: string) {
     this.need(path);
+    if (isArchivePath(path)) throw new BackendError(`${path}: 아카이브 안에서는 휴지통을 쓸 수 없습니다 (영구 삭제만 가능)`);
     this.ensureDir(TRASH);
     this.trashed.push(path);
     for (const k of this.subtree(path)) {

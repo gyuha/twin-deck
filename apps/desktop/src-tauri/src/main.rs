@@ -12,6 +12,11 @@ use commands::{
 };
 use tauri::Manager;
 
+/// 설정의 ZIP 추가 확장자를 서비스에 반영한다 (ARC-01).
+fn apply_archive_extensions(svc: &AppService, loaded: &td_config::Loaded) {
+    svc.set_archive_extensions(loaded.config.file_systems.zip.additional_extensions.clone());
+}
+
 fn main() {
     let builder = specta_builder();
     let (service, channels) = AppService::new(SystemTrash).expect("서비스 초기화 실패");
@@ -59,10 +64,15 @@ fn main() {
                 store,
                 startup_warning,
             });
+            apply_archive_extensions(
+                &app.state::<AppService>(),
+                &app.state::<ConfigState>().current(),
+            );
             if let Some(rx) = config_rx {
                 let handle = app.handle().clone();
                 std::thread::spawn(move || {
                     while let Ok(loaded) = rx.recv() {
+                        apply_archive_extensions(&handle.state::<AppService>(), &loaded);
                         let _ = ConfigChanged { loaded }.emit(&handle);
                     }
                 });

@@ -3,11 +3,11 @@
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::Receiver;
 use std::sync::Mutex;
-use std::time::UNIX_EPOCH;
+use std::time::{Duration, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
-use td_archive::CompositeFs;
+use td_archive::{start_edit, CompositeFs, EditSession};
 use td_launch::{Launch, Launcher};
 use td_ops::{ConflictPolicy, Ops, Trasher};
 use td_queue::{Item, JobInfo, JobKind, JobSpec, JobStatus, Queue, QueueEvent};
@@ -270,6 +270,10 @@ pub struct Channels {
 pub struct Service<T: Trasher> {
     /// 즉시 실행하는 짧은 작업(폴더/파일 만들기, 이름 변경, 충돌 확인).
     ops: Ops<CompositeFs, T>,
+    /// 로컬과 아카이브를 함께 다루는 VFS. 큐의 `Ops`와 확장자 설정을 공유한다.
+    fs: CompositeFs,
+    /// 아카이브 안 파일을 편집 중인 세션들. 세션이 살아 있는 동안 임시 파일의 변경을 아카이브에 되쓴다.
+    edits: Mutex<Vec<EditSession>>,
     queue: Queue,
     watcher: Mutex<DirWatcher>,
 }
@@ -277,10 +281,13 @@ pub struct Service<T: Trasher> {
 impl<T: Trasher + Clone + Send + 'static> Service<T> {
     pub fn new(trasher: T) -> ServiceResult<(Self, Channels)> {
         let (watcher, dir_changes) = DirWatcher::new().map_err(|e| e.to_string())?;
-        let (queue, queue_events) = Queue::new(Ops::new(CompositeFs::default(), trasher.clone()));
+        let fs = CompositeFs::default();
+        let (queue, queue_events) = Queue::new(Ops::new(fs.clone(), trasher.clone()));
         Ok((
             Self {
-                ops: Ops::new(CompositeFs::default(), trasher),
+                ops: Ops::new(fs.clone(), trasher),
+                fs,
+                edits: Mutex::new(Vec::new()),
                 queue,
                 watcher: Mutex::new(watcher),
             },
@@ -289,6 +296,39 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
                 queue_events,
             },
         ))
+    }
+
+    /// 설정 `file_systems.zip.additional_extensions`를 반영한다.
+    pub fn set_archive_extensions(&self, exts: Vec<String>) {
+        self.fs.set_extra_zip_exts(exts);
+    }
+
+    /// 확장자와 무관하게 파일을 아카이브로 연다 (ARC-04). 아카이브 루트 경로(`파일!`)를 돌려준다.
+    pub fn open_as_archive(&self, path: &str) -> ServiceResult<String> {
+        self.fs
+            .open_as_archive(&vp(path))
+            .map(|p| p.to_string())
+            .map_err(|e| e.to_string())
+    }
+
+    /// 편집기에 넘길 경로를 정한다. 아카이브 안 파일은 임시로 추출하고, 임시 파일이 바뀌면 아카이브에 되쓴다 (ARC-03).
+    pub fn prepare_edit(&self, paths: &[String]) -> ServiceResult<Vec<String>> {
+        let mut out = Vec::with_capacity(paths.len());
+        for p in paths {
+            let vp = vp(p);
+            if !self.fs.is_archive_path(&vp) {
+                out.push(p.clone());
+                continue;
+            }
+            let session =
+                start_edit(&self.fs, &vp, Duration::from_millis(300)).map_err(|e| e.to_string())?;
+            out.push(session.temp_path().to_string_lossy().into_owned());
+            let mut edits = self.edits.lock().unwrap();
+            // 임시 파일이 이미 없어진 세션은 정리한다.
+            edits.retain(|s| s.temp_path().exists());
+            edits.push(session);
+        }
+        Ok(out)
     }
 
     /// 복사/이동/휴지통/삭제를 큐에 넣는다. 작업 id를 돌려준다.
@@ -329,7 +369,8 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
 
     /// 폴더 먼저, 이름순으로 정렬해서 돌려준다.
     pub fn list_dir(&self, path: &str, show_hidden: bool) -> ServiceResult<Vec<EntryDto>> {
-        let mut entries = CompositeFs::default()
+        let mut entries = self
+            .fs
             .list(&vp(path), &ListOptions { show_hidden })
             .map_err(|e| e.to_string())?;
         sort_entries(&mut entries);
@@ -337,7 +378,7 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
     }
 
     pub fn file_info(&self, path: &str) -> ServiceResult<FileInfoDto> {
-        CompositeFs::default()
+        self.fs
             .info(&vp(path))
             .map(|i| FileInfoDto::from(&i))
             .map_err(|e| e.to_string())
@@ -625,6 +666,96 @@ mod tests {
         );
         assert_eq!(wait_finished(&svc, del).status, JobStatusDto::Done);
         assert_eq!(names(&format!("{inside}/docs")), ["b.txt"]);
+    }
+
+    #[test]
+    fn additional_zip_extensions_apply_to_the_service() {
+        let (_t, svc, _ch, root) = setup();
+        let docx = format!("{root}/memo.docx");
+        let mut z = td_archive::ZipEdit::create(Path::new(&docx)).unwrap();
+        z.add_file("word/a.xml", td_archive::Source::Bytes(b"<a/>".to_vec()));
+        z.commit().unwrap();
+        // 기본 설정에서는 docx가 아카이브가 아니라 일반 파일이다.
+        assert!(svc.list_dir(&format!("{docx}!"), false).is_err());
+        svc.set_archive_extensions(vec!["docx".into()]);
+        let listed = svc.list_dir(&format!("{docx}!"), false).unwrap();
+        assert_eq!(listed[0].name, "word");
+        svc.set_archive_extensions(vec![]);
+        assert!(svc.list_dir(&format!("{docx}!"), false).is_err());
+    }
+
+    #[test]
+    fn open_as_archive_makes_any_zip_file_navigable() {
+        let (_t, svc, _ch, root) = setup();
+        let bin = format!("{root}/data.bin");
+        let mut z = td_archive::ZipEdit::create(Path::new(&bin)).unwrap();
+        z.add_file("a.txt", td_archive::Source::Bytes(b"a".to_vec()));
+        z.commit().unwrap();
+        assert!(svc.list_dir(&format!("{bin}!"), false).is_err());
+        assert_eq!(svc.open_as_archive(&bin).unwrap(), format!("{bin}!"));
+        assert_eq!(
+            svc.list_dir(&format!("{bin}!"), false).unwrap()[0].name,
+            "a.txt"
+        );
+        let text = format!("{root}/t.txt");
+        std::fs::write(&text, "not an archive").unwrap();
+        assert!(svc.open_as_archive(&text).is_err());
+    }
+
+    #[test]
+    fn editing_an_archive_file_writes_back_through_the_launcher() {
+        use std::sync::{Arc, Mutex as StdMutex};
+        struct Editor(Arc<StdMutex<Vec<String>>>);
+        impl Launcher for Editor {
+            fn run(&self, c: &td_launch::Command) -> Result<(), String> {
+                // 편집기 fake: 받은 임시 파일을 저장한다.
+                for a in &c.args {
+                    std::fs::write(a, "edited").map_err(|e| e.to_string())?;
+                    self.0.lock().unwrap().push(a.clone());
+                }
+                Ok(())
+            }
+        }
+        let (_t, svc, _ch, root) = setup();
+        let zip = format!("{root}/p.zip");
+        let mut z = td_archive::ZipEdit::create(Path::new(&zip)).unwrap();
+        z.add_file("d/a.txt", td_archive::Source::Bytes(b"orig".to_vec()));
+        z.commit().unwrap();
+        let log = Arc::new(StdMutex::new(Vec::new()));
+        let launch = Launch::new(Editor(log.clone()), td_launch::Os::Linux);
+
+        let archive_file = format!("{zip}!/d/a.txt");
+        let local = format!("{root}/plain.txt");
+        std::fs::write(&local, "plain").unwrap();
+        let mapped = svc
+            .prepare_edit(&[archive_file.clone(), local.clone()])
+            .unwrap();
+        assert_ne!(
+            mapped[0], archive_file,
+            "아카이브 안 파일은 임시 경로로 바뀐다"
+        );
+        assert_eq!(mapped[1], local, "로컬 파일은 그대로다");
+        edit(&launch, "code", &mapped).unwrap();
+        assert_eq!(log.lock().unwrap().len(), 2);
+
+        let end = Instant::now() + Duration::from_secs(10);
+        loop {
+            let out = std::process::Command::new("unzip")
+                .args(["-p", &zip, "d/a.txt"])
+                .output()
+                .unwrap();
+            if out.stdout == b"edited" {
+                break;
+            }
+            assert!(
+                Instant::now() < end,
+                "편집 결과가 아카이브에 반영되지 않았다"
+            );
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        // 폴더나 아카이브 루트는 편집기로 열 수 없다.
+        assert!(svc.prepare_edit(&[format!("{zip}!/d")]).is_err());
+        assert!(svc.prepare_edit(&[format!("{zip}!")]).is_err());
     }
 
     #[test]

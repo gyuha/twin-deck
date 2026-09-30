@@ -11,6 +11,7 @@ export function allHandlers(app: AppStore): ActionHandlers {
 export function navigationHandlers({ api }: AppStore): Partial<ActionHandlers> {
   return {
     "core.open": () => api.open(),
+    "core.open.as_archive": () => api.openAsArchive(),
     "core.go.up": () => api.goUp(),
     "core.move.up": () => api.moveCursor(-1),
     "core.move.down": () => api.moveCursor(1),

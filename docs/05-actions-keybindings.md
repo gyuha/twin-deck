@@ -109,6 +109,7 @@ Marta에서는 수정자 없는 단일 키 바인딩이 Quick Select에 가로�
 |---|---|---|---|---|
 | `core.open` | 열기 | `Return` | `Return` | ID 확인 |
 | `core.open.directory` | 폴더 열기 (인수 `src`) | 없음 | 없음 | ID 확인, 인수 확인 |
+| `core.open.as_archive` | 아카이브로 열기 (Open As, ARC-04) | 없음 | 없음 | 자체 ID |
 | `core.go.up` | 상위 폴더 | `Backspace` | `Backspace`, `Alt+Up` | ID 확인 |
 | `core.go.path` | Go To Path | `Mod+G` | `Ctrl+G` | 자체 ID, 키 확인 |
 | `core.move.up` / `core.move.down` | 커서 위/아래 | `Up` / `Down` | 같음 | ID 확인 |

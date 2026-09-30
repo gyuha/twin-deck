@@ -4,7 +4,9 @@ use std::{fs, path::PathBuf, thread};
 
 use td_watch::DirWatcher;
 
-const WAIT: Duration = Duration::from_secs(5);
+/// 이벤트가 와야 하는 검사의 상한. 이벤트가 오면 바로 반환하므로 정상일 때는 느려지지 않는다.
+/// macOS에서 `fseventsd`가 밀려(큰 폴더를 만드는 다른 테스트 직후 등) 이벤트가 수 초 늦게 오는 경우가 있어 넉넉히 둔다.
+const WAIT: Duration = Duration::from_secs(30);
 
 /// 감시 시작 전후의 지연된 이벤트가 검사를 오염시키지 않도록, 500ms 동안 조용해질 때까지(최대 10초) 비운다.
 fn drain(rx: &Receiver<PathBuf>) {

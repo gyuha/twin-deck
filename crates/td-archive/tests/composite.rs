@@ -303,3 +303,48 @@ fn composite_nested_and_readonly_and_trash() {
     let info = cfs.info(&inside(&outer, "inner.zip")).unwrap();
     assert_eq!(info.entry.kind, EntryKind::File);
 }
+
+#[test]
+fn composite_open_as_archive_ignores_extension() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path();
+    let real = root.join("real.zip");
+    new_zip(&real);
+    let disguised = root.join("data.bin");
+    fs::rename(&real, &disguised).unwrap();
+    // 복제본끼리 "Open As" 등록을 공유하므로 큐가 가진 복제본도 같은 결과를 본다.
+    let cfs = CompositeFs::default();
+    let ops = Ops::new(cfs.clone(), NoTrash);
+
+    // 열기 전에는 일반 파일이라 `data.bin!`가 아카이브로 해석되지 않는다.
+    assert!(cfs
+        .list(&root_of(&disguised), &ListOptions::default())
+        .is_err());
+    let root_path = cfs.open_as_archive(&vp(&disguised)).unwrap();
+    assert_eq!(root_path, root_of(&disguised));
+    assert_eq!(names(&cfs, &root_path), ["seed.txt"]);
+
+    // 쓰기도 되고, 결과는 확장자와 무관하게 유효한 zip이다.
+    let f = root.join("added.txt");
+    fs::write(&f, "added").unwrap();
+    ops.copy(&vp(&f), &root_path, ConflictPolicy::Skip).unwrap();
+    assert_eq!(names(&cfs, &root_path), ["added.txt", "seed.txt"]);
+    let unzip = sh(root, "unzip", &["-tq", "data.bin"]);
+    assert!(String::from_utf8_lossy(&unzip).contains("No errors"));
+
+    // tar.gz를 이름을 바꿔 열면 읽기 전용이다.
+    fs::create_dir(root.join("t")).unwrap();
+    fs::write(root.join("t/x.txt"), "x").unwrap();
+    sh(root, "tar", &["-czf", "blob.dat", "-C", "t", "x.txt"]);
+    let blob = root.join("blob.dat");
+    let blob_root = cfs.open_as_archive(&vp(&blob)).unwrap();
+    assert_eq!(names(&cfs, &blob_root), ["x.txt"]);
+    assert!(ops.touch(&blob_root.join("y.txt")).is_err());
+
+    // 아카이브가 아닌 파일과 없는 파일은 거부한다.
+    let text = root.join("plain.txt");
+    fs::write(&text, "just text").unwrap();
+    assert!(cfs.open_as_archive(&vp(&text)).is_err());
+    assert!(cfs.open_as_archive(&vp(&root.join("nope"))).is_err());
+    assert!(cfs.list(&root_of(&text), &ListOptions::default()).is_err());
+}

@@ -27,6 +27,7 @@ export type {
   VolumeDto,
 } from "./generated/bindings";
 export * from "./backend";
+export { archiveFileName, archiveRoot, isArchiveName, isArchivePath } from "./archive";
 export { TauriBackend } from "./tauri";
 export { FakeBackend, defaultLoaded } from "./fake";
 export { globMatch } from "./glob";

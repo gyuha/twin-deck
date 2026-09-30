@@ -22,7 +22,8 @@ impl Kind {
     }
 }
 
-const ZIP_EXTS: [&str; 8] = [
+/// 기본으로 ZIP 계열로 여기는 확장자. `packages/ts-client/src/archive.ts`와 같아야 한다(테스트가 확인한다).
+pub const ZIP_EXTS: [&str; 8] = [
     "zip",
     "jar",
     "war",
@@ -59,4 +60,26 @@ pub fn kind_for_name(name: &str, extra_zip_exts: &[String]) -> Option<Kind> {
         return Some(Kind::Zip);
     }
     None
+}
+
+/// 파일 앞부분(매직 바이트)으로 형식을 판별한다. "Open As"처럼 확장자를 믿을 수 없을 때 쓴다.
+pub fn sniff_kind(path: &std::path::Path) -> std::io::Result<Option<Kind>> {
+    use std::io::Read;
+    let mut head = Vec::with_capacity(512);
+    std::fs::File::open(path)?
+        .take(512)
+        .read_to_end(&mut head)?;
+    Ok(
+        if head.starts_with(b"PK\x03\x04") || head.starts_with(b"PK\x05\x06") {
+            Some(Kind::Zip)
+        } else if head.starts_with(&[0x1f, 0x8b]) {
+            Some(Kind::TarGz)
+        } else if head.starts_with(b"BZh") {
+            Some(Kind::TarBz2)
+        } else if head.get(257..262) == Some(b"ustar") {
+            Some(Kind::Tar)
+        } else {
+            None
+        },
+    )
 }
