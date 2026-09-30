@@ -390,7 +390,6 @@ fn zip_slip_rejected() {
         ("../../evil.txt".into(), false),
         ("a/../../evil.txt".into(), false),
         (abs, false),
-        ("/tmp/evil_abs.txt".into(), false),
         ("..\\evil.txt".into(), false),
         ("a\\..\\..\\evil.txt".into(), false),
         ("C:\\evil.txt".into(), false),
@@ -417,10 +416,6 @@ fn zip_slip_rejected() {
                 s.display()
             );
         }
-        assert!(
-            !Path::new("/tmp/evil_abs.txt").exists(),
-            "{name:?}: 실제 /tmp에 쓰였다"
-        );
     }
 
     // tar에 든 심볼릭 링크도 거부한다 (시스템 tar로 만든 링크)

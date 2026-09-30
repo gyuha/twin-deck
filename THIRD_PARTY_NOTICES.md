@@ -16,3 +16,5 @@ crates.io에서 받아 쓰는 permissive 라이선스 라이브러리이며 코�
 | flate2 | 1.1.10 | MIT OR Apache-2.0 | gzip 해제 |
 | bzip2 | 0.6.1 | MIT OR Apache-2.0 | bzip2 해제 |
 | unicode-normalization | 0.1.25 | MIT OR Apache-2.0 | 한글 NFC/NFD 정규화 |
+
+2026-09-30 기준으로 M3에서 새로 들어온 외부 crate는 위 표가 전부다. 이후에 만든 `td-search`(Look Up, Flatten, Disk Usage)와 압축·추출·편집 세션은 이 crate들과 표준 라이브러리만 쓰고 별도 의존을 더하지 않았다. 테스트는 시스템 `unzip`, `zip`, `tar`(macOS 기본 도구)를 실행해 교차 검증하지만 그 코드를 포함하거나 배포하지 않는다.
