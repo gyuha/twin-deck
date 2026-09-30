@@ -10,10 +10,11 @@ fn quoted_list(src: &str, name: &str) -> Vec<String> {
         .lines()
         .find(|l| l.contains(&format!("const {name}")))
         .unwrap_or_else(|| panic!("{name} 정의를 찾을 수 없다"));
+    // 따옴표로 나눈 조각 중 홀수 번째(따옴표 안)만 값이다.
     line.split('"')
-        .skip(1)
-        .step_by(2)
-        .map(str::to_string)
+        .enumerate()
+        .filter(|(i, _)| i % 2 == 1)
+        .map(|(_, s)| s.to_string())
         .collect()
 }
 
