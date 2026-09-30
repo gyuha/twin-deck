@@ -9,7 +9,7 @@ mod names;
 mod path;
 mod preview;
 
-pub use entry::{Entry, EntryKind, ListOptions};
+pub use entry::{Entry, EntryKind, FileId, ListOptions};
 pub use error::{Result, VfsError};
 pub use glob::glob_match;
 pub use info::Info;

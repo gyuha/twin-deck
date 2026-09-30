@@ -1,7 +1,7 @@
 use std::fs;
 use std::io::Read;
 
-use crate::{Entry, EntryKind, Info, ListOptions, Result, Vfs, VfsError, VfsPath};
+use crate::{Entry, EntryKind, FileId, Info, ListOptions, Result, Vfs, VfsError, VfsPath};
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct LocalFs;
@@ -34,6 +34,23 @@ fn mode_of(meta: &fs::Metadata) -> Option<u32> {
     }
 }
 
+fn file_id_of(meta: &fs::Metadata) -> Option<FileId> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        Some(FileId {
+            dev: meta.dev(),
+            ino: meta.ino(),
+            nlink: meta.nlink(),
+        })
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = meta;
+        None
+    }
+}
+
 fn to_entry(path: &VfsPath, meta: &fs::Metadata) -> Entry {
     let name = path.file_name().unwrap_or_default();
     let ft = meta.file_type();
@@ -53,6 +70,7 @@ fn to_entry(path: &VfsPath, meta: &fs::Metadata) -> Entry {
         modified: meta.modified().ok(),
         created: meta.created().ok(),
         mode: mode_of(meta),
+        file_id: file_id_of(meta),
     }
 }
 

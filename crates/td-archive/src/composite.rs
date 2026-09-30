@@ -81,6 +81,7 @@ fn entry_of(path: VfsPath, name: String, e: &EntryInfo) -> Entry {
         modified: e.modified,
         created: None,
         mode: e.mode,
+        file_id: None,
     }
 }
 
