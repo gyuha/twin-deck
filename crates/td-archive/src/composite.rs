@@ -348,6 +348,25 @@ impl Vfs for CompositeFs {
         }
     }
 
+    fn read_head(&self, path: &VfsPath, max: usize) -> Result<Vec<u8>> {
+        let Loc::Archive(ap) = self.locate(path) else {
+            return self.local.read_head(path, max);
+        };
+        let a = self.open(path, &ap)?;
+        let mut head = HeadWriter {
+            buf: Vec::new(),
+            max,
+        };
+        match a.read_to(&ap.inner, &mut head) {
+            // 앞부분만 필요해서 일부러 중단한 경우
+            Ok(_) | Err(ArchiveError::Io(_)) if head.buf.len() >= max => {}
+            Ok(_) => {}
+            Err(e) => return Err(arc_err(path, e)),
+        }
+        head.buf.truncate(max);
+        Ok(head.buf)
+    }
+
     fn info(&self, path: &VfsPath) -> Result<Info> {
         if !self.is_archive_path(path) {
             return self.local.info(path);
@@ -402,4 +421,26 @@ fn apply_meta(file: &File, path: impl AsRef<Path>, info: &EntryInfo) {
     }
     #[cfg(not(unix))]
     let _ = path;
+}
+
+/// 앞 `max`바이트만 모으고 그다음부터는 쓰기를 거부해 추출을 일찍 멈추게 한다.
+struct HeadWriter {
+    buf: Vec<u8>,
+    max: usize,
+}
+
+impl io::Write for HeadWriter {
+    fn write(&mut self, data: &[u8]) -> io::Result<usize> {
+        let room = self.max.saturating_sub(self.buf.len());
+        if room == 0 {
+            return Err(io::ErrorKind::WriteZero.into());
+        }
+        let n = room.min(data.len());
+        self.buf.extend_from_slice(&data[..n]);
+        Ok(n)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
 }

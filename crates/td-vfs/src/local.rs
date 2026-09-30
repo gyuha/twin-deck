@@ -1,4 +1,5 @@
 use std::fs;
+use std::io::Read;
 
 use crate::{Entry, EntryKind, Info, ListOptions, Result, Vfs, VfsError, VfsPath};
 
@@ -128,6 +129,14 @@ impl Vfs for LocalFs {
             child_count,
             entry,
         })
+    }
+
+    fn read_head(&self, path: &VfsPath, max: usize) -> Result<Vec<u8>> {
+        let mut buf = Vec::new();
+        fs::File::open(path.as_path())
+            .and_then(|f| f.take(max as u64).read_to_end(&mut buf))
+            .map_err(|e| VfsError::io(path, e))?;
+        Ok(buf)
     }
 
     fn read_link(&self, path: &VfsPath) -> Result<VfsPath> {

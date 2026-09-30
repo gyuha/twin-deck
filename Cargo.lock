@@ -3934,6 +3934,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "td-search"
+version = "0.1.0"
+dependencies = [
+ "td-archive",
+ "td-vfs",
+ "tempfile",
+ "thiserror 2.0.21",
+ "unicode-normalization",
+]
+
+[[package]]
 name = "td-state"
 version = "0.1.0"
 dependencies = [

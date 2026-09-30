@@ -1,0 +1,15 @@
+[package]
+name = "td-search"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+td-vfs = { path = "../td-vfs" }
+td-archive = { path = "../td-archive" }
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+unicode-normalization = "0.1"
