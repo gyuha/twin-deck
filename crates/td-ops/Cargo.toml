@@ -7,6 +7,7 @@ license.workspace = true
 
 [dependencies]
 td-vfs = { path = "../td-vfs" }
+td-archive = { path = "../td-archive" }
 thiserror.workspace = true
 trash = "5"
 

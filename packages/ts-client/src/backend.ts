@@ -1,4 +1,4 @@
-import type { EntryDto, FileInfoDto, JobDto, JobKindDto, Loaded, LoadedState, PreviewDto, QueueItemDto, SearchStartDto, SearchSummaryDto, Snapshot, UserDirsDto, VolumeDto } from "./generated/bindings";
+import type { ConflictDto, EntryDto, FileInfoDto, JobDto, JobKindDto, Loaded, LoadedState, PreviewDto, QueueItemDto, SearchStartDto, SearchSummaryDto, Snapshot, UserDirsDto, VolumeDto } from "./generated/bindings";
 
 /** Look Up / Flatten / Disk Usage가 스트리밍으로 보내는 이벤트. 작업마다 마지막은 `done`이다. */
 export type SearchEvent =
@@ -24,6 +24,12 @@ export interface Backend {
   rename(path: string, newName: string): Promise<string>;
   /** 복사/이동/휴지통/삭제를 작업 큐에 넣는다. 작업 id를 돌려준다. */
   enqueue(kind: JobKindDto, items: QueueItemDto[]): Promise<number>;
+  /** 압축 (OP-11): `sources`를 `destDir`의 ZIP 하나로 묶는 작업을 큐에 넣는다. 이름이 겹치면 번호를 붙이고 원본은 그대로 둔다. */
+  enqueueCompress(sources: string[], destDir: string): Promise<number>;
+  /** 추출 (OP-11): 아카이브 `src`를 `destDir` 아래 아카이브 이름의 새 폴더에 안전하게 푸는 작업을 큐에 넣는다. */
+  enqueueExtract(src: string, destDir: string): Promise<number>;
+  /** 심볼릭 링크 만들기 (OP-12). 만든 링크의 경로, 정책이 건너뛰기라 만들지 않았으면 null. */
+  createSymlink(src: string, destDir: string, policy: ConflictDto): Promise<string | null>;
   queueJobs(): Promise<JobDto[]>;
   queuePause(id: number): Promise<void>;
   queueResume(id: number): Promise<void>;

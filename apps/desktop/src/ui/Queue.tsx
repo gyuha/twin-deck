@@ -2,7 +2,7 @@ import { useApp } from "../state/context";
 import { isActiveJob } from "../state/store";
 import type { JobDto } from "@twin-deck/ts-client";
 
-const KIND: Record<JobDto["kind"], string> = { copy: "복사", move: "이동", trash: "휴지통", delete: "삭제", duplicate: "복제" };
+const KIND: Record<JobDto["kind"], string> = { copy: "복사", move: "이동", trash: "휴지통", delete: "삭제", duplicate: "복제", compress: "압축", extract: "추출" };
 const STATUS: Record<JobDto["status"], string> = {
   queued: "대기",
   running: "진행 중",

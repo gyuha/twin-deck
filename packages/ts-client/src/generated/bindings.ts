@@ -162,6 +162,34 @@ async detectConflict(src: string, destDir: string) : Promise<string | null> {
 async enqueueJob(kind: JobKindDto, items: QueueItemDto[]) : Promise<number> {
     return await TAURI_INVOKE("enqueue_job", { kind, items });
 },
+/**
+ * 압축을 큐에 넣는다 (OP-11). 작업 id를 돌려준다.
+ */
+async enqueueCompress(sources: string[], destDir: string, name: string | null) : Promise<Result<number, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("enqueue_compress", { sources, destDir, name }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 추출을 큐에 넣는다 (OP-11). 작업 id를 돌려준다.
+ */
+async enqueueExtract(src: string, destDir: string, folder: string | null) : Promise<number> {
+    return await TAURI_INVOKE("enqueue_extract", { src, destDir, folder });
+},
+/**
+ * 심볼릭 링크를 만든다 (OP-12). 만든 링크의 경로, 건너뛰었으면 null.
+ */
+async createSymlink(src: string, destDir: string, policy: ConflictDto) : Promise<Result<string | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("create_symlink", { src, destDir, policy }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async queueJobs() : Promise<JobDto[]> {
     return await TAURI_INVOKE("queue_jobs");
 },
@@ -327,7 +355,7 @@ childCount: number | null }
 export type FileSystemsConfig = { zip: ZipConfig }
 export type JobDto = { id: number; kind: JobKindDto; status: JobStatusDto; total: number; completed: number; current: string | null; errors: JobErrorDto[] }
 export type JobErrorDto = { path: string; message: string }
-export type JobKindDto = "copy" | "move" | "trash" | "delete" | "duplicate"
+export type JobKindDto = "copy" | "move" | "trash" | "delete" | "duplicate" | "compress" | "extract"
 export type JobStatusDto = "queued" | "running" | "paused" | "done" | "failed" | "aborted"
 export type KindDto = "file" | "dir" | "symlink"
 export type LayoutConfig = { action_bar: string[] }

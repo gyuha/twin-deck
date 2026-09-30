@@ -27,6 +27,8 @@ type OutcomeDto = { type: "done"; path: string } | { type: "skipped" };
 
 interface Node {
   kind: "file" | "dir";
+  /** 심볼릭 링크이면 가리키는 경로(목록에서는 `symlink`로 보인다). */
+  link?: string;
   content: string;
   modifiedMs?: number;
   createdMs?: number;
@@ -147,7 +149,7 @@ export class FakeBackend implements Backend {
     return {
       name,
       path,
-      kind: n.kind,
+      kind: n.link ? "symlink" : n.kind,
       size,
       modifiedMs: n.modifiedMs ?? 0,
       createdMs: n.createdMs ?? 0,
@@ -530,7 +532,83 @@ export class FakeBackend implements Backend {
       case "delete":
         await this.deletePermanent(item.src);
         break;
+      case "compress":
+        this.compress(this.compressSources.get(item) ?? [item.src], item.destDir!);
+        break;
+      case "extract":
+        this.extract(item.src, item.destDir!);
+        break;
     }
+  }
+
+  // ---- 압축/추출/심볼릭 링크 흉내 (실제 zip 동작은 Rust 테스트가 검증한다) ----
+  private compressSources = new WeakMap<QueueItemDto, string[]>();
+  /** 링크를 만들 수 없는 상황(예: Windows 권한 오류)을 흉내 내는 테스트용 오류 문구. */
+  symlinkError: string | null = null;
+
+  async enqueueCompress(sources: string[], destDir: string) {
+    const item: QueueItemDto = { src: sources[0], destDir, policy: "rename" };
+    this.compressSources.set(item, sources);
+    return this.enqueue("compress", [item]);
+  }
+
+  async enqueueExtract(src: string, destDir: string) {
+    return this.enqueue("extract", [{ src, destDir, policy: "rename" }]);
+  }
+
+  /** 겹치지 않는 이름: `이름` → `이름 (1)` (확장자가 있으면 그 앞에 번호). */
+  private freeName(dir: string, name: string): string {
+    if (!this.nodes.has(joinPath(dir, name))) return name;
+    const dot = name.lastIndexOf(".");
+    for (let n = 1; ; n++) {
+      const numbered = dot > 0 ? `${name.slice(0, dot)} (${n})${name.slice(dot)}` : `${name} (${n})`;
+      if (!this.nodes.has(joinPath(dir, numbered))) return numbered;
+    }
+  }
+
+  /** Rust `default_zip_name`과 같은 규칙: 하나면 그 이름(파일은 확장자 제외), 여럿이면 압축 위치의 폴더 이름. */
+  private compress(sources: string[], destDir: string) {
+    sources.forEach((s) => this.need(s));
+    this.need(destDir);
+    const first = this.need(sources[0]);
+    const one = baseName(sources[0]);
+    const dot = one.lastIndexOf(".");
+    const stem = sources.length === 1 ? (first.kind === "dir" || dot <= 0 ? one : one.slice(0, dot)) : baseName(destDir) || "archive";
+    const dest = joinPath(destDir, this.freeName(destDir, `${stem}.zip`));
+    // 결과는 `PK`로 시작하는 파일이고, 안쪽(`dest!`)에 원본 사본이 있어 아카이브로 열 수 있다.
+    this.nodes.set(dest, { kind: "file", content: "PK" });
+    this.nodes.set(`${dest}!`, { kind: "dir", content: "" });
+    for (const s of sources) {
+      for (const k of this.subtree(s)) {
+        this.nodes.set(`${dest}!/${baseName(s)}${k.slice(s.length)}`, { ...this.nodes.get(k)! });
+      }
+    }
+    this.notify(destDir);
+  }
+
+  private extract(src: string, destDir: string) {
+    if (this.need(src).kind !== "file" || !this.nodes.has(`${src}!`)) throw new BackendError(`아카이브가 아닙니다: ${src}`);
+    this.need(destDir);
+    const file = baseName(src);
+    const stem = file.replace(/\.(tar\.gz|tar\.bz2|tgz|tbz2|tbz|tar)$/i, "").replace(/\.[^.]+$/, "") || `${file} 추출`;
+    const dest = joinPath(destDir, this.freeName(destDir, stem));
+    this.nodes.set(dest, { kind: "dir", content: "" });
+    const root = `${src}!`;
+    for (const [k, n] of [...this.nodes]) {
+      if (k.startsWith(`${root}/`)) this.nodes.set(dest + k.slice(root.length), { ...n });
+    }
+    this.notify(destDir);
+  }
+
+  async createSymlink(src: string, destDir: string, policy: ConflictDto) {
+    this.need(src);
+    this.need(destDir);
+    if (this.symlinkError) throw new BackendError(this.symlinkError);
+    const dest = this.resolveDest(src, destDir, policy);
+    if (dest === null) return null;
+    this.nodes.set(dest, { kind: "file", content: "", link: src });
+    this.notify(destDir);
+    return dest;
   }
 
   /** Rust `td_ops::duplicate_name`과 같은 규칙: `a.txt` → `a copy.txt` → `a copy 2.txt`. */

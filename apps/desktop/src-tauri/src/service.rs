@@ -93,6 +93,8 @@ pub enum JobKindDto {
     Trash,
     Delete,
     Duplicate,
+    Compress,
+    Extract,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -218,6 +220,8 @@ impl From<JobKindDto> for JobKind {
             JobKindDto::Trash => JobKind::Trash,
             JobKindDto::Delete => JobKind::Delete,
             JobKindDto::Duplicate => JobKind::Duplicate,
+            JobKindDto::Compress => JobKind::Compress,
+            JobKindDto::Extract => JobKind::Extract,
         }
     }
 }
@@ -227,6 +231,8 @@ impl From<&JobInfo> for JobDto {
         JobDto {
             id: j.id as u32,
             kind: match j.kind {
+                JobKind::Compress => JobKindDto::Compress,
+                JobKind::Extract => JobKindDto::Extract,
                 JobKind::Copy => JobKindDto::Copy,
                 JobKind::Move => JobKindDto::Move,
                 JobKind::Trash => JobKindDto::Trash,
@@ -542,16 +548,57 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
     pub fn enqueue(&self, kind: JobKindDto, items: Vec<QueueItemDto>) -> u32 {
         let items = items
             .into_iter()
-            .map(|i| Item {
-                src: vp(&i.src),
-                dest_dir: i.dest_dir.as_deref().map(vp),
-                policy: i.policy.into(),
-            })
+            .map(|i| Item::new(vp(&i.src), i.dest_dir.as_deref().map(vp), i.policy.into()))
             .collect();
         self.queue.enqueue(JobSpec {
             kind: kind.into(),
             items,
         }) as u32
+    }
+
+    /// 압축 (OP-11): `sources`를 `dest_dir`의 ZIP 하나로 묶는 작업을 큐에 넣는다. 이름이 겹치면 번호를 붙인다.
+    pub fn enqueue_compress(
+        &self,
+        sources: Vec<String>,
+        dest_dir: &str,
+        name: Option<String>,
+    ) -> ServiceResult<u32> {
+        let mut it = sources.iter().map(|s| vp(s));
+        let first = it.next().ok_or("압축할 항목이 없습니다")?;
+        let mut item = Item::new(first, Some(vp(dest_dir)), ConflictPolicy::Rename);
+        item.extra = it.collect();
+        item.name = name;
+        Ok(self.queue.enqueue(JobSpec {
+            kind: JobKind::Compress,
+            items: vec![item],
+        }) as u32)
+    }
+
+    /// 추출 (OP-11): 아카이브 `src`를 `dest_dir` 아래 새 폴더로 푸는 작업을 큐에 넣는다. 이름이 겹치면 번호를 붙인다.
+    pub fn enqueue_extract(&self, src: &str, dest_dir: &str, folder: Option<String>) -> u32 {
+        let mut item = Item::new(vp(src), Some(vp(dest_dir)), ConflictPolicy::Rename);
+        item.name = folder;
+        self.queue.enqueue(JobSpec {
+            kind: JobKind::Extract,
+            items: vec![item],
+        }) as u32
+    }
+
+    /// 심볼릭 링크 만들기 (OP-12). 만든 링크의 경로를 돌려주고, 건너뛰었으면 None.
+    pub fn symlink(
+        &self,
+        src: &str,
+        dest_dir: &str,
+        policy: ConflictDto,
+    ) -> ServiceResult<Option<String>> {
+        match self
+            .ops
+            .symlink(&vp(src), &vp(dest_dir), policy.into())
+            .map_err(|e| e.to_string())?
+        {
+            td_ops::Outcome::Done(p) => Ok(Some(p.to_string())),
+            td_ops::Outcome::Skipped => Ok(None),
+        }
     }
 
     pub fn queue_jobs(&self) -> Vec<JobDto> {
@@ -1077,6 +1124,95 @@ mod tests {
         // 끝난 작업을 취소해도 아무 일 없다
         svc.cancel_search(id);
         svc.cancel_search(9999);
+    }
+
+    #[test]
+    fn compress_extract_and_symlink_through_the_service() {
+        let (_t, svc, _ch, root) = setup();
+        std::fs::create_dir_all(format!("{root}/docs/sub")).unwrap();
+        std::fs::write(format!("{root}/docs/sub/a.txt"), "aaa").unwrap();
+        std::fs::write(format!("{root}/note.txt"), "note").unwrap();
+        let dest = format!("{root}/out");
+        svc.mkdir(&dest).unwrap();
+
+        // 압축: 큐 작업, 시스템 unzip으로 무결성 확인, 원본 유지
+        let id = svc
+            .enqueue_compress(
+                vec![format!("{root}/docs"), format!("{root}/note.txt")],
+                &dest,
+                None,
+            )
+            .unwrap();
+        let job = wait_finished(&svc, id);
+        assert_eq!(
+            (job.kind, job.status),
+            (JobKindDto::Compress, JobStatusDto::Done)
+        );
+        let zip = format!("{dest}/out.zip"); // 여러 항목은 압축 위치의 폴더 이름
+        let unzip = std::process::Command::new("unzip")
+            .args(["-tq", &zip])
+            .output()
+            .unwrap();
+        assert!(
+            unzip.status.success(),
+            "{}",
+            String::from_utf8_lossy(&unzip.stdout)
+        );
+        assert!(Path::new(&format!("{root}/docs/sub/a.txt")).exists());
+        // 두 번째는 번호
+        let id = svc
+            .enqueue_compress(vec![format!("{root}/note.txt")], &dest, None)
+            .unwrap();
+        wait_finished(&svc, id);
+        let id = svc
+            .enqueue_compress(vec![format!("{root}/note.txt")], &dest, None)
+            .unwrap();
+        wait_finished(&svc, id);
+        assert!(Path::new(&format!("{dest}/note.zip")).exists());
+        assert!(Path::new(&format!("{dest}/note (1).zip")).exists());
+        assert_eq!(
+            svc.enqueue_compress(vec![], &dest, None),
+            Err("압축할 항목이 없습니다".to_string())
+        );
+
+        // 추출: 아카이브 옆이 아니라 지정한 폴더 아래 새 폴더
+        let target = format!("{root}/unpacked");
+        svc.mkdir(&target).unwrap();
+        let id = svc.enqueue_extract(&zip, &target, None);
+        let job = wait_finished(&svc, id);
+        assert_eq!(
+            (job.kind, job.status),
+            (JobKindDto::Extract, JobStatusDto::Done)
+        );
+        assert_eq!(
+            std::fs::read_to_string(format!("{target}/out/docs/sub/a.txt")).unwrap(),
+            "aaa"
+        );
+        assert_eq!(
+            std::fs::read_to_string(format!("{target}/out/note.txt")).unwrap(),
+            "note"
+        );
+
+        // 링크
+        #[cfg(unix)]
+        {
+            let made = svc
+                .symlink(&format!("{root}/note.txt"), &target, ConflictDto::Rename)
+                .unwrap();
+            assert_eq!(made, Some(format!("{target}/note.txt")));
+            assert_eq!(
+                std::fs::read_link(format!("{target}/note.txt")).unwrap(),
+                Path::new(&format!("{root}/note.txt"))
+            );
+            assert_eq!(
+                svc.symlink(&format!("{root}/note.txt"), &target, ConflictDto::Skip)
+                    .unwrap(),
+                None
+            );
+            assert!(svc
+                .symlink(&format!("{root}/missing"), &target, ConflictDto::Rename)
+                .is_err());
+        }
     }
 
     #[test]

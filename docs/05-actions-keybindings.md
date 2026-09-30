@@ -95,7 +95,8 @@ Marta에서는 수정자 없는 단일 키 바인딩이 Quick Select에 가로�
 | `core.copy.to_inactive` | 비활성 패널로 복사(대화상자 없음) | 없음 | 없음 | pane | 자체 |
 | `core.move.to_inactive` | 비활성 패널로 이동(대화상자 없음) | 없음 | 없음 | pane | 자체 |
 | `core.compress` | 압축 | 없음 | 없음 | pane | 자체 |
-| `core.extract` | 추출 | 없음 | 없음 | pane | 자체 |
+| `core.extract` | 추출 (선택한 아카이브 옆의 새 폴더로) | 없음 | 없음 | pane | 자체 |
+| `core.extract.to_inactive` | 추출 (반대편 패널 폴더 아래 새 폴더로) | 없음 | 없음 | pane | 자체 |
 | `core.file.symlink` | 심볼릭 링크 만들기 | 없음 | 없음 | pane | 자체 (키 미확인) |
 | `core.file.info` | 파일 정보 | `Mod+I` | `Ctrl+I` | pane | 자체 ID, 키 확인 |
 | `core.path.copy_folder` | 폴더 경로 복사 | `F12` | `F12` | pane | 자체 ID, 키 확인 |

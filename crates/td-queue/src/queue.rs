@@ -344,6 +344,27 @@ where
                 )
                 .map(|_| ()),
             JobKind::Duplicate => ops.duplicate_with(&item.src, &ctl).map(|_| ()),
+            JobKind::Compress => {
+                let mut sources = vec![item.src.clone()];
+                sources.extend(item.extra.iter().cloned());
+                ops.compress_with(
+                    &sources,
+                    dest.expect("압축에는 대상 폴더가 필요하다"),
+                    item.name.as_deref(),
+                    item.policy,
+                    &ctl,
+                )
+                .map(|_| ())
+            }
+            JobKind::Extract => ops
+                .extract_with(
+                    &item.src,
+                    dest.expect("추출에는 대상 폴더가 필요하다"),
+                    item.name.as_deref(),
+                    item.policy,
+                    &ctl,
+                )
+                .map(|_| ()),
             JobKind::Trash => ops.trash(&item.src),
             JobKind::Delete => ops.delete(&item.src),
         };

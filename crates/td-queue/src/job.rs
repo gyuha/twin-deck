@@ -11,6 +11,10 @@ pub enum JobKind {
     Delete,
     /// 같은 폴더에 접미사를 붙여 복사 (OP-08).
     Duplicate,
+    /// 항목(`src`와 `extra`)을 대상 폴더의 ZIP 하나로 압축 (OP-11).
+    Compress,
+    /// 아카이브 `src`를 대상 폴더 아래 새 폴더로 추출 (OP-11).
+    Extract,
 }
 
 #[derive(Debug, Clone)]
@@ -19,6 +23,22 @@ pub struct Item {
     /// 복사/이동의 대상 폴더. 휴지통/삭제에서는 무시한다.
     pub dest_dir: Option<VfsPath>,
     pub policy: ConflictPolicy,
+    /// 압축할 때 `src`와 함께 묶을 다른 원본들.
+    pub extra: Vec<VfsPath>,
+    /// 압축 파일/추출 폴더의 이름. 없으면 원본 이름에서 정한다.
+    pub name: Option<String>,
+}
+
+impl Item {
+    pub fn new(src: VfsPath, dest_dir: Option<VfsPath>, policy: ConflictPolicy) -> Self {
+        Self {
+            src,
+            dest_dir,
+            policy,
+            extra: Vec::new(),
+            name: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

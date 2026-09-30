@@ -48,11 +48,7 @@ fn copy_spec(d: &Dirs, files: &[&str]) -> JobSpec {
         kind: JobKind::Copy,
         items: files
             .iter()
-            .map(|f| Item {
-                src: d.src.join(f),
-                dest_dir: Some(d.dst.clone()),
-                policy: ConflictPolicy::Rename,
-            })
+            .map(|f| Item::new(d.src.join(f), Some(d.dst.clone()), ConflictPolicy::Rename))
             .collect(),
     }
 }
@@ -201,11 +197,11 @@ fn queue_failure_is_summarized_and_queue_continues() {
     let mut spec = copy_spec(&a, &["ok"]);
     spec.items.insert(
         0,
-        Item {
-            src: a.src.join("missing"),
-            dest_dir: Some(a.dst.clone()),
-            policy: ConflictPolicy::Skip,
-        },
+        Item::new(
+            a.src.join("missing"),
+            Some(a.dst.clone()),
+            ConflictPolicy::Skip,
+        ),
     );
     let id = q.enqueue(spec);
     wait_for(&rx, |e| matches!(e, QueueEvent::Finished { .. }));
@@ -223,11 +219,7 @@ fn queue_delete_and_trash_jobs() {
     let (q, rx) = Queue::new(ops());
     q.enqueue(JobSpec {
         kind: JobKind::Delete,
-        items: vec![Item {
-            src: a.src.join("x"),
-            dest_dir: None,
-            policy: ConflictPolicy::Skip,
-        }],
+        items: vec![Item::new(a.src.join("x"), None, ConflictPolicy::Skip)],
     });
     wait_for(&rx, |e| {
         matches!(
@@ -248,11 +240,7 @@ fn queue_duplicate_job() {
     let (q, rx) = Queue::new(ops());
     let id = q.enqueue(JobSpec {
         kind: JobKind::Duplicate,
-        items: vec![Item {
-            src: a.src.join("x.txt"),
-            dest_dir: None,
-            policy: ConflictPolicy::Skip,
-        }],
+        items: vec![Item::new(a.src.join("x.txt"), None, ConflictPolicy::Skip)],
     });
     wait_for(&rx, |e| {
         matches!(
@@ -266,4 +254,87 @@ fn queue_duplicate_job() {
     assert_eq!(q.job(id).unwrap().completed, 1);
     assert!(a.src.join("x copy.txt").as_path().exists());
     assert!(a.src.join("x.txt").as_path().exists());
+}
+
+#[test]
+fn queue_runs_compress_and_extract_jobs() {
+    let a = dirs(&["one.txt", "two.txt", "three.txt"]);
+    let (q, rx) = Queue::new(ops());
+
+    // 여러 원본을 zip 하나로 (Item.extra), 이름 지정
+    let mut compress = Item::new(
+        a.src.join("one.txt"),
+        Some(a.dst.clone()),
+        ConflictPolicy::Rename,
+    );
+    compress.extra = vec![a.src.join("two.txt"), a.src.join("three.txt")];
+    compress.name = Some("bundle.zip".into());
+    let id = q.enqueue(JobSpec {
+        kind: JobKind::Compress,
+        items: vec![compress],
+    });
+    wait_for(
+        &rx,
+        |e| matches!(e, QueueEvent::Finished { job, .. } if *job == id),
+    );
+    let info = q.job(id).unwrap();
+    assert_eq!(
+        (info.status, info.completed, info.errors.len()),
+        (JobStatus::Done, 1, 0)
+    );
+    assert!(a.dst.join("bundle.zip").as_path().is_file());
+    assert!(
+        a.src.join("one.txt").as_path().exists(),
+        "원본은 지우지 않는다"
+    );
+
+    // 추출: 새 폴더 `bundle`에 세 파일
+    let extract = Item::new(
+        a.dst.join("bundle.zip"),
+        Some(a.dst.clone()),
+        ConflictPolicy::Rename,
+    );
+    let id = q.enqueue(JobSpec {
+        kind: JobKind::Extract,
+        items: vec![extract],
+    });
+    let mut progress = 0;
+    wait_for(&rx, |e| {
+        if matches!(e, QueueEvent::Progress { job, .. } if *job == id) {
+            progress += 1;
+        }
+        matches!(e, QueueEvent::Finished { job, .. } if *job == id)
+    });
+    assert!(
+        progress >= 3,
+        "파일마다 진행 이벤트가 와야 한다: {progress}"
+    );
+    assert_eq!(q.job(id).unwrap().status, JobStatus::Done);
+    for f in ["one.txt", "two.txt", "three.txt"] {
+        assert_eq!(
+            std::fs::read_to_string(a.dst.join(&format!("bundle/{f}")).as_path()).unwrap(),
+            f
+        );
+    }
+
+    // 실패는 항목 오류로 남고 작업은 Failed가 된다(아카이브가 아닌 파일)
+    let bad = Item::new(
+        a.src.join("two.txt"),
+        Some(a.dst.clone()),
+        ConflictPolicy::Rename,
+    );
+    let id = q.enqueue(JobSpec {
+        kind: JobKind::Extract,
+        items: vec![bad],
+    });
+    wait_for(
+        &rx,
+        |e| matches!(e, QueueEvent::Finished { job, .. } if *job == id),
+    );
+    let info = q.job(id).unwrap();
+    assert_eq!((info.status, info.errors.len()), (JobStatus::Failed, 1));
+    assert!(
+        !a.dst.join("two").as_path().exists(),
+        "실패한 추출은 폴더를 남기지 않는다"
+    );
 }

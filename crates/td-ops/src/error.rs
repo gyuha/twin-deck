@@ -14,6 +14,17 @@ pub enum OpsError {
     Trash(String),
     #[error("작업이 중단되었습니다")]
     Aborted,
+    #[error("{0}")]
+    Archive(String),
 }
 
 pub type Result<T> = std::result::Result<T, OpsError>;
+
+impl From<td_archive::ArchiveError> for OpsError {
+    fn from(e: td_archive::ArchiveError) -> Self {
+        match e {
+            td_archive::ArchiveError::Aborted => OpsError::Aborted,
+            other => OpsError::Archive(other.to_string()),
+        }
+    }
+}

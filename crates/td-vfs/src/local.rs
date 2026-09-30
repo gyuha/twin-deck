@@ -1,6 +1,7 @@
 use std::fs;
 use std::io::Read;
 
+use crate::symlink_error_message;
 use crate::{Entry, EntryKind, FileId, Info, ListOptions, Result, Vfs, VfsError, VfsPath};
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -175,6 +176,24 @@ impl Vfs for LocalFs {
         } else {
             std::os::windows::fs::symlink_file(target.as_path(), link.as_path())
         };
-        result.map_err(|e| VfsError::io(link, e))
+        result.map_err(|e| {
+            // 알려진 원인은 안내 문구로 바꾼다(특히 Windows의 권한 오류). 이미 있음/없음은 기존 오류 종류를 유지한다.
+            let kind = e.kind();
+            match e
+                .raw_os_error()
+                .and_then(|c| symlink_error_message(cfg!(windows), c))
+            {
+                Some(msg)
+                    if kind != std::io::ErrorKind::AlreadyExists
+                        && kind != std::io::ErrorKind::NotFound =>
+                {
+                    VfsError::Other {
+                        path: link.clone(),
+                        message: msg.to_string(),
+                    }
+                }
+                _ => VfsError::io(link, e),
+            }
+        })
     }
 }

@@ -1051,6 +1051,78 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       await backend.enqueue("trash", targets.map((t) => ({ src: t.path, destDir: null, policy: "skip" })));
       await reloadAll();
     },
+    /** 압축 (OP-11, `core.compress`): 대상 항목을 이 폴더의 ZIP 하나로 묶는다. 원본은 그대로 둔다. */
+    async compress() {
+      const tab = activeTab(get());
+      const targets = targetsOf(tab);
+      if (targets.length === 0) return;
+      if (tab.virtual) return fail("검색/분석 결과 탭에서는 압축할 수 없습니다. 폴더 탭에서 항목을 선택하세요");
+      if (targets.some((t) => isArchivePath(t.path))) return fail("아카이브 안의 항목은 압축할 수 없습니다. 먼저 밖으로 복사하세요");
+      set({ notice: null });
+      patchActive({ selection: new Set() });
+      try {
+        await backend.enqueueCompress(targets.map((t) => t.path), tab.path);
+      } catch (e) {
+        fail(e);
+      }
+      await reloadAll();
+    },
+    /** 추출 (OP-11, `core.extract`): 선택한 아카이브를 각각 그 옆의 새 폴더에 푼다. `toInactive`이면 반대편 패널 폴더에 푼다. */
+    async extract(toInactive = false) {
+      const s = get();
+      const targets = targetsOf(activeTab(s)).filter(
+        (t) => t.kind === "file" && isArchiveName(t.name, cfg().file_systems.zip.additional_extensions),
+      );
+      if (targets.length === 0) return fail("압축 파일(아카이브)을 선택하세요");
+      if (targets.some((t) => isArchivePath(t.path))) return fail("아카이브 안의 아카이브는 먼저 밖으로 꺼낸 뒤 추출하세요");
+      let fixed: string | null = null;
+      if (toInactive) {
+        const inactive = activeTab(s, other(s.activePane));
+        if (inactive.virtual) return fail(VIRTUAL_NO_DEST);
+        if (isArchivePath(inactive.path)) return fail("아카이브 안에는 추출할 수 없습니다");
+        fixed = inactive.path;
+      }
+      set({ notice: null });
+      patchActive({ selection: new Set() });
+      for (const t of targets) {
+        try {
+          await backend.enqueueExtract(t.path, fixed ?? parentPath(t.path) ?? "/");
+        } catch (e) {
+          fail(e);
+          break;
+        }
+      }
+      await reloadAll();
+    },
+    /** 심볼릭 링크 만들기 (OP-12, `core.file.symlink`): 커서 항목을 반대편 패널 폴더에 링크로 만든다. */
+    async symlink() {
+      const s = get();
+      const entry = cursorEntry(activeTab(s));
+      if (!entry) return;
+      const inactive = activeTab(s, other(s.activePane));
+      if (inactive.virtual) return fail(VIRTUAL_NO_DEST);
+      if (isArchivePath(inactive.path) || isArchivePath(entry.path)) return fail("아카이브 안에서는 심볼릭 링크를 만들 수 없습니다");
+      set({ notice: null });
+      try {
+        let policy: ConflictDto = "skip";
+        const existing = await backend.detectConflict(entry.path, inactive.path);
+        if (existing !== null) {
+          const choice = await ask<ConflictDto>({
+            kind: "conflict",
+            title: "링크: 이름이 겹칩니다",
+            existing,
+            selected: CONFLICT_CHOICES.indexOf("rename"),
+          });
+          if (choice === null) return;
+          policy = choice;
+        }
+        const made = await backend.createSymlink(entry.path, inactive.path, policy);
+        if (made) flash(`링크를 만들었습니다: ${made}`);
+        await reloadAll();
+      } catch (e) {
+        fail(e);
+      }
+    },
     /** 복제 (OP-08): 같은 폴더에 접미사를 붙여 복사한다. */
     async duplicateTargets() {
       const targets = targetsOf(activeTab(get()));

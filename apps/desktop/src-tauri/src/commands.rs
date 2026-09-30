@@ -11,7 +11,7 @@ use td_state::{LoadedState, Snapshot, Spawner};
 use td_volumes::{SystemUnmounter, Volumes};
 
 use crate::service::{
-    edit, reveal, EntryDto, FileInfoDto, JobDto, JobKindDto, PreviewDto, QueueItemDto,
+    edit, reveal, ConflictDto, EntryDto, FileInfoDto, JobDto, JobKindDto, PreviewDto, QueueItemDto,
     SearchStartDto, SearchSummaryDto, Service, ServiceResult,
 };
 
@@ -320,6 +320,42 @@ pub fn enqueue_job(svc: State<'_, AppService>, kind: JobKindDto, items: Vec<Queu
     svc.enqueue(kind, items)
 }
 
+/// 압축을 큐에 넣는다 (OP-11). 작업 id를 돌려준다.
+#[tauri::command]
+#[specta::specta]
+pub fn enqueue_compress(
+    svc: State<'_, AppService>,
+    sources: Vec<String>,
+    dest_dir: String,
+    name: Option<String>,
+) -> ServiceResult<u32> {
+    svc.enqueue_compress(sources, &dest_dir, name)
+}
+
+/// 추출을 큐에 넣는다 (OP-11). 작업 id를 돌려준다.
+#[tauri::command]
+#[specta::specta]
+pub fn enqueue_extract(
+    svc: State<'_, AppService>,
+    src: String,
+    dest_dir: String,
+    folder: Option<String>,
+) -> u32 {
+    svc.enqueue_extract(&src, &dest_dir, folder)
+}
+
+/// 심볼릭 링크를 만든다 (OP-12). 만든 링크의 경로, 건너뛰었으면 null.
+#[tauri::command]
+#[specta::specta]
+pub fn create_symlink(
+    svc: State<'_, AppService>,
+    src: String,
+    dest_dir: String,
+    policy: ConflictDto,
+) -> ServiceResult<Option<String>> {
+    svc.symlink(&src, &dest_dir, policy)
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn queue_jobs(svc: State<'_, AppService>) -> Vec<JobDto> {
@@ -427,6 +463,9 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             touch,
             detect_conflict,
             enqueue_job,
+            enqueue_compress,
+            enqueue_extract,
+            create_symlink,
             queue_jobs,
             queue_pause,
             queue_resume,

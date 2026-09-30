@@ -63,7 +63,7 @@ fn civil_from_days(z: i64) -> (i64, i64, i64) {
 }
 
 /// zip이 표현할 수 있는 범위(1980~2107)로 수정 시각을 변환한다.
-fn zip_datetime(t: Option<SystemTime>) -> Option<zip::DateTime> {
+pub(crate) fn zip_datetime(t: Option<SystemTime>) -> Option<zip::DateTime> {
     let secs = t?.duration_since(UNIX_EPOCH).ok()?.as_secs() as i64;
     let (y, m, d) = civil_from_days(secs.div_euclid(86_400));
     let rem = secs.rem_euclid(86_400);

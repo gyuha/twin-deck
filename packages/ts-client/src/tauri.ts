@@ -2,7 +2,7 @@ import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { BackendError } from "./backend";
 import type { Backend, SearchEvent } from "./backend";
 import { commands, events } from "./generated/bindings";
-import type { FileInfoDto, JobDto, LoadedState, PreviewDto, Snapshot, JobKindDto, Loaded, QueueItemDto, Result } from "./generated/bindings";
+import type { ConflictDto, FileInfoDto, JobDto, LoadedState, PreviewDto, Snapshot, JobKindDto, Loaded, QueueItemDto, Result } from "./generated/bindings";
 
 function unwrap<T>(r: Result<T, string>): T {
   if (r.status === "error") throw new BackendError(r.error);
@@ -28,6 +28,15 @@ export class TauriBackend implements Backend {
   }
   enqueue(kind: JobKindDto, items: QueueItemDto[]) {
     return commands.enqueueJob(kind, items);
+  }
+  async enqueueCompress(sources: string[], destDir: string) {
+    return unwrap(await commands.enqueueCompress(sources, destDir, null));
+  }
+  enqueueExtract(src: string, destDir: string) {
+    return commands.enqueueExtract(src, destDir, null);
+  }
+  async createSymlink(src: string, destDir: string, policy: ConflictDto) {
+    return unwrap(await commands.createSymlink(src, destDir, policy));
   }
   queueJobs() {
     return commands.queueJobs();

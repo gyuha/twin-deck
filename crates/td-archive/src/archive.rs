@@ -255,6 +255,16 @@ impl Archive {
     /// 아카이브 전체를 `dest`에 푼다. **먼저 모든 항목을 검사**해서 하나라도 안전하지 않으면(경로 탈출, 절대 경로,
     /// 심볼릭 링크·특수 파일) 아무것도 쓰지 않고 오류를 돌려준다. 이미 있는 파일은 덮어쓰지 않는다.
     pub fn extract_all(&self, dest: &Path) -> Result<ExtractReport> {
+        self.extract_all_with(dest, &mut |_| true)
+    }
+
+    /// `extract_all`과 같지만 항목마다 `progress(이름)`을 부르고, false를 돌려주면 `Aborted`로 멈춘다.
+    /// 파일의 수정 시각과 권한(유닉스, setuid/setgid 제외)을 항목에서 이어받는다.
+    pub fn extract_all_with(
+        &self,
+        dest: &Path,
+        progress: &mut dyn FnMut(&str) -> bool,
+    ) -> Result<ExtractReport> {
         for e in &self.entries {
             if e.is_symlink {
                 return Err(ArchiveError::Unsafe {
@@ -270,6 +280,9 @@ impl Archive {
         fs::create_dir_all(dest)?;
         let mut report = ExtractReport::default();
         for e in &self.entries {
+            if !progress(&e.name) {
+                return Err(ArchiveError::Aborted);
+            }
             let target = dest.join(safe_relative(&e.name).expect("위에서 검사함"));
             if e.is_dir {
                 fs::create_dir_all(&target)?;
@@ -291,6 +304,14 @@ impl Archive {
                     }
                 })?;
             self.read_to(&e.name, &mut f)?;
+            if let Some(t) = e.modified {
+                let _ = f.set_modified(t);
+            }
+            #[cfg(unix)]
+            if let Some(mode) = e.mode {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = fs::set_permissions(&target, fs::Permissions::from_mode(mode & 0o777));
+            }
             report.files += 1;
         }
         Ok(report)

@@ -16,6 +16,8 @@ pub enum ArchiveError {
     Exists(String),
     #[error("지원하지 않는 형식입니다: {0}")]
     Unsupported(String),
+    #[error("작업이 중단되었습니다")]
+    Aborted,
 }
 
 pub type Result<T> = std::result::Result<T, ArchiveError>;

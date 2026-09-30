@@ -3918,6 +3918,7 @@ version = "0.1.0"
 name = "td-ops"
 version = "0.1.0"
 dependencies = [
+ "td-archive",
  "td-vfs",
  "tempfile",
  "thiserror 2.0.21",
