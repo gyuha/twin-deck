@@ -285,6 +285,11 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
     /// 휴지통으로 이동 (OP-06).
     pub fn trash(&self, path: &VfsPath) -> Result<()> {
         self.vfs.stat(path)?;
+        if !self.vfs.can_trash(path) {
+            return Err(OpsError::Trash(format!(
+                "{path}: 아카이브 안에서는 휴지통을 쓸 수 없습니다 (영구 삭제만 가능)"
+            )));
+        }
         self.trasher.trash(path.as_path())
     }
 

@@ -6,6 +6,9 @@ pub enum VfsError {
     NotFound(VfsPath),
     #[error("이미 존재함: {0}")]
     AlreadyExists(VfsPath),
+    /// 파일시스템 오류가 아닌 계층(아카이브 등)이 낸 오류.
+    #[error("{path}: {message}")]
+    Other { path: VfsPath, message: String },
     #[error("{path}: {source}")]
     Io {
         path: VfsPath,

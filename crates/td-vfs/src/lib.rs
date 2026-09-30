@@ -18,7 +18,7 @@ pub use names::{compare_names, matches_prefix, normalize_name, sort_entries};
 pub use path::VfsPath;
 pub use preview::{read_preview, Preview, PreviewKind, PreviewLimits};
 
-/// 파일시스템 추상화. 지금은 `LocalFs`만 구현한다.
+/// 파일시스템 추상화. `LocalFs`가 기본 구현이고, 아카이브는 td-archive의 `CompositeFs`가 라우팅한다.
 pub trait Vfs {
     fn list(&self, dir: &VfsPath, opts: &ListOptions) -> Result<Vec<Entry>>;
     fn stat(&self, path: &VfsPath) -> Result<Entry>;
@@ -37,4 +37,8 @@ pub trait Vfs {
     fn read_link(&self, path: &VfsPath) -> Result<VfsPath>;
     /// `link` 위치에 `target`을 가리키는 심볼릭 링크를 만든다. `target_is_dir`은 Windows에서만 쓰인다.
     fn symlink(&self, target: &VfsPath, link: &VfsPath, target_is_dir: bool) -> Result<()>;
+    /// 휴지통으로 보낼 수 있는 위치인가. 아카이브 안은 영구 삭제만 된다.
+    fn can_trash(&self, _path: &VfsPath) -> bool {
+        true
+    }
 }

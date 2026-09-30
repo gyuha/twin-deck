@@ -7,10 +7,11 @@ use std::time::UNIX_EPOCH;
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
+use td_archive::CompositeFs;
 use td_launch::{Launch, Launcher};
 use td_ops::{ConflictPolicy, Ops, Trasher};
 use td_queue::{Item, JobInfo, JobKind, JobSpec, JobStatus, Queue, QueueEvent};
-use td_vfs::{sort_entries, Entry, EntryKind, ListOptions, LocalFs, Vfs, VfsPath};
+use td_vfs::{sort_entries, Entry, EntryKind, ListOptions, Vfs, VfsPath};
 use td_watch::DirWatcher;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -268,7 +269,7 @@ pub struct Channels {
 /// 파일 작업과 감시, 작업 큐를 묶은 서비스. 앱 상태로 보관한다.
 pub struct Service<T: Trasher> {
     /// 즉시 실행하는 짧은 작업(폴더/파일 만들기, 이름 변경, 충돌 확인).
-    ops: Ops<LocalFs, T>,
+    ops: Ops<CompositeFs, T>,
     queue: Queue,
     watcher: Mutex<DirWatcher>,
 }
@@ -276,10 +277,10 @@ pub struct Service<T: Trasher> {
 impl<T: Trasher + Clone + Send + 'static> Service<T> {
     pub fn new(trasher: T) -> ServiceResult<(Self, Channels)> {
         let (watcher, dir_changes) = DirWatcher::new().map_err(|e| e.to_string())?;
-        let (queue, queue_events) = Queue::new(Ops::new(LocalFs, trasher.clone()));
+        let (queue, queue_events) = Queue::new(Ops::new(CompositeFs::default(), trasher.clone()));
         Ok((
             Self {
-                ops: Ops::new(LocalFs, trasher),
+                ops: Ops::new(CompositeFs::default(), trasher),
                 queue,
                 watcher: Mutex::new(watcher),
             },
@@ -328,7 +329,7 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
 
     /// 폴더 먼저, 이름순으로 정렬해서 돌려준다.
     pub fn list_dir(&self, path: &str, show_hidden: bool) -> ServiceResult<Vec<EntryDto>> {
-        let mut entries = LocalFs
+        let mut entries = CompositeFs::default()
             .list(&vp(path), &ListOptions { show_hidden })
             .map_err(|e| e.to_string())?;
         sort_entries(&mut entries);
@@ -336,7 +337,7 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
     }
 
     pub fn file_info(&self, path: &str) -> ServiceResult<FileInfoDto> {
-        LocalFs
+        CompositeFs::default()
             .info(&vp(path))
             .map(|i| FileInfoDto::from(&i))
             .map_err(|e| e.to_string())
@@ -534,6 +535,96 @@ mod tests {
         assert_eq!(job.errors.len(), 1);
         svc.queue_clear_finished();
         assert!(svc.queue_jobs().is_empty());
+    }
+
+    #[test]
+    fn archive_paths_work_through_service_and_queue() {
+        let (_t, svc, _ch, root) = setup();
+        let zip = format!("{root}/box.zip");
+        let mut z = td_archive::ZipEdit::create(Path::new(&zip)).unwrap();
+        z.add_file("seed.txt", td_archive::Source::Bytes(b"seed".to_vec()));
+        z.commit().unwrap();
+        let inside = format!("{zip}!");
+
+        // 목록/정보/충돌 확인/짧은 작업이 `x.zip!/…` 경로를 받는다.
+        let listed = svc.list_dir(&inside, false).unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].path, format!("{zip}!/seed.txt"));
+        svc.mkdir(&format!("{inside}/docs")).unwrap();
+        svc.touch(&format!("{inside}/docs/a.txt")).unwrap();
+        let renamed = svc
+            .rename(&format!("{inside}/docs/a.txt"), "b.txt")
+            .unwrap();
+        assert_eq!(renamed, format!("{zip}!/docs/b.txt"));
+        assert_eq!(
+            svc.file_info(&format!("{inside}/docs"))
+                .unwrap()
+                .child_count,
+            Some(1.0)
+        );
+        std::fs::write(format!("{root}/seed.txt"), "local").unwrap();
+        assert_eq!(
+            svc.detect_conflict(&format!("{root}/seed.txt"), &inside),
+            Some(format!("{zip}!/seed.txt"))
+        );
+
+        // 큐: 로컬 → zip 복사, zip → 로컬 복사, zip 안 삭제, zip 안 휴지통은 실패
+        std::fs::write(format!("{root}/new.txt"), "n").unwrap();
+        let up = svc.enqueue(
+            JobKindDto::Copy,
+            vec![item(
+                &format!("{root}/new.txt"),
+                Some(&format!("{inside}/docs")),
+                ConflictDto::Skip,
+            )],
+        );
+        assert_eq!(wait_finished(&svc, up).status, JobStatusDto::Done);
+        let names = |dir: &str| -> Vec<String> {
+            svc.list_dir(dir, true)
+                .unwrap()
+                .into_iter()
+                .map(|e| e.name)
+                .collect()
+        };
+        assert_eq!(names(&format!("{inside}/docs")), ["b.txt", "new.txt"]);
+
+        let out = format!("{root}/out");
+        svc.mkdir(&out).unwrap();
+        let down = svc.enqueue(
+            JobKindDto::Copy,
+            vec![item(
+                &format!("{inside}/docs"),
+                Some(&out),
+                ConflictDto::Skip,
+            )],
+        );
+        assert_eq!(wait_finished(&svc, down).status, JobStatusDto::Done);
+        assert_eq!(
+            std::fs::read_to_string(format!("{out}/docs/new.txt")).unwrap(),
+            "n"
+        );
+
+        let trash = svc.enqueue(
+            JobKindDto::Trash,
+            vec![item(
+                &format!("{inside}/docs/new.txt"),
+                None,
+                ConflictDto::Skip,
+            )],
+        );
+        assert_eq!(wait_finished(&svc, trash).status, JobStatusDto::Failed);
+        assert!(names(&format!("{inside}/docs")).contains(&"new.txt".to_string()));
+
+        let del = svc.enqueue(
+            JobKindDto::Delete,
+            vec![item(
+                &format!("{inside}/docs/new.txt"),
+                None,
+                ConflictDto::Skip,
+            )],
+        );
+        assert_eq!(wait_finished(&svc, del).status, JobStatusDto::Done);
+        assert_eq!(names(&format!("{inside}/docs")), ["b.txt"]);
     }
 
     #[test]
