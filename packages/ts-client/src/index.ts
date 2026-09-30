@@ -23,6 +23,8 @@ export type {
   KindDto,
   QueueChanged,
   QueueItemDto,
+  SearchStartDto,
+  SearchSummaryDto,
   UserDirsDto,
   VolumeDto,
 } from "./generated/bindings";

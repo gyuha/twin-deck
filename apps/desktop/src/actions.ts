@@ -12,6 +12,12 @@ export function navigationHandlers({ api }: AppStore): Partial<ActionHandlers> {
   return {
     "core.open": () => api.open(),
     "core.open.as_archive": () => api.openAsArchive(),
+    "core.lookup.global": () => api.lookup("global"),
+    "core.lookup.folder": () => api.lookup("folder"),
+    "core.flatten": () => api.flatten(),
+    "core.disk_usage": (_ctx, args) => api.diskUsage(args),
+    "core.search.cancel": () => api.cancelSearch(),
+    "core.reveal_in_tab": () => api.revealInTab(),
     "core.go.up": () => api.goUp(),
     "core.move.up": () => api.moveCursor(-1),
     "core.move.down": () => api.moveCursor(1),

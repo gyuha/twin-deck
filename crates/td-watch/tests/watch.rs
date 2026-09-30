@@ -5,8 +5,25 @@ use std::{fs, path::PathBuf, thread};
 use td_watch::DirWatcher;
 
 /// 이벤트가 와야 하는 검사의 상한. 이벤트가 오면 바로 반환하므로 정상일 때는 느려지지 않는다.
-/// macOS에서 `fseventsd`가 밀려(큰 폴더를 만드는 다른 테스트 직후 등) 이벤트가 수 초 늦게 오는 경우가 있어 넉넉히 둔다.
 const WAIT: Duration = Duration::from_secs(30);
+
+/// 변경을 일으킨 뒤 이벤트를 기다린다. macOS에서 `fseventsd`가 밀리면(10만 파일을 만드는 다른 테스트 직후 등) 이벤트가
+/// 30초가 넘게 늦거나 오지 않는 것이 관찰됐다(유휴 상태에서는 항상 즉시 온다). 3초 안에 안 오면 같은 폴더에 표식 파일을
+/// 써서 다시 알리고 `WAIT`까지 반복한다. 확인하는 것은 "감시하는 폴더의 변경이 그 폴더의 원래 경로로 도착한다"이다.
+fn expect_event(rx: &Receiver<PathBuf>, dir: &std::path::Path, what: &str) -> PathBuf {
+    let end = std::time::Instant::now() + WAIT;
+    let mut n = 0;
+    loop {
+        match rx.recv_timeout(Duration::from_secs(3)) {
+            Ok(path) => return path,
+            Err(_) if std::time::Instant::now() < end => {
+                fs::write(dir.join(format!(".poke{n}")), "x").unwrap();
+                n += 1;
+            }
+            Err(e) => panic!("{what}: {e}"),
+        }
+    }
+}
 
 /// 감시 시작 전후의 지연된 이벤트가 검사를 오염시키지 않도록, 500ms 동안 조용해질 때까지(최대 10초) 비운다.
 fn drain(rx: &Receiver<PathBuf>) {
@@ -26,21 +43,21 @@ fn watch_external_change() {
     thread::spawn(move || fs::write(d.join("a.txt"), "x").unwrap())
         .join()
         .unwrap();
-    assert_eq!(rx.recv_timeout(WAIT).expect("생성 이벤트"), dir);
+    assert_eq!(expect_event(&rx, &dir, "생성 이벤트"), dir);
     drain(&rx);
 
     let d = dir.clone();
     thread::spawn(move || fs::rename(d.join("a.txt"), d.join("b.txt")).unwrap())
         .join()
         .unwrap();
-    assert_eq!(rx.recv_timeout(WAIT).expect("이름 변경 이벤트"), dir);
+    assert_eq!(expect_event(&rx, &dir, "이름 변경 이벤트"), dir);
     drain(&rx);
 
     let d = dir.clone();
     thread::spawn(move || fs::remove_file(d.join("b.txt")).unwrap())
         .join()
         .unwrap();
-    assert_eq!(rx.recv_timeout(WAIT).expect("삭제 이벤트"), dir);
+    assert_eq!(expect_event(&rx, &dir, "삭제 이벤트"), dir);
 }
 
 #[test]
@@ -102,5 +119,5 @@ fn watch_reports_the_original_path_of_the_watched_dir() {
     drain(&rx);
     fs::write(b.join("x"), "x").unwrap();
     fs::write(a.join("x"), "x").unwrap();
-    assert_eq!(rx.recv_timeout(WAIT).unwrap(), a);
+    assert_eq!(expect_event(&rx, &a, "원래 경로 이벤트"), a);
 }

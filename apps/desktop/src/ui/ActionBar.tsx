@@ -11,12 +11,14 @@ export function useActionContext(): ActionContext {
   const hasCursorItem = useApp((s) => !!cursorEntry(activeTab(s)));
   const selectedCount = useApp((s) => activeTab(s).selection.size);
   const tabCount = useApp((s) => s.panes[s.activePane].tabs.length);
-  const canGoUp = useApp((s) => parentPath(activeTab(s).path) !== null);
+  const canGoUp = useApp((s) => !activeTab(s).virtual && parentPath(activeTab(s).path) !== null);
   const cursorIsDir = useApp((s) => cursorEntry(activeTab(s))?.kind === "dir");
   const multiColumn = useApp((s) => activeTab(s).view.mode === "columns");
+  const virtualTab = useApp((s) => !!activeTab(s).virtual);
+  const searching = useApp((s) => !!activeTab(s).virtual?.running);
   return useMemo(
-    () => ({ hasCursorItem, selectedCount, tabCount, canGoUp, cursorIsDir, multiColumn }),
-    [hasCursorItem, selectedCount, tabCount, canGoUp, cursorIsDir, multiColumn],
+    () => ({ hasCursorItem, selectedCount, tabCount, canGoUp, cursorIsDir, multiColumn, virtualTab, searching }),
+    [hasCursorItem, selectedCount, tabCount, canGoUp, cursorIsDir, multiColumn, virtualTab, searching],
   );
 }
 

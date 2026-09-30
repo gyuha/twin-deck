@@ -1,6 +1,6 @@
 import { archiveRoot, isArchivePath } from "./archive";
 import { BackendError, baseName, joinPath, parentPath } from "./backend";
-import type { Backend } from "./backend";
+import type { Backend, SearchEvent } from "./backend";
 import type {
   ConflictDto,
   EntryDto,
@@ -11,6 +11,7 @@ import type {
   LoadedState,
   PreviewDto,
   QueueItemDto,
+  SearchStartDto,
   Snapshot,
   UserDirsDto,
   VolumeDto,
@@ -32,6 +33,14 @@ interface Node {
 }
 
 const TRASH = "/.trash";
+
+interface FakeSearch {
+  kind: "chunk" | "usage";
+  entries: EntryDto[];
+  pos: number;
+  finished: boolean;
+  warnings: string[];
+}
 
 interface FakeJob {
   dto: JobDto;
@@ -133,6 +142,20 @@ export class FakeBackend implements Backend {
     return this.need(path).content;
   }
 
+  private dto(path: string, n: Node, size = n.content.length): EntryDto {
+    const name = baseName(path);
+    return {
+      name,
+      path,
+      kind: n.kind,
+      size,
+      modifiedMs: n.modifiedMs ?? 0,
+      createdMs: n.createdMs ?? 0,
+      mode: n.kind === "dir" ? 0o755 : 0o644,
+      hidden: name.startsWith("."),
+    };
+  }
+
   async listDir(path: string, showHidden: boolean): Promise<EntryDto[]> {
     if (this.need(path).kind !== "dir") throw new BackendError(`폴더가 아님: ${path}`);
     const prefix = path === "/" ? "/" : `${path}/`;
@@ -144,16 +167,7 @@ export class FakeBackend implements Backend {
       if (name.endsWith("!") && this.nodes.get(p.slice(0, -1))?.kind === "file") continue;
       const hidden = name.startsWith(".");
       if (hidden && !showHidden) continue;
-      out.push({
-        name,
-        path: p,
-        kind: n.kind,
-        size: n.content.length,
-        modifiedMs: n.modifiedMs ?? 0,
-        createdMs: n.createdMs ?? 0,
-        mode: n.kind === "dir" ? 0o755 : 0o644,
-        hidden,
-      });
+      out.push(this.dto(p, n));
     }
     // Rust의 compare_names와 같은 규칙: NFC + 소문자 후 코드 순서 비교. 키는 한 번만 계산한다.
     const keyed = out.map((e) => ({ e, k: e.name.normalize("NFC").toLowerCase() }));
@@ -295,6 +309,144 @@ export class FakeBackend implements Backend {
     const root = archiveRoot(path);
     if (!this.nodes.has(root)) this.nodes.set(root, { kind: "dir", content: "" });
     return root;
+  }
+
+  // ---- Look Up / Flatten / Disk Usage 흉내 ----
+  // 실제 질의 문법과 순회 규칙은 Rust `td-search` 테스트가 검증한다. 여기서는 UI 흐름을 확인하기에 충분한 만큼만 흉내 낸다
+  // (이름 부분 일치, `Name contains/is …`, 지원하지 않는 변수 경고).
+
+  /**
+   * `instant`: 시작하는 순간 결과를 모두 보낸다. 실제 앱처럼 응답(id)보다 이벤트가 먼저 도착하는 순서다.
+   * `manual`: `stepSearch()`를 부를 때마다 항목 하나(Disk Usage는 스냅샷 하나)씩 보낸다.
+   */
+  searchMode: "instant" | "manual" = "instant";
+  /** 시작한 검색/순회의 기록: [종류, 시작 위치, 질의]. */
+  readonly searchesStarted: Array<[string, string, string]> = [];
+  private searches = new Map<number, FakeSearch>();
+  private nextSearchId = 1;
+  private searchListeners = new Set<(e: SearchEvent) => void>();
+
+  private emitSearch(e: SearchEvent) {
+    this.searchListeners.forEach((l) => l(e));
+  }
+
+  onSearchEvent(callback: (event: SearchEvent) => void) {
+    this.searchListeners.add(callback);
+    return () => void this.searchListeners.delete(callback);
+  }
+
+  /** `root` 아래의 노드. 파일 옆의 `x.zip!` 가상 위치 안쪽은 (root가 아카이브 안이 아니면) 훑지 않는다. */
+  private below(root: string): Array<[string, Node]> {
+    this.need(root);
+    const prefix = root === "/" ? "/" : `${root}/`;
+    const skipArchives = !isArchivePath(root);
+    return [...this.nodes].filter(([k]) => {
+      if (!k.startsWith(prefix) || k === root) return false;
+      return !(skipArchives && /(^|\/)[^/]*!(\/|$)/.test(k.slice(prefix.length)));
+    });
+  }
+
+  private register(kind: FakeSearch["kind"], entries: EntryDto[], warnings: string[] = []): number {
+    const id = this.nextSearchId++;
+    this.searches.set(id, { kind, entries, pos: 0, finished: false, warnings });
+    if (this.searchMode === "instant") this.deliverAll(id);
+    return id;
+  }
+
+  private finishSearch(id: number, cancelled: boolean) {
+    const s = this.searches.get(id);
+    if (!s || s.finished) return;
+    s.finished = true;
+    this.emitSearch({
+      type: "done",
+      id,
+      summary: { visited: s.entries.length, matched: s.entries.length, unreadable: 0, cancelled, warnings: s.warnings },
+    });
+  }
+
+  private usageEvent(id: number, s: FakeSearch, count: number, done: boolean): SearchEvent {
+    const items = s.entries.slice(0, count);
+    return { type: "usage", id, items, done, totalBytes: items.reduce((n, e) => n + e.size, 0), files: items.length };
+  }
+
+  private deliverAll(id: number) {
+    const s = this.searches.get(id)!;
+    if (s.kind === "usage") {
+      this.emitSearch(this.usageEvent(id, s, Math.ceil(s.entries.length / 2), false));
+      this.emitSearch(this.usageEvent(id, s, s.entries.length, true));
+    } else {
+      for (let i = 0; i < s.entries.length; i += 50) {
+        this.emitSearch({ type: "chunk", id, entries: s.entries.slice(i, i + 50) });
+      }
+    }
+    this.finishSearch(id, false);
+  }
+
+  /** 수동 모드: 실행 중인 가장 오래된 검색을 한 걸음 진행한다. 진행했으면 true. */
+  async stepSearch(): Promise<boolean> {
+    const found = [...this.searches].find(([, s]) => !s.finished);
+    if (!found) return false;
+    const [id, s] = found;
+    if (s.kind === "usage") {
+      s.pos++;
+      const done = s.pos >= s.entries.length;
+      this.emitSearch(this.usageEvent(id, s, done ? s.entries.length : s.pos, done));
+      if (done) this.finishSearch(id, false);
+    } else if (s.pos < s.entries.length) {
+      this.emitSearch({ type: "chunk", id, entries: [s.entries[s.pos++]] });
+      if (s.pos >= s.entries.length) this.finishSearch(id, false);
+    } else {
+      this.finishSearch(id, false);
+    }
+    return true;
+  }
+
+  async startLookup(root: string, query: string): Promise<SearchStartDto> {
+    const q = query.trim();
+    if (!q) throw new BackendError("질의가 비었습니다 (위치 0)");
+    this.searchesStarted.push(["lookup", root, q]);
+    const unsupported = /^(uti|author|title|album|genre)\s*(=|is|contains|has)\b/i.exec(q);
+    const warnings = unsupported ? [`${unsupported[1]}: 이 백엔드(라이브 순회)에서 지원하지 않습니다`] : [];
+    const named = /^name\s+(contains|has|is|=|==|equals)\s+"?(.+?)"?$/i.exec(q);
+    const [exact, needle] = named ? [/^(is|=|==|equals)$/i.test(named[1]), named[2]] : [false, q.replace(/^"(.*)"$/, "$1")];
+    const wanted = needle.normalize("NFC").toLowerCase();
+    const entries = unsupported
+      ? []
+      : this.below(root)
+          .filter(([k]) => {
+            const name = baseName(k).normalize("NFC").toLowerCase();
+            return exact ? name === wanted : name.includes(wanted);
+          })
+          .map(([k, n]) => this.dto(k, n));
+    return { id: this.register("chunk", entries, warnings), warnings };
+  }
+
+  async startFlatten(root: string) {
+    this.searchesStarted.push(["flatten", root, ""]);
+    const entries = this.below(root)
+      .filter(([, n]) => n.kind === "file")
+      .map(([k, n]) => this.dto(k, n));
+    return this.register("chunk", entries);
+  }
+
+  async startDiskUsage(root: string) {
+    this.searchesStarted.push(["usage", root, ""]);
+    const prefix = root === "/" ? "/" : `${root}/`;
+    const below = this.below(root);
+    const items = below
+      .filter(([k]) => !k.slice(prefix.length).includes("/"))
+      .map(([k, n]) => {
+        const total = below
+          .filter(([f, fn]) => fn.kind === "file" && (f === k || f.startsWith(`${k}/`)))
+          .reduce((sum, [, fn]) => sum + fn.content.length, 0);
+        return this.dto(k, n, total);
+      })
+      .sort((a, b) => b.size - a.size || a.name.localeCompare(b.name));
+    return this.register("usage", items);
+  }
+
+  async cancelSearch(id: number) {
+    this.finishSearch(id, true);
   }
 
   async listVolumes() {

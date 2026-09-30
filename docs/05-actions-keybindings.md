@@ -161,6 +161,8 @@ Shift+이동 키(범위의 선택 반전)는 액션이 아니라 `pane` 스코�
 | `core.lookup.folder` | Look Up (현재 폴더) | `Alt+Mod+P` | `Ctrl+Alt+P` | 자체 ID, 키 확인 |
 | `core.flatten` | Flatten | 없음 | 없음 | 자체 |
 | `core.disk_usage` | Analyze Disk Usage (인수) | 없음 | 없음 | 자체 |
+| `core.search.cancel` | 검색/분석 취소 (진행 중인 가상 탭에서는 선택이 없을 때 `Escape`도 같다) | 없음 | 없음 | 자체 |
+| `core.reveal_in_tab` | 해당 폴더로 이동 (가상 탭 항목이 있는 폴더를 새 탭으로) | 없음 | 없음 | 자체 |
 | `core.queue.open` | 큐 열기 | `=` | `=` | 자체 ID, 키 확인. `=`는 문자 키이므로 `pane` 스코프에서는 Quick Select와 충돌한다. 3.2절 규칙에 따라 `global` 스코프의 예약 키로 지정한다 |
 | `core.actions.panel` | Actions Panel | `Mod+Shift+P` | `Ctrl+Shift+P` | 자체 ID, 키 확인 |
 | `core.terminal.focus` | 터미널 열기/포커스 | `Mod+O` | `Ctrl+O` | 자체 ID, 키 확인 |

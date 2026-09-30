@@ -18,6 +18,8 @@ const ctx = (o: Partial<ActionContext> = {}): ActionContext => ({
   canGoUp: true,
   cursorIsDir: false,
   multiColumn: false,
+  virtualTab: false,
+  searching: false,
   ...o,
 });
 

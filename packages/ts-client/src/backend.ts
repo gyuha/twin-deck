@@ -1,4 +1,11 @@
-import type { EntryDto, FileInfoDto, JobDto, JobKindDto, Loaded, LoadedState, PreviewDto, QueueItemDto, Snapshot, UserDirsDto, VolumeDto } from "./generated/bindings";
+import type { EntryDto, FileInfoDto, JobDto, JobKindDto, Loaded, LoadedState, PreviewDto, QueueItemDto, SearchStartDto, SearchSummaryDto, Snapshot, UserDirsDto, VolumeDto } from "./generated/bindings";
+
+/** Look Up / Flatten / Disk Usage가 스트리밍으로 보내는 이벤트. 작업마다 마지막은 `done`이다. */
+export type SearchEvent =
+  | { type: "chunk"; id: number; entries: EntryDto[] }
+  /** Disk Usage의 크기 내림차순 전체 스냅샷. `done`이면 최종 결과다. `size`는 항목의 총 크기. */
+  | { type: "usage"; id: number; items: EntryDto[]; done: boolean; totalBytes: number; files: number }
+  | { type: "done"; id: number; summary: SearchSummaryDto };
 
 /** Rust 쪽이 돌려준 오류 문자열을 감싼 예외. */
 export class BackendError extends Error {}
@@ -44,6 +51,15 @@ export interface Backend {
   editPaths(paths: string[]): Promise<void>;
   /** 확장자와 무관하게 파일을 아카이브로 연다 (ARC-04). 아카이브 루트 경로(`파일!`)를 돌려준다. */
   openAsArchive(path: string): Promise<string>;
+  /** Look Up을 시작한다. 질의가 문법에 어긋나면 위치가 든 메시지로 거부된다. 결과는 `onSearchEvent`로 온다. */
+  startLookup(root: string, query: string): Promise<SearchStartDto>;
+  /** `root` 아래의 모든 파일을 평면 목록으로 흘려 보낸다. */
+  startFlatten(root: string): Promise<number>;
+  /** `root`의 하위 항목별 총 크기를 계산해 크기 내림차순 스냅샷으로 흘려 보낸다. */
+  startDiskUsage(root: string): Promise<number>;
+  /** 실행 중인 검색/순회를 취소한다. 취소돼도 `done` 이벤트는 온다. */
+  cancelSearch(id: number): Promise<void>;
+  onSearchEvent(callback: (event: SearchEvent) => void): () => void;
   /** 마운트된 볼륨. 루트가 첫 항목이다. */
   listVolumes(): Promise<VolumeDto[]>;
   /** 언마운트/추출. 루트나 목록에 없는 경로는 거부된다. */

@@ -15,6 +15,10 @@ export interface ActionContext {
   cursorIsDir: boolean;
   /** 활성 탭이 다중 컬럼 표시 모드인지. */
   multiColumn: boolean;
+  /** 활성 탭이 위치 없는 가상 탭(Look Up/Flatten/Disk Usage 결과)인지. */
+  virtualTab: boolean;
+  /** 활성 탭의 검색/순회가 아직 진행 중인지. */
+  searching: boolean;
 }
 
 const hasTarget = (c: ActionContext) => c.selectedCount > 0 || c.hasCursorItem;
@@ -51,6 +55,12 @@ export const DEFAULT_ACTION_META = [
   { id: "core.select.group", title: "패턴으로 선택", category: "Selection", scopes: ["pane"] },
   { id: "core.deselect.group", title: "패턴으로 선택 해제", category: "Selection", scopes: ["pane"] },
   { id: "core.open", title: "열기", category: "Navigation", scopes: ["pane"], isApplicable: (c) => c.hasCursorItem },
+  { id: "core.lookup.global", title: "Look Up (전역)", category: "Navigation", scopes: ["pane"] },
+  { id: "core.lookup.folder", title: "Look Up (현재 폴더)", category: "Navigation", scopes: ["pane"], isApplicable: (c) => !c.virtualTab },
+  { id: "core.flatten", title: "Flatten (하위 파일을 평면 목록으로)", category: "Navigation", scopes: ["pane"], isApplicable: (c) => !c.virtualTab },
+  { id: "core.disk_usage", title: "디스크 사용량 분석 (인수: src)", category: "Navigation", scopes: ["pane"] },
+  { id: "core.search.cancel", title: "검색/분석 취소", category: "Navigation", scopes: ["pane"], isApplicable: (c) => c.searching },
+  { id: "core.reveal_in_tab", title: "해당 폴더로 이동 (새 탭)", category: "Navigation", scopes: ["pane"], isApplicable: (c) => c.virtualTab && c.hasCursorItem },
   { id: "core.open.as_archive", title: "아카이브로 열기 (Open As)", category: "Navigation", scopes: ["pane"], isApplicable: (c) => c.hasCursorItem },
   { id: "core.go.up", title: "상위 폴더", category: "Navigation", scopes: ["pane"], isApplicable: (c) => c.canGoUp },
   { id: "core.move.up", title: "커서 위로", category: "Navigation", scopes: ["pane"] },
@@ -67,7 +77,8 @@ export const DEFAULT_ACTION_META = [
   { id: "core.view.mode", title: "표시 모드 (인수: mode)", category: "View", scopes: ["pane"] },
   { id: "core.pane.switch", title: "활성 패널 전환", category: "Navigation", scopes: ["pane"] },
   { id: "core.select.all", title: "전체 선택", category: "Selection", scopes: ["pane"] },
-  { id: "core.select.none", title: "선택 해제", category: "Selection", scopes: ["pane"], isApplicable: (c) => c.selectedCount > 0 },
+  // 검색/분석이 진행 중이면 선택이 없어도 Esc가 그 작업을 취소하므로 실행할 수 있다.
+  { id: "core.select.none", title: "선택 해제", category: "Selection", scopes: ["pane"], isApplicable: (c) => c.selectedCount > 0 || c.searching },
   { id: "core.select.toggle", title: "현재 항목 선택 토글", category: "Selection", scopes: ["pane"], isApplicable: (c) => c.hasCursorItem },
   { id: "core.preview", title: "미리보기", category: "View", scopes: ["pane"], isApplicable: (c) => c.hasCursorItem },
   { id: "core.preview.close", title: "미리보기 닫기", category: "View", scopes: ["preview"] },
@@ -161,6 +172,8 @@ export const DEFAULT_BINDINGS: Binding[] = [
   b("pane", "core.delete", "Shift+F8"),
   b("pane", "core.open", "Return"),
   b("pane", "core.go.up", "Backspace"),
+  b("pane", "core.lookup.global", "Mod+P"),
+  b("pane", "core.lookup.folder", "Mod+Alt+P"),
   b("pane", "core.move.up", "Up"),
   b("pane", "core.move.down", "Down"),
   b("pane", "core.move.page_up", "PageUp"),

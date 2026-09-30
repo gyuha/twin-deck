@@ -17,6 +17,7 @@ specta = { version = "=2.0.0-rc.22", features = ["derive"] }
 specta-typescript = "=0.0.9"
 tauri-specta = { version = "=2.0.0-rc.21", features = ["derive", "typescript"] }
 td-archive = { path = "../../../crates/td-archive" }
+td-search = { path = "../../../crates/td-search" }
 td-vfs = { path = "../../../crates/td-vfs" }
 td-config = { path = "../../../crates/td-config" }
 td-launch = { path = "../../../crates/td-launch" }

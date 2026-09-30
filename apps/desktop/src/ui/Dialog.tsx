@@ -40,7 +40,7 @@ export function Dialog() {
           <>
             <input
               ref={input}
-              aria-label="이름"
+              aria-label={dialog.label ?? "이름"}
               value={dialog.value}
               onChange={(e) => api.dialogSetValue(e.target.value)}
               className="w-full border border-neutral-400 px-1 py-0.5"

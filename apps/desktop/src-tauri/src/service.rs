@@ -1,9 +1,11 @@
 //! Tauri에 의존하지 않는 명령 구현. commands.rs가 이 계층에 위임한다.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::Receiver;
-use std::sync::Mutex;
-use std::time::{Duration, UNIX_EPOCH};
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::mpsc::{Receiver, Sender};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -11,6 +13,7 @@ use td_archive::{start_edit, CompositeFs, EditSession};
 use td_launch::{Launch, Launcher};
 use td_ops::{ConflictPolicy, Ops, Trasher};
 use td_queue::{Item, JobInfo, JobKind, JobSpec, JobStatus, Queue, QueueEvent};
+use td_search::{CancelToken, SearchOptions, UsageItem, UsageOptions};
 use td_vfs::{sort_entries, Entry, EntryKind, ListOptions, Vfs, VfsPath};
 use td_watch::DirWatcher;
 
@@ -253,6 +256,99 @@ impl From<&JobInfo> for JobDto {
     }
 }
 
+/// 검색/순회 작업을 시작했을 때의 응답. 지원하지 않는 변수 경고는 시작 즉시 알 수 있다.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchStartDto {
+    pub id: u32,
+    pub warnings: Vec<String>,
+}
+
+/// 작업이 끝났을 때(정상, 취소 모두)의 요약.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchSummaryDto {
+    pub visited: f64,
+    pub matched: f64,
+    pub unreadable: f64,
+    pub cancelled: bool,
+    pub warnings: Vec<String>,
+}
+
+/// 서비스 밖(Tauri 이벤트)으로 나가는 작업 결과.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SearchMsg {
+    /// Look Up / Flatten 결과 묶음.
+    Chunk { id: u32, entries: Vec<EntryDto> },
+    /// Disk Usage 스냅샷(크기 내림차순). `done`이면 최종 결과다.
+    Usage {
+        id: u32,
+        items: Vec<EntryDto>,
+        done: bool,
+        total_bytes: f64,
+        files: f64,
+    },
+    /// 마지막 메시지. 이후 이 id의 메시지는 오지 않는다.
+    Done { id: u32, summary: SearchSummaryDto },
+}
+
+impl From<&UsageItem> for EntryDto {
+    /// 크기 칸에 항목의 총 크기를 담는다.
+    fn from(i: &UsageItem) -> Self {
+        EntryDto {
+            name: i.name.clone(),
+            path: i.path.to_string(),
+            kind: match i.kind {
+                EntryKind::File => KindDto::File,
+                EntryKind::Dir => KindDto::Dir,
+                EntryKind::Symlink => KindDto::Symlink,
+            },
+            size: i.bytes as f64,
+            modified_ms: None,
+            created_ms: None,
+            mode: None,
+            hidden: i.name.starts_with('.'),
+        }
+    }
+}
+
+/// 결과를 200개 또는 50ms 단위로 묶어 보낸다.
+struct Batcher {
+    id: u32,
+    tx: Sender<SearchMsg>,
+    buf: Vec<EntryDto>,
+    last: Instant,
+}
+
+impl Batcher {
+    fn new(id: u32, tx: Sender<SearchMsg>) -> Self {
+        Self {
+            id,
+            tx,
+            buf: Vec::new(),
+            last: Instant::now(),
+        }
+    }
+
+    fn push(&mut self, e: &Entry) {
+        self.buf.push(EntryDto::from(e));
+        if self.buf.len() >= 200 || self.last.elapsed() >= Duration::from_millis(50) {
+            self.flush();
+        }
+    }
+
+    fn flush(&mut self) {
+        if !self.buf.is_empty() {
+            let entries = std::mem::take(&mut self.buf);
+            let _ = self.tx.send(SearchMsg::Chunk {
+                id: self.id,
+                entries,
+            });
+        }
+        self.last = Instant::now();
+    }
+}
+
 pub type ServiceResult<T> = Result<T, String>;
 
 fn vp(p: &str) -> VfsPath {
@@ -264,6 +360,8 @@ pub struct Channels {
     /// 변경된 디렉터리 경로.
     pub dir_changes: Receiver<PathBuf>,
     pub queue_events: Receiver<QueueEvent>,
+    /// Look Up / Flatten / Disk Usage 작업이 흘려 보내는 결과.
+    pub search_events: Receiver<SearchMsg>,
 }
 
 /// 파일 작업과 감시, 작업 큐를 묶은 서비스. 앱 상태로 보관한다.
@@ -276,12 +374,17 @@ pub struct Service<T: Trasher> {
     edits: Mutex<Vec<EditSession>>,
     queue: Queue,
     watcher: Mutex<DirWatcher>,
+    /// 실행 중인 검색/순회 작업의 취소 표시.
+    searches: Arc<Mutex<HashMap<u32, CancelToken>>>,
+    next_search: AtomicU32,
+    search_tx: Sender<SearchMsg>,
 }
 
 impl<T: Trasher + Clone + Send + 'static> Service<T> {
     pub fn new(trasher: T) -> ServiceResult<(Self, Channels)> {
         let (watcher, dir_changes) = DirWatcher::new().map_err(|e| e.to_string())?;
         let fs = CompositeFs::default();
+        let (search_tx, search_events) = std::sync::mpsc::channel();
         let (queue, queue_events) = Queue::new(Ops::new(fs.clone(), trasher.clone()));
         Ok((
             Self {
@@ -290,12 +393,116 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
                 edits: Mutex::new(Vec::new()),
                 queue,
                 watcher: Mutex::new(watcher),
+                searches: Arc::default(),
+                next_search: AtomicU32::new(0),
+                search_tx,
             },
             Channels {
                 dir_changes,
                 queue_events,
+                search_events,
             },
         ))
+    }
+
+    /// 별도 스레드에서 `work`를 돌리고, 끝나면 `Done`을 보낸다. 작업 id를 돌려준다.
+    fn spawn_job(
+        &self,
+        work: impl FnOnce(u32, &CancelToken, &Sender<SearchMsg>) -> SearchSummaryDto + Send + 'static,
+    ) -> u32 {
+        let id = self.next_search.fetch_add(1, Ordering::SeqCst) + 1;
+        let cancel = CancelToken::new();
+        self.searches.lock().unwrap().insert(id, cancel.clone());
+        let (tx, searches) = (self.search_tx.clone(), self.searches.clone());
+        std::thread::spawn(move || {
+            let summary = work(id, &cancel, &tx);
+            searches.lock().unwrap().remove(&id);
+            let _ = tx.send(SearchMsg::Done { id, summary });
+        });
+        id
+    }
+
+    /// Look Up (FIND-01~04): `root` 아래에서 질의에 맞는 항목을 찾아 `Chunk`로 흘려 보낸다.
+    /// 질의가 문법에 어긋나면 위치가 든 오류를, 지원하지 않는 변수는 경고를 돌려준다.
+    pub fn start_lookup(&self, root: &str, query: &str) -> ServiceResult<SearchStartDto> {
+        let parsed = td_search::parse(query, SystemTime::now()).map_err(|e| e.to_string())?;
+        let warnings = parsed.warnings();
+        let (fs, root) = (self.fs.clone(), vp(root));
+        let opts = SearchOptions {
+            extra_zip_exts: self.fs.extra_zip_exts(),
+            ..SearchOptions::default()
+        };
+        let id = self.spawn_job(move |id, cancel, tx| {
+            let mut batch = Batcher::new(id, tx.clone());
+            let report =
+                td_search::search(&fs, &root, &parsed, &opts, cancel, &mut |e| batch.push(e));
+            batch.flush();
+            SearchSummaryDto {
+                visited: report.visited as f64,
+                matched: report.matched as f64,
+                unreadable: report.unreadable as f64,
+                cancelled: report.cancelled,
+                warnings: report.warnings,
+            }
+        });
+        Ok(SearchStartDto { id, warnings })
+    }
+
+    /// Flatten (FIND-05): `root` 아래의 모든 파일을 평면 목록으로 흘려 보낸다.
+    pub fn start_flatten(&self, root: &str) -> u32 {
+        let (fs, root) = (self.fs.clone(), vp(root));
+        self.spawn_job(move |id, cancel, tx| {
+            let mut batch = Batcher::new(id, tx.clone());
+            let mut matched = 0;
+            let report = td_search::flatten(&fs, &root, cancel, &mut |e| {
+                matched += 1;
+                batch.push(e);
+            });
+            batch.flush();
+            SearchSummaryDto {
+                visited: report.visited as f64,
+                matched: matched as f64,
+                unreadable: report.unreadable as f64,
+                cancelled: report.cancelled,
+                warnings: Vec::new(),
+            }
+        })
+    }
+
+    /// Analyze Disk Usage (FIND-06): `root`의 하위 항목별 총 크기를 계산해 크기 내림차순 스냅샷으로 흘려 보낸다.
+    pub fn start_disk_usage(&self, root: &str, cross_volumes: bool) -> u32 {
+        let (fs, root) = (self.fs.clone(), vp(root));
+        self.spawn_job(move |id, cancel, tx| {
+            let usage = |items: &[UsageItem], done: bool| SearchMsg::Usage {
+                id,
+                items: items.iter().map(EntryDto::from).collect(),
+                done,
+                total_bytes: items.iter().map(|i| i.bytes).sum::<u64>() as f64,
+                files: items.iter().map(|i| i.files).sum::<u64>() as f64,
+            };
+            let opts = UsageOptions {
+                cross_volumes,
+                ..UsageOptions::default()
+            };
+            let (items, report) = td_search::disk_usage(&fs, &root, &opts, cancel, &mut |snap| {
+                let _ = tx.send(usage(snap, false));
+            });
+            let _ = tx.send(usage(&items, true));
+            SearchSummaryDto {
+                visited: report.total_files as f64,
+                matched: items.len() as f64,
+                unreadable: report.unreadable as f64,
+                cancelled: report.cancelled,
+                warnings: Vec::new(),
+            }
+        })
+    }
+
+    /// 실행 중인 검색/순회 작업을 취소한다. 이미 끝났으면 아무 일도 없다.
+    pub fn cancel_search(&self, id: u32) {
+        if let Some(c) = self.searches.lock().unwrap().get(&id) {
+            c.cancel();
+        }
     }
 
     /// 설정 `file_systems.zip.additional_extensions`를 반영한다.
@@ -756,6 +963,120 @@ mod tests {
         // 폴더나 아카이브 루트는 편집기로 열 수 없다.
         assert!(svc.prepare_edit(&[format!("{zip}!/d")]).is_err());
         assert!(svc.prepare_edit(&[format!("{zip}!")]).is_err());
+    }
+
+    /// 작업 `id`의 메시지를 `Done`까지 모은다.
+    fn collect_search(ch: &Channels, id: u32) -> (Vec<EntryDto>, Vec<SearchMsg>, SearchSummaryDto) {
+        let mut entries = Vec::new();
+        let mut usage = Vec::new();
+        let end = Instant::now() + Duration::from_secs(10);
+        loop {
+            let left = end.saturating_duration_since(Instant::now());
+            match ch
+                .search_events
+                .recv_timeout(left)
+                .expect("검색이 끝나지 않았다")
+            {
+                SearchMsg::Chunk { id: i, entries: e } if i == id => entries.extend(e),
+                m @ SearchMsg::Usage { id: i, .. } if i == id => usage.push(m),
+                SearchMsg::Done { id: i, summary } if i == id => return (entries, usage, summary),
+                _ => {}
+            }
+        }
+    }
+
+    #[test]
+    fn lookup_flatten_and_usage_stream_through_the_service() {
+        let (_t, svc, ch, root) = setup();
+        for (rel, size) in [
+            ("a/one.txt", 10usize),
+            ("a/deep/two.txt", 20),
+            ("b/three.md", 30),
+            ("top.txt", 5),
+        ] {
+            let p = format!("{root}/{rel}");
+            std::fs::create_dir_all(Path::new(&p).parent().unwrap()).unwrap();
+            std::fs::write(&p, vec![b'x'; size]).unwrap();
+        }
+
+        // Look Up
+        let start = svc.start_lookup(&root, "Name endsWith .txt").unwrap();
+        assert!(start.warnings.is_empty());
+        let (entries, _, summary) = collect_search(&ch, start.id);
+        let mut names: Vec<_> = entries.iter().map(|e| e.name.as_str()).collect();
+        names.sort();
+        assert_eq!(names, ["one.txt", "top.txt", "two.txt"]);
+        assert_eq!((summary.matched, summary.cancelled), (3.0, false));
+        // 지원하지 않는 변수는 시작 즉시 경고가 오고 결과는 비어 있다
+        let start = svc.start_lookup(&root, "UTI is public.image").unwrap();
+        assert_eq!(start.warnings.len(), 1);
+        let (entries, _, summary) = collect_search(&ch, start.id);
+        assert!(entries.is_empty() && summary.warnings == start.warnings);
+        // 문법 오류는 위치가 든 문자열
+        let err = svc.start_lookup(&root, "Name contains").unwrap_err();
+        assert!(err.contains("위치 13"), "{err}");
+
+        // Flatten: 파일만
+        let id = svc.start_flatten(&root);
+        let (entries, _, summary) = collect_search(&ch, id);
+        assert_eq!(entries.len(), 4);
+        assert!(entries.iter().all(|e| e.kind != KindDto::Dir));
+        assert_eq!(summary.matched, 4.0);
+
+        // Disk Usage: 크기 내림차순, 마지막 스냅샷이 done
+        let id = svc.start_disk_usage(&root, false);
+        let (_, usage, summary) = collect_search(&ch, id);
+        let SearchMsg::Usage {
+            items,
+            done,
+            total_bytes,
+            files,
+            ..
+        } = usage.last().unwrap()
+        else {
+            panic!("Usage가 아님")
+        };
+        assert!(*done && !summary.cancelled);
+        let got: Vec<(&str, f64)> = items.iter().map(|e| (e.name.as_str(), e.size)).collect();
+        assert_eq!(got, [("a", 30.0), ("b", 30.0), ("top.txt", 5.0)]);
+        assert_eq!((*total_bytes, *files), (65.0, 4.0));
+
+        // 아카이브 안: 같은 명령이 `x.zip!`에서도 동작한다
+        let zip = format!("{root}/pack.zip");
+        let mut z = td_archive::ZipEdit::create(Path::new(&zip)).unwrap();
+        z.add_file("docs/note.txt", td_archive::Source::Bytes(vec![b'n'; 40]));
+        z.add_file("readme.txt", td_archive::Source::Bytes(vec![b'r'; 7]));
+        z.commit().unwrap();
+        let start = svc.start_lookup(&format!("{zip}!"), "note").unwrap();
+        let (entries, _, _) = collect_search(&ch, start.id);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].path, format!("{zip}!/docs/note.txt"));
+        let id = svc.start_disk_usage(&format!("{zip}!"), false);
+        let (_, usage, _) = collect_search(&ch, id);
+        let SearchMsg::Usage { items, .. } = usage.last().unwrap() else {
+            panic!()
+        };
+        assert_eq!(items[0].size, 40.0);
+    }
+
+    #[test]
+    fn cancel_search_stops_a_running_job() {
+        let (_t, svc, ch, root) = setup();
+        for d in 0..30 {
+            for f in 0..30 {
+                let p = format!("{root}/d{d}/f{f}.txt");
+                std::fs::create_dir_all(Path::new(&p).parent().unwrap()).unwrap();
+                std::fs::write(p, "x").unwrap();
+            }
+        }
+        let id = svc.start_flatten(&root);
+        svc.cancel_search(id);
+        let (entries, _, summary) = collect_search(&ch, id);
+        assert!(summary.cancelled, "취소 요청 뒤에 끝나야 한다");
+        assert!(entries.len() < 900, "{}", entries.len());
+        // 끝난 작업을 취소해도 아무 일 없다
+        svc.cancel_search(id);
+        svc.cancel_search(9999);
     }
 
     #[test]

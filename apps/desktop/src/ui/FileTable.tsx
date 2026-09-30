@@ -121,7 +121,7 @@ export function FileTable({ pane }: { pane: PaneId }) {
         <span aria-hidden>{mark}</span>
         {(multi ? [{ name: "name" } as ColumnSpec] : columns).map((c, k) => (
           <span key={`${c.name}-${k}`} className={c.name === "name" ? "truncate" : "truncate text-right tabular-nums"}>
-            {cellText(e, c.name, config.display)}
+            {cellText(e, c.name, config.display, undefined, tab.virtual?.kind === "usage")}
           </span>
         ))}
       </div>
@@ -179,7 +179,9 @@ export function FileTable({ pane }: { pane: PaneId }) {
           {tab.error}
         </div>
       )}
-      {!tab.error && tab.entries.length === 0 && <div className="px-2 py-1 text-neutral-500">항목 없음</div>}
+      {!tab.error && tab.entries.length === 0 && (
+        <div className="px-2 py-1 text-neutral-500">{tab.virtual?.running ? "찾는 중…" : "항목 없음"}</div>
+      )}
       <div
         ref={listRef}
         role="listbox"

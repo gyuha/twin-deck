@@ -1,6 +1,6 @@
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { BackendError } from "./backend";
-import type { Backend } from "./backend";
+import type { Backend, SearchEvent } from "./backend";
 import { commands, events } from "./generated/bindings";
 import type { FileInfoDto, JobDto, LoadedState, PreviewDto, Snapshot, JobKindDto, Loaded, QueueItemDto, Result } from "./generated/bindings";
 
@@ -82,6 +82,28 @@ export class TauriBackend implements Backend {
   }
   async openAsArchive(path: string) {
     return unwrap(await commands.openAsArchive(path));
+  }
+  async startLookup(root: string, query: string) {
+    return unwrap(await commands.startLookup(root, query));
+  }
+  startFlatten(root: string) {
+    return commands.startFlatten(root);
+  }
+  startDiskUsage(root: string) {
+    return commands.startDiskUsage(root);
+  }
+  async cancelSearch(id: number) {
+    await commands.cancelSearch(id);
+  }
+  onSearchEvent(callback: (event: SearchEvent) => void) {
+    const unlisten = [
+      events.searchChunk.listen((e) => callback({ type: "chunk", id: e.payload.id, entries: e.payload.entries })),
+      events.usageUpdate.listen((e) => callback({ type: "usage", ...e.payload })),
+      events.searchDone.listen((e) => callback({ type: "done", id: e.payload.id, summary: e.payload.summary })),
+    ];
+    return () => {
+      for (const u of unlisten) void u.then((fn) => fn());
+    };
   }
   listVolumes() {
     return commands.listVolumes();

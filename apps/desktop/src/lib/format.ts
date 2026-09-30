@@ -121,12 +121,13 @@ export const COLUMN_TITLES: Record<ColumnName, string> = {
 };
 
 /** 한 셀의 표시 문자열. */
-export function cellText(e: EntryDto, column: ColumnName, display: Display, now?: number): string {
+/** `dirSize`: 폴더에도 크기를 보여 준다(Disk Usage 결과는 폴더의 총 크기를 담고 있다). */
+export function cellText(e: EntryDto, column: ColumnName, display: Display, now?: number, dirSize = false): string {
   switch (column) {
     case "name":
       return e.name;
     case "size":
-      return e.kind === "dir" ? "" : formatSize(e.size, display.size_format);
+      return e.kind === "dir" && !dirSize ? "" : formatSize(e.size, display.size_format);
     case "created":
       return formatDate(e.createdMs, display, now);
     case "modified":

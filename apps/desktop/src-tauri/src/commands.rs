@@ -11,8 +11,8 @@ use td_state::{LoadedState, Snapshot, Spawner};
 use td_volumes::{SystemUnmounter, Volumes};
 
 use crate::service::{
-    edit, reveal, EntryDto, FileInfoDto, JobDto, JobKindDto, PreviewDto, QueueItemDto, Service,
-    ServiceResult,
+    edit, reveal, EntryDto, FileInfoDto, JobDto, JobKindDto, PreviewDto, QueueItemDto,
+    SearchStartDto, SearchSummaryDto, Service, ServiceResult,
 };
 
 pub type AppService = Service<SystemTrash>;
@@ -29,6 +29,31 @@ pub struct DirChanged {
 #[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
 pub struct QueueChanged {
     pub jobs: Vec<JobDto>,
+}
+
+/// Look Up / Flatten 결과가 더 도착했다.
+#[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
+pub struct SearchChunk {
+    pub id: u32,
+    pub entries: Vec<EntryDto>,
+}
+
+/// Disk Usage의 부분(또는 최종) 결과. 크기 내림차순 전체 스냅샷이다.
+#[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct UsageUpdate {
+    pub id: u32,
+    pub items: Vec<EntryDto>,
+    pub done: bool,
+    pub total_bytes: f64,
+    pub files: f64,
+}
+
+/// 검색/순회 작업이 끝났다(정상, 취소 모두). 이 id의 마지막 이벤트다.
+#[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
+pub struct SearchDone {
+    pub id: u32,
+    pub summary: SearchSummaryDto,
 }
 
 /// 설정이 바뀌었다(파일 감시). 문법 오류가 있으면 이전 유효 설정과 경고가 온다.
@@ -335,6 +360,37 @@ pub fn rename_entry(
     svc.rename(&path, &new_name)
 }
 
+/// Look Up을 시작한다. 결과는 `SearchChunk` 이벤트로 온다. 질의 오류는 위치가 든 문자열이다.
+#[tauri::command]
+#[specta::specta]
+pub fn start_lookup(
+    svc: State<'_, AppService>,
+    root: String,
+    query: String,
+) -> ServiceResult<SearchStartDto> {
+    svc.start_lookup(&root, &query)
+}
+
+/// Flatten을 시작한다. 결과는 `SearchChunk` 이벤트로 온다.
+#[tauri::command]
+#[specta::specta]
+pub fn start_flatten(svc: State<'_, AppService>, root: String) -> u32 {
+    svc.start_flatten(&root)
+}
+
+/// Disk Usage를 시작한다. 결과는 `UsageUpdate` 이벤트로 온다.
+#[tauri::command]
+#[specta::specta]
+pub fn start_disk_usage(svc: State<'_, AppService>, root: String) -> u32 {
+    svc.start_disk_usage(&root, false)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn cancel_search(svc: State<'_, AppService>, id: u32) {
+    svc.cancel_search(id);
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn watch_dir(svc: State<'_, AppService>, path: String) -> ServiceResult<()> {
@@ -378,9 +434,20 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             queue_clear_finished,
             rename_entry,
             watch_dir,
-            unwatch_dir
+            unwatch_dir,
+            start_lookup,
+            start_flatten,
+            start_disk_usage,
+            cancel_search
         ])
-        .events(collect_events![DirChanged, QueueChanged, ConfigChanged])
+        .events(collect_events![
+            DirChanged,
+            QueueChanged,
+            ConfigChanged,
+            SearchChunk,
+            UsageUpdate,
+            SearchDone
+        ])
 }
 
 #[cfg(test)]

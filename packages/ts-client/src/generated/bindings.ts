@@ -200,6 +200,32 @@ async unwatchDir(path: string) : Promise<Result<null, string>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+/**
+ * Look Up을 시작한다. 결과는 `SearchChunk` 이벤트로 온다. 질의 오류는 위치가 든 문자열이다.
+ */
+async startLookup(root: string, query: string) : Promise<Result<SearchStartDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("start_lookup", { root, query }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Flatten을 시작한다. 결과는 `SearchChunk` 이벤트로 온다.
+ */
+async startFlatten(root: string) : Promise<number> {
+    return await TAURI_INVOKE("start_flatten", { root });
+},
+/**
+ * Disk Usage를 시작한다. 결과는 `UsageUpdate` 이벤트로 온다.
+ */
+async startDiskUsage(root: string) : Promise<number> {
+    return await TAURI_INVOKE("start_disk_usage", { root });
+},
+async cancelSearch(id: number) : Promise<void> {
+    await TAURI_INVOKE("cancel_search", { id });
 }
 }
 
@@ -209,11 +235,17 @@ async unwatchDir(path: string) : Promise<Result<null, string>> {
 export const events = __makeEvents__<{
 configChanged: ConfigChanged,
 dirChanged: DirChanged,
-queueChanged: QueueChanged
+queueChanged: QueueChanged,
+searchChunk: SearchChunk,
+searchDone: SearchDone,
+usageUpdate: UsageUpdate
 }>({
 configChanged: "config-changed",
 dirChanged: "dir-changed",
-queueChanged: "queue-changed"
+queueChanged: "queue-changed",
+searchChunk: "search-chunk",
+searchDone: "search-done",
+usageUpdate: "usage-update"
 })
 
 /** user-defined constants **/
@@ -321,6 +353,22 @@ export type QueueItemDto = { src: string;
  */
 destDir: string | null; policy: ConflictDto }
 export type QuickSelect = { match_only_prefix: boolean; activate_on_any_character: boolean }
+/**
+ * Look Up / Flatten 결과가 더 도착했다.
+ */
+export type SearchChunk = { id: number; entries: EntryDto[] }
+/**
+ * 검색/순회 작업이 끝났다(정상, 취소 모두). 이 id의 마지막 이벤트다.
+ */
+export type SearchDone = { id: number; summary: SearchSummaryDto }
+/**
+ * 검색/순회 작업을 시작했을 때의 응답. 지원하지 않는 변수 경고는 시작 즉시 알 수 있다.
+ */
+export type SearchStartDto = { id: number; warnings: string[] }
+/**
+ * 작업이 끝났을 때(정상, 취소 모두)의 요약.
+ */
+export type SearchSummaryDto = { visited: number; matched: number; unreadable: number; cancelled: boolean; warnings: string[] }
 export type SelectionConfig = { 
 /**
  * "invert" | "extend"
@@ -349,6 +397,10 @@ export type TableView = {
  * 컬럼 명세 `[<|>]이름[:너비]`.
  */
 columns: string[] }
+/**
+ * Disk Usage의 부분(또는 최종) 결과. 크기 내림차순 전체 스냅샷이다.
+ */
+export type UsageUpdate = { id: number; items: EntryDto[]; done: boolean; totalBytes: number; files: number }
 /**
  * 경로 변수(`${user.downloads}` 등)와 `~` 확장에 쓰는 사용자 폴더. 알 수 없으면 null.
  */

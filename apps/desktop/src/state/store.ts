@@ -18,6 +18,8 @@ import type {
   Loaded,
   PreviewDto,
   QueueItemDto,
+  SearchEvent,
+  SearchSummaryDto,
   Snapshot,
   TabSnap,
   UserDirsDto,
@@ -51,6 +53,28 @@ export interface TabState {
   quick: string | null;
   /** 복원한 커서 항목 이름. 첫 목록을 읽을 때 한 번 쓰고 지운다. */
   restoreCursor?: string;
+  /** 있으면 위치가 없는 가상 탭(PANE-06)이다. `path`는 `virtual:<종류>:<탭 id>` 자리표시자다. */
+  virtual?: VirtualTab;
+}
+
+export type VirtualKind = "lookup" | "flatten" | "usage";
+
+/** Look Up / Flatten / Disk Usage 결과를 담은 탭의 부가 상태. 탭을 닫으면 결과를 버린다. */
+export interface VirtualTab {
+  kind: VirtualKind;
+  title: string;
+  /** 검색/순회를 시작한 위치. */
+  base: string;
+  /** 진행 중인 작업 id (취소에 쓴다). */
+  jobId: number;
+  running: boolean;
+  cancelled: boolean;
+  warnings: string[];
+  summary: SearchSummaryDto | null;
+  /** Disk Usage의 지금까지 센 총 바이트. */
+  totalBytes: number;
+  /** 삭제/이동/휴지통을 보낸 뒤 실제로 사라졌는지 확인할 경로들. */
+  recheck: string[];
 }
 
 export interface PaneState {
@@ -61,7 +85,7 @@ export interface PaneState {
 export const CONFLICT_CHOICES: readonly ConflictDto[] = ["overwrite", "skip", "rename"];
 
 export type DialogState =
-  | { kind: "name"; title: string; value: string; error: string | null; selectStem: boolean; goto?: boolean }
+  | { kind: "name"; title: string; value: string; error: string | null; selectStem: boolean; goto?: boolean; label?: string }
   | { kind: "confirm"; title: string; lines: string[] }
   | { kind: "conflict"; title: string; existing: string; selected: number }
   | { kind: "info"; title: string; lines: string[] };
@@ -142,6 +166,8 @@ export interface AppState {
 }
 
 export const PAGE_SIZE = 10;
+const VIRTUAL_NO_CREATE = "검색/분석 결과 탭에서는 새로 만들 수 없습니다. 폴더 탭에서 시도하세요";
+const VIRTUAL_NO_DEST = "검색/분석 결과 탭은 복사·이동의 대상이 될 수 없습니다. 반대편 패널을 폴더로 바꾸세요";
 /** 상태 저장을 미루는 시간(디바운스). */
 export const SAVE_DELAY_MS = 400;
 /** 저장하는 선택 항목 수의 상한. 폴더 전체 선택(수만 개)이 스냅샷을 키우지 않게 한다. */
@@ -160,6 +186,9 @@ export function activeTab(s: AppState, pane: PaneId = s.activePane): TabState {
   return p.tabs[p.active];
 }
 
+/** 탭이 실제로 보고 있는 위치. 가상 탭은 검색을 시작한 위치를 돌려준다. */
+export const hereOf = (tab: TabState): string => tab.virtual?.base ?? tab.path;
+
 export function cursorEntry(tab: TabState): EntryDto | undefined {
   return tab.entries[tab.cursor];
 }
@@ -177,9 +206,11 @@ export function actionContext(s: AppState): ActionContext {
     hasCursorItem: !!cursorEntry(tab),
     selectedCount: tab.selection.size,
     tabCount: s.panes[s.activePane].tabs.length,
-    canGoUp: parentPath(tab.path) !== null,
+    canGoUp: !tab.virtual && parentPath(tab.path) !== null,
     cursorIsDir: cursorEntry(tab)?.kind === "dir",
     multiColumn: tab.view.mode === "columns",
+    virtualTab: !!tab.virtual,
+    searching: !!tab.virtual?.running,
   };
 }
 
@@ -268,6 +299,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
   async function reload(pane: PaneId, tabId: number, focusName?: string) {
     const tab = get().panes[pane].tabs.find((t) => t.id === tabId);
     if (!tab) return;
+    if (tab.virtual) return revalidateVirtual(pane, tab);
     const keepName = focusName ?? tab.restoreCursor ?? cursorEntry(tab)?.name;
     try {
       const listed = await backend.listDir(tab.path, get().showHidden);
@@ -288,10 +320,39 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     }
   }
 
+  /** 가상 탭: 삭제/이동/휴지통을 보낸 경로가 실제로 사라졌으면 결과에서 뺀다. 작업이 모두 끝나면 확인을 멈춘다. */
+  async function revalidateVirtual(pane: PaneId, tab: TabState) {
+    const v = tab.virtual!;
+    if (v.recheck.length === 0) return;
+    const gone = new Set<string>();
+    for (const path of v.recheck) {
+      try {
+        await backend.fileInfo(path);
+      } catch {
+        gone.add(path);
+      }
+    }
+    const idle = !get().queue.some(isActiveJob);
+    patchTab(pane, tab.id, (t) => {
+      if (!t.virtual) return {};
+      const entries = t.entries.filter((e) => !gone.has(e.path));
+      const cursorName = t.entries[t.cursor]?.name;
+      const idx = cursorName ? entries.findIndex((e) => e.name === cursorName) : -1;
+      return {
+        entries,
+        cursor: idx >= 0 ? idx : Math.min(t.cursor, Math.max(entries.length - 1, 0)),
+        selection: new Set([...t.selection].filter((p) => !gone.has(p))),
+        virtual: { ...t.virtual, recheck: idle ? [] : t.virtual.recheck.filter((p) => !gone.has(p)) },
+      };
+    });
+  }
+
   const watched = new Set<string>();
   async function syncWatches() {
     const s = get();
-    const wanted = new Set(Object.values(s.panes).flatMap((p) => p.tabs.map((t) => t.path)));
+    const wanted = new Set(
+      Object.values(s.panes).flatMap((p) => p.tabs.filter((t) => !t.virtual).map((t) => t.path)),
+    );
     for (const p of wanted) {
       if (!watched.has(p)) {
         watched.add(p);
@@ -316,6 +377,57 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       for (const t of get().panes[pane].tabs) if (t.path === path) void reload(pane, t.id);
     }
   });
+
+  // Look Up / Flatten / Disk Usage 이벤트. 응답(작업 id)보다 이벤트가 먼저 올 수 있어서, 탭이 생기기 전 이벤트는 모아 둔다.
+  const earlySearchEvents = new Map<number, SearchEvent[]>();
+  const findVirtual = (id: number) => {
+    for (const pane of ["left", "right"] as const) {
+      const tab = get().panes[pane].tabs.find((t) => t.virtual?.jobId === id);
+      if (tab) return { pane, tab };
+    }
+    return null;
+  };
+  function applySearchEvent(pane: PaneId, tabId: number, e: SearchEvent) {
+    patchTab(pane, tabId, (t) => {
+      const v = t.virtual;
+      if (!v) return {};
+      if (e.type === "chunk") return { entries: [...t.entries, ...e.entries] };
+      // 커서가 맨 위이면 정렬/갱신 뒤에도 맨 위에 둔다(사용자가 움직이지 않은 것이다). 아니면 같은 항목을 따라간다.
+      if (e.type === "usage") {
+        const name = t.cursor > 0 ? t.entries[t.cursor]?.name : undefined;
+        const idx = name ? e.items.findIndex((x) => x.name === name) : -1;
+        return {
+          entries: e.items,
+          cursor: idx >= 0 ? idx : Math.min(t.cursor, Math.max(e.items.length - 1, 0)),
+          virtual: { ...v, totalBytes: e.totalBytes },
+        };
+      }
+      // done: 스트리밍 중에는 도착 순서대로 두었다가 끝나면 한 번만 정렬한다(Disk Usage는 크기 순서를 그대로 둔다).
+      const name = t.cursor > 0 ? t.entries[t.cursor]?.name : undefined;
+      const entries = v.kind === "usage" ? t.entries : sortEntries(t.entries, effectiveSort(t, cfg().view.table.columns));
+      const idx = name ? entries.findIndex((x) => x.name === name) : -1;
+      return {
+        entries,
+        cursor: idx >= 0 ? idx : Math.min(t.cursor, Math.max(entries.length - 1, 0)),
+        virtual: {
+          ...v,
+          running: false,
+          cancelled: e.summary.cancelled,
+          summary: e.summary,
+          warnings: [...new Set([...v.warnings, ...e.summary.warnings])],
+        },
+      };
+    });
+  }
+  const unsubscribeSearch = backend.onSearchEvent((e) => {
+    const hit = findVirtual(e.id);
+    if (hit) return applySearchEvent(hit.pane, hit.tab.id, e);
+    earlySearchEvents.set(e.id, [...(earlySearchEvents.get(e.id) ?? []), e]);
+  });
+  /** 탭이 실행 중인 검색/순회를 취소한다. */
+  const stopSearch = (tab: TabState) => {
+    if (tab.virtual?.running) void backend.cancelSearch(tab.virtual.jobId).catch(() => {});
+  };
 
   /** 다이얼로그를 열고 사용자의 결정을 기다린다. 취소하면 null. */
   let pending: ((value: unknown) => void) | null = null;
@@ -357,18 +469,28 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
   /** 지금 화면 상태를 저장 형식으로 만든다. */
   const toSnapshot = (): Snapshot => {
     const s = get();
-    const pane = (p: PaneState) => ({
-      active: p.active,
-      tabs: p.tabs.map(
+    // 가상 탭은 저장하지 않는다(결과는 탭과 함께 버려진다). 진짜 탭이 하나도 없으면 시작 위치의 탭으로 대신한다.
+    const pane = (p: PaneState) => {
+      const real = p.tabs.filter((t) => !t.virtual);
+      const keep = real.length > 0 ? real : p.tabs.slice(0, 1);
+      const current = p.tabs[p.active];
+      const at = keep.indexOf(current);
+      const before = p.tabs.slice(0, p.active).reverse().find((t) => keep.includes(t));
+      const after = p.tabs.slice(p.active).find((t) => keep.includes(t));
+      const active = Math.max(keep.indexOf(at >= 0 ? current : (before ?? after ?? keep[0])), 0);
+      return {
+        active,
+        tabs: keep.map(
         (t): TabSnap => ({
-          path: t.path,
+          path: hereOf(t),
           cursorName: t.entries[t.cursor]?.name ?? t.restoreCursor ?? null,
           selection: t.selection.size <= SELECTION_SAVE_LIMIT ? [...t.selection] : [],
           sort: t.sort,
           view: t.view.mode === "columns" ? { mode: "columns", count: t.view.count } : { mode: "table", count: 1 },
         }),
       ),
-    });
+      };
+    };
     return {
       version: 1,
       activePane: s.activePane,
@@ -513,6 +635,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       unsubscribeBackend();
       unsubscribeQueue();
       unsubscribeConfig();
+      unsubscribeSearch();
+      for (const pane of ["left", "right"] as const) for (const t of get().panes[pane].tabs) stopSearch(t);
       for (const p of watched) void backend.unwatch(p);
       watched.clear();
     },
@@ -520,7 +644,9 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     async navigate(path: string, focusName?: string) {
       const s = get();
       const tab = activeTab(s);
+      stopSearch(tab); // 가상 탭에서 실제 위치로 나가면 결과를 버린다
       patchActive((t) => ({
+        virtual: undefined,
         path,
         history: [...t.history, path],
         cursor: 0,
@@ -534,10 +660,14 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
 
     /** 열기: 폴더는 들어가고, 아카이브 파일은 폴더처럼 연다 (ARC-01). */
     async open() {
-      const c = cursorEntry(activeTab(get()));
+      const tab = activeTab(get());
+      const c = cursorEntry(tab);
       if (c?.kind === "dir") await api.navigate(c.path);
       else if (c?.kind === "file" && isArchiveName(c.name, cfg().file_systems.zip.additional_extensions)) {
         await api.navigate(archiveRoot(c.path));
+      } else if (c && tab.virtual) {
+        // 검색 결과의 일반 파일: 그 파일이 있는 폴더를 새 탭으로 연다
+        await api.revealInTab();
       }
     },
 
@@ -560,6 +690,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     /** 상위 폴더. 아카이브 루트에서는 아카이브가 들어 있는 폴더로 나가고 커서는 그 아카이브 파일에 놓인다. */
     async goUp() {
       const tab = activeTab(get());
+      if (tab.virtual) return;
       const parent = parentPath(tab.path);
       if (parent !== null) await api.navigate(parent, archiveFileName(baseName(tab.path)));
     },
@@ -649,7 +780,10 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     selectAll() {
       patchActive((t) => ({ selection: new Set(t.entries.map((e) => e.path)) }));
     },
+    /** 선택 해제. 선택이 없는 채로 진행 중인 검색/분석 탭이면 대신 그 작업을 취소한다(Esc). */
     selectNone() {
+      const tab = activeTab(get());
+      if (tab.selection.size === 0 && tab.virtual?.running) return api.cancelSearch();
       patchActive({ selection: new Set() });
     },
     /** 커서 항목의 선택을 토글하고 한 칸 내려간다. */
@@ -722,7 +856,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     async newTab() {
       const s = get();
       const p = s.panes[s.activePane];
-      const tab = newTab(activeTab(s).path);
+      const tab = newTab(hereOf(activeTab(s)));
       set({
         panes: { ...s.panes, [s.activePane]: { tabs: [...p.tabs, tab], active: p.tabs.length } },
       });
@@ -733,6 +867,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const s = get();
       const p = s.panes[s.activePane];
       if (p.tabs.length <= 1) return;
+      stopSearch(p.tabs[p.active]); // 가상 탭을 닫으면 진행 중인 작업도 멈추고 결과를 버린다
       const tabs = p.tabs.filter((_, i) => i !== p.active);
       set({
         panes: { ...s.panes, [s.activePane]: { tabs, active: Math.min(p.active, tabs.length - 1) } },
@@ -814,6 +949,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     /** 새 폴더 (OP-01). 중첩 경로(`a/b/c`)를 허용한다. */
     async newFolder() {
       const tab = activeTab(get());
+      if (tab.virtual) return fail(VIRTUAL_NO_CREATE);
       const name = await ask<string>({ kind: "name", title: "새 폴더", value: "", error: null, selectStem: false });
       if (name === null) return;
       set({ notice: null });
@@ -827,6 +963,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     /** 새 파일 (OP-02). */
     async newFile() {
       const tab = activeTab(get());
+      if (tab.virtual) return fail(VIRTUAL_NO_CREATE);
       const name = await ask<string>({ kind: "name", title: "새 파일", value: "", error: null, selectStem: false });
       if (name === null) return;
       set({ notice: null });
@@ -848,7 +985,15 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       set({ notice: null });
       try {
         const dest = await backend.rename(entry.path, name.trim());
-        await reload(s.activePane, tab.id, baseName(dest));
+        if (tab.virtual) {
+          // 가상 탭은 다시 읽을 폴더가 없으니 결과 항목만 새 이름으로 바꾼다
+          patchTab(s.activePane, tab.id, (t) => ({
+            entries: t.entries.map((e) => (e.path === entry.path ? { ...e, name: baseName(dest), path: dest } : e)),
+            selection: new Set([...t.selection].map((p) => (p === entry.path ? dest : p))),
+          }));
+        } else {
+          await reload(s.activePane, tab.id, baseName(dest));
+        }
         await reloadAll();
       } catch (e) {
         fail(e);
@@ -859,7 +1004,9 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const s = get();
       const targets = targetsOf(activeTab(s));
       if (targets.length === 0) return;
-      const destDir = api.inactivePath();
+      const inactive = activeTab(s, other(s.activePane));
+      if (inactive.virtual) return fail(VIRTUAL_NO_DEST);
+      const destDir = inactive.path;
       set({ notice: null });
       const items: QueueItemDto[] = [];
       for (const t of targets) {
@@ -883,20 +1030,24 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         }
       }
       patchTab(s.activePane, activeTab(s).id, { selection: new Set() });
-      if (items.length > 0) await backend.enqueue(kind, items);
+      if (items.length > 0) {
+        if (kind === "move") api.recheckVirtual(items.map((i) => i.src));
+        await backend.enqueue(kind, items);
+      }
       await reloadAll();
     },
     /** 휴지통으로 이동 (OP-06). 기본 설정에서는 확인하지 않는다. */
     async trashTargets() {
       const targets = targetsOf(activeTab(get()));
       if (targets.length === 0) return;
-      if (isArchivePath(activeTab(get()).path)) {
+      if (targets.some((t) => isArchivePath(t.path))) {
         fail("아카이브 안에서는 휴지통을 쓸 수 없습니다. 영구 삭제(Shift+F8)를 사용하세요");
         return;
       }
       if (cfg().core.confirm.trash && !(await api.confirmTargets(`${targets.length}개 항목을 휴지통으로 보낼까요?`, targets))) return;
       set({ notice: null });
       patchActive({ selection: new Set() });
+      api.recheckVirtual(targets.map((t) => t.path));
       await backend.enqueue("trash", targets.map((t) => ({ src: t.path, destDir: null, policy: "skip" })));
       await reloadAll();
     },
@@ -939,7 +1090,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     },
     /** 폴더 경로 복사 (OP-15, F12). */
     async copyFolderPath() {
-      const path = activeTab(get()).path;
+      const path = hereOf(activeTab(get()));
       try {
         await backend.copyText(path);
         flash(`폴더 경로를 복사했습니다: ${path}`);
@@ -963,7 +1114,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const tab = activeTab(get());
       set({ notice: null });
       try {
-        await backend.revealPath(cursorEntry(tab)?.path ?? tab.path);
+        await backend.revealPath(cursorEntry(tab)?.path ?? hereOf(tab));
       } catch (e) {
         fail(e);
       }
@@ -983,7 +1134,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     async editFolder() {
       set({ notice: null });
       try {
-        await backend.editPaths([activeTab(get()).path]);
+        await backend.editPaths([hereOf(activeTab(get()))]);
       } catch (e) {
         fail(e);
       }
@@ -1005,6 +1156,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (cfg().core.confirm.delete && !(await api.confirmTargets(`${targets.length}개 항목을 영구 삭제할까요?`, targets))) return;
       set({ notice: null });
       patchActive({ selection: new Set() });
+      api.recheckVirtual(targets.map((t) => t.path));
       await backend.enqueue("delete", targets.map((t) => ({ src: t.path, destDir: null, policy: "skip" })));
       await reloadAll();
     },
@@ -1063,7 +1215,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         } else if (kind === "recent") {
           title = "최근 위치";
           const seen = new Set<string>([tab.path]);
-          for (const p of [...tab.history].reverse()) {
+          for (const p of [...(tab.virtual ? [] : tab.history)].reverse()) {
             if (seen.has(p)) continue;
             seen.add(p);
             items.push({ label: p, path: p });
@@ -1071,7 +1223,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
           }
         } else {
           title = "상위 폴더";
-          for (let p: string | null = tab.path; p !== null; p = parentPath(p)) {
+          for (let p: string | null = hereOf(tab); p !== null; p = parentPath(p)) {
             items.push({ label: p, path: p });
           }
         }
@@ -1139,20 +1291,21 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     /** 현재 폴더를 즐겨찾기에 추가한다. */
     async addFavoriteHere() {
       const tab = activeTab(get());
+      const here = hereOf(tab);
       set({ notice: null });
       try {
-        await backend.addFavorite(baseName(tab.path) || tab.path, tab.path);
+        await backend.addFavorite(baseName(here) || here, here);
       } catch (e) {
         fail(e);
       }
     },
     /** Go To Path (NAV-11): 경로를 입력해 이동한다. Tab으로 폴더 이름을 완성한다. */
     async gotoPath() {
-      const tab = activeTab(get());
+      const here = hereOf(activeTab(get()));
       const value = await ask<string>({
         kind: "name",
         title: "경로로 이동",
-        value: tab.path.endsWith("/") ? tab.path : `${tab.path}/`,
+        value: here.endsWith("/") ? here : `${here}/`,
         error: null,
         selectStem: false,
         goto: true,
@@ -1269,12 +1422,93 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (job && isActiveJob(job)) await backend.queueAbort(job.id);
     },
 
+    /** 삭제/이동/휴지통을 보낸 경로 중 이 탭의 결과에 있는 것을 사라졌는지 확인할 목록에 올린다(가상 탭만). */
+    recheckVirtual(paths: string[]) {
+      const tab = activeTab(get());
+      if (!tab.virtual) return;
+      const set_ = new Set(paths);
+      patchActive((t) => ({ virtual: t.virtual && { ...t.virtual, recheck: [...t.virtual.recheck, ...t.entries.filter((e) => set_.has(e.path)).map((e) => e.path)] } }));
+    },
+
+    /** 새 가상 탭을 열고 결과를 받기 시작한다. */
+    async openVirtual(kind: VirtualKind, title: string, base: string, start: () => Promise<{ id: number; warnings: string[] }>) {
+      set({ notice: null });
+      let started: { id: number; warnings: string[] };
+      try {
+        started = await start();
+      } catch (e) {
+        return fail(e); // 질의 문법 오류 등: 탭을 만들지 않는다
+      }
+      const s = get();
+      const p = s.panes[s.activePane];
+      const tab = newTab("");
+      tab.path = `virtual:${kind}:${tab.id}`;
+      tab.history = [tab.path];
+      tab.sort = kind === "usage" ? { key: "size", dir: "desc" } : null;
+      tab.virtual = { kind, title, base, jobId: started.id, running: true, cancelled: false, warnings: started.warnings, summary: null, totalBytes: 0, recheck: [] };
+      set({ panes: { ...s.panes, [s.activePane]: { tabs: [...p.tabs, tab], active: p.tabs.length } } });
+      // 탭이 생기기 전에 도착한 이벤트를 순서대로 반영한다
+      for (const e of earlySearchEvents.get(started.id) ?? []) applySearchEvent(s.activePane, tab.id, e);
+      earlySearchEvents.delete(started.id);
+    },
+
+    /** Look Up (FIND-01): 질의를 물어보고 결과를 새 가상 탭에 스트리밍한다. 전역은 홈 아래, 폴더는 현재 위치 아래. */
+    async lookup(scope: "global" | "folder") {
+      const s = get();
+      const base = scope === "global" ? (s.userDirs.home ?? "/") : hereOf(activeTab(s));
+      const query = await ask<string>({
+        kind: "name",
+        title: scope === "global" ? "Look Up (전역: 홈 아래)" : "Look Up (현재 폴더 아래)",
+        label: "질의",
+        value: "",
+        error: null,
+        selectStem: false,
+      });
+      if (query === null) return;
+      const q = query.trim();
+      await api.openVirtual("lookup", `Look Up: ${q}`, base, () => backend.startLookup(base, q));
+    },
+
+    /** Flatten (FIND-05): 현재 위치 아래의 모든 파일을 평면 목록으로. */
+    async flatten() {
+      const base = hereOf(activeTab(get()));
+      await api.openVirtual("flatten", `Flatten: ${baseName(base) || base}`, base, async () => ({ id: await backend.startFlatten(base), warnings: [] }));
+    },
+
+    /** Analyze Disk Usage (FIND-06). 인수 `src`가 있으면 그 폴더(`~` 확장), 없으면 현재 위치. */
+    async diskUsage(args?: Record<string, unknown>) {
+      const raw = typeof args?.src === "string" ? args.src : null;
+      const src = raw === null ? hereOf(activeTab(get())) : expandPath(raw, get().userDirs);
+      if (src === null) return fail("사용자 폴더를 알 수 없어 경로를 확장하지 못했습니다");
+      await api.openVirtual("usage", `Disk Usage: ${baseName(src) || src}`, src, async () => ({ id: await backend.startDiskUsage(src), warnings: [] }));
+    },
+
+    /** 진행 중인 검색/분석을 취소한다. 그때까지 온 결과는 남는다. */
+    cancelSearch() {
+      stopSearch(activeTab(get()));
+    },
+
+    /** 가상 탭의 커서 항목이 있는 폴더를 새 탭으로 연다. 커서는 그 항목에 놓인다. */
+    async revealInTab() {
+      const s = get();
+      const entry = cursorEntry(activeTab(s));
+      if (!entry) return;
+      const parent = parentPath(entry.path);
+      if (parent === null) return;
+      const p = s.panes[s.activePane];
+      const tab = newTab(parent);
+      tab.restoreCursor = archiveFileName(entry.name);
+      set({ panes: { ...s.panes, [s.activePane]: { tabs: [...p.tabs, tab], active: p.tabs.length } } });
+      await reload(s.activePane, tab.id);
+      await syncWatches();
+    },
+
     reload: (pane: PaneId, tabId: number, focusName?: string) => reload(pane, tabId, focusName),
     reloadAll,
-    /** 비활성 패널의 활성 탭 경로. */
+    /** 비활성 패널의 활성 탭 경로(가상 탭이면 시작 위치). */
     inactivePath(): string {
       const s = get();
-      return activeTab(s, other(s.activePane)).path;
+      return hereOf(activeTab(s, other(s.activePane)));
     },
     childPath: joinPath,
   };

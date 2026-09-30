@@ -120,6 +120,11 @@ impl CompositeFs {
         *self.extra_zip_exts.write().unwrap() = exts;
     }
 
+    /// 지금 설정된 추가 ZIP 확장자.
+    pub fn extra_zip_exts(&self) -> Vec<String> {
+        self.extra()
+    }
+
     fn extra(&self) -> Vec<String> {
         self.extra_zip_exts.read().unwrap().clone()
     }

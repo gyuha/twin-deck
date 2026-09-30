@@ -8,8 +8,9 @@ use td_ops::SystemTrash;
 
 use commands::{
     specta_builder, AppLaunch, AppService, AppVolumes, ConfigChanged, ConfigState, DirChanged,
-    QueueChanged,
+    QueueChanged, SearchChunk, SearchDone, UsageUpdate,
 };
+use service::SearchMsg;
 use tauri::Manager;
 
 /// 설정의 ZIP 추가 확장자를 서비스에 반영한다 (ARC-01).
@@ -20,7 +21,11 @@ fn apply_archive_extensions(svc: &AppService, loaded: &td_config::Loaded) {
 fn main() {
     let builder = specta_builder();
     let (service, channels) = AppService::new(SystemTrash).expect("서비스 초기화 실패");
-    let (changes, queue_events) = (channels.dir_changes, channels.queue_events);
+    let (changes, queue_events, search_events) = (
+        channels.dir_changes,
+        channels.queue_events,
+        channels.search_events,
+    );
 
     tauri::Builder::default()
         .invoke_handler(builder.invoke_handler())
@@ -84,6 +89,36 @@ fn main() {
                     while queue_events.try_recv().is_ok() {}
                     let jobs = handle.state::<AppService>().queue_jobs();
                     let _ = QueueChanged { jobs }.emit(&handle);
+                }
+            });
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                // 검색/순회 결과를 UI로 전달한다.
+                while let Ok(msg) = search_events.recv() {
+                    match msg {
+                        SearchMsg::Chunk { id, entries } => {
+                            let _ = SearchChunk { id, entries }.emit(&handle);
+                        }
+                        SearchMsg::Usage {
+                            id,
+                            items,
+                            done,
+                            total_bytes,
+                            files,
+                        } => {
+                            let _ = UsageUpdate {
+                                id,
+                                items,
+                                done,
+                                total_bytes,
+                                files,
+                            }
+                            .emit(&handle);
+                        }
+                        SearchMsg::Done { id, summary } => {
+                            let _ = SearchDone { id, summary }.emit(&handle);
+                        }
+                    }
                 }
             });
             Ok(())
