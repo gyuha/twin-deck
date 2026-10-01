@@ -14,7 +14,7 @@ export function TabBar({ pane }: { pane: PaneId }) {
           type="button"
           tabIndex={-1}
           aria-selected={i === active}
-          onClick={() => api.activate(pane)}
+          onClick={() => api.activate(pane, i)}
           className={i === active ? "border-b-2 border-blue-600 px-2 font-semibold" : "px-2 text-neutral-500"}
         >
           {t.virtual ? t.virtual.title : baseName(t.path) || "/"}

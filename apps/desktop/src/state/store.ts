@@ -798,8 +798,12 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       });
     },
 
-    activate(pane: PaneId) {
-      set({ activePane: pane });
+    activate(pane: PaneId, tab?: number) {
+      if (tab === undefined) {
+        set({ activePane: pane });
+        return;
+      }
+      set((s) => ({ activePane: pane, panes: { ...s.panes, [pane]: { ...s.panes[pane], active: tab } } }));
     },
     setCursor(index: number) {
       patchActive((t) => ({ cursor: clamp(index, t.entries.length) }));
