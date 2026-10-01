@@ -7,6 +7,7 @@ import { parseColumns } from "../lib/columns";
 import type { ColumnSpec } from "../lib/columns";
 import { COLUMN_TITLES, cellText } from "../lib/format";
 import { SORT_KEYS } from "../lib/sort";
+import { FileIcon } from "./FileIcon";
 import type { SortKey } from "../lib/sort";
 import { useApp, useAppStore } from "../state/context";
 import { activeTab, effectiveSort } from "../state/store";
@@ -25,8 +26,11 @@ const DEFAULT_WIDTH: Record<ColumnSpec["name"], string> = {
   permissions_octal: "5rem",
 };
 
-const gridTemplate = (cols: ColumnSpec[]) =>
-  `1.25rem ${cols.map((c) => (c.width ? `${c.width}px` : DEFAULT_WIDTH[c.name])).join(" ")}`;
+/** 아이콘 칸은 아이콘 크기에 이름과의 간격(6px)을 더한 폭이다. */
+const iconColumn = (iconSize: number) => `${iconSize + 6}px`;
+
+const gridTemplate = (cols: ColumnSpec[], iconSize: number) =>
+  `1.25rem ${iconColumn(iconSize)} ${cols.map((c) => (c.width ? `${c.width}px` : DEFAULT_WIDTH[c.name])).join(" ")}`;
 
 /** 보이는 행만 그리는 가상 스크롤러. jsdom처럼 크기 관찰이 없는 환경에서도 동작하도록 측정을 직접 제공한다. */
 function useRows(count: number, ref: React.RefObject<HTMLDivElement | null>): Virtualizer<HTMLDivElement, Element> {
@@ -65,6 +69,7 @@ export function FileTable({ pane }: { pane: PaneId }) {
   const isActive = useApp((s) => s.activePane === pane);
   const config = useApp((s) => s.loaded.config);
   const rightClickSelect = config.behavior.table.right_click_select;
+  const iconSize = config.behavior.table.icon_size;
   const columns = useMemo(() => parseColumns(config.view.table.columns), [config.view.table.columns]);
   const sort = effectiveSort(tab, config.view.table.columns);
 
@@ -110,15 +115,20 @@ export function FileTable({ pane }: { pane: PaneId }) {
           activate();
           api.toggleSelectAt(i);
         }}
-        style={multi ? undefined : { gridTemplateColumns: gridTemplate(columns) }}
+        style={{
+          gridTemplateColumns: multi
+            ? `1.25rem ${iconColumn(iconSize)} minmax(0,1fr)`
+            : gridTemplate(columns, iconSize),
+        }}
         className={[
-          multi ? "grid grid-cols-[1.25rem_minmax(0,1fr)]" : "grid",
+          "grid",
           "h-6 cursor-default items-center px-2",
           cursor ? (isActive ? "bg-blue-600 text-white outline outline-2 outline-blue-800" : "bg-neutral-300") : "",
           selected ? "font-bold" : "",
         ].join(" ")}
       >
         <span aria-hidden>{mark}</span>
+        <FileIcon name={e.name} kind={e.kind} size={iconSize} />
         {(multi ? [{ name: "name" } as ColumnSpec] : columns).map((c, k) => (
           <span key={`${c.name}-${k}`} className={c.name === "name" ? "truncate" : "truncate text-right tabular-nums"}>
             {cellText(e, c.name, config.display, undefined, tab.virtual?.kind === "usage")}
@@ -148,9 +158,10 @@ export function FileTable({ pane }: { pane: PaneId }) {
         <div
           role="row"
           aria-label="컬럼 머리글"
-          style={{ gridTemplateColumns: gridTemplate(columns) }}
+          style={{ gridTemplateColumns: gridTemplate(columns, iconSize) }}
           className="grid border-b border-neutral-300 px-2 text-xs text-neutral-600"
         >
+          <span aria-hidden />
           <span aria-hidden />
           {columns.map((c, k) => {
             const sortable = (SORT_KEYS as readonly string[]).includes(c.name);
