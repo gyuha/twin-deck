@@ -131,7 +131,7 @@ describe("OP-03/04 충돌 처리 (이름 겹침)", () => {
   const onAtxt = async (kind: "{F5}" | "{F6}") => {
     const r = await renderApp(withConflict());
     await r.user.keyboard("{ArrowDown}{ArrowDown}");
-    await r.user.keyboard(kind);
+    await r.user.keyboard(`${kind}{Enter}`); // 전송 확인 창을 시작하면 충돌 창이 뜬다
     await dialog();
     return r;
   };
@@ -170,7 +170,7 @@ describe("OP-03/04 충돌 처리 (이름 겹침)", () => {
   it("Esc는 남은 항목까지 모두 취소한다", async () => {
     const backend = seedBackend().seed({ "/home/b/a.txt": "old", "/home/b/b.txt": "oldb" });
     const { user } = await renderApp(backend);
-    await user.keyboard("{ArrowDown}{ArrowDown}{Control>}a{/Control}{F5}"); // 5개 전부 선택
+    await user.keyboard("{ArrowDown}{ArrowDown}{Control>}a{/Control}{F5}{Enter}"); // 5개 전부 선택
     await dialog();
     await user.keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
@@ -184,7 +184,7 @@ describe("OP-03/04 충돌 처리 (이름 겹침)", () => {
   it("선택한 여러 항목은 겹치는 것마다 묻고 나머지는 그대로 복사한다", async () => {
     const backend = seedBackend().seed({ "/home/b/a.txt": "old" });
     const { user } = await renderApp(backend);
-    await user.keyboard("{Control>}a{/Control}{F5}");
+    await user.keyboard("{Control>}a{/Control}{F5}{Enter}");
     await dialog();
     await user.keyboard("s"); // a.txt만 겹침 → 건너뜀
     await waitFor(() => expect(backend.exists("/home/b/b.txt")).toBe(true));

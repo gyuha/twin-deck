@@ -56,7 +56,7 @@ describe("M2 키보드 전용 종단 시나리오", () => {
     await waitFor(() => expect(selectedNames("left")).toEqual(["d.txt", "a.txt"]));
 
     // 5) F5: 비활성 패널로 복사 → 큐. 일시정지 중에는 진행하지 않고 재개하면 끝난다
-    await user.keyboard("{F5}");
+    await user.keyboard("{F5}{Enter}");
     await waitFor(() => expect(screen.getByRole("status", { name: "작업 큐 진행" })).toHaveTextContent("0/2"));
     await user.keyboard("=");
     await screen.findByRole("dialog", { name: "작업 큐" });

@@ -85,10 +85,12 @@ export interface PaneState {
 export const CONFLICT_CHOICES: readonly ConflictDto[] = ["overwrite", "skip", "rename"];
 
 export type DialogState =
-  | { kind: "name"; title: string; value: string; error: string | null; selectStem: boolean; goto?: boolean; label?: string }
+  | { kind: "name"; title: string; value: string; error: string | null; selectStem: boolean; goto?: boolean; label?: string; confirmLabel?: string }
   | { kind: "confirm"; title: string; lines: string[] }
   | { kind: "conflict"; title: string; existing: string; selected: number }
-  | { kind: "info"; title: string; lines: string[] };
+  | { kind: "info"; title: string; lines: string[] }
+  /** 실행 중인 전송(복사/이동) 작업의 진행 창. */
+  | { kind: "progress"; title: string; jobId: number };
 
 export type MenuKind = "volumes" | "favorites" | "recent" | "hierarchy";
 
@@ -167,6 +169,10 @@ export interface AppState {
 
 export const PAGE_SIZE = 10;
 const VIRTUAL_NO_CREATE = "검색/분석 결과 탭에서는 새로 만들 수 없습니다. 폴더 탭에서 시도하세요";
+/** 전송이 이 시간을 넘겨 계속 실행 중일 때만 진행 창을 띄운다. */
+const TRANSFER_PROGRESS_DELAY_MS = 300;
+/** 전송이 끝날 때까지 큐를 직접 조회하는 간격. */
+const TRANSFER_POLL_MS = 100;
 const VIRTUAL_NO_DEST = "검색/분석 결과 탭은 복사·이동의 대상이 될 수 없습니다. 반대편 패널을 폴더로 바꾸세요";
 /** 상태 저장을 미루는 시간(디바운스). */
 export const SAVE_DELAY_MS = 400;
@@ -296,13 +302,19 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
   };
 
   /** 목록을 다시 읽는다. 커서는 이름으로, 선택은 남아 있는 경로로 유지한다. `focusName`이 있으면 커서를 그 이름에 둔다. */
+  const reloadSeq = new Map<string, number>();
   async function reload(pane: PaneId, tabId: number, focusName?: string) {
     const tab = get().panes[pane].tabs.find((t) => t.id === tabId);
     if (!tab) return;
     if (tab.virtual) return revalidateVirtual(pane, tab);
     const keepName = focusName ?? tab.restoreCursor ?? cursorEntry(tab)?.name;
+    // 조회가 겹치면 나중에 시작한 것만 반영한다(느리게 도착한 옛 목록이 최신 목록을 덮어쓰지 않도록).
+    const key = `${pane}:${tabId}`;
+    const seq = (reloadSeq.get(key) ?? 0) + 1;
+    reloadSeq.set(key, seq);
     try {
       const listed = await backend.listDir(tab.path, get().showHidden);
+      if (reloadSeq.get(key) !== seq) return;
       patchTab(pane, tabId, (t) => {
         const entries = sortEntries(listed, effectiveSort(t, cfg().view.table.columns));
         const idx = keepName ? entries.findIndex((e) => e.name === keepName) : -1;
@@ -316,6 +328,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         };
       });
     } catch (e) {
+      if (reloadSeq.get(key) !== seq) return;
       patchTab(pane, tabId, { entries: [], cursor: 0, selection: new Set(), error: String(e instanceof Error ? e.message : e) });
     }
   }
@@ -452,13 +465,26 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       queue: jobs,
       queueCursor: Math.min(s.queueCursor, Math.max(jobs.length - 1, 0)),
     }));
+    // 진행 창은 작업이 끝나면(실패 제외) 저절로 닫힌다. 실패하면 오류를 볼 수 있게 남긴다.
+    const d = get().dialog;
+    if (d?.kind === "progress") {
+      const job = jobs.find((j) => j.id === d.jobId);
+      if (!job || job.status === "done" || job.status === "aborted") set({ dialog: null });
+    }
     const signature = jobs.map((j) => `${j.id}:${j.status}:${j.completed}`).join("|");
     if (signature !== lastSignature) {
       lastSignature = signature;
       void reloadAll();
     }
   };
-  const unsubscribeQueue = backend.onQueueChanged(applyQueue);
+  let sawQueueEvent = false;
+  const unsubscribeQueue = backend.onQueueChanged((jobs) => {
+    if (!sawQueueEvent) {
+      sawQueueEvent = true;
+      console.info("[twin-deck] 큐 이벤트를 처음 받았습니다");
+    }
+    applyQueue(jobs);
+  });
   // 설정이 바뀌면 컬럼 명세(정렬 표시)나 표시 옵션이 달라질 수 있으니 목록을 다시 정렬한다.
   const unsubscribeConfig = backend.onConfigChanged((loaded) => {
     set({ loaded });
@@ -578,6 +604,46 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       return fail(e);
     }
     await api.navigate(clean);
+  }
+
+  /**
+   * 전송 작업이 끝날 때까지 큐를 직접 조회해서 진행 창을 띄우고, 끝나면 목록을 다시 읽는다.
+   * 큐/디렉터리 이벤트가 웹뷰에 닿는지는 실제 Tauri 런타임에서 검증된 적이 없어서(docs/m1-status.md) 이벤트에 기대지 않는다.
+   */
+  async function trackTransfer(jobId: number, verb: string) {
+    const started = Date.now();
+    for (;;) {
+      await new Promise((r) => setTimeout(r, TRANSFER_POLL_MS));
+      let jobs: JobDto[];
+      try {
+        jobs = await backend.queueJobs();
+      } catch {
+        return;
+      }
+      applyQueue(jobs);
+      const job = jobs.find((j) => j.id === jobId);
+      if (!job || !isActiveJob(job)) {
+        await reloadAll();
+        return;
+      }
+      if (!get().dialog && Date.now() - started >= TRANSFER_PROGRESS_DELAY_MS) {
+        set({ dialog: { kind: "progress", title: `${verb} 중`, jobId } });
+      }
+    }
+  }
+
+  /** 전송 확인 창의 대상 폴더가 쓸 수 없으면 사유를, 괜찮으면 null을 돌려준다. */
+  async function transferDestError(dest: string, targets: EntryDto[]): Promise<string | null> {
+    const clean = dest.length > 1 ? dest.replace(/\/+$/, "") : dest;
+    if (targets.some((t) => t.kind === "dir" && (clean === t.path || clean.startsWith(t.path + "/")))) {
+      return "원본 폴더 안으로는 보낼 수 없습니다";
+    }
+    try {
+      await backend.listDir(clean, true);
+    } catch (e) {
+      return String(e instanceof Error ? e.message : e);
+    }
+    return null;
   }
 
   const api = {
@@ -930,6 +996,12 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     dialogConfirm() {
       const d = get().dialog;
       if (!d) return;
+      if (d.kind === "progress") {
+        // 진행 중에는 Return이 아무 일도 하지 않고, 끝난(실패) 뒤에는 닫는다.
+        const job = get().queue.find((j) => j.id === d.jobId);
+        if (!job || !isActiveJob(job)) set({ dialog: null });
+        return;
+      }
       let result: unknown = true;
       if (d.kind === "name") {
         if (d.value.trim() === "") {
@@ -945,6 +1017,13 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       pending = null;
     },
     dialogCancel() {
+      const d = get().dialog;
+      if (d?.kind === "progress") {
+        const job = get().queue.find((j) => j.id === d.jobId);
+        set({ dialog: null });
+        if (job && isActiveJob(job)) void backend.queueAbort(d.jobId);
+        return;
+      }
       set({ dialog: null });
       pending?.(null);
       pending = null;
@@ -1004,14 +1083,28 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       }
     },
     /** 비활성 패널로 복사/이동 (OP-03, OP-04). 이름이 겹치면 항목마다 물어본 뒤 작업 큐에 넣는다. */
-    async copyOrMove(kind: "copy" | "move") {
+    async copyOrMove(kind: "copy" | "move", confirm = true) {
       const s = get();
       const targets = targetsOf(activeTab(s));
       if (targets.length === 0) return;
       const inactive = activeTab(s, other(s.activePane));
       if (inactive.virtual) return fail(VIRTUAL_NO_DEST);
-      const destDir = inactive.path;
+      const verb = kind === "copy" ? "복사" : "이동";
       set({ notice: null });
+      const title =
+        targets.length === 1
+          ? `"${targets[0].name}" 항목을 ${verb}하시겠습니까?`
+          : `선택한 ${targets.length}개 항목을 ${verb}하시겠습니까?`;
+      let destDir = inactive.path;
+      let error: string | null = null;
+      while (confirm) {
+        const value = await ask<string>({ kind: "name", title, label: "대상 폴더", value: destDir, error, selectStem: false, confirmLabel: "시작" });
+        if (value === null) return;
+        destDir = value.trim();
+        if (destDir.length > 1) destDir = destDir.replace(/\/+$/, "");
+        error = await transferDestError(destDir, targets);
+        if (!error) break;
+      }
       const items: QueueItemDto[] = [];
       for (const t of targets) {
         try {
@@ -1020,7 +1113,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
           if (existing !== null) {
             const choice = await ask<ConflictDto>({
               kind: "conflict",
-              title: kind === "copy" ? "복사: 이름이 겹칩니다" : "이동: 이름이 겹칩니다",
+              title: `${verb}: 이름이 겹칩니다`,
               existing,
               selected: CONFLICT_CHOICES.indexOf("rename"),
             });
@@ -1036,7 +1129,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       patchTab(s.activePane, activeTab(s).id, { selection: new Set() });
       if (items.length > 0) {
         if (kind === "move") api.recheckVirtual(items.map((i) => i.src));
-        await backend.enqueue(kind, items);
+        const jobId = await backend.enqueue(kind, items);
+        void trackTransfer(jobId, verb);
       }
       await reloadAll();
     },
@@ -1052,7 +1146,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       set({ notice: null });
       patchActive({ selection: new Set() });
       api.recheckVirtual(targets.map((t) => t.path));
-      await backend.enqueue("trash", targets.map((t) => ({ src: t.path, destDir: null, policy: "skip" })));
+      const jobId = await backend.enqueue("trash", targets.map((t) => ({ src: t.path, destDir: null, policy: "skip" })));
+      void trackTransfer(jobId, "휴지통으로 이동");
       await reloadAll();
     },
     /** 압축 (OP-11, `core.compress`): 대상 항목을 이 폴더의 ZIP 하나로 묶는다. 원본은 그대로 둔다. */
@@ -1233,7 +1328,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       set({ notice: null });
       patchActive({ selection: new Set() });
       api.recheckVirtual(targets.map((t) => t.path));
-      await backend.enqueue("delete", targets.map((t) => ({ src: t.path, destDir: null, policy: "skip" })));
+      const jobId = await backend.enqueue("delete", targets.map((t) => ({ src: t.path, destDir: null, policy: "skip" })));
+      void trackTransfer(jobId, "삭제");
       await reloadAll();
     },
 

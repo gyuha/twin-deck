@@ -27,7 +27,7 @@ describe("키보드 전용 종단 시나리오", () => {
     expect(screen.getByRole("status", { name: "상태 표시줄" })).toHaveTextContent("선택 2개");
 
     // 3) F5: 비활성 패널(/home/b)로 복사
-    await user.keyboard("{F5}");
+    await user.keyboard("{F5}{Enter}");
     await waitFor(() => expect(backend.exists("/home/b/readme.md")).toBe(true));
     expect(backend.exists("/home/b/notes.md")).toBe(true);
     expect(backend.exists("/home/a/docs/readme.md")).toBe(true); // 원본 유지
@@ -35,7 +35,7 @@ describe("키보드 전용 종단 시나리오", () => {
 
     // 4) F6: readme.md를 이동 → 같은 이름이 있어 충돌 다이얼로그 → R(이름 바꿈)
     expect(cursorName("left")).toBe("readme.md");
-    await user.keyboard("{F6}");
+    await user.keyboard("{F6}{Enter}");
     expect(await screen.findByRole("dialog")).toHaveTextContent("/home/b/readme.md");
     await user.keyboard("r");
     await waitFor(() => expect(backend.exists("/home/b/readme (1).md")).toBe(true));

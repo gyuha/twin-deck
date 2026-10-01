@@ -10,7 +10,7 @@ async function manualCopyAll() {
   const backend = seedBackend();
   backend.queueMode = "manual";
   const r = await renderApp(backend);
-  await r.user.keyboard("{Control>}a{/Control}{F5}"); // 5개 항목을 큐에
+  await r.user.keyboard("{Control>}a{/Control}{F5}{Enter}"); // 5개 항목을 큐에
   await waitFor(() => expect(indicator()).toBeInTheDocument());
   return { ...r, backend };
 }
@@ -30,7 +30,7 @@ describe("Q-02 진행 표시", () => {
 
   it("즉시 실행 모드에서는 남지 않는다", async () => {
     const { user, backend } = await renderApp();
-    await user.keyboard("{ArrowDown}{ArrowDown}{F5}");
+    await user.keyboard("{ArrowDown}{ArrowDown}{F5}{Enter}");
     await waitFor(() => expect(backend.exists("/home/b/a.txt")).toBe(true));
     expect(indicator()).toBeNull();
   });
@@ -82,7 +82,7 @@ describe("Q-03 큐 팝업과 키보드 조작", () => {
   it("방향키/Space로 작업을 고르고 선택한 작업에만 P/D가 적용된다", async () => {
     const { user, backend } = await manualCopyAll();
     await user.keyboard("{Escape}"); // 선택 해제 후 두 번째 작업
-    await user.keyboard("{F5}"); // 커서 항목 하나를 또 큐에
+    await user.keyboard("{F5}{Enter}"); // 커서 항목 하나를 또 큐에
     await waitFor(() => expect(backend.queueJobs().then((j) => j.length)).resolves.toBe(2));
     await user.keyboard("=");
     await screen.findByRole("dialog", { name: "작업 큐" });
@@ -114,7 +114,7 @@ describe("실패 요약", () => {
     const backend = seedBackend();
     backend.queueMode = "manual";
     const { user } = await renderApp(backend);
-    await user.keyboard("{ArrowDown}{ArrowDown}{F5}"); // a.txt
+    await user.keyboard("{ArrowDown}{ArrowDown}{F5}{Enter}"); // a.txt
     await waitFor(() => expect(indicator()).toBeInTheDocument());
     await backend.deletePermanent("/home/a/a.txt"); // 실행 전에 원본이 사라짐
     await advance(backend);
