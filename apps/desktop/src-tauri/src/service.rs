@@ -208,6 +208,9 @@ pub struct JobDto {
     pub status: JobStatusDto,
     pub total: u32,
     pub completed: u32,
+    /// 복사/이동의 전체 파일 수. 집계 전이거나 해당 없는 작업이면 `None`.
+    pub files_total: Option<u32>,
+    pub files_done: u32,
     pub current: Option<String>,
     pub errors: Vec<JobErrorDto>,
 }
@@ -249,6 +252,8 @@ impl From<&JobInfo> for JobDto {
             },
             total: j.total as u32,
             completed: j.completed as u32,
+            files_total: j.files_total.map(|n| n as u32),
+            files_done: j.files_done as u32,
             current: j.current.clone(),
             errors: j
                 .errors
@@ -359,6 +364,16 @@ pub type ServiceResult<T> = Result<T, String>;
 
 fn vp(p: &str) -> VfsPath {
     VfsPath::new(PathBuf::from(p))
+}
+
+/// `rx`로 이벤트가 몰려 와도 `interval`마다 한 번만 `on_batch`를 부른다. 이벤트가 오면 `interval`만큼 모은 뒤
+/// 그 사이 쌓인 것을 비우고 부르므로, 마지막 이벤트 뒤에는 반드시 한 번 더 불린다. 보내는 쪽이 닫히면 끝난다.
+pub fn coalesce<T>(rx: &Receiver<T>, interval: Duration, mut on_batch: impl FnMut()) {
+    while rx.recv().is_ok() {
+        std::thread::sleep(interval);
+        while rx.try_recv().is_ok() {}
+        on_batch();
+    }
 }
 
 /// 서비스가 밖으로 내보내는 수신기들.
@@ -780,6 +795,53 @@ mod tests {
         let renamed = svc.rename(&a, "b.txt").unwrap();
         assert!(renamed.ends_with("root/b.txt"));
         assert!(svc.rename(&renamed, "x/y").is_err());
+    }
+
+    #[test]
+    fn queue_copies_folder_tree_and_reports_file_progress() {
+        let (_t, svc, _ch, root) = setup();
+        let dest = format!("{root}/dest");
+        svc.mkdir(&dest).unwrap();
+        let src = format!("{root}/[이력서]/하위");
+        std::fs::create_dir_all(&src).unwrap();
+        std::fs::write(format!("{root}/[이력서]/a.pdf"), "a").unwrap();
+        std::fs::write(format!("{src}/b.pdf"), "b").unwrap();
+        std::fs::write(format!("{src}/.DS_Store"), "x").unwrap();
+        let id = svc.enqueue(
+            JobKindDto::Copy,
+            vec![item(
+                &format!("{root}/[이력서]"),
+                Some(&dest),
+                ConflictDto::Skip,
+            )],
+        );
+        let job = wait_finished(&svc, id);
+        assert_eq!(job.status, JobStatusDto::Done);
+        assert_eq!((job.files_total, job.files_done), (Some(3), 3));
+        assert!(Path::new(&format!("{dest}/[이력서]/하위/b.pdf")).exists());
+    }
+
+    #[test]
+    fn coalesce_batches_a_burst_and_flushes_after_the_last_event() {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let ended = std::sync::Arc::new(Mutex::new(None::<Instant>));
+        let e2 = ended.clone();
+        let sender = std::thread::spawn(move || {
+            for i in 0..300 {
+                tx.send(i).unwrap();
+                std::thread::sleep(Duration::from_millis(1));
+            }
+            *e2.lock().unwrap() = Some(Instant::now());
+        });
+        let mut batches = 0;
+        let mut last_batch = None;
+        coalesce(&rx, Duration::from_millis(50), || {
+            batches += 1;
+            last_batch = Some(Instant::now());
+        });
+        sender.join().unwrap();
+        assert!((1..30).contains(&batches), "알림이 {batches}번 나갔다");
+        assert!(last_batch.unwrap() >= ended.lock().unwrap().unwrap());
     }
 
     #[test]

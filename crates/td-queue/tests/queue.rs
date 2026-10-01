@@ -338,3 +338,102 @@ fn queue_runs_compress_and_extract_jobs() {
         "실패한 추출은 폴더를 남기지 않는다"
     );
 }
+
+fn tree(root: &VfsPath) {
+    let sub = root.as_path().join("tree/sub");
+    std::fs::create_dir_all(&sub).unwrap();
+    std::fs::write(root.as_path().join("tree/a.txt"), "a").unwrap();
+    std::fs::write(sub.join("b.txt"), "b").unwrap();
+    std::fs::write(sub.join("c.txt"), "c").unwrap();
+}
+
+#[test]
+fn file_progress_counts_files_in_copied_tree() {
+    let d = dirs(&[]);
+    tree(&d.src);
+    let (q, rx) = Queue::new(ops());
+    let id = q.enqueue(copy_spec(&d, &["tree"]));
+    wait_for(&rx, |e| matches!(e, QueueEvent::Finished { .. }));
+    let info = q.job(id).unwrap();
+    assert_eq!(info.files_total, Some(3));
+    assert_eq!(info.files_done, 3);
+    assert_eq!(info.completed, 1);
+}
+
+#[test]
+fn file_progress_reports_each_file_as_current() {
+    let d = dirs(&[]);
+    tree(&d.src);
+    let (q, rx) = Queue::new(ops());
+    q.enqueue(copy_spec(&d, &["tree"]));
+    let mut seen = Vec::new();
+    wait_for(&rx, |e| {
+        if let QueueEvent::Progress { path, .. } = e {
+            seen.push(path.clone());
+        }
+        matches!(e, QueueEvent::Finished { .. })
+    });
+    for f in ["a.txt", "b.txt", "c.txt"] {
+        assert!(seen.iter().any(|p| p.ends_with(f)), "{f} 진행 알림 없음");
+    }
+}
+
+#[test]
+fn file_progress_counts_moved_tree() {
+    let d = dirs(&[]);
+    tree(&d.src);
+    let (q, rx) = Queue::new(ops());
+    let mut spec = copy_spec(&d, &["tree"]);
+    spec.kind = JobKind::Move;
+    let id = q.enqueue(spec);
+    wait_for(&rx, |e| matches!(e, QueueEvent::Finished { .. }));
+    let info = q.job(id).unwrap();
+    assert_eq!(info.files_total, Some(3));
+    assert_eq!(info.files_done, 3);
+}
+
+#[test]
+fn file_progress_is_none_for_other_kinds() {
+    let d = dirs(&["x"]);
+    let (q, rx) = Queue::new(ops());
+    let id = q.enqueue(JobSpec {
+        kind: JobKind::Duplicate,
+        items: vec![Item::new(d.src.join("x"), None, ConflictPolicy::Skip)],
+    });
+    wait_for(&rx, |e| matches!(e, QueueEvent::Finished { .. }));
+    assert_eq!(q.job(id).unwrap().files_total, None);
+}
+
+#[test]
+fn file_progress_counts_deleted_tree() {
+    let d = dirs(&[]);
+    tree(&d.src);
+    let (q, rx) = Queue::new(ops());
+    let id = q.enqueue(JobSpec {
+        kind: JobKind::Delete,
+        items: vec![Item::new(d.src.join("tree"), None, ConflictPolicy::Skip)],
+    });
+    wait_for(&rx, |e| matches!(e, QueueEvent::Finished { .. }));
+    let info = q.job(id).unwrap();
+    assert_eq!(info.files_total, Some(3));
+    assert_eq!(info.files_done, 3);
+    assert_eq!(info.status, JobStatus::Done);
+    assert!(!d.src.join("tree").as_path().exists());
+}
+
+#[test]
+fn file_progress_counts_trashed_items() {
+    let d = dirs(&["x", "y"]);
+    let (q, rx) = Queue::new(ops());
+    let id = q.enqueue(JobSpec {
+        kind: JobKind::Trash,
+        items: ["x", "y"]
+            .iter()
+            .map(|f| Item::new(d.src.join(f), None, ConflictPolicy::Skip))
+            .collect(),
+    });
+    wait_for(&rx, |e| matches!(e, QueueEvent::Finished { .. }));
+    let info = q.job(id).unwrap();
+    assert_eq!(info.files_total, Some(2));
+    assert_eq!(info.files_done, 2);
+}
