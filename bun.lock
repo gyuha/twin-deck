@@ -11,6 +11,7 @@
         "@tauri-apps/api": "^2.1.0",
         "@twin-deck/actions": "workspace:*",
         "@twin-deck/keybinds": "workspace:*",
+        "@twin-deck/material-icons": "workspace:*",
         "@twin-deck/ts-client": "workspace:*",
         "react": "19.1.0",
         "react-dom": "19.1.0",
@@ -48,6 +49,15 @@
       "name": "@twin-deck/keybinds",
       "version": "0.1.0",
       "devDependencies": {
+        "typescript": "^5.6.0",
+        "vitest": "^2.1.0",
+      },
+    },
+    "packages/material-icons": {
+      "name": "@twin-deck/material-icons",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@types/node": "^26.6.3",
         "typescript": "^5.6.0",
         "vitest": "^2.1.0",
       },
@@ -301,6 +311,8 @@
     "@twin-deck/desktop": ["@twin-deck/desktop@workspace:apps/desktop"],
 
     "@twin-deck/keybinds": ["@twin-deck/keybinds@workspace:packages/keybinds"],
+
+    "@twin-deck/material-icons": ["@twin-deck/material-icons@workspace:packages/material-icons"],
 
     "@twin-deck/ts-client": ["@twin-deck/ts-client@workspace:packages/ts-client"],
 
