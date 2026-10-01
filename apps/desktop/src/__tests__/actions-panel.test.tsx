@@ -55,6 +55,8 @@ describe("ACT-01 Actions Panel", () => {
     await r.user.keyboard("{ArrowDown}{ArrowDown}"); // a.txt
     await open(r);
     await r.user.keyboard("core.copy{Enter}");
+    await screen.findByRole("dialog", { name: /복사/ }); // 전송 확인 창
+    await r.user.keyboard("{Enter}");
     await waitFor(() => expect(b.exists("/home/b/a.txt")).toBe(true));
     expect(screen.queryByRole("dialog", { name: "Actions Panel" })).toBeNull();
     expect(cursorName("left")).toBe("a.txt");

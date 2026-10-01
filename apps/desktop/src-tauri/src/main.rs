@@ -10,7 +10,8 @@ use commands::{
     specta_builder, AppLaunch, AppService, AppVolumes, ConfigChanged, ConfigState, DirChanged,
     QueueChanged, SearchChunk, SearchDone, UsageUpdate,
 };
-use service::SearchMsg;
+use service::{coalesce, SearchMsg};
+use std::time::Duration;
 use tauri::Manager;
 
 /// 설정의 ZIP 추가 확장자를 서비스에 반영한다 (ARC-01).
@@ -85,11 +86,11 @@ fn main() {
             let handle = app.handle().clone();
             std::thread::spawn(move || {
                 // 큐 이벤트가 오면 최신 스냅샷을 UI로 보낸다.
-                while queue_events.recv().is_ok() {
-                    while queue_events.try_recv().is_ok() {}
+                // 파일이 많으면 이벤트가 초당 수천 개 나오므로, 웹뷰가 밀리지 않게 합쳐서 보낸다.
+                coalesce(&queue_events, Duration::from_millis(100), || {
                     let jobs = handle.state::<AppService>().queue_jobs();
                     let _ = QueueChanged { jobs }.emit(&handle);
-                }
+                });
             });
             let handle = app.handle().clone();
             std::thread::spawn(move || {

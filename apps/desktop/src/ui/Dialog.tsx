@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useApp, useAppStore } from "../state/context";
-import { CONFLICT_CHOICES } from "../state/store";
+import { CONFLICT_CHOICES, isActiveJob } from "../state/store";
 
 const CHOICE_LABEL = { overwrite: "덮어쓰기 (O)", skip: "건너뛰기 (S)", rename: "이름 바꿔 복사 (R)" } as const;
 
@@ -10,6 +10,8 @@ export function Dialog() {
   const { api } = useAppStore();
   const input = useRef<HTMLInputElement>(null);
   const kind = dialog?.kind;
+  const jobId = dialog?.kind === "progress" ? dialog.jobId : null;
+  const job = useApp((s) => (jobId === null ? undefined : s.queue.find((j) => j.id === jobId)));
   const selectStem = dialog?.kind === "name" && dialog.selectStem;
 
   // 열릴 때 첫 입력에 포커스, 이름 변경이면 확장자를 뺀 부분을 선택한다.
@@ -50,6 +52,42 @@ export function Dialog() {
                 {dialog.error}
               </p>
             )}
+            {dialog.confirmLabel && (
+              <div className="mt-3 flex justify-end gap-2">
+                <button type="button" className="rounded border border-neutral-400 px-3 py-0.5" onClick={() => api.dialogCancel()}>
+                  취소
+                </button>
+                <button type="button" className="rounded bg-blue-600 px-3 py-0.5 text-white" onClick={() => api.dialogConfirm()}>
+                  {dialog.confirmLabel}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+        {dialog.kind === "progress" && job && (
+          <>
+            <div
+              role="progressbar"
+              aria-label="전송 진행"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={job.filesTotal ? Math.round((job.filesDone / job.filesTotal) * 100) : undefined}
+              className="h-2 w-full overflow-hidden rounded bg-neutral-200"
+            >
+              <div className="h-full bg-blue-600" style={{ width: `${job.filesTotal ? (job.filesDone / job.filesTotal) * 100 : 0}%` }} />
+            </div>
+            <p className="mt-1">{job.filesTotal === null ? "집계 중…" : `${job.filesDone}/${job.filesTotal}개`}</p>
+            {job.current && isActiveJob(job) && <p className="truncate text-xs text-neutral-600">{job.current}</p>}
+            {job.errors.map((e) => (
+              <p key={e.path} role="alert" className="text-xs text-red-700">
+                {e.path}: {e.message}
+              </p>
+            ))}
+            <div className="mt-3 flex justify-end">
+              <button type="button" className="rounded border border-neutral-400 px-3 py-0.5" onClick={() => (isActiveJob(job) ? api.dialogCancel() : api.dialogConfirm())}>
+                {isActiveJob(job) ? "중단" : "닫기"}
+              </button>
+            </div>
           </>
         )}
         {(dialog.kind === "confirm" || dialog.kind === "info") && (
@@ -78,7 +116,11 @@ export function Dialog() {
             </div>
           </>
         )}
-        <p className="mt-3 text-xs text-neutral-500">Return 확인 · Esc 취소{dialog.kind === "name" && dialog.goto ? " · Tab 완성" : ""}</p>
+        <p className="mt-3 text-xs text-neutral-500">
+          {dialog.kind === "progress"
+            ? "Esc 중단"
+            : `Return 확인 · Esc 취소${dialog.kind === "name" && dialog.goto ? " · Tab 완성" : ""}`}
+        </p>
       </div>
     </div>
   );

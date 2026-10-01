@@ -151,7 +151,7 @@ describe("가상 탭의 항목도 일반 항목처럼 다룬다", () => {
   it("선택해서 다른 패널로 복사하면 원래 위치의 파일이 복사되고 결과는 그대로다", async () => {
     const { user, backend } = await lookupReport();
     expect(entryNames("left")).toEqual(["annual-report.txt", "report-2026.md", "report.txt"]);
-    await user.keyboard("{Insert}{Insert}{F5}"); // annual-report.txt, report-2026.md 선택 후 복사
+    await user.keyboard("{Insert}{Insert}{F5}{Enter}"); // annual-report.txt, report-2026.md 선택 후 복사
     await waitFor(() => expect(backend.exists("/home/b/annual-report.txt")).toBe(true));
     expect(backend.exists("/home/b/report-2026.md")).toBe(true);
     expect(backend.exists("/home/a/docs/deep/annual-report.txt")).toBe(true); // 복사이므로 원본이 남는다
@@ -160,7 +160,7 @@ describe("가상 탭의 항목도 일반 항목처럼 다룬다", () => {
 
   it("이동하면 원래 위치에서 사라지고 결과에서도 빠진다", async () => {
     const { user, backend } = await lookupReport();
-    await user.keyboard("{ArrowDown}{F6}"); // report-2026.md → 오른쪽
+    await user.keyboard("{ArrowDown}{F6}{Enter}"); // report-2026.md → 오른쪽
     await waitFor(() => expect(backend.exists("/home/b/report-2026.md")).toBe(true));
     expect(backend.exists("/home/a/docs/report-2026.md")).toBe(false);
     await waitFor(() => expect(entryNames("left")).toEqual(["annual-report.txt", "report.txt"]));

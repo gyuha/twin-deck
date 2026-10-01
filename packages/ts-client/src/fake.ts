@@ -510,7 +510,11 @@ export class FakeBackend implements Backend {
     return [...this.jobs.values()].map((j) => ({ ...j.dto, errors: [...j.dto.errors] }));
   }
 
+  /** 테스트용: false면 큐 변경 알림을 보내지 않는다(실제 앱에서 이벤트가 오지 않는 상황). */
+  queueEvents = true;
+
   private notifyQueue() {
+    if (!this.queueEvents) return;
     const snap = this.snapshot();
     this.queueListeners.forEach((l) => l(snap));
   }
@@ -645,6 +649,7 @@ export class FakeBackend implements Backend {
       job.dto.errors.push({ path: item.src, message: e instanceof Error ? e.message : String(e) });
     }
     job.dto.completed += 1;
+    job.dto.filesDone += 1;
     if (job.dto.completed >= job.dto.total) this.finish(job);
     this.notifyQueue();
     return true;
@@ -654,7 +659,7 @@ export class FakeBackend implements Backend {
     const id = this.nextJobId++;
     const job: FakeJob = {
       items,
-      dto: { id, kind, status: "queued", total: items.length, completed: 0, current: null, errors: [] },
+      dto: { id, kind, status: "queued", total: items.length, completed: 0, filesTotal: ["copy", "move", "delete", "trash"].includes(kind) ? items.length : null, filesDone: 0, current: null, errors: [] },
     };
     this.jobs.set(id, job);
     this.notifyQueue();
@@ -668,6 +673,7 @@ export class FakeBackend implements Backend {
           job.dto.errors.push({ path: item.src, message: e instanceof Error ? e.message : String(e) });
         }
         job.dto.completed += 1;
+        job.dto.filesDone += 1;
       }
       this.finish(job);
       this.notifyQueue();

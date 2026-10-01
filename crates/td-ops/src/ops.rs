@@ -22,6 +22,8 @@ pub trait Control {
     fn on_item(&self, path: &VfsPath);
     /// true이면 작업을 멈추고 `OpsError::Aborted`를 돌려준다.
     fn should_stop(&self) -> bool;
+    /// 파일(또는 심볼릭 링크) 하나를 다 처리한 직후에 호출된다.
+    fn on_file_done(&self) {}
 }
 
 /// 진행 알림도 중단도 없는 기본 제어.
@@ -227,6 +229,7 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
         match entry.kind {
             EntryKind::File => {
                 self.vfs.copy_file(&entry.path, dest)?;
+                ctl.on_file_done();
             }
             EntryKind::Symlink => {
                 let target = self.vfs.read_link(&entry.path)?;
@@ -234,6 +237,7 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
                     .map(|m| m.is_dir())
                     .unwrap_or(false);
                 self.vfs.symlink(&target, dest, is_dir)?;
+                ctl.on_file_done();
             }
             EntryKind::Dir => {
                 self.vfs.mkdir(dest)?;
@@ -244,6 +248,24 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
             }
         }
         Ok(())
+    }
+
+    /// `src` 아래의 파일 수(심볼릭 링크 포함, 폴더는 세지 않는다). 진행률의 분모로 쓴다.
+    pub fn count_files(&self, src: &VfsPath) -> Result<usize> {
+        let entry = self.vfs.stat(src)?;
+        self.count_entry(&entry)
+    }
+
+    fn count_entry(&self, entry: &Entry) -> Result<usize> {
+        if entry.kind != EntryKind::Dir {
+            return Ok(1);
+        }
+        let opts = ListOptions { show_hidden: true };
+        let mut n = 0;
+        for child in self.vfs.list(&entry.path, &opts)? {
+            n += self.count_entry(&child)?;
+        }
+        Ok(n)
     }
 
     /// 복사 (OP-03). 심볼릭 링크는 링크로 복사한다.
@@ -455,5 +477,45 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
     /// 영구 삭제 (OP-07). 확인은 UI 책임이다.
     pub fn delete(&self, path: &VfsPath) -> Result<()> {
         self.remove_any(path)
+    }
+
+    /// 영구 삭제의 진행 단위 수. 휴지통을 쓸 수 있는 곳(로컬)은 파일 수, 아카이브 안은 한 번에 지우므로 1이다.
+    pub fn delete_units(&self, path: &VfsPath) -> Result<usize> {
+        if self.vfs.can_trash(path) {
+            self.count_files(path)
+        } else {
+            Ok(1)
+        }
+    }
+
+    /// `delete`와 같지만 파일마다 `ctl`로 진행을 알리고 중단 요청을 확인한다.
+    /// 아카이브 안은 파일마다 압축 파일을 다시 쓰게 되므로 순회하지 않고 한 번에 지운다.
+    pub fn delete_with(&self, path: &VfsPath, ctl: &dyn Control) -> Result<()> {
+        if !self.vfs.can_trash(path) {
+            ctl.on_item(path);
+            self.remove_any(path)?;
+            ctl.on_file_done();
+            return Ok(());
+        }
+        let entry = self.vfs.stat(path)?;
+        self.delete_entry(&entry, ctl)
+    }
+
+    fn delete_entry(&self, entry: &Entry, ctl: &dyn Control) -> Result<()> {
+        if ctl.should_stop() {
+            return Err(OpsError::Aborted);
+        }
+        ctl.on_item(&entry.path);
+        if entry.kind == EntryKind::Dir {
+            let opts = ListOptions { show_hidden: true };
+            for child in self.vfs.list(&entry.path, &opts)? {
+                self.delete_entry(&child, ctl)?;
+            }
+            self.vfs.remove_dir_all(&entry.path)?;
+        } else {
+            self.vfs.remove_file(&entry.path)?;
+            ctl.on_file_done();
+        }
+        Ok(())
     }
 }

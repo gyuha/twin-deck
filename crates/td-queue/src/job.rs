@@ -76,6 +76,10 @@ pub struct JobInfo {
     pub total: usize,
     /// 처리가 끝난(성공 또는 실패) 항목 수.
     pub completed: usize,
+    /// 복사/이동에서 처리할 전체 파일 수. 집계 전이거나 해당 없는 작업이면 `None`.
+    pub files_total: Option<usize>,
+    /// 처리가 끝난 파일 수.
+    pub files_done: usize,
     /// 지금 처리 중인 경로.
     pub current: Option<String>,
     /// 실패한 항목: (경로, 오류 문자열)

@@ -86,6 +86,11 @@ impl Control for JobControl<'_> {
             path: p,
         });
     }
+    fn on_file_done(&self) {
+        if let Some(j) = self.shared.state.lock().unwrap().jobs.get_mut(&self.job) {
+            j.info.files_done += 1;
+        }
+    }
     fn should_stop(&self) -> bool {
         self.shared
             .state
@@ -144,6 +149,8 @@ impl Queue {
             status: JobStatus::Queued,
             total: spec.items.len(),
             completed: 0,
+            files_total: None,
+            files_done: 0,
             current: None,
             errors: Vec::new(),
         };
@@ -289,6 +296,29 @@ where
     };
     shared.emit(QueueEvent::Started(id));
 
+    // 복사/이동/삭제는 먼저 항목별 진행 단위(파일) 수를 세어 분모를 정한다. 세지 못한 항목은 0으로 친다.
+    // 휴지통은 OS 호출 한 번이 한 항목이라 항목 수가 곧 단위 수다.
+    let counts: Option<Vec<usize>> = match kind {
+        JobKind::Copy | JobKind::Move => Some(
+            items
+                .iter()
+                .map(|i| ops.count_files(&i.src).unwrap_or(0))
+                .collect(),
+        ),
+        JobKind::Delete => Some(
+            items
+                .iter()
+                .map(|i| ops.delete_units(&i.src).unwrap_or(0))
+                .collect(),
+        ),
+        JobKind::Trash => Some(vec![1; items.len()]),
+        _ => None,
+    };
+    if let Some(c) = &counts {
+        let mut st = shared.state.lock().unwrap();
+        st.jobs.get_mut(&id).unwrap().info.files_total = Some(c.iter().sum());
+    }
+
     for (index, item) in items.iter().enumerate() {
         if let Some(h) = hook {
             h(id, index);
@@ -366,9 +396,14 @@ where
                 )
                 .map(|_| ()),
             JobKind::Trash => ops.trash(&item.src),
-            JobKind::Delete => ops.delete(&item.src),
+            JobKind::Delete => ops.delete_with(&item.src, &ctl),
         };
 
+        if let Some(c) = &counts {
+            // 이름 바꾸기로 끝난 이동이나 건너뛴/실패한 항목도 분모와 맞도록 누적 값으로 맞춘다.
+            let mut st = shared.state.lock().unwrap();
+            st.jobs.get_mut(&id).unwrap().info.files_done = c[..=index].iter().sum();
+        }
         match result {
             Ok(()) => {
                 bump(shared, id, None);

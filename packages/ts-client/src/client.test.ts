@@ -67,7 +67,7 @@ describe("FakeBackend는 Backend 포트를 만족하고 Rust 규칙을 따른다
       { src: "/a/none", destDir: "/b", policy: "skip" },
     ]);
     const [job] = await b.queueJobs();
-    expect(job).toMatchObject({ id, status: "failed", total: 2, completed: 2 });
+    expect(job).toMatchObject({ id, status: "failed", total: 2, completed: 2, filesTotal: 2, filesDone: 2 });
     expect(job.errors).toHaveLength(1);
     expect(b.exists("/b/x.txt")).toBe(true);
     await b.queueClearFinished();

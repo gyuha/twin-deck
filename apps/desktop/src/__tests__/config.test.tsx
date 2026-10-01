@@ -48,7 +48,7 @@ describe("설정 경고 표시", () => {
     });
     const { user } = await renderApp(b);
     expect(await screen.findByRole("button", { name: /설정 경고 2개/ })).toBeInTheDocument();
-    await user.keyboard("{ArrowDown}{ArrowDown}{F5}");
+    await user.keyboard("{ArrowDown}{ArrowDown}{F5}{Enter}");
     await waitFor(() => expect(exists(b, "/home/b/a.txt")).toBe(true));
   });
 
@@ -69,14 +69,14 @@ describe("CFG-02 키바인딩 설정", () => {
     await new Promise((r) => setTimeout(r, 50));
     expect(exists(b, "/home/b/a.txt")).toBe(false);
     expect((await b.queueJobs()).length).toBe(0);
-    await user.keyboard("{F6}"); // 다른 키는 그대로
+    await user.keyboard("{F6}{Enter}"); // 다른 키는 그대로
     await waitFor(() => expect(exists(b, "/home/b/a.txt")).toBe(true));
   });
 
   it("다른 액션으로 다시 바인딩한다", async () => {
     const b = withConfig((l) => l.bindings.push(bind("F5", "core.move")));
     const { user } = await renderApp(b);
-    await user.keyboard("{ArrowDown}{ArrowDown}{F5}");
+    await user.keyboard("{ArrowDown}{ArrowDown}{F5}{Enter}");
     await waitFor(() => expect(exists(b, "/home/b/a.txt")).toBe(true));
     expect(exists(b, "/home/a/a.txt")).toBe(false); // 복사가 아니라 이동
   });
@@ -89,7 +89,7 @@ describe("CFG-02 키바인딩 설정", () => {
     await new Promise((r) => setTimeout(r, 50));
     expect(exists(b, "/home/b/a.txt")).toBe(false);
     await act(async () => b.setConfig((l) => (l.bindings = [])));
-    await user.keyboard("{F5}");
+    await user.keyboard("{F5}{Enter}");
     await waitFor(() => expect(exists(b, "/home/b/a.txt")).toBe(true));
   });
 });

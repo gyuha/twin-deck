@@ -64,6 +64,7 @@ describe("PANE-07 Action Bar", () => {
     expect(button(/복사/)).toHaveAttribute("aria-disabled", "false");
     await user.keyboard("{ArrowDown}{ArrowDown}");
     await user.click(button(/복사/));
+    await user.keyboard("{Enter}");
     await waitFor(() => expect(b.exists("/home/b/a.txt")).toBe(true));
   });
 

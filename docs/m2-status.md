@@ -21,7 +21,7 @@
 | SEL-04 | done | crates/td-vfs/tests/info_glob.rs | glob 매처는 Rust가 원본, TS는 같은 26개 케이스 표로 검증(packages/ts-client/src/client.test.ts). UI: file-actions.test.tsx. Marta의 패턴 문법은 확인하지 못함 |
 | OP-08 | done | crates/td-ops/tests/ops.rs | `duplicate_suffix`. 접미사 규칙은 자체 정의(`a copy.txt`). UI: file-actions.test.tsx |
 | OP-09 | done | apps/desktop/src/__tests__/file-actions.test.tsx | **외부 편집기 실행은 fake만 검증**. 명령 조립은 crates/td-launch/tests/launch.rs (`launch_editor_args`) |
-| OP-10 | done | apps/desktop/src/__tests__/file-actions.test.tsx | `copy.to_inactive`/`move.to_inactive`. F5/F6도 대상 경로 확인 대화상자가 없어서 같은 동작이다(docs/07 §6의 수정 가능한 확인 대화상자는 미구현) |
+| OP-10 | done | apps/desktop/src/__tests__/file-actions.test.tsx | `copy.to_inactive`/`move.to_inactive`는 확인 창 없이 바로 비활성 패널로 보낸다. F5/F6(`core.copy`/`core.move`)은 대상 폴더를 고칠 수 있는 전송 확인 창을 거친다(`transfer.test.tsx`) |
 | OP-13 | done | apps/desktop/src/__tests__/config.test.tsx | 삭제/휴지통 확인 on/off |
 | OP-14 | done | crates/td-vfs/tests/info_glob.rs | `file_info_fields`. UI: file-actions.test.tsx. 폴더는 항목 수만(재귀 크기 없음) |
 | OP-15 | done | apps/desktop/src/__tests__/file-actions.test.tsx | **클립보드 쓰기는 fake만 검증**(Tauri 플러그인 호출은 실제로 실행하지 않음) |

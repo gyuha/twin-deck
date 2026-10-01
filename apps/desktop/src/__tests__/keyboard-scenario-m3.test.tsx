@@ -21,7 +21,7 @@ describe("M3 키보드 종단 시나리오", () => {
     expect(entryNames("left")).toEqual(["inner", "data.bin"]);
     await user.keyboard("{Enter}");
     await waitFor(() => expect(entryNames("left")).toEqual(["report-in-zip.txt"]));
-    await user.keyboard("{F5}");
+    await user.keyboard("{F5}{Enter}");
     await waitFor(() => expect(backend.exists("/home/b/report-in-zip.txt")).toBe(true));
     expect(backend.read("/home/b/report-in-zip.txt")).toBe("zzzzzzz");
     expect(backend.exists("/home/a/pack.zip!/inner/report-in-zip.txt")).toBe(true); // 복사이므로 원본이 남는다
@@ -29,7 +29,7 @@ describe("M3 키보드 종단 시나리오", () => {
     // 2) 반대편의 로컬 파일을 zip 안으로 복사한다
     await user.keyboard("{Tab}");
     await waitFor(() => expect(entryNames("right")).toEqual(["report-in-zip.txt", "x.txt"]));
-    await user.keyboard("{ArrowDown}{F5}"); // x.txt → 왼쪽(zip 안 inner)
+    await user.keyboard("{ArrowDown}{F5}{Enter}"); // x.txt → 왼쪽(zip 안 inner)
     await waitFor(() => expect(backend.exists("/home/a/pack.zip!/inner/x.txt")).toBe(true));
     expect(backend.read("/home/a/pack.zip!/inner/x.txt")).toBe("xxx");
     await user.keyboard("{Tab}");
@@ -45,7 +45,7 @@ describe("M3 키보드 종단 시나리오", () => {
     await waitDone();
     expect(tabTitles()).toEqual(["a", "Look Up: report"]);
     expect(entryNames("left")).toEqual(["annual-report.txt", "report-2026.md", "report.txt"]);
-    await user.keyboard("{F5}"); // 커서: annual-report.txt
+    await user.keyboard("{F5}{Enter}"); // 커서: annual-report.txt
     await waitFor(() => expect(backend.exists("/home/b/annual-report.txt")).toBe(true));
     expect(backend.exists("/home/a/docs/deep/annual-report.txt")).toBe(true);
     await user.keyboard("{Control>}w{/Control}"); // 결과 탭을 닫으면 결과를 버린다

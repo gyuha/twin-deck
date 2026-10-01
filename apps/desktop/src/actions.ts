@@ -56,9 +56,9 @@ export function fileOpHandlers({ api }: AppStore): Partial<ActionHandlers> {
   return {
     "core.copy": () => api.copyOrMove("copy"),
     "core.move": () => api.copyOrMove("move"),
-    // 이 앱의 F5/F6도 대상 경로 대화상자 없이 비활성 패널로 보낸다(docs/07 §6의 확인 대화상자는 아직 없다).
-    "core.copy.to_inactive": () => api.copyOrMove("copy"),
-    "core.move.to_inactive": () => api.copyOrMove("move"),
+    // F5/F6(`core.copy`/`core.move`)은 전송 확인 창을 거치고, `*.to_inactive`는 창 없이 바로 비활성 패널로 보낸다.
+    "core.copy.to_inactive": () => api.copyOrMove("copy", false),
+    "core.move.to_inactive": () => api.copyOrMove("move", false),
     "core.duplicate": () => api.duplicateTargets(),
     "core.compress": () => api.compress(),
     "core.extract": () => api.extract(false),

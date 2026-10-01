@@ -162,12 +162,12 @@ describe("아카이브 안 파일 작업", () => {
     const { user } = await renderApp(backend);
     await user.keyboard(`${TO_PACK}{Enter}`);
     await waitFor(() => expect(entryNames("left")).toContain("top.txt"));
-    await user.keyboard("{ArrowDown}{ArrowDown}{F5}"); // top.txt → 오른쪽(/home/b)
+    await user.keyboard("{ArrowDown}{ArrowDown}{F5}{Enter}"); // top.txt → 오른쪽(/home/b)
     await waitFor(() => expect(backend.exists("/home/b/top.txt")).toBe(true));
     expect(backend.exists("/home/a/pack.zip!/top.txt")).toBe(true); // 복사이므로 원본이 남는다
 
     await user.keyboard("{Tab}"); // 오른쪽 패널: x.txt, top.txt
-    await user.keyboard("{F5}"); // x.txt → 왼쪽(아카이브 안)
+    await user.keyboard("{F5}{Enter}"); // x.txt → 왼쪽(아카이브 안)
     await waitFor(() => expect(backend.exists("/home/a/pack.zip!/x.txt")).toBe(true));
   });
 
