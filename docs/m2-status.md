@@ -32,7 +32,7 @@
 | VIEW-01 | done | apps/desktop/src/__tests__/preview.test.tsx | 텍스트·이미지. Space는 미리보기로 재배정(선택 토글은 Insert/Shift+Space). Rust: crates/td-vfs/tests/preview.rs |
 | CFG-02 | done | apps/desktop/src/__tests__/config.test.tsx | 수정자, 인수, `none` 해제, OS 섹션. 병합 로직은 packages/actions/src/actions.test.ts, 파싱은 crates/td-config/tests/config.rs |
 | CFG-03 | done | apps/desktop/src/__tests__/theme.test.tsx | 라이트/다크/system만(5종 재현은 P3). 색 대비(WCAG AA)는 검증하지 않음 |
-| CFG-05 | done | apps/desktop/src/__tests__/lib.test.ts | 상대 날짜, 날짜/시간 strftime 부분집합, 크기 표기. 아이콘 크기(`icon_size`)는 설정만 받고 아이콘을 그리지 않는다 |
+| CFG-05 | done | apps/desktop/src/__tests__/lib.test.ts | 상대 날짜, 날짜/시간 strftime 부분집합, 크기 표기. 아이콘 크기(`icon_size`)는 M2 시점에는 설정만 받았고, 이후 파일 목록 행의 아이콘 크기로 쓰인다(Material Icon Theme, `apps/desktop/src/__tests__/file-icons.test.tsx`) |
 | CFG-06 | done | crates/td-config/tests/config.rs | `columns_spec_parse`. `<`=오름차순, `>`=내림차순 해석은 가정 `[낮음]`. `added`는 값을 얻을 수 없어 "—" |
 | CFG-07 | done | apps/desktop/src/__tests__/columns-sort.test.tsx | Table, 다중 컬럼 1~3, 탭별 |
 | CFG-08 | done | apps/desktop/src/__tests__/columns-sort.test.tsx | `core.view.order` 인수, 기본 키는 자체 정의 |
