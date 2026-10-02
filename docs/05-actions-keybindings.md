@@ -88,7 +88,7 @@ Marta에서는 수정자 없는 단일 키 바인딩이 Quick Select에 가로�
 | `core.file.new_folder` | 새 폴더 | `F7` | `F7` | pane | 자체 ID, 키 확인 |
 | `core.file.new_file` | 새 파일 | `Shift+F7` | `Shift+F7` | pane | 자체 ID, 키 확인 |
 | `core.trash` | 휴지통으로 이동 | `F8` | `F8` | pane | 자체 ID, 키 확인 |
-| `core.delete` | 영구 삭제 | `Shift+F8` | `Shift+F8` | pane | 자체 ID, 키 확인 |
+| `core.delete` | 영구 삭제 | `Shift+F8` 또는 `Delete` | `Shift+F8` 또는 `Delete` | pane | 자체 ID, 키 확인 |
 | `core.duplicate` | 복제 | `Mod+D` | `Ctrl+D` | pane | 자체 ID, 키 확인 |
 | `core.edit` | 편집 | `F4` | `F4` | pane | ID 확인, 키 확인 |
 | `core.edit.folder` | 폴더 편집 | `Shift+F4` | `Shift+F4` | pane | 자체 ID, 키 확인 |

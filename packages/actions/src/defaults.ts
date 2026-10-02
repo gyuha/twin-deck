@@ -175,7 +175,7 @@ export const DEFAULT_BINDINGS: Binding[] = [
   b("pane", "core.file.new_folder", "F7"),
   b("pane", "core.file.new_file", "Shift+F7"),
   b("pane", "core.trash", "F8"),
-  b("pane", "core.delete", "Shift+F8"),
+  b("pane", "core.delete", "Shift+F8", "Delete"),
   b("pane", "core.open", "Return"),
   b("pane", "core.go.up", "Backspace"),
   b("pane", "core.lookup.global", "Mod+P"),
