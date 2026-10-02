@@ -47,6 +47,16 @@ export function Dialog() {
               onChange={(e) => api.dialogSetValue(e.target.value)}
               className="w-full border border-app-line px-1 py-0.5"
             />
+            {dialog.option && (
+              <label className="mt-2 flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={dialog.option.checked}
+                  onChange={(e) => api.dialogSetOption(e.target.checked)}
+                />
+                {dialog.option.label}
+              </label>
+            )}
             {dialog.error && (
               <p role="alert" className="mt-1 text-status-error">
                 {dialog.error}

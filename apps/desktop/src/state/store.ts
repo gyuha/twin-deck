@@ -86,7 +86,7 @@ export interface PaneState {
 export const CONFLICT_CHOICES: readonly ConflictDto[] = ["overwrite", "skip", "rename"];
 
 export type DialogState =
-  | { kind: "name"; title: string; value: string; error: string | null; selectStem: boolean; goto?: boolean; label?: string; confirmLabel?: string }
+  | { kind: "name"; title: string; value: string; error: string | null; selectStem: boolean; goto?: boolean; label?: string; confirmLabel?: string; option?: { label: string; checked: boolean } }
   | { kind: "confirm"; title: string; lines: string[] }
   | { kind: "conflict"; title: string; existing: string; selected: number }
   | { kind: "info"; title: string; lines: string[] }
@@ -1055,6 +1055,10 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       patchActive({ quick: null });
     },
 
+    /** 이름 다이얼로그의 체크박스를 바꾼다. */
+    dialogSetOption(checked: boolean) {
+      set((s) => (s.dialog?.kind === "name" && s.dialog.option ? { dialog: { ...s.dialog, option: { ...s.dialog.option, checked } } } : {}));
+    },
     dialogSetValue(value: string) {
       set((s) => (s.dialog?.kind === "name" ? { dialog: { ...s.dialog, value, error: null } } : {}));
     },
@@ -1080,7 +1084,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
           set({ dialog: { ...d, error: "이름을 입력하세요" } });
           return;
         }
-        result = d.value;
+        result = d.option ? { value: d.value, checked: d.option.checked } : d.value;
       } else if (d.kind === "conflict") {
         result = CONFLICT_CHOICES[d.selected];
       }
@@ -1231,35 +1235,42 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (targets.some((t) => isArchivePath(t.path))) return fail("아카이브 안의 항목은 압축할 수 없습니다. 먼저 밖으로 복사하세요");
       // 여러 항목은 압축 파일 이름을 물어본다(기본: 이 폴더 이름). 하나면 그 항목 이름을 쓴다.
       let name: string | undefined;
+      const pane = get().activePane;
+      const otherPane = other(pane);
+      const inactive = activeTab(get(), otherPane);
+      let toOther = false;
       if (targets.length > 1) {
-        const asked = await ask<string>({
+        // 반대 패널이 실제 폴더일 때만 거기에 둘 수 있다(검색 결과·아카이브 안은 불가).
+        const canOther = !inactive.virtual && !isArchivePath(inactive.path);
+        const asked = await ask<{ value: string; checked: boolean }>({
           kind: "name",
           title: "압축 파일 이름",
           value: `${baseName(tab.path) || "archive"}.zip`,
           error: null,
           selectStem: true,
+          option: canOther ? { label: "반대 패널에 압축 파일 놓기", checked: false } : undefined,
         });
         if (asked === null) return;
-        const trimmed = asked.trim();
+        const trimmed = asked.value.trim();
         name = /\.zip$/i.test(trimmed) ? trimmed : `${trimmed}.zip`;
+        toOther = canOther && asked.checked;
       }
       set({ notice: null });
       patchActive({ selection: new Set() });
-      const pane = get().activePane;
-      const before = new Set(tab.entries.map((e) => e.name));
+      const destPane = toOther ? otherPane : pane;
+      const destTab = toOther ? inactive : tab;
+      const before = new Set(destTab.entries.map((e) => e.name));
       try {
-        const jobId = await backend.enqueueCompress(targets.map((t) => t.path), tab.path, name);
+        const jobId = await backend.enqueueCompress(targets.map((t) => t.path), destTab.path, name);
         await trackTransfer(jobId, "압축");
       } catch (e) {
         fail(e);
       }
       await reloadAll();
       // 만들어진 압축 파일에 커서를 둔다(작업이 끝나 목록에 나타난 새 항목).
-      const after = get().panes[pane].tabs.find((t) => t.id === tab.id);
+      const after = get().panes[destPane].tabs.find((t) => t.id === destTab.id);
       const idx = after?.entries.findIndex((e) => !before.has(e.name) && e.kind === "file") ?? -1;
-      if (after && idx >= 0 && get().panes[pane].tabs[get().panes[pane].active].id === tab.id) {
-        patchTab(pane, tab.id, { cursor: idx });
-      }
+      if (after && idx >= 0) patchTab(destPane, destTab.id, { cursor: idx });
     },
     /** 추출 (OP-11, `core.extract`): 선택한 아카이브를 각각 그 옆의 새 폴더에 푼다. `toInactive`이면 반대편 패널 폴더에 푼다. */
     async extract(toInactive = false) {

@@ -96,6 +96,41 @@ describe("OP-11 압축", () => {
     expect((await b.queueJobs()).length).toBe(0);
   });
 
+  it("체크박스를 켜면 압축 파일이 반대 패널 폴더에 만들어진다", async () => {
+    const b = backend();
+    const { user } = await renderApp(b);
+    await user.keyboard("{Insert}{Insert}"); // docs, bundle.zip 선택
+    await runAction(user, "core.compress");
+    const dlg = await screen.findByRole("dialog");
+    await user.click(within(dlg).getByRole("checkbox", { name: "반대 패널에 압축 파일 놓기" }));
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(b.exists("/home/b/a.zip")).toBe(true));
+    expect(b.exists("/home/a/a.zip")).toBe(false); // 이 폴더에는 없다
+    expect(b.exists("/home/b/a.zip!/docs/readme.md")).toBe(true);
+    await waitFor(() => expect(entryNames("right")).toContain("a.zip")); // 반대 패널 목록에 나타난다
+  });
+
+  it("체크박스는 기본이 꺼져 있어 이 폴더에 만든다", async () => {
+    const b = backend();
+    const { user } = await renderApp(b);
+    await user.keyboard("{Insert}{Insert}");
+    await runAction(user, "core.compress");
+    const dlg = await screen.findByRole("dialog");
+    expect(within(dlg).getByRole("checkbox", { name: "반대 패널에 압축 파일 놓기" })).not.toBeChecked();
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(b.exists("/home/a/a.zip")).toBe(true));
+    expect(b.exists("/home/b/a.zip")).toBe(false);
+  });
+
+  it("반대 패널이 아카이브 안이면 체크박스를 보이지 않는다", async () => {
+    const b = backend();
+    const { user } = await renderApp(b, "linux", { left: "/home/a", right: "/home/a/bundle.zip!" });
+    await user.keyboard("{Insert}{Insert}");
+    await runAction(user, "core.compress");
+    const dlg = await screen.findByRole("dialog");
+    expect(within(dlg).queryByRole("checkbox")).toBeNull();
+  });
+
   it("한 항목은 이름을 묻지 않고 바로 압축한다", async () => {
     const b = backend();
     const { user } = await renderApp(b);
