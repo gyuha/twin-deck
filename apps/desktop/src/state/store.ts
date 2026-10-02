@@ -1,3 +1,5 @@
+import { buildNewNames, DEFAULT_RENAME_OPTIONS, needsTempStep, validateNames } from "../lib/multiRename";
+import type { RenameOptions } from "../lib/multiRename";
 import { createStore } from "zustand/vanilla";
 import {
   archiveFileName,
@@ -87,6 +89,7 @@ export const CONFLICT_CHOICES: readonly ConflictDto[] = ["overwrite", "skip", "r
 
 export type DialogState =
   | { kind: "name"; title: string; value: string; error: string | null; selectStem: boolean; goto?: boolean; label?: string; confirmLabel?: string; option?: { label: string; checked: boolean } }
+  | { kind: "multirename"; title: string; items: { path: string; name: string; isDir: boolean }[]; existing: string[]; options: RenameOptions }
   | { kind: "confirm"; title: string; lines: string[] }
   | { kind: "conflict"; title: string; existing: string; selected: number }
   | { kind: "info"; title: string; lines: string[] }
@@ -1070,6 +1073,13 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     dialogSetOption(checked: boolean) {
       set((s) => (s.dialog?.kind === "name" && s.dialog.option ? { dialog: { ...s.dialog, option: { ...s.dialog.option, checked } } } : {}));
     },
+    /** 다중 이름 바꾸기 창의 입력을 바꾼다. */
+    dialogMultiRenameSet(patch: Partial<RenameOptions>) {
+      set((s) => (s.dialog?.kind === "multirename" ? { dialog: { ...s.dialog, options: { ...s.dialog.options, ...patch } } } : {}));
+    },
+    dialogMultiRenameReset() {
+      set((s) => (s.dialog?.kind === "multirename" ? { dialog: { ...s.dialog, options: { ...DEFAULT_RENAME_OPTIONS } } } : {}));
+    },
     dialogSetValue(value: string) {
       set((s) => (s.dialog?.kind === "name" ? { dialog: { ...s.dialog, value, error: null } } : {}));
     },
@@ -1090,7 +1100,13 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         return;
       }
       let result: unknown = true;
-      if (d.kind === "name") {
+      if (d.kind === "multirename") {
+        // 오류가 있거나 바뀌는 이름이 없으면 닫지 않는다(버튼도 비활성이다).
+        const newNames = buildNewNames(d.items, d.options);
+        const errors = validateNames(d.items, newNames, d.existing);
+        if (errors.some((e) => e !== null) || d.items.every((it, i) => it.name === newNames[i])) return;
+        result = { items: d.items, newNames };
+      } else if (d.kind === "name") {
         if (d.value.trim() === "") {
           set({ dialog: { ...d, error: "이름을 입력하세요" } });
           return;
@@ -1148,6 +1164,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     async renameCursor() {
       const s = get();
       const tab = activeTab(s);
+      // 2개 이상 선택하면 다중 이름 바꾸기, 아니면 커서 항목 하나의 이름을 바꾼다.
+      if (tab.selection.size >= 2) return api.multiRename();
       const entry = cursorEntry(tab);
       if (!entry) return;
       const name = await ask<string>({ kind: "name", title: "이름 변경", value: entry.name, error: null, selectStem: true });
@@ -1168,6 +1186,60 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       } catch (e) {
         fail(e);
       }
+    },
+    /** 다중 이름 바꾸기 (`core.rename.multi`): 선택한 항목의 이름을 마스크·찾기/바꾸기·카운터로 한꺼번에 바꾼다. */
+    async multiRename() {
+      const s = get();
+      const pane = s.activePane;
+      const tab = activeTab(s);
+      const targets = targetsOf(tab);
+      if (targets.length < 2) return fail("이름을 바꿀 항목을 2개 이상 선택하세요");
+      if (tab.virtual) return fail("검색/분석 결과 탭에서는 여러 항목의 이름을 한꺼번에 바꿀 수 없습니다. 폴더 탭에서 선택하세요");
+      if (targets.some((t) => isArchivePath(t.path))) return fail("아카이브 안의 항목은 이름을 바꿀 수 없습니다");
+      const items = targets.map((t) => ({ path: t.path, name: t.name, isDir: t.kind === "dir" }));
+      const plan = await ask<{ items: typeof items; newNames: string[] }>({
+        kind: "multirename",
+        title: "다중 이름 바꾸기 도구",
+        items,
+        existing: tab.entries.map((e) => e.name),
+        options: { ...DEFAULT_RENAME_OPTIONS },
+      });
+      if (!plan) return;
+      set({ notice: null });
+      const rows = plan.items.map((it, i) => ({ ...it, to: plan.newNames[i] })).filter((r) => r.to !== r.name);
+      const done: string[] = [];
+      const failed: string[] = [];
+      const run = async (path: string, to: string, label: string) => {
+        try {
+          return await backend.rename(path, to);
+        } catch (e) {
+          failed.push(`${label}: ${e instanceof Error ? e.message : String(e)}`);
+          return null;
+        }
+      };
+      if (needsTempStep(plan.items, plan.newNames)) {
+        // 새 이름이 다른 항목의 옛 이름과 겹치면(맞바꾸기·연쇄) 모두 임시 이름을 거쳐 옮긴다.
+        const stamp = Date.now();
+        const staged: { tmp: string; to: string; name: string }[] = [];
+        for (const [i, r] of rows.entries()) {
+          const tmp = await run(r.path, `.td-rename-${stamp}-${i}`, r.name);
+          if (tmp) staged.push({ tmp, to: r.to, name: r.name });
+        }
+        for (const st of staged) {
+          const dest = await run(st.tmp, st.to, st.name);
+          if (dest) done.push(dest);
+          else failed.push(`${st.name}: 임시 이름(${baseName(st.tmp)})으로 남아 있습니다`);
+        }
+      } else {
+        for (const r of rows) {
+          const dest = await run(r.path, r.to, r.name);
+          if (dest) done.push(dest);
+        }
+      }
+      patchTab(pane, tab.id, { selection: new Set(done) });
+      await reloadAll();
+      if (failed.length > 0) fail(`${done.length}개 변경, ${failed.length}개 실패 — ${failed.join(" / ")}`);
+      else flash(`${done.length}개의 이름을 바꿨습니다`);
     },
     /** 비활성 패널로 복사/이동 (OP-03, OP-04). 이름이 겹치면 항목마다 물어본 뒤 작업 큐에 넣는다. */
     async copyOrMove(kind: "copy" | "move", confirm = true) {

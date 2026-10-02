@@ -1,8 +1,17 @@
 import { useEffect, useRef } from "react";
 import { useApp, useAppStore } from "../state/context";
 import { CONFLICT_CHOICES, isActiveJob } from "../state/store";
+import type { DialogState } from "../state/store";
+import { buildNewNames, validateNames } from "../lib/multiRename";
+import { MultiRename } from "./MultiRename";
 
 const CHOICE_LABEL = { overwrite: "덮어쓰기 (O)", skip: "건너뛰기 (S)", rename: "이름 바꿔 복사 (R)" } as const;
+
+/** 다중 이름 바꾸기: 오류가 없고 바뀌는 이름이 하나라도 있을 때만 실행할 수 있다. */
+function canMultiRename(d: Extract<DialogState, { kind: "multirename" }>): boolean {
+  const names = buildNewNames(d.items, d.options);
+  return !validateNames(d.items, names, d.existing).some((e) => e !== null) && d.items.some((it, i) => it.name !== names[i]);
+}
 
 /** 모달 다이얼로그. Return 확인, Escape 취소는 키 라우터(dialog 스코프)가 처리한다. */
 export function Dialog() {
@@ -35,7 +44,7 @@ export function Dialog() {
         role="dialog"
         aria-modal="true"
         aria-label={dialog.title}
-        className="w-96 max-w-full rounded border border-app-line bg-app-box p-4 text-sm shadow-lg"
+        className={`${dialog.kind === "multirename" ? "w-[56rem]" : "w-96"} max-w-full rounded border border-app-line bg-app-box p-4 text-sm shadow-lg`}
       >
         <h2 className="mb-2 font-semibold">{dialog.title}</h2>
         {dialog.kind === "name" && (
@@ -64,6 +73,7 @@ export function Dialog() {
             )}
           </>
         )}
+        {dialog.kind === "multirename" && <MultiRename items={dialog.items} existing={dialog.existing} options={dialog.options} />}
         {dialog.kind === "progress" && job && (
           <>
             <div
@@ -118,13 +128,23 @@ export function Dialog() {
         )}
         {dialog.kind !== "progress" && (
           <div className="mt-3 flex justify-end gap-2">
-            {dialog.kind !== "info" && (
-              <button type="button" className="rounded border border-app-line px-3 py-0.5" onClick={() => api.dialogCancel()}>
-                취소
+            {dialog.kind === "multirename" && (
+              <button type="button" className="mr-auto rounded border border-app-line px-3 py-0.5" onClick={() => api.dialogMultiRenameReset()}>
+                모두 재설정
               </button>
             )}
-            <button type="button" className="rounded bg-accent px-3 py-0.5 text-white" onClick={() => api.dialogConfirm()}>
-              {dialog.kind === "name" && dialog.confirmLabel ? dialog.confirmLabel : "확인"}
+            {dialog.kind !== "info" && (
+              <button type="button" className="rounded border border-app-line px-3 py-0.5" onClick={() => api.dialogCancel()}>
+                {dialog.kind === "multirename" ? "닫기" : "취소"}
+              </button>
+            )}
+            <button
+              type="button"
+              disabled={dialog.kind === "multirename" && !canMultiRename(dialog)}
+              className="rounded bg-accent px-3 py-0.5 text-white disabled:opacity-40"
+              onClick={() => api.dialogConfirm()}
+            >
+              {dialog.kind === "name" && dialog.confirmLabel ? dialog.confirmLabel : dialog.kind === "multirename" ? "이름 바꾸기" : "확인"}
             </button>
           </div>
         )}

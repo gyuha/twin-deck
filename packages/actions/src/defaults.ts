@@ -37,6 +37,7 @@ export const DEFAULT_ACTION_META = [
   { id: "core.copy", title: "복사", shortTitle: "복사", category: "File", scopes: ["pane"], isApplicable: hasTarget },
   { id: "core.move", title: "이동", shortTitle: "이동", category: "File", scopes: ["pane"], isApplicable: hasTarget },
   { id: "core.rename", title: "이름 변경", category: "File", scopes: ["pane"], isApplicable: (c) => c.hasCursorItem },
+  { id: "core.rename.multi", title: "다중 이름 바꾸기", category: "File", scopes: ["pane"], isApplicable: (c) => c.selectedCount >= 2 },
   { id: "core.file.new_folder", title: "새 폴더", shortTitle: "새 폴더", category: "File", scopes: ["pane"] },
   { id: "core.file.new_file", title: "새 파일", category: "File", scopes: ["pane"] },
   { id: "core.trash", title: "휴지통으로 이동", shortTitle: "휴지통", category: "File", scopes: ["pane"], isApplicable: hasTarget },

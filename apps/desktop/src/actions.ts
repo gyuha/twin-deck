@@ -71,6 +71,7 @@ export function fileOpHandlers({ api }: AppStore): Partial<ActionHandlers> {
     "core.edit": () => api.editTargets(),
     "core.edit.folder": () => api.editFolder(),
     "core.rename": () => api.renameCursor(),
+    "core.rename.multi": () => api.multiRename(),
     "core.file.new_folder": () => api.newFolder(),
     "core.file.new_file": () => api.newFile(),
     "core.trash": () => api.trashTargets(),
