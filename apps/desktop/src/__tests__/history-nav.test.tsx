@@ -104,13 +104,13 @@ describe("마우스 뒤로/앞으로 버튼", () => {
 });
 
 describe("뒤로/앞으로 키", () => {
-  it("Mod+[ 와 Mod+] (Alt+←/→ 도 같다)", async () => {
+  it("Mod+[ 와 Mod+] (왼쪽 패널의 Alt+←도 뒤로 간다. Alt+→는 반대편으로 보내기: pane-send.test)", async () => {
     const { user } = await renderApp(seed(), "linux");
     await user.keyboard("{Enter}");
     await waitFor(() => expect(entryNames("left")).toEqual(["sub", "d.txt"]));
     await user.keyboard("{Alt>}{ArrowLeft}{/Alt}");
     await waitFor(() => expect(entryNames("left")).toEqual(["docs", "other", "a.txt"]));
-    await user.keyboard("{Alt>}{ArrowRight}{/Alt}");
+    await user.keyboard("{Control>}]{/Control}");
     await waitFor(() => expect(entryNames("left")).toEqual(["sub", "d.txt"]));
     await user.keyboard("{Control>}[[{/Control}");
     await waitFor(() => expect(entryNames("left")).toEqual(["docs", "other", "a.txt"]));

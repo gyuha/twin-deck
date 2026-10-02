@@ -33,6 +33,7 @@ export function navigationHandlers({ api }: AppStore): Partial<ActionHandlers> {
     "core.view.mode": (_ctx, args) => api.setViewMode(args),
     "core.move.home": () => api.cursorHome(),
     "core.move.end": () => api.cursorEnd(),
+    "core.pane.send": (_ctx, args) => api.paneSend(args),
     "core.pane.switch": () => api.switchPane(),
     "core.select.all": () => api.selectAll(),
     "core.select.none": () => api.selectNone(),
@@ -126,6 +127,10 @@ export function paletteHandlers({ api }: AppStore): Partial<ActionHandlers> {
     "core.state.reset": () => api.resetState(),
     "core.preview": () => api.previewToggle(),
     "core.preview.close": () => api.previewClose(),
+    "core.preview.open": async () => {
+      api.previewClose();
+      await api.open();
+    },
     "core.preview.prev": () => api.previewMove(-1),
     "core.preview.next": () => api.previewMove(1),
     "core.actions.panel": () => api.paletteOpen(),

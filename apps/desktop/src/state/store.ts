@@ -772,11 +772,11 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     },
 
     /** 폴더로 이동한다. `how`: 일반 이동은 방문 스택에 쌓고(앞으로 기록은 버림), back/forward는 스택 사이를 옮긴다. */
-    async navigate(path: string, focusName?: string, how: "push" | "back" | "forward" = "push") {
+    async navigate(path: string, focusName?: string, how: "push" | "back" | "forward" = "push", pane: PaneId = get().activePane) {
       const s = get();
-      const tab = activeTab(s);
+      const tab = activeTab(s, pane);
       stopSearch(tab); // 가상 탭에서 실제 위치로 나가면 결과를 버린다
-      patchActive((t) => {
+      patchTab(pane, tab.id, (t) => {
         // 가상 탭(검색 결과)에서 나올 때는 돌아갈 실제 위치가 없으므로 쌓지 않는다.
         const here = t.virtual ? [] : [t.path];
         const stacks =
@@ -793,8 +793,23 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         quick: null,
         entries: [],
       }; });
-      await reload(s.activePane, tab.id, focusName);
+      await reload(pane, tab.id, focusName);
       await syncWatches();
+    },
+    /**
+     * 반대편 패널로 보낸다 (`core.pane.send`). 커서가 폴더면 그 폴더를, 파일이면 현재 폴더를 반대편 패널에서 연다.
+     * 활성 패널은 그대로다. `to`가 이미 활성 패널이면 보낼 곳이 없으므로 이전/다음 폴더로 간다(같은 키의 기존 동작).
+     */
+    async paneSend(args?: Record<string, unknown>) {
+      const to = args?.to;
+      if (to !== "left" && to !== "right") return fail("core.pane.send에는 인수 to(left|right)가 필요합니다");
+      const s = get();
+      if (s.activePane === to) return to === "right" ? api.goForward() : api.goBack();
+      const tab = activeTab(s);
+      const c = cursorEntry(tab);
+      const dest = c?.kind === "dir" ? c.path : tab.virtual ? (c ? parentPath(c.path) : null) : tab.path;
+      if (dest === null) return;
+      await api.navigate(dest, undefined, "push", to);
     },
     /** 이전 폴더로 (마우스 뒤로 버튼, `core.history.back`). 방금 나온 하위 폴더가 있으면 그 폴더에 커서를 둔다. */
     async goBack() {

@@ -25,6 +25,18 @@ describe("파일 실행", () => {
     expect(backend.opened).toEqual(["/home/a/f.txt"]);
   });
 
+  it("미리보기에서 Enter는 미리보기를 닫고 그 파일을 연다", async () => {
+    const backend = seed();
+    const { user } = await renderApp(backend);
+    await user.keyboard("{ArrowDown}{ArrowRight}"); // f.txt 미리보기
+    await screen.findByRole("dialog", { name: "미리보기: f.txt" });
+    await user.keyboard("{ArrowDown}"); // z.zip으로 넘김
+    await screen.findByRole("dialog", { name: "미리보기: z.zip" });
+    await user.keyboard("{ArrowUp}{Enter}");
+    await waitFor(() => expect(backend.opened).toEqual(["/home/a/f.txt"]));
+    expect(screen.queryByRole("dialog", { name: /미리보기/ })).toBeNull();
+  });
+
   it("실행에 실패하면 오류를 알린다", async () => {
     const backend = seed();
     backend.openPath = async () => {
