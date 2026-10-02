@@ -5,9 +5,11 @@ import { formatKey } from "@twin-deck/keybinds";
 import { Keymap } from "@twin-deck/keybinds";
 import type { Platform } from "@twin-deck/keybinds";
 import type { Backend, Snapshot } from "@twin-deck/ts-client";
+import { isTauri } from "@tauri-apps/api/core";
 import { allHandlers } from "./actions";
+import { installFileMenuForWindow } from "./appMenu";
 import { StoreContext, useApp, useAppStore } from "./state/context";
-import { actionContext, activeTab, createAppStore } from "./state/store";
+import { actionContext, activeTab, createAppStore, scopeStack } from "./state/store";
 import { ActionBar, useBarIds } from "./ui/ActionBar";
 import { ActionsPalette } from "./ui/ActionsPalette";
 import { Dialog } from "./ui/Dialog";
@@ -145,6 +147,24 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
       (id) => registry.dispatch(id, actionContext(app.store.getState())),
     );
   }, [app, registry, keymap, platform]);
+
+  // macOS 상단 메뉴바의 File 메뉴에 파일 항목(다중 이름 바꾸기 포함)을 붙인다. 열려 있는 창·메뉴 위에서는 실행하지 않는다.
+  useEffect(() => {
+    if (platform !== "mac" || !isTauri()) return;
+    let off: (() => void) | undefined;
+    let gone = false;
+    installFileMenuForWindow((id) => {
+      const s = app.store.getState();
+      if (scopeStack(s)[0] !== "pane") return;
+      void registry.dispatch(id, actionContext(s));
+    })
+      .then((unlisten) => (gone ? unlisten() : (off = unlisten)))
+      .catch((e) => console.warn("[twin-deck] 메뉴바를 설정하지 못했습니다", e));
+    return () => {
+      gone = true;
+      off?.();
+    };
+  }, [app, registry, platform]);
 
   useEffect(() => {
     void app.api.init().then(() => {
