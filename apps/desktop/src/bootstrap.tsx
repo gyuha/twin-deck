@@ -37,7 +37,7 @@ export async function start(rootEl: HTMLElement, deps: BootDeps = defaultDeps())
     );
   } catch (e) {
     root.render(
-      <pre role="alert" className="p-4 text-red-700">
+      <pre role="alert" className="p-4 text-status-error">
         시작 실패: {String(e)}
       </pre>,
     );

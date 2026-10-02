@@ -91,7 +91,13 @@ fn syntax_warning(file: &str, src: &str, e: &toml::de::Error) -> Warning {
 }
 
 const ENUMS: [(&str, &str, &[&str]); 3] = [
-    ("behavior", "theme", &["light", "dark", "system"]),
+    (
+        "behavior",
+        "theme",
+        &[
+            "dark", "light", "midnight", "noir", "slate", "nord", "mocha", "system",
+        ],
+    ),
     ("behavior.selection", "shift_mode", &["invert", "extend"]),
     (
         "display",

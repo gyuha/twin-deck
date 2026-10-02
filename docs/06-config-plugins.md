@@ -191,6 +191,8 @@ working_directory = "${active.folder.path}"
 
 테마는 CSS 변수(디자인 토큰)의 집합이다. `@spacedrive/tokens`를 기반으로 하고, 사용자 테마는 그 값을 덮어쓴다.
 
+- 구현됨(2026-10-01): `behavior.theme`은 spaceui 테마 7종(`dark`, `light`, `midnight`, `noir`, `slate`, `nord`, `mocha`)과 `system`(OS 설정에 따라 dark/light) 중 하나다. 기본값은 `system`. 테마는 `<html>`의 클래스로 바뀐다. 사용자 정의 테마 파일(아래 예시)은 아직 없다.
+
 ```toml
 # themes/my-theme.toml
 name = "My Theme"
@@ -204,7 +206,7 @@ cursor = "#3a3f4b"
 text = "#e6e6e6"
 ```
 
-- 내장 테마: `light`, `dark` (P1). Marta의 5종(Kon, Dark, Classic, Sakura, Commander)에 해당하는 테마는 P3에서 별도로 디자인한다. Marta 테마 파일은 복사하지 않는다.
+- 내장 테마: spaceui의 7종과 `system` (위 "구현됨" 참고). Marta의 5종(Kon, Dark, Classic, Sakura, Commander)에 해당하는 테마는 P3에서 별도로 디자인한다. Marta 테마 파일은 복사하지 않는다.
 - 테마 전환은 `core.theme.switch` 액션(즉시 미리보기)과 `behavior.theme` 설정으로 한다.
 - 터미널 색상은 xterm.js 테마 객체로 매핑한다. Marta의 `.ettyTheme` 형식은 지원하지 않는다.
 - 테마 키 이름(`pane_active_border` 등)은 토큰 목록을 [07](07-ui-spec.md)과 함께 확정한다. 지금 이름은 예시다.

@@ -163,6 +163,45 @@ pub fn add_favorite(
     td_config::append_favorite(store.dir(), &name, &path)
 }
 
+/// 설정 화면: 사용자 `config.toml`의 키 하나를 쓰고, 새로 병합된 설정을 바로 돌려준다(변경 이벤트를 기다리지 않는다).
+#[tauri::command]
+#[specta::specta]
+pub fn set_config_value(
+    config: State<'_, ConfigState>,
+    key: String,
+    value: td_config::ConfigValue,
+) -> ServiceResult<Loaded> {
+    let store = config
+        .store
+        .as_ref()
+        .ok_or("설정 디렉터리를 사용할 수 없습니다")?;
+    td_config::set_user_value(store.dir(), &key, value)?;
+    Ok(store.refresh())
+}
+
+/// 설정 화면: 사용자 `config.toml`에서 키 하나를 지워 내장 기본값으로 되돌린다.
+#[tauri::command]
+#[specta::specta]
+pub fn reset_config_value(config: State<'_, ConfigState>, key: String) -> ServiceResult<Loaded> {
+    let store = config
+        .store
+        .as_ref()
+        .ok_or("설정 디렉터리를 사용할 수 없습니다")?;
+    td_config::reset_user_value(store.dir(), &key)?;
+    Ok(store.refresh())
+}
+
+/// 설정 화면: 설정 폴더를 파일 관리자로 연다.
+#[tauri::command]
+#[specta::specta]
+pub fn reveal_config_dir(
+    launch: State<'_, AppLaunch>,
+    config: State<'_, ConfigState>,
+) -> ServiceResult<()> {
+    let dir = config_dir(&config)?.to_string_lossy().into_owned();
+    reveal(&launch, &dir)
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn file_info(svc: State<'_, AppService>, path: String) -> ServiceResult<FileInfoDto> {
@@ -458,6 +497,9 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             eject_volume,
             user_dirs,
             add_favorite,
+            set_config_value,
+            reset_config_value,
+            reveal_config_dir,
             list_dir,
             mkdir,
             touch,

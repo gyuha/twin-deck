@@ -23,7 +23,7 @@ export function QueueIndicator() {
     <div
       role="status"
       aria-label="작업 큐 진행"
-      className="fixed right-2 top-2 rounded bg-blue-600 px-2 py-0.5 text-xs text-white"
+      className="fixed right-2 top-2 rounded bg-accent px-2 py-0.5 text-xs text-white"
     >
       작업 {active.length}개 · {done}/{total} <span className="opacity-80">(=)</span>
     </div>
@@ -38,10 +38,10 @@ export function QueuePopup() {
   if (!open) return null;
   return (
     <div className="fixed inset-0 flex items-start justify-center bg-black/20 pt-16">
-      <div role="dialog" aria-label="작업 큐" className="w-[32rem] max-w-full rounded border border-neutral-400 bg-(--td-surface) p-3 text-sm shadow-lg">
+      <div role="dialog" aria-label="작업 큐" className="w-[32rem] max-w-full rounded border border-app-line bg-app-box p-3 text-sm shadow-lg">
         <h2 className="mb-2 font-semibold">작업 큐</h2>
         {jobs.length === 0 ? (
-          <p className="text-neutral-500">작업 없음</p>
+          <p className="text-ink-faint">작업 없음</p>
         ) : (
           <div role="listbox" aria-label="작업 목록" aria-activedescendant={`job-${jobs[cursor]?.id}`}>
             {jobs.map((j, i) => (
@@ -50,14 +50,14 @@ export function QueuePopup() {
                 id={`job-${j.id}`}
                 role="option"
                 aria-selected={i === cursor}
-                className={i === cursor ? "border-l-4 border-blue-600 bg-blue-50 px-2 py-1" : "border-l-4 border-transparent px-2 py-1"}
+                className={i === cursor ? "border-l-4 border-accent bg-app-selected px-2 py-1" : "border-l-4 border-transparent px-2 py-1"}
               >
                 <div>
                   {KIND[j.kind]} {j.completed}/{j.total} — {STATUS[j.status]}
                 </div>
-                {j.current && isActiveJob(j) && <div className="truncate text-xs text-neutral-600">{j.current}</div>}
+                {j.current && isActiveJob(j) && <div className="truncate text-xs text-ink-dull">{j.current}</div>}
                 {j.errors.map((e) => (
-                  <div key={e.path} role="alert" className="text-xs text-red-700">
+                  <div key={e.path} role="alert" className="text-xs text-status-error">
                     {e.path}: {e.message}
                   </div>
                 ))}
@@ -65,7 +65,7 @@ export function QueuePopup() {
             ))}
           </div>
         )}
-        <p className="mt-2 text-xs text-neutral-500">↑↓/Space 이동 · P 일시정지/재개 · A/D 중단 · Esc 닫기</p>
+        <p className="mt-2 text-xs text-ink-faint">↑↓/Space 이동 · P 일시정지/재개 · A/D 중단 · Esc 닫기</p>
       </div>
     </div>
   );

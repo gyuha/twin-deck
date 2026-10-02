@@ -10,12 +10,13 @@ export type Scope =
   | "terminal"
   | "dialog"
   | "panel"
-  | "palette";
+  | "palette"
+  | "settings";
 
 /** 열려 있으면 바깥 스코프의 바인딩을 무시하는 스코프. */
-const MODAL_SCOPES: ReadonlySet<Scope> = new Set(["dialog", "panel", "palette", "preview"]);
+const MODAL_SCOPES: ReadonlySet<Scope> = new Set(["dialog", "panel", "palette", "preview", "settings"]);
 /** 수정자 없는 문자 키를 허용하는 스코프(3.2절). */
-const PLAIN_CHAR_SCOPES: ReadonlySet<Scope> = new Set(["queue", "preview", "dialog", "panel", "palette"]);
+const PLAIN_CHAR_SCOPES: ReadonlySet<Scope> = new Set(["queue", "preview", "dialog", "panel", "palette", "settings"]);
 
 export interface Binding {
   scope: Scope;

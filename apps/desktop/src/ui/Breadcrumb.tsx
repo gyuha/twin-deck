@@ -24,7 +24,7 @@ export function Breadcrumb({ pane, path }: { pane: PaneId; path: string }) {
               {isArchive ? seg.label.slice(0, -1) : seg.label}
             </button>
             {isArchive && (
-              <span role="img" aria-label="아카이브 경계" title="아카이브 경계" className="font-bold text-blue-600">
+              <span role="img" aria-label="아카이브 경계" title="아카이브 경계" className="font-bold text-accent">
                 !
               </span>
             )}

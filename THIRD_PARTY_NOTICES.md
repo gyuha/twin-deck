@@ -26,3 +26,12 @@ crates.io에서 받아 쓰는 permissive 라이선스 라이브러리이며 코�
 | 항목 | 버전 | 라이선스 | 위치 |
 |---|---|---|---|
 | material-icon-theme (SVG 1,199개 + `manifest.json`) | 5.38.1 | MIT | `packages/material-icons/` (라이선스 원문: `LICENSE`) |
+
+## 디자인 토큰 (spaceui)
+
+앱의 색·테마·글자 크기 체계와 설정 화면의 컨트롤은 Spacedrive의 디자인 시스템 저장소 [spaceui](https://github.com/spacedriveapp/spaceui)가 npm에 게시한 토큰 패키지를 의존성으로 쓴다. 코드를 복사하지 않았다. Spacedrive 본 저장소(`spacedriveapp/spacedrive`)에서는 아무것도 가져오지 않았다.
+
+| npm 패키지 | 버전 | 라이선스 | 용도 |
+|---|---|---|---|
+| @spacedrive/primitives | 0.2.4 | MIT (spaceui 저장소 표기. 패키지 매니페스트에는 license 필드가 없다) | 설정 화면의 Switch, Select, Input, Button (radix 기반) |
+| @spacedrive/tokens | 0.2.3 | MIT (spaceui 저장소 표기, 2026-10-01 GitHub API로 확인. 패키지 매니페스트에는 license 필드가 없다) | 색 토큰, 테마 7종(dark, light, midnight, noir, slate, nord, mocha), 글자 크기 체계 |

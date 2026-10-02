@@ -2,6 +2,7 @@ import { archiveRoot, isArchivePath } from "./archive";
 import { BackendError, baseName, joinPath, parentPath } from "./backend";
 import type { Backend, SearchEvent } from "./backend";
 import type {
+  ConfigValue,
   ConflictDto,
   EntryDto,
   FileInfoDto,
@@ -20,6 +21,16 @@ import { globMatch } from "./glob";
 import defaultConfigJson from "./generated/default-config.json";
 
 /** Rust가 만든 내장 기본 설정(무경고, 사용자 바인딩 없음). */
+const getPath = (obj: Record<string, unknown>, key: string): unknown =>
+  key.split(".").reduce<unknown>((o, k) => (o as Record<string, unknown> | undefined)?.[k], obj);
+
+const setPath = (obj: Record<string, unknown>, key: string, value: unknown) => {
+  const parts = key.split(".");
+  const leaf = parts.pop()!;
+  const parent = parts.reduce<Record<string, unknown>>((o, k) => (o[k] ??= {}) as Record<string, unknown>, obj);
+  parent[leaf] = value;
+};
+
 export const defaultLoaded = (): Loaded => structuredClone(defaultConfigJson) as Loaded;
 
 /** FakeBackend 내부의 복사/이동 결과. */
@@ -487,6 +498,25 @@ export class FakeBackend implements Backend {
 
   async getConfig() {
     return structuredClone(this.loaded);
+  }
+
+  /** 설정 화면 쓰기를 흉내 낸다: 점 표기 키에 값을 넣고 구독자에게도 알린다. */
+  async setConfigValue(key: string, value: ConfigValue) {
+    this.setConfig((l) => setPath(l.config as unknown as Record<string, unknown>, key, value.value));
+    return structuredClone(this.loaded);
+  }
+
+  /** 기본값에서 그 키의 값을 가져와 되돌린다. */
+  async resetConfigValue(key: string) {
+    const fallback = getPath(defaultLoaded().config as unknown as Record<string, unknown>, key);
+    this.setConfig((l) => setPath(l.config as unknown as Record<string, unknown>, key, fallback));
+    return structuredClone(this.loaded);
+  }
+
+  /** 테스트용: 설정 폴더 열기를 누른 횟수. */
+  configDirRevealed = 0;
+  async revealConfigDir() {
+    this.configDirRevealed += 1;
   }
 
   /** 테스트용: 파일의 수정·생성 시각을 지정한다. */

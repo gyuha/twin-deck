@@ -93,7 +93,7 @@ Spacedrive에는 듀얼 패널이나 분할 뷰가 없다 `[높음]`(코드 검�
 | 재배포 조건 | 라이선스 조항(또는 링크)과 저작권 고지를 유지해야 함 `[높음]` |
 | Rust 크레이트 | 대부분 `license.workspace = true`(즉 FSL). `core`와 일부 크레이트는 license 필드 없음. `crates/sdk`는 `MIT OR Apache-2.0` `[높음]` |
 | TS 패키지 | `packages/interface`, `packages/assets`는 `GPL-3.0-only`, `packages/ts-client`는 `GPL-3.0`로 `package.json`에 표기됨 `[높음]`. 루트 FSL과 충돌하며 어느 쪽이 적용되는지는 알 수 없다 `[알 수 없음]` |
-| `spaceui` | MIT (GitHub API 표기) `[중간]` |
+| `spaceui` | MIT (GitHub API 표기, 2026-10-01 재확인. npm 패키지 매니페스트에는 license 필드가 없다) `[높음]` |
 | NOTICE 파일 | 없음. 루트 `LICENSE`만 있음 `[높음]` |
 
 ### 5.2 twin-deck 규칙
@@ -133,6 +133,6 @@ Marta는 폐쇄 소스이며 API 문서는 CC BY-ND 4.0이다 `[높음]`. twin-d
 |---|---|
 | `file-opening-*` 내부의 OS API 의존성(objc, windows 크레이트 등) | 각 `Cargo.toml` 열람 |
 | `volume/detection.rs`, `platform/*`의 독립성 | 소스 열람 후 `crate::` 참조 확인 |
-| `@spacedrive/primitives`, `tokens`의 npm 게시 여부와 버전 | `npm view` |
+| ~~`@spacedrive/primitives`, `tokens`의 npm 게시 여부와 버전~~ | 확인함(2026-10-01): `tokens` 0.2.3, `primitives` 0.2.4 |
 | 키바인드/TabManager 파일의 상대 import 사슬이 어디까지 이어지는지 | 이식 시 import 그래프 확인 |
 | GPL 표기 패키지의 실제 적용 라이선스 | Spacedrive 저장소 이슈/커밋 이력 조사 또는 무시하고 `gpl-tainted`로 관리 |

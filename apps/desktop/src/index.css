@@ -1,2 +1,26 @@
 @import "tailwindcss";
+@import "@spacedrive/tokens/theme";
+@import "@spacedrive/tokens/css/themes/dark";
+@import "@spacedrive/tokens/css/themes/light";
+@import "@spacedrive/tokens/css/themes/midnight";
+@import "@spacedrive/tokens/css/themes/noir";
+@import "@spacedrive/tokens/css/themes/slate";
+@import "@spacedrive/tokens/css/themes/nord";
+@import "@spacedrive/tokens/css/themes/mocha";
 @import "./theme.css";
+/* @spacedrive/primitives가 쓰는 Tailwind 클래스를 만들도록 패키지를 스캔한다(설정 화면에서만 쓴다). */
+@source "../node_modules/@spacedrive/primitives/dist/index.js";
+
+/*
+ * @spacedrive/primitives는 Tailwind 플러그인이 만들던 radix 변형(radix-state-checked: 등)을 클래스로 쓴다.
+ * Tailwind v4는 그 변형을 모르므로 여기서 정의한다(theme.test.tsx가 빠진 것이 없는지 검사한다).
+ */
+@custom-variant radix-state-checked (&[data-state="checked"]);
+@custom-variant radix-state-unchecked (&[data-state="unchecked"]);
+@custom-variant radix-state-active (&[data-state="active"]);
+@custom-variant radix-highlighted (&[data-highlighted]);
+@custom-variant radix-disabled (&[data-disabled]);
+@custom-variant radix-placeholder (&[data-placeholder]);
+@custom-variant group-radix-highlighted (&:is(:where(.group)[data-highlighted] *));
+@custom-variant group-radix-disabled (&:is(:where(.group)[data-disabled] *));
+@custom-variant group-radix-state-open (&:is(:where(.group)[data-state="open"] *));

@@ -21,7 +21,7 @@ Spacedrive가 쓰지만 twin-deck은 쓰지 않는 기술은 3절에 이유와 �
 | 가상 스크롤 | `@tanstack/react-virtual ^3.13.12` | 같음 | |
 | 클라이언트 상태 | zustand 5 | 같음 | |
 | 드래그 앤 드롭 | `@dnd-kit`, `react-selecto` | 같음 | 드래그 선택은 `react-selecto` 대신 자체 구현이 필요할 수 있음 `[낮음]` |
-| UI 프리미티브 | radix, framer-motion, `@spacedrive/primitives`, `tokens` (외부 저장소 `spacedriveapp/spaceui`, MIT) | radix와 `@spacedrive/tokens`, `primitives` | npm 배포 여부와 버전은 도입 시 확인 `[알 수 없음]` |
+| UI 프리미티브 | radix, framer-motion, `@spacedrive/primitives`, `tokens` (외부 저장소 `spacedriveapp/spaceui`, MIT) | radix와 `@spacedrive/tokens`, `primitives` | npm 게시 확인(2026-10-01): `tokens` 0.2.3, `primitives` 0.2.4. 저장소 MIT, 패키지 매니페스트에는 license 필드 없음 `[높음]`. `tokens`는 도입함 |
 | 타입 생성 | Specta (git fork `jamiepine/specta`) | specta 계열 | 업스트림 릴리스가 twin-deck 요구를 충족하는지 스캐폴딩 때 확인 |
 | 패키지 매니저 | Bun 1.3.0 (`packageManager`), Node 20.18 (`.nvmrc`) | Bun, Node 20.18 | |
 | 작업 러너 | `just` (`justfile`) | 같음 | |
@@ -74,6 +74,6 @@ Tauri는 OS 웹뷰를 쓴다. macOS는 WKWebView, Windows는 WebView2, Linux는 
 | 항목 | 확인 방법 |
 |---|---|
 | specta 업스트림/fork 선택 | 스캐폴딩 때 `tauri-specta` 조합으로 타입 생성 시험 |
-| `@spacedrive/primitives`, `tokens`의 npm 게시와 버전, 라이선스 | npm 조회 및 `spaceui` 저장소 확인 |
+| ~~`@spacedrive/primitives`, `tokens`의 npm 게시와 버전, 라이선스~~ | 확인함(2026-10-01, 위 표) |
 | Spacedrive의 린트/포맷/테스트 도구 | 루트 설정 파일 확인 |
 | rar 처리 방식 | 라이선스와 크레이트 현황 조사 |

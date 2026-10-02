@@ -148,6 +148,18 @@ Disk Usage, Look Up, Flatten의 결과는 위치가 없는 탭에 표시한다(P
 - 색만으로 상태를 구분하지 않는다(활성 패널, 선택, 커서는 테두리/아이콘/굵기를 함께 쓴다).
 - 색 대비는 WCAG AA를 목표로 한다. 검증은 M2 테마 확정 때 한다.
 
+## 11.1 설정 화면
+
+`Mod+,`(`core.settings.open`)로 메인 창을 덮는 설정 화면을 연다. Esc로 닫는다. 구현됨(2026-10-01).
+
+- 배치: 위쪽 제목 줄(설정 폴더 열기, 닫기), 왼쪽 섹션 목록, 오른쪽에 한 섹션. 섹션은 모양, 목록과 선택, 표시 형식, 확인, 환경이다.
+- 항목은 값 하나짜리 14개다. 스위치(`@spacedrive/primitives` Switch), 선택(Select), 숫자·문자 입력(Input)을 쓴다. 배열 설정(컬럼, Action Bar 목록, 즐겨찾기, zip 확장자)과 키바인딩, `shift_mode`, `terminal`은 넣지 않았다. 그런 것은 설정 폴더 열기로 파일을 고친다.
+- 바꾸는 즉시 사용자 `config.toml`의 그 키만 쓴다(`toml_edit`로 주석, 다른 키, 순서를 보존한다). 스위치와 선택은 바꾸는 순간, 입력창은 Enter나 포커스를 벗어날 때 저장한다.
+- 값이 기본값과 다르면 항목 옆에 "기본값으로"가 보이고, 누르면 그 키를 사용자 설정에서 지운다.
+- 쓴 직후의 설정은 Tauri 명령의 응답으로 받아 바로 적용한다. 파일 변경 이벤트를 기다리지 않는다.
+- `config.toml`에 문법 오류가 있으면 파일을 건드리지 않고, 화면 위에 알리고 컨트롤을 비활성화한다.
+- 키 스코프는 `settings`다. 열려 있는 동안 패널 키는 무시된다.
+
 ## 12. 스코프별 컴포넌트와 출처
 
 | 컴포넌트 | 출처 |
@@ -158,7 +170,8 @@ Disk Usage, Look Up, Flatten의 결과는 위치가 없는 탭에 표시한다(P
 | PathBar, Breadcrumb | Spacedrive 포팅 |
 | InlineNameEdit, DragSelect | Spacedrive 포팅 |
 | QuickPreview | Spacedrive 포팅 (P1 일부) |
-| Action Bar, Actions Panel, 큐 팝업, 팝업 메뉴, 다이얼로그 | 새로 작성 (`@spacedrive/primitives`, radix 위) |
+| Action Bar, Actions Panel, 큐 팝업, 팝업 메뉴, 다이얼로그 | 새로 작성 (직접 만든 컴포넌트, 색은 `@spacedrive/tokens`) |
+| 설정 화면 | 새로 작성 (`@spacedrive/primitives`의 Switch, Select, Input, Button) |
 | 듀얼 패널 레이아웃, 패널 전환, 활성 패널 모델 | 새로 작성 |
 
 ## 13. 미확인 과제

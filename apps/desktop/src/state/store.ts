@@ -12,6 +12,7 @@ import {
 } from "@twin-deck/ts-client";
 import type {
   Backend,
+  ConfigValue,
   ConflictDto,
   EntryDto,
   JobDto,
@@ -156,6 +157,10 @@ export interface AppState {
   /** 작업 큐 스냅샷 (끝난 작업은 팝업을 닫을 때까지 남는다). */
   queue: JobDto[];
   queueOpen: boolean;
+  /** 설정 화면이 열려 있는지, 어느 섹션인지, 마지막 저장 오류. */
+  settingsOpen: boolean;
+  settingsSection: number;
+  settingsError: string | null;
   queueCursor: number;
   /** 설정 파일에서 읽은 설정·키바인딩·경고. 로딩 전에는 내장 기본값. */
   loaded: Loaded;
@@ -222,6 +227,8 @@ export function actionContext(s: AppState): ActionContext {
 
 export function scopeStack(s: AppState): Scope[] {
   if (s.dialog) return ["dialog", "pane", "global"];
+  // 설정 화면은 메인 창을 덮는 모달이다(settings 스코프).
+  if (s.settingsOpen) return ["settings", "global"];
   // Actions Panel은 입력창이 있는 모달이다(palette 스코프).
   if (s.palette) return ["palette", "global"];
   // 미리보기가 열려 있으면 패널 키는 받지 않는다(preview 스코프).
@@ -282,6 +289,9 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     userDirs: { home: null, downloads: null, documents: null, desktop: null, pictures: null, music: null, movies: null },
     queue: [],
     queueOpen: false,
+    settingsOpen: false,
+    settingsSection: 0,
+    settingsError: null,
     queueCursor: 0,
     loaded: defaultLoaded(),
     keymapWarnings: [],
@@ -1567,6 +1577,41 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       await runFn(item.id);
     },
 
+    /** 설정 화면 열기/닫기 (`Mod+,`). */
+    openSettings() {
+      set({ settingsOpen: true, settingsSection: 0, settingsError: null });
+    },
+    closeSettings() {
+      set({ settingsOpen: false, settingsError: null });
+    },
+    setSettingsSection(settingsSection: number) {
+      set({ settingsSection });
+    },
+    /** 설정 하나를 사용자 config.toml에 즉시 쓰고, 돌려받은 새 설정을 바로 적용한다(변경 이벤트를 기다리지 않는다). */
+    async setConfigValue(key: string, value: ConfigValue) {
+      try {
+        set({ loaded: await backend.setConfigValue(key, value), settingsError: null });
+        void reloadAll();
+      } catch (e) {
+        set({ settingsError: String(e instanceof Error ? e.message : e) });
+      }
+    },
+    /** 설정 하나를 사용자 config.toml에서 지워 기본값으로 되돌린다. */
+    async resetConfigValue(key: string) {
+      try {
+        set({ loaded: await backend.resetConfigValue(key), settingsError: null });
+        void reloadAll();
+      } catch (e) {
+        set({ settingsError: String(e instanceof Error ? e.message : e) });
+      }
+    },
+    async revealConfigDir() {
+      try {
+        await backend.revealConfigDir();
+      } catch (e) {
+        set({ settingsError: String(e instanceof Error ? e.message : e) });
+      }
+    },
     /** 작업 큐 팝업 열기/닫기 (`=`). 닫을 때 끝난 작업을 지운다. */
     toggleQueue() {
       if (get().queueOpen) {

@@ -40,7 +40,7 @@ export function ActionBar() {
   const { registry, keymap, platform } = useUi();
   if (!show) return null;
   return (
-    <div role="toolbar" aria-label="액션 바" className="flex gap-1 border-t border-neutral-300 bg-neutral-50 px-1 py-0.5 text-xs">
+    <div role="toolbar" aria-label="액션 바" className="flex gap-1 border-t border-app-line bg-app-dark-box px-1 py-0.5 text-xs">
       {known.map((id) => {
         const action = registry.get(id)!;
         const key = keymap.keysFor(id)[0];
@@ -55,9 +55,9 @@ export function ActionBar() {
             onClick={() => {
               if (enabled) void registry.dispatch(id, ctx);
             }}
-            className={"flex items-center gap-1 rounded border border-neutral-300 px-2 py-0.5 " + (enabled ? "" : "opacity-40")}
+            className={"flex items-center gap-1 rounded border border-app-line px-2 py-0.5 " + (enabled ? "" : "opacity-40")}
           >
-            {key && <kbd className="font-mono text-neutral-600">{formatKey(key, platform)}</kbd>}
+            {key && <kbd className="font-mono text-ink-dull">{formatKey(key, platform)}</kbd>}
             <span>{action.shortTitle ?? action.title}</span>
           </button>
         );

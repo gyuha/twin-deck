@@ -327,18 +327,106 @@ fn columns_spec_parse() {
 
 #[test]
 fn theme_setting_is_validated() {
-    assert_eq!(load("").config.behavior.theme, "light");
-    for t in ["light", "dark", "system"] {
-        let l = load(&format!("[behavior]\ntheme = \"{t}\"\n"));
-        assert!(l.warnings.is_empty(), "{t}: {:?}", l.warnings);
-        assert_eq!(l.config.behavior.theme, t);
-    }
     // 아직 사용자 정의 테마(P3)는 없으므로 알 수 없는 이름은 경고하고 기본값
     let l = load("[behavior]\ntheme = \"sakura\"\n");
-    assert_eq!(l.config.behavior.theme, "light");
+    assert_eq!(l.config.behavior.theme, "system");
     assert!(
         l.warnings.iter().any(|w| w.message.contains("theme")),
         "{:?}",
         l.warnings
+    );
+}
+
+#[test]
+fn theme_accepts_spaceui_themes() {
+    assert_eq!(load("").config.behavior.theme, "system");
+    for t in [
+        "dark", "light", "midnight", "noir", "slate", "nord", "mocha", "system",
+    ] {
+        let l = load(&format!("[behavior]\ntheme = \"{t}\"\n"));
+        assert!(l.warnings.is_empty(), "{t}: {:?}", l.warnings);
+        assert_eq!(l.config.behavior.theme, t);
+    }
+}
+
+fn user_value_dir(initial: Option<&str>) -> tempfile::TempDir {
+    let d = tempfile::tempdir().unwrap();
+    if let Some(s) = initial {
+        fs::write(d.path().join("config.toml"), s).unwrap();
+    }
+    d
+}
+
+#[test]
+fn user_value_set_keeps_comments_and_other_keys() {
+    let d = user_value_dir(Some(
+        "# 내 설정\n[behavior.table]\nicon_size = 16 # 아이콘\ncircular_selection = true\n\n[core.confirm]\ntrash = true\n",
+    ));
+    td_config::set_user_value(
+        d.path(),
+        "behavior.table.icon_size",
+        td_config::ConfigValue::Int(20),
+    )
+    .unwrap();
+    let text = fs::read_to_string(d.path().join("config.toml")).unwrap();
+    assert!(text.contains("# 내 설정"), "{text}");
+    assert!(text.contains("# 아이콘"), "{text}");
+    assert!(text.contains("icon_size = 20"), "{text}");
+    assert!(text.contains("circular_selection = true"), "{text}");
+    assert!(text.contains("trash = true"), "{text}");
+    let l = load_dir(d.path(), Platform::Linux);
+    assert_eq!(l.config.behavior.table.icon_size, 20);
+    assert!(l.config.behavior.table.circular_selection);
+}
+
+#[test]
+fn user_value_set_creates_file_and_tables_with_each_type() {
+    let d = user_value_dir(None);
+    use td_config::{set_user_value, ConfigValue};
+    set_user_value(
+        d.path(),
+        "behavior.theme",
+        ConfigValue::Str("midnight".into()),
+    )
+    .unwrap();
+    set_user_value(d.path(), "core.confirm.delete", ConfigValue::Bool(false)).unwrap();
+    set_user_value(d.path(), "behavior.table.icon_size", ConfigValue::Int(24)).unwrap();
+    let l = load_dir(d.path(), Platform::Linux);
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert_eq!(l.config.behavior.theme, "midnight");
+    assert!(!l.config.core.confirm.delete);
+    assert_eq!(l.config.behavior.table.icon_size, 24);
+}
+
+#[test]
+fn user_value_reset_removes_key_and_prunes_empty_tables() {
+    let d = user_value_dir(Some(
+        "[behavior]\ntheme = \"nord\"\n\n[core.confirm]\ndelete = false\n",
+    ));
+    td_config::reset_user_value(d.path(), "core.confirm.delete").unwrap();
+    let text = fs::read_to_string(d.path().join("config.toml")).unwrap();
+    assert!(!text.contains("delete"), "{text}");
+    assert!(!text.contains("confirm"), "빈 테이블이 남았다: {text}");
+    assert!(text.contains("theme = \"nord\""), "{text}");
+    let l = load_dir(d.path(), Platform::Linux);
+    assert!(l.config.core.confirm.delete, "기본값으로 돌아간다");
+    // 없는 키를 지워도 오류가 아니다
+    td_config::reset_user_value(d.path(), "core.confirm.trash").unwrap();
+}
+
+#[test]
+fn user_value_syntax_error_is_refused_and_file_untouched() {
+    let broken = "[behavior\ntheme = ";
+    let d = user_value_dir(Some(broken));
+    let set = td_config::set_user_value(
+        d.path(),
+        "behavior.theme",
+        td_config::ConfigValue::Str("dark".into()),
+    );
+    assert!(set.is_err());
+    assert!(td_config::reset_user_value(d.path(), "behavior.theme").is_err());
+    assert_eq!(
+        fs::read_to_string(d.path().join("config.toml")).unwrap(),
+        broken
     );
 }

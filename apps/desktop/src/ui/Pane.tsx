@@ -16,7 +16,7 @@ export function Pane({ pane }: { pane: PaneId }) {
       data-active={isActive}
       className={[
         "flex min-h-0 min-w-0 flex-1 flex-col border-2",
-        isActive ? "border-blue-600" : "border-transparent",
+        isActive ? "border-accent" : "border-transparent",
       ].join(" ")}
     >
       <TabBar pane={pane} />

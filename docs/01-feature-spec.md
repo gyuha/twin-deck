@@ -132,6 +132,7 @@ Marta의 기본 키는 Total Commander 계열(F5 복사, F6 이동 등)을 따�
 | CFG-09 | Gadgets: application/executable 유형, 선택/폴더 변수 | `/docs/advanced/gadgets/` | P3 | [06](06-config-plugins.md) |
 | CFG-10 | Lua 플러그인 (액션 정의, `isApplicable`, `apply`, 컨텍스트 객체) | `/api/` | P3 | ADR-0008 (Proposed) |
 | CFG-11 | 튜토리얼(첫 실행), 상태 초기화 | `/docs/tutorial/` | P2 | |
+| CFG-12 | 설정 화면: 값 하나짜리 설정을 항목별 컨트롤로 바꾸고 즉시 저장, 항목별 기본값 복원 (`Mod+,`) | twin-deck 자체 | P1 | 구현됨(2026-10-01). 배열·키바인딩 편집과 TOML 편집기(CFG-01)는 아직 |
 
 ## 10. 액션 시스템
 

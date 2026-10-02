@@ -11,15 +11,15 @@ export function VirtualHeader({ pane }: { pane: PaneId }) {
   if (!v) return null;
   const state = v.running ? "진행 중… (Esc로 취소)" : v.cancelled ? "취소됨" : "완료";
   return (
-    <div className="border-b border-neutral-300 px-2 py-1 text-sm">
+    <div className="border-b border-app-line px-2 py-1 text-sm">
       <div role="status" aria-label="검색 상태" className="flex flex-wrap items-center gap-x-3">
         <span className="font-semibold">{v.title}</span>
         <span>{tab.entries.length}개</span>
         {v.kind === "usage" && <span>총 {formatSize(v.totalBytes, style)}</span>}
-        <span className={v.running ? "text-blue-800" : "text-neutral-600"}>{state}</span>
+        <span className={v.running ? "text-accent" : "text-ink-dull"}>{state}</span>
       </div>
       {v.warnings.length > 0 && (
-        <ul aria-label="경고" className="text-red-700">
+        <ul aria-label="경고" className="text-status-error">
           {v.warnings.map((w) => (
             <li key={w}>⚠ {w}</li>
           ))}
