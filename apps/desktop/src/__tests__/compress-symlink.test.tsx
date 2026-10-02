@@ -2,7 +2,7 @@ import { act, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { FakeBackend } from "@twin-deck/ts-client";
 import { crumbs, runAction } from "./search-helpers";
-import { entryNames, renderApp } from "./helpers";
+import { cursorName, entryNames, renderApp } from "./helpers";
 
 /**
  * /home/a 목록: docs(폴더) bundle.zip plain.txt report.txt / /home/b: x.txt
@@ -57,6 +57,8 @@ describe("OP-11 압축", () => {
     await user.keyboard("{Insert}"); // docs 선택 (커서는 bundle.zip으로)
     await user.keyboard("{ArrowDown}{Insert}"); // plain.txt 선택 (커서는 report.txt로)
     await runAction(user, "core.compress");
+    expect(await screen.findByRole("dialog")).toHaveTextContent("압축 파일 이름"); // 여러 항목은 이름을 묻는다
+    await user.keyboard("{Enter}"); // 기본 이름(현재 폴더 이름)
     await waitFor(() => expect(b.exists("/home/a/a.zip")).toBe(true));
     expect(b.exists("/home/a/a.zip!/docs/readme.md")).toBe(true);
     expect(b.exists("/home/a/a.zip!/plain.txt")).toBe(true);
@@ -66,8 +68,66 @@ describe("OP-11 압축", () => {
     await waitFor(() => expect(entryNames("left")).toContain("a.zip"));
     await user.keyboard("{Home}{Insert}{Insert}"); // docs, a.zip 선택
     await runAction(user, "core.compress");
+    await screen.findByRole("dialog");
+    await user.keyboard("{Enter}");
     await waitFor(() => expect(b.exists("/home/a/a (1).zip")).toBe(true));
     expect(b.exists("/home/a/a.zip")).toBe(true);
+  });
+
+  it("여러 항목: 다이얼로그에서 지정한 이름으로 만든다(.zip이 없으면 붙인다)", async () => {
+    const b = backend();
+    const { user } = await renderApp(b);
+    await user.keyboard("{Insert}{Insert}"); // docs, bundle.zip 선택
+    await runAction(user, "core.compress");
+    await screen.findByRole("dialog");
+    await user.keyboard("{Control>}a{/Control}mine{Enter}");
+    await waitFor(() => expect(b.exists("/home/a/mine.zip")).toBe(true));
+    expect(b.exists("/home/a/a.zip")).toBe(false);
+  });
+
+  it("여러 항목: 이름 다이얼로그를 취소하면 압축하지 않는다", async () => {
+    const b = backend();
+    const { user } = await renderApp(b);
+    await user.keyboard("{Insert}{Insert}");
+    await runAction(user, "core.compress");
+    await screen.findByRole("dialog");
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect((await b.queueJobs()).length).toBe(0);
+  });
+
+  it("한 항목은 이름을 묻지 않고 바로 압축한다", async () => {
+    const b = backend();
+    const { user } = await renderApp(b);
+    await user.keyboard(TO_REPORT);
+    await runAction(user, "core.compress");
+    await waitFor(() => expect(b.exists("/home/a/report.zip")).toBe(true));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("끝나면 만들어진 압축 파일이 목록에 나타나고 커서가 그 파일에 놓인다", async () => {
+    const b = backend();
+    b.queueMode = "manual";
+    const { user } = await renderApp(b);
+    await user.keyboard(TO_REPORT);
+    await runAction(user, "core.compress");
+    await waitFor(() => expect(indicator()).toBeInTheDocument());
+    expect(entryNames("left")).not.toContain("report.zip"); // 끝나기 전에는 없다
+    await advance(b);
+    await waitFor(() => expect(entryNames("left")).toContain("report.zip")); // 이벤트 없이도 끝나면 나타난다
+    await waitFor(() => expect(cursorName("left")).toBe("report.zip"));
+  });
+
+  it("큐 이벤트가 웹뷰에 닿지 않아도(실제 Tauri 런타임) 끝나면 목록에 나타난다", async () => {
+    const b = backend();
+    b.queueMode = "manual";
+    b.onQueueChanged = () => () => {}; // 이벤트를 받지 못하는 환경
+    b.onDirChanged = () => () => {};
+    const { user } = await renderApp(b);
+    await user.keyboard(TO_REPORT);
+    await runAction(user, "core.compress");
+    await advance(b);
+    await waitFor(() => expect(entryNames("left")).toContain("report.zip"));
   });
 
   it("큐 작업으로 실행된다: 진행 표시가 있고 끝나기 전에는 결과가 없다", async () => {

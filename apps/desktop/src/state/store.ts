@@ -1229,14 +1229,37 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (targets.length === 0) return;
       if (tab.virtual) return fail("검색/분석 결과 탭에서는 압축할 수 없습니다. 폴더 탭에서 항목을 선택하세요");
       if (targets.some((t) => isArchivePath(t.path))) return fail("아카이브 안의 항목은 압축할 수 없습니다. 먼저 밖으로 복사하세요");
+      // 여러 항목은 압축 파일 이름을 물어본다(기본: 이 폴더 이름). 하나면 그 항목 이름을 쓴다.
+      let name: string | undefined;
+      if (targets.length > 1) {
+        const asked = await ask<string>({
+          kind: "name",
+          title: "압축 파일 이름",
+          value: `${baseName(tab.path) || "archive"}.zip`,
+          error: null,
+          selectStem: true,
+        });
+        if (asked === null) return;
+        const trimmed = asked.trim();
+        name = /\.zip$/i.test(trimmed) ? trimmed : `${trimmed}.zip`;
+      }
       set({ notice: null });
       patchActive({ selection: new Set() });
+      const pane = get().activePane;
+      const before = new Set(tab.entries.map((e) => e.name));
       try {
-        await backend.enqueueCompress(targets.map((t) => t.path), tab.path);
+        const jobId = await backend.enqueueCompress(targets.map((t) => t.path), tab.path, name);
+        await trackTransfer(jobId, "압축");
       } catch (e) {
         fail(e);
       }
       await reloadAll();
+      // 만들어진 압축 파일에 커서를 둔다(작업이 끝나 목록에 나타난 새 항목).
+      const after = get().panes[pane].tabs.find((t) => t.id === tab.id);
+      const idx = after?.entries.findIndex((e) => !before.has(e.name) && e.kind === "file") ?? -1;
+      if (after && idx >= 0 && get().panes[pane].tabs[get().panes[pane].active].id === tab.id) {
+        patchTab(pane, tab.id, { cursor: idx });
+      }
     },
     /** 추출 (OP-11, `core.extract`): 선택한 아카이브를 각각 그 옆의 새 폴더에 푼다. `toInactive`이면 반대편 패널 폴더에 푼다. */
     async extract(toInactive = false) {

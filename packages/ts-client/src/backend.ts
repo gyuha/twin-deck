@@ -25,7 +25,7 @@ export interface Backend {
   /** 복사/이동/휴지통/삭제를 작업 큐에 넣는다. 작업 id를 돌려준다. */
   enqueue(kind: JobKindDto, items: QueueItemDto[]): Promise<number>;
   /** 압축 (OP-11): `sources`를 `destDir`의 ZIP 하나로 묶는 작업을 큐에 넣는다. 이름이 겹치면 번호를 붙이고 원본은 그대로 둔다. */
-  enqueueCompress(sources: string[], destDir: string): Promise<number>;
+  enqueueCompress(sources: string[], destDir: string, name?: string): Promise<number>;
   /** 추출 (OP-11): 아카이브 `src`를 `destDir` 아래 아카이브 이름의 새 폴더에 안전하게 푸는 작업을 큐에 넣는다. */
   enqueueExtract(src: string, destDir: string): Promise<number>;
   /** 심볼릭 링크 만들기 (OP-12). 만든 링크의 경로, 정책이 건너뛰기라 만들지 않았으면 null. */

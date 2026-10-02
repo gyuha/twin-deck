@@ -29,8 +29,8 @@ export class TauriBackend implements Backend {
   enqueue(kind: JobKindDto, items: QueueItemDto[]) {
     return commands.enqueueJob(kind, items);
   }
-  async enqueueCompress(sources: string[], destDir: string) {
-    return unwrap(await commands.enqueueCompress(sources, destDir, null));
+  async enqueueCompress(sources: string[], destDir: string, name?: string) {
+    return unwrap(await commands.enqueueCompress(sources, destDir, name ?? null));
   }
   enqueueExtract(src: string, destDir: string) {
     return commands.enqueueExtract(src, destDir, null);

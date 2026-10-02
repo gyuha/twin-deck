@@ -574,7 +574,7 @@ export class FakeBackend implements Backend {
         await this.deletePermanent(item.src);
         break;
       case "compress":
-        this.compress(this.compressSources.get(item) ?? [item.src], item.destDir!);
+        this.compress(this.compressSources.get(item)?.sources ?? [item.src], item.destDir!, this.compressSources.get(item)?.name);
         break;
       case "extract":
         this.extract(item.src, item.destDir!);
@@ -583,13 +583,13 @@ export class FakeBackend implements Backend {
   }
 
   // ---- 압축/추출/심볼릭 링크 흉내 (실제 zip 동작은 Rust 테스트가 검증한다) ----
-  private compressSources = new WeakMap<QueueItemDto, string[]>();
+  private compressSources = new WeakMap<QueueItemDto, { sources: string[]; name?: string }>();
   /** 링크를 만들 수 없는 상황(예: Windows 권한 오류)을 흉내 내는 테스트용 오류 문구. */
   symlinkError: string | null = null;
 
-  async enqueueCompress(sources: string[], destDir: string) {
+  async enqueueCompress(sources: string[], destDir: string, name?: string) {
     const item: QueueItemDto = { src: sources[0], destDir, policy: "rename" };
-    this.compressSources.set(item, sources);
+    this.compressSources.set(item, { sources, name });
     return this.enqueue("compress", [item]);
   }
 
@@ -608,14 +608,14 @@ export class FakeBackend implements Backend {
   }
 
   /** Rust `default_zip_name`과 같은 규칙: 하나면 그 이름(파일은 확장자 제외), 여럿이면 압축 위치의 폴더 이름. */
-  private compress(sources: string[], destDir: string) {
+  private compress(sources: string[], destDir: string, name?: string) {
     sources.forEach((s) => this.need(s));
     this.need(destDir);
     const first = this.need(sources[0]);
     const one = baseName(sources[0]);
     const dot = one.lastIndexOf(".");
     const stem = sources.length === 1 ? (first.kind === "dir" || dot <= 0 ? one : one.slice(0, dot)) : baseName(destDir) || "archive";
-    const dest = joinPath(destDir, this.freeName(destDir, `${stem}.zip`));
+    const dest = joinPath(destDir, this.freeName(destDir, name ?? `${stem}.zip`));
     // 결과는 `PK`로 시작하는 파일이고, 안쪽(`dest!`)에 원본 사본이 있어 아카이브로 열 수 있다.
     this.nodes.set(dest, { kind: "file", content: "PK" });
     this.nodes.set(`${dest}!`, { kind: "dir", content: "" });
