@@ -947,6 +947,16 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     setCursor(index: number) {
       patchActive((t) => ({ cursor: clamp(index, t.entries.length) }));
     },
+    /** Shift+클릭: 지금 커서 항목부터 클릭한 항목까지(양 끝 포함)를 기존 선택에 더하고 커서를 옮긴다. */
+    selectRangeTo(index: number) {
+      patchActive((t) => {
+        if (t.entries.length === 0) return {};
+        const to = clamp(index, t.entries.length);
+        const sel = new Set(t.selection);
+        for (let i = Math.min(t.cursor, to); i <= Math.max(t.cursor, to); i++) sel.add(t.entries[i].path);
+        return { cursor: to, selection: sel };
+      });
+    },
     /** 선택 반전 (SEL-03): 모든 항목의 선택 상태를 뒤집는다. */
     invertSelection() {
       patchActive((t) => ({ selection: new Set(t.entries.filter((e) => !t.selection.has(e.path)).map((e) => e.path)) }));

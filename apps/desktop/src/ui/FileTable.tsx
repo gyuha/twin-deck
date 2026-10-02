@@ -101,6 +101,10 @@ export function FileTable({ pane }: { pane: PaneId }) {
         data-cursor={cursor}
         onClick={(ev) => {
           activate();
+          if (ev.shiftKey) {
+            api.selectRangeTo(i); // 커서가 기준 행이라 setCursor 보다 먼저
+            return;
+          }
           api.setCursor(i);
           if (ev.ctrlKey || ev.metaKey) api.toggleSelect();
         }}
