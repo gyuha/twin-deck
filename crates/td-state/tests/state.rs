@@ -25,6 +25,7 @@ fn sample() -> Snapshot {
         active_pane: "right".into(),
         show_hidden: true,
         palette_query: "복제".into(),
+        split: 500,
         left: PaneSnap {
             tabs: vec![tab("/home/a"), tab("/home/a/docs")],
             active: 1,
@@ -205,4 +206,24 @@ fn window_open_uses_a_free_label_and_reports_failures() {
         "창을 만들 수 없음"
     );
     assert!(bad.spawned.borrow().is_empty());
+}
+
+#[test]
+fn split_defaults_for_old_files_and_rejects_out_of_range() {
+    let tmp = tempfile::tempdir().unwrap();
+    // split이 없던 옛 파일은 반반(500)으로 읽는다
+    let mut json: serde_json::Value = serde_json::to_value(sample()).unwrap();
+    json.as_object_mut().unwrap().remove("split");
+    fs::write(tmp.path().join("state.json"), json.to_string()).unwrap();
+    assert_eq!(load(tmp.path(), "main").snapshot.unwrap().split, 500);
+
+    // 범위를 벗어난 값은 무시하고 경고한다
+    for bad in [0u32, 1000] {
+        let mut s = sample();
+        s.split = bad;
+        save(tmp.path(), "main", &s).unwrap();
+        let got = load(tmp.path(), "main");
+        assert_eq!(got.snapshot, None, "split={bad}");
+        assert!(got.warning.is_some());
+    }
 }

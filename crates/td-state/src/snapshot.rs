@@ -51,8 +51,15 @@ pub struct Snapshot {
     pub active_pane: String,
     pub show_hidden: bool,
     pub palette_query: String,
+    /// 왼쪽 패널이 차지하는 너비 비율(천분율, 1~999). 옛 파일에는 없어서 500(반반)으로 읽는다.
+    #[serde(default = "default_split")]
+    pub split: u32,
     pub left: PaneSnap,
     pub right: PaneSnap,
+}
+
+fn default_split() -> u32 {
+    500
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -99,6 +106,9 @@ fn valid(s: &Snapshot) -> Result<(), String> {
         if pane.active as usize >= pane.tabs.len() {
             return Err(format!("{name} 패널의 활성 탭 번호가 범위를 벗어났습니다"));
         }
+    }
+    if !(1..=999).contains(&s.split) {
+        return Err(format!("패널 분할 비율이 범위를 벗어났습니다: {}", s.split));
     }
     if s.active_pane != "left" && s.active_pane != "right" {
         return Err(format!("알 수 없는 활성 패널: {}", s.active_pane));

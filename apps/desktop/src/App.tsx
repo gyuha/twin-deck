@@ -14,7 +14,7 @@ import { ActionBar, useBarIds } from "./ui/ActionBar";
 import { ActionsPalette } from "./ui/ActionsPalette";
 import { Dialog } from "./ui/Dialog";
 import { Preview } from "./ui/Preview";
-import { Pane } from "./ui/Pane";
+import { PaneSplit } from "./ui/PaneSplit";
 import { ContextMenu } from "./ui/ContextMenu";
 import { PopupMenu } from "./ui/PopupMenu";
 import { QueueIndicator, QueuePopup } from "./ui/Queue";
@@ -193,10 +193,7 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
       <UiContext.Provider value={{ registry, keymap, platform }}>
       <BarWarnings base={warnings} />
       <main className="flex h-screen flex-col">
-        <div className="flex min-h-0 flex-1">
-          <Pane pane="left" />
-          <Pane pane="right" />
-        </div>
+        <PaneSplit />
         <StatusBar />
         <ActionBar />
         <ActionsPalette />

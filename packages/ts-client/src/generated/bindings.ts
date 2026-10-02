@@ -465,7 +465,11 @@ export type Snapshot = { version: number;
 /**
  * "left" | "right"
  */
-activePane: string; showHidden: boolean; paletteQuery: string; left: PaneSnap; right: PaneSnap }
+activePane: string; showHidden: boolean; paletteQuery: string; 
+/**
+ * 왼쪽 패널이 차지하는 너비 비율(천분율, 1~999). 옛 파일에는 없어서 500(반반)으로 읽는다.
+ */
+split?: number; left: PaneSnap; right: PaneSnap }
 export type SortSnap = { key: string; dir: string }
 export type TabSnap = { path: string; 
 /**

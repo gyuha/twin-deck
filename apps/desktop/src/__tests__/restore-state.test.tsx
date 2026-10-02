@@ -18,6 +18,7 @@ const snap = (over: Partial<Snapshot> = {}): Snapshot => ({
   activePane: "left",
   showHidden: false,
   paletteQuery: "",
+  split: 500,
   left: { tabs: [tab("/home/a")], active: 0 },
   right: { tabs: [tab("/home/b")], active: 0 },
   ...over,
@@ -50,6 +51,7 @@ describe("PANE-05 상태 복원", () => {
       activePane: "right",
       showHidden: true,
       paletteQuery: "dupl",
+      split: 500,
       left: {
         active: 1,
         tabs: [

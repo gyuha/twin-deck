@@ -190,6 +190,8 @@ export interface PreviewState {
 export interface AppState {
   panes: Record<PaneId, PaneState>;
   activePane: PaneId;
+  /** 왼쪽 패널이 차지하는 너비 비율(0~1). 화면 크기가 바뀌어도 비율이 유지된다. */
+  split: number;
   showHidden: boolean;
   dialog: DialogState | null;
   /** 열려 있는 미리보기 (VIEW-01). */
@@ -236,6 +238,9 @@ export const SELECTION_SAVE_LIMIT = 5000;
 export function effectiveSort(tab: TabState, columns: readonly string[]): SortState {
   return tab.sort ?? sortFromColumns(parseColumns(columns)) ?? DEFAULT_SORT;
 }
+export const SPLIT_MIN = 0.15;
+const clampSplit = (r: number) => Math.min(1 - SPLIT_MIN, Math.max(SPLIT_MIN, Number.isFinite(r) ? r : 0.5));
+
 const other = (p: PaneId): PaneId => (p === "left" ? "right" : "left");
 
 export const isActiveJob = (j: JobDto) => ["queued", "running", "paused"].includes(j.status);
@@ -332,6 +337,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
           right: { tabs: [newTab(rightPath)], active: 0 },
         },
     activePane: snapshot?.activePane === "right" ? "right" : "left",
+    split: clampSplit((snapshot?.split ?? 500) / 1000),
     showHidden: snapshot?.showHidden ?? false,
     dialog: null,
     preview: null,
@@ -585,6 +591,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       activePane: s.activePane,
       showHidden: s.showHidden,
       paletteQuery: s.lastPaletteQuery,
+      split: Math.round(s.split * 1000),
       left: pane(s.panes.left),
       right: pane(s.panes.right),
     };
@@ -800,6 +807,10 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
      * 반대편 패널로 보낸다 (`core.pane.send`). 커서가 폴더면 그 폴더를, 파일이면 현재 폴더를 반대편 패널에서 연다.
      * 활성 패널은 그대로다. `to`가 이미 활성 패널이면 보낼 곳이 없으므로 이전/다음 폴더로 간다(같은 키의 기존 동작).
      */
+    /** 두 패널 사이 구분선을 옮긴다. `ratio`는 왼쪽 패널이 차지할 너비 비율(0~1)이다. */
+    setSplit(ratio: number) {
+      set({ split: clampSplit(ratio) });
+    },
     async paneSend(args?: Record<string, unknown>) {
       const to = args?.to;
       if (to !== "left" && to !== "right") return fail("core.pane.send에는 인수 to(left|right)가 필요합니다");
