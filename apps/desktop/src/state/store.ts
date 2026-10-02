@@ -109,6 +109,47 @@ export interface MenuState {
   cursor: number;
 }
 
+/** 컨텍스트 메뉴 항목. `sub`가 있으면 하위 메뉴를 연다. 둘 다 없으면 구분선이다. */
+export interface CtxItem {
+  label?: string;
+  actionId?: string;
+  sub?: CtxItem[];
+}
+
+/** 파일 행 컨텍스트 메뉴의 구성 (Finder 스타일). 단축키 힌트와 실행 가능 여부는 액션 ID로 구한다. */
+export const CONTEXT_MENU: readonly CtxItem[] = [
+  { label: "열기", actionId: "core.open" },
+  {
+    label: "다음으로 열기",
+    sub: [
+      { label: "편집기로 열기", actionId: "core.edit" },
+      { label: "아카이브로 열기…", actionId: "core.open.as_archive" },
+      { label: "파일 관리자에서 보기", actionId: "core.reveal" },
+    ],
+  },
+  {},
+  { label: "여기에 압축…", actionId: "core.compress" },
+  {},
+  { label: "이동", actionId: "core.move" },
+  { label: "복사", actionId: "core.copy" },
+  { label: "삭제", actionId: "core.trash" },
+  { label: "이름 바꾸기", actionId: "core.rename" },
+  {},
+  { label: "파일 속성 표시", actionId: "core.file.info" },
+];
+
+export interface CtxMenuState {
+  /** 화면 좌표(마우스 위치). */
+  x: number;
+  y: number;
+  /** 커서가 있는 최상위 항목. */
+  cursor: number;
+  /** 하위 메뉴가 열려 있으면 그 안의 커서. */
+  subCursor: number | null;
+}
+
+const selectableIn = (items: readonly CtxItem[]) => items.flatMap((it, i) => (it.label ? [i] : []));
+
 /** Actions Panel에 나열되는 액션 한 줄. App이 레지스트리와 키맵에서 만든다. */
 export interface CatalogItem {
   id: string;
@@ -153,6 +194,7 @@ export interface AppState {
   lastPaletteQuery: string;
   /** 열려 있는 팝업 메뉴 (Volumes/Favorites/Recent/Hierarchy). */
   menu: MenuState | null;
+  ctxMenu: CtxMenuState | null;
   userDirs: UserDirsDto;
   /** 작업 큐 스냅샷 (끝난 작업은 팝업을 닫을 때까지 남는다). */
   queue: JobDto[];
@@ -233,8 +275,8 @@ export function scopeStack(s: AppState): Scope[] {
   if (s.palette) return ["palette", "global"];
   // 미리보기가 열려 있으면 패널 키는 받지 않는다(preview 스코프).
   if (s.preview) return ["preview", "global"];
-  // 팝업 메뉴는 모달이다(panel 스코프).
-  if (s.menu) return ["panel", "global"];
+  // 팝업 메뉴와 컨텍스트 메뉴는 모달이다(panel 스코프).
+  if (s.menu || s.ctxMenu) return ["panel", "global"];
   // 큐 팝업이 열려 있으면 패널 키는 받지 않는다.
   if (s.queueOpen) return ["queue", "global"];
   return activeTab(s).quick !== null ? ["quickSelect", "pane", "global"] : ["pane", "global"];
@@ -286,6 +328,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     palette: null,
     lastPaletteQuery: snapshot?.paletteQuery ?? "",
     menu: null,
+    ctxMenu: null,
     userDirs: { home: null, downloads: null, documents: null, desktop: null, pictures: null, music: null, movies: null },
     queue: [],
     queueOpen: false,
@@ -1435,7 +1478,62 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const first = items.findIndex((i) => i.path !== undefined);
       set({ menu: { kind, title, items, cursor: Math.max(first, 0) } });
     },
+    /** 파일 행 우클릭: 선택 밖의 행이면 그 행만 대상으로 삼고, 선택 안의 행이면 선택을 유지한 채 메뉴를 연다. */
+    openContextMenu(pane: PaneId, index: number, x: number, y: number) {
+      api.activate(pane);
+      const tab = activeTab(get());
+      const entry = tab.entries[index];
+      if (!entry) return;
+      if (!tab.selection.has(entry.path)) patchActive({ selection: new Set() });
+      api.setCursor(index);
+      set({ menu: null, ctxMenu: { x, y, cursor: selectableIn(CONTEXT_MENU)[0], subCursor: null } });
+    },
+    ctxClose() {
+      set({ ctxMenu: null });
+    },
+    ctxHover(cursor: number, subCursor: number | null) {
+      set((s) => (s.ctxMenu ? { ctxMenu: { ...s.ctxMenu, cursor, subCursor } } : {}));
+    },
+    ctxMove(delta: 1 | -1) {
+      set((s) => {
+        const m = s.ctxMenu;
+        if (!m) return {};
+        const items = m.subCursor === null ? CONTEXT_MENU : (CONTEXT_MENU[m.cursor].sub ?? []);
+        const cur = m.subCursor === null ? m.cursor : m.subCursor;
+        const sel = selectableIn(items);
+        const next = sel[Math.min(Math.max(sel.indexOf(cur) + delta, 0), sel.length - 1)];
+        return { ctxMenu: m.subCursor === null ? { ...m, cursor: next } : { ...m, subCursor: next } };
+      });
+    },
+    /** → 키: 하위 메뉴가 있는 항목이면 연다. */
+    ctxRight() {
+      set((s) => {
+        const m = s.ctxMenu;
+        const sub = m && m.subCursor === null ? CONTEXT_MENU[m.cursor].sub : undefined;
+        return m && sub ? { ctxMenu: { ...m, subCursor: selectableIn(sub)[0] } } : {};
+      });
+    },
+    /** ← 키: 하위 메뉴가 열려 있으면 닫고, 아니면 메뉴를 닫는다. */
+    ctxLeft() {
+      set((s) => {
+        const m = s.ctxMenu;
+        if (!m) return {};
+        return m.subCursor === null ? { ctxMenu: null } : { ctxMenu: { ...m, subCursor: null } };
+      });
+    },
+    /** 커서 항목을 실행한다. 하위 메뉴 항목이면 하위 메뉴를 연다. */
+    async ctxSelect(item?: CtxItem) {
+      const m = get().ctxMenu;
+      if (!m) return;
+      const it = item ?? (m.subCursor === null ? CONTEXT_MENU[m.cursor] : CONTEXT_MENU[m.cursor].sub?.[m.subCursor]);
+      if (!it) return;
+      if (it.sub) return api.ctxRight();
+      if (!it.actionId) return;
+      set({ ctxMenu: null });
+      await runFn(it.actionId);
+    },
     menuMove(delta: 1 | -1) {
+      if (get().ctxMenu) return api.ctxMove(delta);
       set((s) => {
         const m = s.menu;
         if (!m) return {};
@@ -1447,10 +1545,11 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       });
     },
     menuClose() {
-      set({ menu: null });
+      set({ menu: null, ctxMenu: null });
     },
     /** 커서 항목으로 이동하고 메뉴를 닫는다. */
     async menuSelect(index?: number) {
+      if (get().ctxMenu) return api.ctxSelect();
       const m = get().menu;
       if (!m) return;
       const item = m.items[index ?? m.cursor];

@@ -110,10 +110,10 @@ export function FileTable({ pane }: { pane: PaneId }) {
           void api.open();
         }}
         onContextMenu={(ev) => {
-          if (!rightClickSelect) return;
           ev.preventDefault();
           activate();
-          api.toggleSelectAt(i);
+          if (rightClickSelect) api.toggleSelectAt(i);
+          api.openContextMenu(pane, i, ev.clientX, ev.clientY);
         }}
         style={{
           gridTemplateColumns: multi

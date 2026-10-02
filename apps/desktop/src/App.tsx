@@ -13,6 +13,7 @@ import { ActionsPalette } from "./ui/ActionsPalette";
 import { Dialog } from "./ui/Dialog";
 import { Preview } from "./ui/Preview";
 import { Pane } from "./ui/Pane";
+import { ContextMenu } from "./ui/ContextMenu";
 import { PopupMenu } from "./ui/PopupMenu";
 import { QueueIndicator, QueuePopup } from "./ui/Queue";
 import { Settings } from "./ui/Settings";
@@ -172,6 +173,7 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
         <ActionsPalette />
         <Preview />
         <PopupMenu />
+        <ContextMenu />
         <QueueIndicator />
         <QueuePopup />
         <Settings />

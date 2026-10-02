@@ -105,6 +105,8 @@ export function menuHandlers({ api }: AppStore): Partial<ActionHandlers> {
     "core.menu.down": () => api.menuMove(1),
     "core.menu.select": () => api.menuSelect(),
     "core.menu.close": () => api.menuClose(),
+    "core.menu.right": () => api.ctxRight(),
+    "core.menu.left": () => api.ctxLeft(),
     "core.volume.unmount": () => api.menuVolumeAction("unmount"),
     "core.volume.eject": () => api.menuVolumeAction("eject"),
     "core.recent.clear": () => api.menuClearRecent(),
