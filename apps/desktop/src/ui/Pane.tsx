@@ -15,7 +15,17 @@ export function Pane({ pane }: { pane: PaneId }) {
     <section
       aria-label={pane === "left" ? "왼쪽 패널" : "오른쪽 패널"}
       data-active={isActive}
-      onMouseDown={() => api.activate(pane)}
+      onMouseDown={(e) => {
+        api.activate(pane);
+        if (e.button === 3 || e.button === 4) e.preventDefault(); // 웹뷰가 자체 뒤로가기를 하지 않게
+      }}
+      onMouseUp={(e) => {
+        // 마우스 뒤로(3)/앞으로(4) 버튼: 이 패널 탭의 이전/다음 폴더로
+        if (e.button === 3) void api.goBack();
+        else if (e.button === 4) void api.goForward();
+        else return;
+        e.preventDefault();
+      }}
       className={[
         "flex min-h-0 min-w-0 flex-1 flex-col border-2",
         isActive ? "border-accent" : "border-transparent",

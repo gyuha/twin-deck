@@ -48,6 +48,9 @@ export interface TabState {
   path: string;
   /** 방문한 경로 이력 (이 탭). */
   history: string[];
+  /** 뒤로/앞으로 이동용 방문 스택(이 탭에서 실제 폴더를 옮긴 기록). `history`는 최근 위치 메뉴용이다. */
+  back: string[];
+  forward: string[];
   entries: EntryDto[];
   cursor: number;
   selection: ReadonlySet<string>;
@@ -263,6 +266,8 @@ export function actionContext(s: AppState): ActionContext {
     selectedCount: tab.selection.size,
     tabCount: s.panes[s.activePane].tabs.length,
     canGoUp: !tab.virtual && parentPath(tab.path) !== null,
+    canGoBack: !tab.virtual && tab.back.length > 0,
+    canGoForward: !tab.virtual && tab.forward.length > 0,
     cursorIsDir: cursorEntry(tab)?.kind === "dir",
     multiColumn: tab.view.mode === "columns",
     virtualTab: !!tab.virtual,
@@ -293,6 +298,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     view: { mode: "table" },
     path,
     history: [path],
+    back: [],
+    forward: [],
     entries: [],
     cursor: 0,
     selection: new Set(),
@@ -764,21 +771,44 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       watched.clear();
     },
 
-    async navigate(path: string, focusName?: string) {
+    /** 폴더로 이동한다. `how`: 일반 이동은 방문 스택에 쌓고(앞으로 기록은 버림), back/forward는 스택 사이를 옮긴다. */
+    async navigate(path: string, focusName?: string, how: "push" | "back" | "forward" = "push") {
       const s = get();
       const tab = activeTab(s);
       stopSearch(tab); // 가상 탭에서 실제 위치로 나가면 결과를 버린다
-      patchActive((t) => ({
-        virtual: undefined,
+      patchActive((t) => {
+        // 가상 탭(검색 결과)에서 나올 때는 돌아갈 실제 위치가 없으므로 쌓지 않는다.
+        const here = t.virtual ? [] : [t.path];
+        const stacks =
+          how === "back"
+            ? { back: t.back.slice(0, -1), forward: [...t.forward, ...here] }
+            : how === "forward"
+              ? { back: [...t.back, ...here], forward: t.forward.slice(0, -1) }
+              : { back: t.path === path ? t.back : [...t.back, ...here], forward: t.path === path && !t.virtual ? t.forward : [] };
+        return { ...stacks, virtual: undefined,
         path,
         history: [...t.history, path],
         cursor: 0,
         selection: new Set(),
         quick: null,
         entries: [],
-      }));
+      }; });
       await reload(s.activePane, tab.id, focusName);
       await syncWatches();
+    },
+    /** 이전 폴더로 (마우스 뒤로 버튼, `core.history.back`). 방금 나온 하위 폴더가 있으면 그 폴더에 커서를 둔다. */
+    async goBack() {
+      const tab = activeTab(get());
+      const target = tab.back.at(-1);
+      if (target === undefined) return;
+      await api.navigate(target, parentPath(tab.path) === target ? baseName(tab.path) : undefined, "back");
+    },
+    /** 다음 폴더로 (마우스 앞으로 버튼, `core.history.forward`). */
+    async goForward() {
+      const tab = activeTab(get());
+      const target = tab.forward.at(-1);
+      if (target === undefined) return;
+      await api.navigate(target, parentPath(tab.path) === target ? baseName(tab.path) : undefined, "forward");
     },
 
     /** 열기: 폴더는 들어가고, 아카이브 파일은 폴더처럼 연다 (ARC-01). */

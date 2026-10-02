@@ -16,6 +16,8 @@ const ctx = (o: Partial<ActionContext> = {}): ActionContext => ({
   selectedCount: 0,
   tabCount: 1,
   canGoUp: true,
+  canGoBack: false,
+  canGoForward: false,
   cursorIsDir: false,
   multiColumn: false,
   virtualTab: false,
@@ -73,6 +75,11 @@ describe("ACT-02 컨텍스트 조건부 활성", () => {
     expect(r.isApplicable("core.tab.close", ctx({ tabCount: 1 }))).toBe(false);
     expect(r.isApplicable("core.tab.close", ctx({ tabCount: 2 }))).toBe(true);
     expect(r.isApplicable("core.go.up", ctx({ canGoUp: false }))).toBe(false);
+    // 이전/다음 폴더는 이 탭에 방문 기록이 있을 때만 가능하다
+    expect(r.isApplicable("core.history.back", ctx())).toBe(false);
+    expect(r.isApplicable("core.history.back", ctx({ canGoBack: true }))).toBe(true);
+    expect(r.isApplicable("core.history.forward", ctx())).toBe(false);
+    expect(r.isApplicable("core.history.forward", ctx({ canGoForward: true }))).toBe(true);
   });
 
   it("조건 없는 액션(새 폴더)은 항상 활성", () => {

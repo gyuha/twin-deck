@@ -11,6 +11,9 @@ export interface ActionContext {
   tabCount: number;
   /** 상위 폴더로 갈 수 있는지. */
   canGoUp: boolean;
+  /** 이전/다음 폴더로 갈 수 있는지(이 탭의 방문 기록). */
+  canGoBack: boolean;
+  canGoForward: boolean;
   /** 커서 항목이 폴더인지. */
   cursorIsDir: boolean;
   /** 활성 탭이 다중 컬럼 표시 모드인지. */
@@ -67,6 +70,8 @@ export const DEFAULT_ACTION_META = [
   { id: "core.search.cancel", title: "검색/분석 취소", category: "Navigation", scopes: ["pane"], isApplicable: (c) => c.searching },
   { id: "core.reveal_in_tab", title: "해당 폴더로 이동 (새 탭)", category: "Navigation", scopes: ["pane"], isApplicable: (c) => c.virtualTab && c.hasCursorItem },
   { id: "core.open.as_archive", title: "아카이브로 열기 (Open As)", category: "Navigation", scopes: ["pane"], isApplicable: (c) => c.hasCursorItem },
+  { id: "core.history.back", title: "이전 폴더", category: "Navigation", scopes: ["pane"], isApplicable: (c) => c.canGoBack },
+  { id: "core.history.forward", title: "다음 폴더", category: "Navigation", scopes: ["pane"], isApplicable: (c) => c.canGoForward },
   { id: "core.go.up", title: "상위 폴더", category: "Navigation", scopes: ["pane"], isApplicable: (c) => c.canGoUp },
   { id: "core.move.up", title: "커서 위로", category: "Navigation", scopes: ["pane"] },
   { id: "core.move.down", title: "커서 아래로", category: "Navigation", scopes: ["pane"] },
@@ -181,6 +186,8 @@ export const DEFAULT_BINDINGS: Binding[] = [
   b("pane", "core.delete", "Shift+F8", "Delete"),
   b("pane", "core.open", "Return"),
   b("pane", "core.go.up", "Backspace"),
+  b("pane", "core.history.back", "Mod+[", "Alt+Left"),
+  b("pane", "core.history.forward", "Mod+]", "Alt+Right"),
   b("pane", "core.lookup.global", "Mod+P"),
   b("pane", "core.lookup.folder", "Mod+Alt+P"),
   b("pane", "core.move.up", "Up"),
