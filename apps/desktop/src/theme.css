@@ -15,3 +15,15 @@ body {
   background-color: var(--color-app);
   color: var(--color-ink);
 }
+
+/* 파일 관리자 화면에서는 글자 선택이 필요 없다(Shift+클릭·드래그가 목록 글자를 칠하는 것을 막는다). 입력창은 예외다. */
+body {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
