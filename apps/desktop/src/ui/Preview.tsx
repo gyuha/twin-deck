@@ -1,4 +1,6 @@
+import { languageFor } from "../lib/highlight";
 import { useApp } from "../state/context";
+import { CodeView } from "./CodeView";
 import { JsonView } from "./JsonView";
 import { MarkdownView } from "./MarkdownView";
 import { PdfView } from "./PdfView";
@@ -39,6 +41,8 @@ export function Preview() {
                 <MarkdownView text={d.text ?? ""} />
               ) : isJson(p.name) ? (
                 <JsonView text={d.text ?? ""} />
+              ) : languageFor(p.name) ? (
+                <CodeView name={p.name} text={d.text ?? ""} />
               ) : (
                 <pre aria-label="텍스트 미리보기" className="whitespace-pre-wrap break-words font-mono text-xs">
                   {d.text}

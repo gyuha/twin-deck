@@ -40,3 +40,13 @@
 .td-thin-scroll::-webkit-scrollbar-thumb:hover {
   background: var(--color-ink-faint);
 }
+
+/* 코드 미리보기(highlight.js) 색. 테마 토큰을 써서 테마를 바꾸면 같이 바뀐다. */
+.hljs-keyword, .hljs-selector-tag, .hljs-doctag, .hljs-meta .hljs-keyword { color: var(--color-accent); }
+.hljs-string, .hljs-regexp, .hljs-addition, .hljs-template-variable { color: var(--color-status-success); }
+.hljs-number, .hljs-literal, .hljs-symbol, .hljs-bullet { color: var(--color-status-info); }
+.hljs-title, .hljs-title.function_, .hljs-title.class_, .hljs-built_in, .hljs-type, .hljs-attr, .hljs-attribute, .hljs-selector-class, .hljs-selector-id { color: var(--color-status-warning); }
+.hljs-comment, .hljs-quote, .hljs-meta { color: var(--color-ink-faint); font-style: italic; }
+.hljs-deletion { color: var(--color-status-error); }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 600; }
