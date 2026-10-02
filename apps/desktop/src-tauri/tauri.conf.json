@@ -10,7 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [{ "title": "twin-deck", "width": 1200, "height": 760 }],
+    "windows": [{ "title": "Twin deck", "width": 1200, "height": 760 }],
     "security": { "csp": null }
   },
   "bundle": { "active": false }
