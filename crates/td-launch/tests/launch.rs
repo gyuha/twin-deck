@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use td_launch::{editor_command, reveal_command, Command, Launch, Launcher, Os};
+use td_launch::{editor_command, open_command, reveal_command, Command, Launch, Launcher, Os};
 
 fn cmd(program: &str, args: &[&str]) -> Command {
     Command {
@@ -109,5 +109,22 @@ fn launch_facade_passes_commands_to_the_launcher() {
             cmd("code", &["/home/me/a.txt"])
         ],
         "오류인 요청은 실행기까지 가지 않는다"
+    );
+}
+
+#[test]
+fn launch_open_args() {
+    assert_eq!(
+        open_command(Os::Mac, "/Users/me/a b.txt"),
+        cmd("open", &["/Users/me/a b.txt"])
+    );
+    assert_eq!(
+        open_command(Os::Windows, "C:\\x\\a.txt"),
+        cmd("explorer", &["C:\\x\\a.txt"])
+    );
+    assert_eq!(
+        open_command(Os::Linux, "/tmp/a; rm -rf ~/x.txt"),
+        cmd("xdg-open", &["/tmp/a; rm -rf ~/x.txt"]),
+        "셸 메타문자가 든 이름도 인수 하나로 그대로 전달된다"
     );
 }

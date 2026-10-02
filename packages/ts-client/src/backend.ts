@@ -53,6 +53,8 @@ export interface Backend {
   copyText(text: string): Promise<void>;
   /** 파일 관리자에서 항목을 보여 준다. */
   revealPath(path: string): Promise<void>;
+  /** 파일을 운영체제 기본 프로그램으로 실행한다. */
+  openPath(path: string): Promise<void>;
   /** 설정한 편집기로 항목을 연다. */
   editPaths(paths: string[]): Promise<void>;
   /** 확장자와 무관하게 파일을 아카이브로 연다 (ARC-04). 아카이브 루트 경로(`파일!`)를 돌려준다. */

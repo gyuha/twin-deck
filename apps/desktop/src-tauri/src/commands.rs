@@ -11,8 +11,8 @@ use td_state::{LoadedState, Snapshot, Spawner};
 use td_volumes::{SystemUnmounter, Volumes};
 
 use crate::service::{
-    edit, reveal, ConflictDto, EntryDto, FileInfoDto, JobDto, JobKindDto, PreviewDto, QueueItemDto,
-    SearchStartDto, SearchSummaryDto, Service, ServiceResult,
+    edit, open_file, reveal, ConflictDto, EntryDto, FileInfoDto, JobDto, JobKindDto, PreviewDto,
+    QueueItemDto, SearchStartDto, SearchSummaryDto, Service, ServiceResult,
 };
 
 pub type AppService = Service<SystemTrash>;
@@ -225,6 +225,13 @@ pub fn glob_filter(svc: State<'_, AppService>, pattern: String, names: Vec<Strin
 #[specta::specta]
 pub fn reveal_path(launch: State<'_, AppLaunch>, path: String) -> ServiceResult<()> {
     reveal(&launch, &path)
+}
+
+/// 파일을 운영체제 기본 프로그램으로 실행한다 (Enter/더블클릭).
+#[tauri::command]
+#[specta::specta]
+pub fn open_path(launch: State<'_, AppLaunch>, path: String) -> ServiceResult<()> {
+    open_file(&launch, &path)
 }
 
 /// 확장자와 무관하게 파일을 아카이브로 연다 (ARC-04). 아카이브 루트 경로를 돌려준다.
@@ -490,6 +497,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             preview_file,
             glob_filter,
             reveal_path,
+            open_path,
             edit_paths,
             open_as_archive,
             list_volumes,

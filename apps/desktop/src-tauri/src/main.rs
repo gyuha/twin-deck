@@ -130,6 +130,22 @@ fn main() {
         .expect("twin-deck 실행 중 오류가 발생했습니다");
 }
 
+/// `tauri dev`는 .app 번들 없이 실행되어 macOS가 아이콘을 읽지 못하므로 Dock 아이콘을 직접 지정한다.
+#[cfg(target_os = "macos")]
+fn set_dock_icon() {
+    use objc2::{AllocAnyThread, MainThreadMarker};
+    use objc2_app_kit::{NSApplication, NSImage};
+    use objc2_foundation::NSData;
+
+    let Some(mtm) = MainThreadMarker::new() else {
+        return;
+    };
+    let data = NSData::with_bytes(include_bytes!("../icons/icon.png"));
+    if let Some(image) = NSImage::initWithData(NSImage::alloc(), &data) {
+        unsafe { NSApplication::sharedApplication(mtm).setApplicationIconImage(Some(&image)) };
+    }
+}
+
 #[cfg(test)]
 mod capability_tests {
     use std::fs;
@@ -201,21 +217,5 @@ mod capability_tests {
             );
             existing.push(label);
         }
-    }
-}
-
-/// `tauri dev`는 .app 번들 없이 실행되어 macOS가 아이콘을 읽지 못하므로 Dock 아이콘을 직접 지정한다.
-#[cfg(target_os = "macos")]
-fn set_dock_icon() {
-    use objc2::{AllocAnyThread, MainThreadMarker};
-    use objc2_app_kit::{NSApplication, NSImage};
-    use objc2_foundation::NSData;
-
-    let Some(mtm) = MainThreadMarker::new() else {
-        return;
-    };
-    let data = NSData::with_bytes(include_bytes!("../icons/icon.png"));
-    if let Some(image) = NSImage::initWithData(NSImage::alloc(), &data) {
-        unsafe { NSApplication::sharedApplication(mtm).setApplicationIconImage(Some(&image)) };
     }
 }

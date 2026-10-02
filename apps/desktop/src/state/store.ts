@@ -744,6 +744,13 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       } else if (c && tab.virtual) {
         // 검색 결과의 일반 파일: 그 파일이 있는 폴더를 새 탭으로 연다
         await api.revealInTab();
+      } else if (c?.kind === "file") {
+        // 일반 파일: 운영체제 기본 프로그램으로 실행한다
+        try {
+          await backend.openPath(c.path);
+        } catch (e) {
+          fail(e);
+        }
       }
     },
 

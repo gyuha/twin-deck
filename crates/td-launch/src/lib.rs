@@ -1,4 +1,4 @@
-//! 외부 프로그램 실행: 파일 관리자에서 보기, 편집기로 열기.
+//! 외부 프로그램 실행: 파일 관리자에서 보기, 편집기로 열기, 기본 프로그램으로 실행.
 //! 명령 조립(`*_command`)은 순수 함수라 모든 OS의 결과를 테스트할 수 있고, 실제 실행은 `Launcher` trait 뒤에 둔다.
 
 use std::process::Command as Process;
@@ -60,6 +60,15 @@ pub fn reveal_command(os: Os, path: &str, is_dir: bool) -> Command {
     }
 }
 
+/// 파일을 운영체제 기본 프로그램으로 실행하는 명령. 셸을 거치지 않는다(Windows는 `cmd /c start` 대신 explorer).
+pub fn open_command(os: Os, path: &str) -> Command {
+    match os {
+        Os::Mac => Command::new("open", [path.to_string()]),
+        Os::Windows => Command::new("explorer", [path.to_string()]),
+        Os::Linux => Command::new("xdg-open", [path.to_string()]),
+    }
+}
+
 /// `environment.text_editor`로 `paths`를 여는 명령.
 /// macOS에서 경로 구분자가 없는 이름("Visual Studio Code")은 앱 이름으로 보고 `open -a`를 쓴다.
 pub fn editor_command(os: Os, editor: &str, paths: &[String]) -> Result<Command, String> {
@@ -111,6 +120,10 @@ impl<L: Launcher> Launch<L> {
 
     pub fn reveal(&self, path: &str, is_dir: bool) -> Result<(), String> {
         self.launcher.run(&reveal_command(self.os, path, is_dir))
+    }
+
+    pub fn open(&self, path: &str) -> Result<(), String> {
+        self.launcher.run(&open_command(self.os, path))
     }
 
     pub fn edit(&self, editor: &str, paths: &[String]) -> Result<(), String> {

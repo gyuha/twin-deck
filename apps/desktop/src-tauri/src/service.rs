@@ -713,6 +713,12 @@ pub fn reveal<L: Launcher>(launch: &Launch<L>, path: &str) -> ServiceResult<()> 
     launch.reveal(path, meta.is_dir())
 }
 
+/// 기본 프로그램으로 파일 실행. 없는 경로는 실행하지 않는다.
+pub fn open_file<L: Launcher>(launch: &Launch<L>, path: &str) -> ServiceResult<()> {
+    std::fs::symlink_metadata(path).map_err(|e| format!("{path}: {e}"))?;
+    launch.open(path)
+}
+
 /// 설정한 편집기로 열기 (OP-09). 없는 경로가 하나라도 있으면 실행하지 않는다.
 pub fn edit<L: Launcher>(launch: &Launch<L>, editor: &str, paths: &[String]) -> ServiceResult<()> {
     for p in paths {
