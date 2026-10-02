@@ -127,7 +127,7 @@ describe("spaceui 토큰 가드", () => {
 
   it("spaceui: primitives가 쓰는 radix 변형이 index.css에 모두 정의돼 있다", () => {
     // Tailwind v4는 radix-state-checked: 같은 변형을 모른다. 정의하지 않으면 스위치가 켜져도 색이 안 바뀐다.
-    const dist = readFileSync(join(src, "..", "node_modules", "@spacedrive", "primitives", "dist", "index.js"), "utf8");
+    const dist = readFileSync(join(src, "..", "..", "..", "node_modules", "@spacedrive", "primitives", "dist", "index.js"), "utf8");
     const used = [...new Set([...dist.matchAll(/(?:group-)?radix-[a-z-]+(?=:)/g)].map((m) => m[0]))];
     expect(used.length).toBeGreaterThan(5); // 정규식이 아무것도 못 잡아서 통과하는 일이 없게
     const css = readFileSync(join(src, "index.css"), "utf8");

@@ -9,7 +9,7 @@
 @import "@spacedrive/tokens/css/themes/mocha";
 @import "./theme.css";
 /* @spacedrive/primitives가 쓰는 Tailwind 클래스를 만들도록 패키지를 스캔한다(설정 화면에서만 쓴다). */
-@source "../node_modules/@spacedrive/primitives/dist/index.js";
+@source "../../../node_modules/@spacedrive/primitives/dist/index.js";
 
 /*
  * @spacedrive/primitives는 Tailwind 플러그인이 만들던 radix 변형(radix-state-checked: 등)을 클래스로 쓴다.
