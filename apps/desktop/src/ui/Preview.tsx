@@ -1,7 +1,10 @@
 import { useApp } from "../state/context";
+import { JsonView } from "./JsonView";
 import { MarkdownView } from "./MarkdownView";
 
 const isMarkdown = (name: string) => /\.(md|markdown)$/i.test(name);
+
+const isJson = (name: string) => /\.json$/i.test(name);
 
 const KIND_LABEL = { text: "텍스트", image: "이미지", directory: "폴더", other: "기타" } as const;
 
@@ -33,6 +36,8 @@ export function Preview() {
             <>
               {isMarkdown(p.name) ? (
                 <MarkdownView text={d.text ?? ""} />
+              ) : isJson(p.name) ? (
+                <JsonView text={d.text ?? ""} />
               ) : (
                 <pre aria-label="텍스트 미리보기" className="whitespace-pre-wrap break-words font-mono text-xs">
                   {d.text}
