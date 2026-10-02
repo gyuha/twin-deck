@@ -23,11 +23,11 @@ export function Preview() {
       <div
         role="dialog"
         aria-label={`미리보기: ${p.name}`}
-        className="flex max-h-[80vh] w-[44rem] max-w-full flex-col rounded border border-app-line bg-app-box p-3 text-sm shadow-lg"
+        className="flex h-[80vh] w-[44rem] max-w-full flex-col rounded border border-app-line bg-app-box p-3 text-sm shadow-lg"
       >
         <h2 className="mb-2 shrink-0 break-all font-semibold">{p.name}</h2>
-        <div className="min-h-0 flex-1 overflow-auto">
-          {p.status === "loading" && <p className="text-ink-faint">불러오는 중…</p>}
+        <div className={`min-h-0 flex-1 overflow-auto ${p.status === "loading" && d ? "opacity-60" : ""}`}>
+          {p.status === "loading" && !d && <p className="text-ink-faint">불러오는 중…</p>}
           {p.status === "error" && (
             <p role="alert" className="text-status-error">
               {p.error}

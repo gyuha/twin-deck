@@ -182,3 +182,35 @@ describe("미리보기 제목", () => {
     expect(h.className).toContain("break-all");
   });
 });
+
+describe("항목을 넘길 때 깜빡임", () => {
+  it("다음 항목을 읽는 동안 이전 내용을 그대로 보여 주고(빈 창·'불러오는 중' 없음), 도착하면 바뀐다", async () => {
+    const b = seed();
+    const orig = b.preview.bind(b);
+    b.preview = async (p) => {
+      if (p.endsWith("notes.txt")) await new Promise((r) => setTimeout(r, 150)); // 다음 항목이 느리다
+      return orig(p);
+    };
+    const { user } = await renderApp(b);
+    await goTo(user, 3); // data.bin
+    await user.keyboard("{ArrowRight}");
+    const d = await dlg("미리보기: data.bin");
+    await within(d).findByText(/미리 볼 수 없는 형식/);
+    await user.keyboard("{ArrowDown}"); // notes.txt (느림)
+    const d2 = await dlg("미리보기: notes.txt");
+    // 읽는 중에도 이전 내용이 남아 있고 로딩 문구로 비워지지 않는다
+    expect(within(d2).queryByText("불러오는 중…")).toBeNull();
+    expect(within(d2).getByText(/미리 볼 수 없는 형식/)).toBeTruthy();
+    await waitFor(() => expect(within(d2).getByLabelText("텍스트 미리보기")).toHaveTextContent("hello preview"));
+    expect(within(d2).queryByText(/미리 볼 수 없는 형식/)).toBeNull();
+  });
+
+  it("창 높이는 내용과 무관하게 고정이다(짧은 내용에서 줄었다 늘어나지 않는다)", async () => {
+    const { user } = await renderApp(seed());
+    await goTo(user, 4);
+    await user.keyboard("{ArrowRight}");
+    const d = await dlg("미리보기: notes.txt");
+    expect(d.className).toContain("h-[80vh]");
+    expect(d.className).not.toContain("max-h-[80vh]");
+  });
+});

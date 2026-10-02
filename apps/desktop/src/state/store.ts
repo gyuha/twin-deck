@@ -632,7 +632,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
   async function loadPreview(entry: EntryDto) {
     const seq = ++previewSeq;
     const base = { path: entry.path, name: entry.name };
-    set({ preview: { ...base, status: "loading" } });
+    // 항목을 넘기는 동안은 이전 내용을 그대로 두어 창이 비었다 채워지며 깜빡이지 않게 한다.
+    set((s) => ({ preview: { ...base, status: "loading", data: s.preview?.data } }));
     try {
       const data = await backend.preview(entry.path);
       if (seq === previewSeq) set({ preview: { ...base, status: "ready", data } });
