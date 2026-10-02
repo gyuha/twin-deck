@@ -165,3 +165,20 @@ describe("Space는 선택 토글, 미리보기는 오른쪽 키", () => {
     await waitFor(() => expect(selectedNames("left")).toEqual(["docs", "a.png"]));
   });
 });
+
+describe("미리보기 제목", () => {
+  it("긴 파일 이름도 줄여서 자르지 않고 줄바꿈으로 전부 보여 주며, 본문이 길어도 제목 높이가 줄지 않는다", async () => {
+    const long = `${"아주긴이름".repeat(15)}.txt`;
+    const { user } = await renderApp(
+      new FakeBackend().seed({ [`/home/a/${long}`]: "x\n".repeat(5000), "/home/b": null }),
+    );
+    await user.keyboard("{ArrowRight}");
+    const d = await dlg(`미리보기: ${long}`);
+    const h = within(d).getByRole("heading", { name: long });
+    expect(h.textContent).toBe(long); // 이름이 잘리지 않고 그대로 들어 있다
+    // truncate(overflow:hidden)는 flex 안에서 높이가 0까지 줄어 글자 윗부분이 잘리는 원인이었다
+    expect(h.className).not.toContain("truncate");
+    expect(h.className).toContain("shrink-0");
+    expect(h.className).toContain("break-all");
+  });
+});
