@@ -3,7 +3,7 @@
 export type CaseMode = "none" | "upper" | "lower" | "title";
 
 export interface RenameOptions {
-  /** 파일 이름(확장자 앞) 마스크. `[N]` 원래 이름, `[E]` 원래 확장자, `[C]` 카운터. */
+  /** 파일 이름(확장자 앞) 마스크. 쓸 수 있는 토큰은 `MASK_HELP`를 본다. */
   nameMask: string;
   /** 확장자 마스크. 같은 토큰을 쓴다. 결과가 비면 확장자를 붙이지 않는다. */
   extMask: string;
@@ -40,7 +40,31 @@ export interface RenameItem {
   name: string;
   /** 폴더는 확장자를 나누지 않는다. */
   isDir: boolean;
+  /** 전체 경로. `[A]`·`[P]` 토큰이 쓴다. */
+  path?: string;
+  /** 수정 시각(epoch 밀리초). 날짜·시간 토큰이 쓴다. */
+  modifiedMs?: number | null;
 }
+
+/** 마스크 토큰 도움말(화면의 도움말 표). 위치 x, y는 1부터 센다. */
+export const MASK_HELP: { token: string; description: string; example: string }[] = [
+  { token: "[N]", description: "원래 파일 이름(확장자 제외)", example: "photo.jpg → photo" },
+  { token: "[Nx]", description: "이름의 x번째 문자", example: "[N2] : photo → h" },
+  { token: "[Nx:y]", description: "이름의 x번째부터 y번째까지의 문자", example: "[N1:3] : photo → pho" },
+  { token: "[E]", description: "원래 확장자(점 제외)", example: "photo.jpg → jpg" },
+  { token: "[Ex]", description: "확장자의 x번째 문자", example: "[E1] : jpg → j" },
+  { token: "[Ex:y]", description: "확장자의 x번째부터 y번째까지의 문자", example: "[E1:2] : jpg → jp" },
+  { token: "[A]", description: "경로와 확장자가 있는 완전한 파일 이름", example: "/home/a/photo.jpg" },
+  { token: "[Ax:y]", description: "완전한 파일 이름의 x번째부터 y번째까지의 문자", example: "[A9:13] : /home/a/photo.jpg → photo" },
+  { token: "[P]", description: "상위 폴더 이름", example: "/home/a/photo.jpg → a" },
+  { token: "[C]", description: "카운터(시작 번호·간격·너비 설정)", example: "너비 3 : 001, 002, …" },
+  { token: "[Y]", description: "수정 연도(4자리)", example: "2024" },
+  { token: "[M]", description: "수정 월(2자리)", example: "05" },
+  { token: "[D]", description: "수정 일(2자리)", example: "06" },
+  { token: "[h]", description: "수정 시(2자리)", example: "07" },
+  { token: "[m]", description: "수정 분(2자리)", example: "08" },
+  { token: "[s]", description: "수정 초(2자리)", example: "09" },
+];
 
 /** 이름을 확장자 앞뒤로 나눈다. 맨 앞의 점은 확장자가 아니다(`.gitignore`는 이름 전체). */
 export function splitName(name: string, isDir: boolean): { stem: string; ext: string } {
@@ -52,8 +76,47 @@ export function splitName(name: string, isDir: boolean): { stem: string; ext: st
 const applyCase = (s: string, mode: CaseMode) =>
   mode === "upper" ? s.toUpperCase() : mode === "lower" ? s.toLowerCase() : mode === "title" ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s;
 
-const expand = (mask: string, stem: string, ext: string, counter: string) =>
-  mask.replace(/\[(N|E|C)\]/g, (_, t: string) => (t === "N" ? stem : t === "E" ? ext : counter));
+/** 문자열의 x번째(1부터)부터 y번째까지. y가 없으면 x번째 한 글자, x도 없으면 전체. 범위를 벗어나면 있는 만큼만 돌려준다. */
+function slice(text: string, x?: number, y?: number): string {
+  if (x === undefined) return text;
+  const chars = Array.from(text);
+  const from = Math.max(x, 1) - 1;
+  return y === undefined ? (chars[from] ?? "") : chars.slice(from, Math.max(y, 0)).join("");
+}
+
+const two = (n: number) => String(n).padStart(2, "0");
+
+const parentName = (path: string) => {
+  const parts = path.split("/").filter(Boolean);
+  return parts.length >= 2 ? parts[parts.length - 2] : "";
+};
+
+/** 마스크의 토큰을 값으로 바꾼다. 알 수 없는 `[...]`는 그대로 둔다. */
+function expand(mask: string, it: RenameItem, stem: string, ext: string, counter: string): string {
+  const when = it.modifiedMs == null ? null : new Date(it.modifiedMs);
+  return mask.replace(/\[([NEAPCYMDhms])(?:(\d+)(?::(\d+))?)?\]/g, (all, t: string, x?: string, y?: string) => {
+    const from = x === undefined ? undefined : Number(x);
+    const to = y === undefined ? undefined : Number(y);
+    const ranged = t === "N" || t === "E" || t === "A";
+    if (!ranged && x !== undefined) return all; // [C1] 같은 인수는 이 토큰에 없다
+    switch (t) {
+      case "N":
+        return slice(stem, from, to);
+      case "E":
+        return slice(ext, from, to);
+      case "A":
+        return slice(it.path ?? it.name, from, to);
+      case "P":
+        return it.path ? parentName(it.path) : "";
+      case "C":
+        return counter;
+      default: {
+        if (!when) return "";
+        return { Y: String(when.getFullYear()), M: two(when.getMonth() + 1), D: two(when.getDate()), h: two(when.getHours()), m: two(when.getMinutes()), s: two(when.getSeconds()) }[t] ?? all;
+      }
+    }
+  });
+}
 
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -74,8 +137,8 @@ export function buildNewNames(items: readonly RenameItem[], o: RenameOptions): s
   return items.map((it, i) => {
     const { stem, ext } = splitName(it.name, it.isDir);
     const counter = String(o.start + i * o.step).padStart(Math.max(o.width, 1), "0");
-    const newStem = applyCase(expand(o.nameMask, stem, ext, counter), o.nameCase);
-    const newExt = it.isDir ? "" : applyCase(expand(o.extMask, stem, ext, counter), o.extCase);
+    const newStem = applyCase(expand(o.nameMask, it, stem, ext, counter), o.nameCase);
+    const newExt = it.isDir ? "" : applyCase(expand(o.extMask, it, stem, ext, counter), o.extCase);
     let full = newExt ? `${newStem}.${newExt}` : newStem;
     if (re) full = full.replace(re, o.replace);
     return full;

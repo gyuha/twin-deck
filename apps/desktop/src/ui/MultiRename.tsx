@@ -1,6 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useAppStore } from "../state/context";
-import { buildNewNames, findPattern, validateNames } from "../lib/multiRename";
+import { buildNewNames, findPattern, MASK_HELP, validateNames } from "../lib/multiRename";
 import type { CaseMode, RenameItem, RenameOptions } from "../lib/multiRename";
 
 interface Props {
@@ -22,6 +22,7 @@ const parentOf = (path: string) => path.slice(0, Math.max(path.lastIndexOf("/"),
 /** 다중 이름 바꾸기 도구(미리보기 표와 입력). 새 이름과 오류는 입력이 바뀔 때마다 다시 계산한다. */
 export function MultiRename({ items, existing, options: o }: Props) {
   const { api } = useAppStore();
+  const [help, setHelp] = useState(false);
   const newNames = useMemo(() => buildNewNames(items, o), [items, o]);
   const errors = useMemo(() => validateNames(items, newNames, existing), [items, newNames, existing]);
   const patternError = findPattern(o).error;
@@ -32,7 +33,41 @@ export function MultiRename({ items, existing, options: o }: Props) {
 
   return (
     <div data-can-rename={!hasError && changed}>
-      <div role="table" aria-label="이름 바꾸기 미리보기" className="mb-3 h-52 overflow-auto border border-app-line">
+      <div className="mb-1 flex justify-end">
+        <button type="button" aria-pressed={help} className="rounded border border-app-line px-2 py-0.5 text-xs" onClick={() => setHelp(!help)}>
+          {help ? "도움말 닫기" : "도움말"}
+        </button>
+      </div>
+      {help && (
+        <div role="region" aria-label="마스크 도움말" className="mb-3 h-52 overflow-auto border border-app-line p-2 text-xs">
+          <p className="mb-2 text-ink-dull">
+            마스크에 아래 토큰을 쓰면 항목마다 값으로 바뀝니다. 위치 x, y는 1부터 세고 y를 포함합니다. 범위를 벗어나면 있는 만큼만 가져옵니다.
+            날짜·시간은 파일의 수정 시각입니다.
+          </p>
+          <table className="w-full">
+            <thead>
+              <tr className="text-left text-ink-faint">
+                <th className="w-24 py-0.5">토큰</th>
+                <th>설명</th>
+                <th>예</th>
+              </tr>
+            </thead>
+            <tbody>
+              {MASK_HELP.map((h) => (
+                <tr key={h.token}>
+                  <td className="py-0.5 font-mono">{h.token}</td>
+                  <td>{h.description}</td>
+                  <td className="font-mono text-ink-faint">{h.example}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="mt-2 text-ink-dull">
+            이름에 쓸 수 없는 문자(/)가 생기거나 새 이름이 겹치면 해당 행에 오류가 표시되고 실행할 수 없습니다. 선택 안에서 이름을 서로 맞바꾸는 것은 가능합니다.
+          </p>
+        </div>
+      )}
+      <div role="table" aria-label="이름 바꾸기 미리보기" hidden={help} className="mb-3 h-52 overflow-auto border border-app-line">
         <div role="row" className="sticky top-0 grid grid-cols-[1fr_1fr_1fr] bg-app-box px-2 py-0.5 text-xs text-ink-faint">
           <span role="columnheader">이전 파일 이름</span>
           <span role="columnheader">새 파일 이름</span>
@@ -79,7 +114,7 @@ export function MultiRename({ items, existing, options: o }: Props) {
               </option>
             ))}
           </select>
-          <p className="text-ink-faint">[N] 이름 · [E] 확장자 · [C] 카운터</p>
+          <p className="text-ink-faint">[N] 이름 · [Nx:y] 일부 · [E] 확장자 · [C] 카운터 · [Y][M][D] 날짜 — 자세한 내용은 도움말</p>
         </fieldset>
 
         <fieldset className="space-y-1">

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildNewNames, DEFAULT_RENAME_OPTIONS, needsTempStep, splitName, validateNames } from "../lib/multiRename";
+import { buildNewNames, DEFAULT_RENAME_OPTIONS, MASK_HELP, needsTempStep, splitName, validateNames } from "../lib/multiRename";
 import type { RenameItem, RenameOptions } from "../lib/multiRename";
 
 const file = (name: string): RenameItem => ({ name, isDir: false });
@@ -111,5 +111,82 @@ describe("needsTempStep", () => {
     expect(needsTempStep([file("1"), file("2")], ["2", "3"])).toBe(true);
     expect(needsTempStep([file("a"), file("b")], ["x", "y"])).toBe(false);
     expect(needsTempStep([file("a"), file("b")], ["a", "y"])).toBe(false);
+  });
+});
+
+const at = (name: string, path: string, modifiedMs: number | null = null, isDir = false): RenameItem => ({ name, path, modifiedMs, isDir });
+
+describe("마스크 토큰: 위치·범위", () => {
+  const photo = [file("photo.jpg")];
+  it("[Nx]는 x번째 문자, [Nx:y]는 x부터 y까지(1부터, y 포함)", () => {
+    expect(names(photo, { nameMask: "[N1]" })).toEqual(["p.jpg"]);
+    expect(names(photo, { nameMask: "[N2]" })).toEqual(["h.jpg"]);
+    expect(names(photo, { nameMask: "[N1:3]" })).toEqual(["pho.jpg"]);
+    expect(names(photo, { nameMask: "[N2:4]-[N5]" })).toEqual(["hot-o.jpg"]);
+  });
+
+  it("범위를 벗어나면 있는 만큼만, 완전히 벗어나면 빈 문자열", () => {
+    expect(names(photo, { nameMask: "[N3:99]" })).toEqual(["oto.jpg"]);
+    expect(names(photo, { nameMask: "x[N9]y" })).toEqual(["xy.jpg"]);
+    expect(names(photo, { nameMask: "[N0:2]" })).toEqual(["ph.jpg"]); // 0은 1로 본다
+  });
+
+  it("글자(코드 포인트) 단위로 센다", () => {
+    expect(names([file("한글파일.txt")], { nameMask: "[N2:3]" })).toEqual(["글파.txt"]);
+    expect(names([file("a😀b.txt")], { nameMask: "[N2]" })).toEqual(["😀.txt"]);
+  });
+
+  it("[Ex]·[Ex:y]는 확장자에서 가져온다", () => {
+    expect(names(photo, { extMask: "[E1]" })).toEqual(["photo.j"]);
+    expect(names(photo, { extMask: "[E2:3]" })).toEqual(["photo.pg"]);
+  });
+
+  it("[A]는 경로 포함 전체 파일 이름, [Ax:y]는 그 일부, [P]는 상위 폴더 이름", () => {
+    const it = [at("photo.jpg", "/home/a/photo.jpg")];
+    expect(buildNewNames(it, opts({ nameMask: "[A]" }))).toEqual(["/home/a/photo.jpg.jpg"]); // 이름에 /가 생기므로 검사에서 막힌다
+    expect(buildNewNames(it, opts({ nameMask: "[A9:13]" }))).toEqual(["photo.jpg"]);
+    expect(buildNewNames(it, opts({ nameMask: "[P]_[N]" }))).toEqual(["a_photo.jpg"]);
+    expect(validateNames(it, buildNewNames(it, opts({ nameMask: "[A]" })), [])[0]).toBe("이름에 사용할 수 없는 문자가 있습니다");
+  });
+
+  it("[P]는 최상위 파일이면 빈 문자열이고, 경로가 없으면 빈 문자열이다", () => {
+    expect(buildNewNames([at("a.txt", "/a.txt")], opts({ nameMask: "[P]x" }))).toEqual(["x.txt"]);
+    expect(names([file("a.txt")], { nameMask: "[P]x" })).toEqual(["x.txt"]);
+  });
+
+  it("인수를 받지 않는 토큰에 인수를 붙이면 그대로 둔다", () => {
+    expect(names(photo, { nameMask: "[C1]" })).toEqual(["[C1].jpg"]);
+    expect(names(photo, { nameMask: "[Z]" })).toEqual(["[Z].jpg"]);
+  });
+});
+
+describe("마스크 토큰: 날짜·시간(수정 시각)", () => {
+  const t = new Date(2024, 4, 6, 7, 8, 9).getTime(); // 로컬 시각 2024-05-06 07:08:09
+  it("[Y][M][D][h][m][s]", () => {
+    const it = [at("a.txt", "/x/a.txt", t)];
+    expect(buildNewNames(it, opts({ nameMask: "[Y]-[M]-[D]_[h][m][s]" }))).toEqual(["2024-05-06_070809.txt"]);
+  });
+
+  it("수정 시각을 모르면 빈 문자열이다", () => {
+    expect(buildNewNames([at("a.txt", "/x/a.txt", null)], opts({ nameMask: "[Y]_[N]" }))).toEqual(["_a.txt"]);
+  });
+
+  it("[M](월)과 [m](분)은 구분한다", () => {
+    const it = [at("a.txt", "/x/a.txt", t)];
+    expect(buildNewNames(it, opts({ nameMask: "[M]/[m]" }))).toEqual(["05/08.txt"]);
+  });
+});
+
+describe("도움말 표", () => {
+  it("지원하는 모든 토큰이 도움말에 있고, 도움말의 예시 토큰이 실제로 동작한다", () => {
+    const docs = MASK_HELP.map((h) => h.token);
+    for (const tok of ["[N]", "[Nx]", "[Nx:y]", "[E]", "[Ex]", "[Ex:y]", "[A]", "[Ax:y]", "[P]", "[C]", "[Y]", "[M]", "[D]", "[h]", "[m]", "[s]"]) {
+      expect(docs).toContain(tok);
+    }
+    // 도움말의 예시가 구현과 어긋나지 않는지: 몇 가지를 실제로 돌려 본다.
+    expect(names([file("photo.jpg")], { nameMask: "[N2]" })).toEqual(["h.jpg"]);
+    expect(names([file("photo.jpg")], { nameMask: "[N1:3]" })).toEqual(["pho.jpg"]);
+    expect(names([file("photo.jpg")], { nameMask: "[E1:2]", extMask: "[E1:2]" })).toEqual(["jp.jp"]);
+    expect(buildNewNames([at("photo.jpg", "/home/a/photo.jpg")], opts({ nameMask: "[A9:13]" }))).toEqual(["photo.jpg"]);
   });
 });

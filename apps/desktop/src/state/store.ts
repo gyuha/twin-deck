@@ -89,7 +89,7 @@ export const CONFLICT_CHOICES: readonly ConflictDto[] = ["overwrite", "skip", "r
 
 export type DialogState =
   | { kind: "name"; title: string; value: string; error: string | null; selectStem: boolean; goto?: boolean; label?: string; confirmLabel?: string; option?: { label: string; checked: boolean } }
-  | { kind: "multirename"; title: string; items: { path: string; name: string; isDir: boolean }[]; existing: string[]; options: RenameOptions }
+  | { kind: "multirename"; title: string; items: { path: string; name: string; isDir: boolean; modifiedMs: number | null }[]; existing: string[]; options: RenameOptions }
   | { kind: "confirm"; title: string; lines: string[] }
   | { kind: "conflict"; title: string; existing: string; selected: number }
   | { kind: "info"; title: string; lines: string[] }
@@ -1196,7 +1196,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (targets.length < 2) return fail("이름을 바꿀 항목을 2개 이상 선택하세요");
       if (tab.virtual) return fail("검색/분석 결과 탭에서는 여러 항목의 이름을 한꺼번에 바꿀 수 없습니다. 폴더 탭에서 선택하세요");
       if (targets.some((t) => isArchivePath(t.path))) return fail("아카이브 안의 항목은 이름을 바꿀 수 없습니다");
-      const items = targets.map((t) => ({ path: t.path, name: t.name, isDir: t.kind === "dir" }));
+      const items = targets.map((t) => ({ path: t.path, name: t.name, isDir: t.kind === "dir", modifiedMs: t.modifiedMs }));
       const plan = await ask<{ items: typeof items; newNames: string[] }>({
         kind: "multirename",
         title: "다중 이름 바꾸기 도구",

@@ -150,6 +150,27 @@ describe("다중 이름 바꾸기 도구", () => {
     expect(b.exists("/home/a/a.txt")).toBe(true);
   });
 
+  it("도움말 버튼이 토큰 도움말을 보여 주고 다시 누르면 표로 돌아간다", async () => {
+    const { user, d } = await openFor(seed());
+    expect(within(d).queryByRole("region", { name: "마스크 도움말" })).toBeNull();
+    await user.click(within(d).getByRole("button", { name: "도움말" }));
+    const help = within(d).getByRole("region", { name: "마스크 도움말" });
+    for (const tok of ["[N]", "[Nx:y]", "[A]", "[P]", "[C]", "[Y]"]) expect(within(help).getByText(tok)).toBeTruthy();
+    expect(help).toHaveTextContent("1부터 세고");
+    expect(within(d).getByRole("button", { name: "도움말 닫기" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(within(d).getByRole("button", { name: "도움말 닫기" }));
+    expect(within(d).queryByRole("region", { name: "마스크 도움말" })).toBeNull();
+    expect(rows(d)).toHaveLength(2);
+  });
+
+  it("도움말을 열어 둔 채로도 입력하면 새 이름이 계산되고, 닫으면 반영돼 있다", async () => {
+    const { user, d } = await openFor(seed());
+    await user.click(within(d).getByRole("button", { name: "도움말" }));
+    type("파일 이름 마스크", "[N1]_[C]");
+    await user.click(within(d).getByRole("button", { name: "도움말 닫기" }));
+    expect(newNames(d)).toEqual(["a_1.txt", "b_2.txt"]);
+  });
+
   it("컨텍스트 메뉴의 이름 바꾸기도 여러 항목이면 다중 도구를 연다", async () => {
     const { user } = await renderApp(seed());
     await user.keyboard("{Insert}{Insert}");
