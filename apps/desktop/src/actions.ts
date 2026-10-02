@@ -139,5 +139,8 @@ export function paletteHandlers({ api }: AppStore): Partial<ActionHandlers> {
     "core.palette.run": () => api.paletteRun(),
     "core.palette.close": () => api.paletteClose(),
     "core.open.directory": (_ctx, args) => api.openDirectory(args),
+    "core.app.launch": (_ctx, args) => api.launchApp(args),
+    "core.help": () => api.openHelp(),
+    "core.help.close": () => api.closeHelp(),
   };
 }

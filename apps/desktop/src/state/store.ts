@@ -209,6 +209,8 @@ export interface AppState {
   queueOpen: boolean;
   /** 설정 화면이 열려 있는지, 어느 섹션인지, 마지막 저장 오류. */
   settingsOpen: boolean;
+  /** 도움말(단축키 목록) 화면이 열려 있는지. */
+  helpOpen: boolean;
   settingsSection: number;
   settingsError: string | null;
   queueCursor: number;
@@ -284,6 +286,8 @@ export function scopeStack(s: AppState): Scope[] {
   if (s.dialog) return ["dialog", "pane", "global"];
   // 설정 화면은 메인 창을 덮는 모달이다(settings 스코프).
   if (s.settingsOpen) return ["settings", "global"];
+  // 도움말(단축키 목록)도 메인 창을 덮는 모달이다(help 스코프).
+  if (s.helpOpen) return ["help", "global"];
   // Actions Panel은 입력창이 있는 모달이다(palette 스코프).
   if (s.palette) return ["palette", "global"];
   // 미리보기가 열려 있으면 패널 키는 받지 않는다(preview 스코프).
@@ -349,6 +353,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     queue: [],
     queueOpen: false,
     settingsOpen: false,
+    helpOpen: false,
     settingsSection: 0,
     settingsError: null,
     queueCursor: 0,
@@ -1876,6 +1881,36 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     },
 
     /** 설정 화면 열기/닫기 (`Mod+,`). */
+    openHelp() {
+      set({ helpOpen: true });
+    },
+    closeHelp() {
+      set({ helpOpen: false });
+    },
+    /** 도움말 화면에 보일 줄: 키가 걸린 액션만, Actions Panel과 같은 카탈로그에서 가져온다. */
+    helpItems(): CatalogItem[] {
+      return catalogFn().filter((i) => i.keys !== "");
+    },
+    /**
+     * F키 등에 지정한 애플리케이션으로 항목을 연다 (`core.app.launch`).
+     * 넘기는 경로: 선택한 항목 전체, 없으면 커서 항목, 항목이 하나도 없으면(빈 폴더) 현재 폴더.
+     */
+    async launchApp(args?: Record<string, unknown>) {
+      const app = typeof args?.app === "string" ? args.app.trim() : "";
+      const key = typeof args?.key === "string" ? args.key : "이 키";
+      if (!app) return fail(`${key}에 지정된 애플리케이션이 없습니다 (설정 > F키)`);
+      const tab = activeTab(get());
+      const selected = tab.entries.filter((e) => tab.selection.has(e.path)).map((e) => e.path);
+      const cursor = cursorEntry(tab);
+      const paths = selected.length > 0 ? selected : cursor ? [cursor.path] : tab.virtual ? [] : [tab.path];
+      if (paths.length === 0) return fail("애플리케이션에 전달할 항목이 없습니다");
+      set({ notice: null });
+      try {
+        await backend.launchApp(app, paths);
+      } catch (e) {
+        fail(e);
+      }
+    },
     openSettings() {
       set({ settingsOpen: true, settingsSection: 0, settingsError: null });
     },

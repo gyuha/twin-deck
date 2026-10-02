@@ -14,6 +14,8 @@ import { ActionBar, useBarIds } from "./ui/ActionBar";
 import { ActionsPalette } from "./ui/ActionsPalette";
 import { Dialog } from "./ui/Dialog";
 import { Preview } from "./ui/Preview";
+import { fkeyBindings } from "./lib/fkeys";
+import { Help } from "./ui/Help";
 import { PaneSplit } from "./ui/PaneSplit";
 import { ContextMenu } from "./ui/ContextMenu";
 import { PopupMenu } from "./ui/PopupMenu";
@@ -112,7 +114,7 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
   const { keymap, warnings } = useMemo(() => {
     const merged = mergeUserBindings(
       defaultBindingsFor(platform),
-      loaded.bindings,
+      [...fkeyBindings(loaded.config), ...loaded.bindings], // F키 설정 → keybindings.toml 순서라 파일이 이긴다
       (id) => registry.get(id)?.scopes,
       platform,
     );
@@ -203,6 +205,7 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
         <QueueIndicator />
         <QueuePopup />
         <Settings />
+        <Help />
         <Dialog />
       </main>
       </UiContext.Provider>
