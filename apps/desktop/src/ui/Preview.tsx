@@ -49,7 +49,9 @@ export function Preview() {
           )}
           {d?.kind === "image" &&
             (d.dataUrl ? (
-              <img src={d.dataUrl} alt={p.name} className="mx-auto max-h-[60vh] max-w-full object-contain" />
+              <div className="flex h-full items-center justify-center">
+                <img src={d.dataUrl} alt={p.name} className="max-h-full max-w-full object-contain" />
+              </div>
             ) : (
               <p className="text-ink-faint">이미지가 너무 커서 미리 볼 수 없습니다 ({size(d.size)})</p>
             ))}

@@ -19,5 +19,5 @@ export function PdfView({ dataUrl, name }: { dataUrl: string; name: string }) {
     };
   }, [dataUrl]);
   if (!src) return <p className="text-ink-faint">PDF를 여는 중…</p>;
-  return <iframe title={`PDF 미리보기: ${name}`} src={src} className="h-[60vh] w-full border-0" />;
+  return <iframe title={`PDF 미리보기: ${name}`} src={src} className="block h-full w-full border-0" />;
 }
