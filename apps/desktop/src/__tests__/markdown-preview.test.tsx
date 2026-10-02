@@ -28,7 +28,7 @@ const EVIL = [
 async function open(files: Record<string, string>, name: string) {
   const { user } = await renderApp(new FakeBackend().seed({ ...files, "/home/b": null }));
   // 목록은 이름순이며 파일 하나뿐이다.
-  await user.keyboard(" ");
+  await user.keyboard("{ArrowRight}");
   return { user, dlg: await screen.findByRole("dialog", { name: `미리보기: ${name}` }) };
 }
 

@@ -794,6 +794,18 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         return { cursor: clamp(t.cursor + dir * rows, t.entries.length) };
       });
     },
+    /** 왼쪽 키: 여러 컬럼 보기에서는 이전 컬럼, 그 밖에는 상위 폴더로 간다. */
+    async goLeft() {
+      if (activeTab(get()).view.mode === "columns") api.moveColumn(-1);
+      else await api.goUp();
+    },
+    /** 오른쪽 키: 여러 컬럼 보기에서는 다음 컬럼, 그 밖에는 폴더면 들어가고 파일이면 미리보기를 연다. */
+    async goRight() {
+      const tab = activeTab(get());
+      if (tab.view.mode === "columns") api.moveColumn(1);
+      else if (cursorEntry(tab)?.kind === "dir") await api.open();
+      else await api.previewToggle();
+    },
     /** 정렬 변경 (`core.view.order`). 같은 키를 다시 고르면 방향을 뒤집는다. `dir`로 방향을 지정할 수 있다. */
     setOrder(args?: Record<string, unknown>) {
       const s = get();

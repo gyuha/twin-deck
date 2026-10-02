@@ -114,7 +114,7 @@ Marta에서는 수정자 없는 단일 키 바인딩이 Quick Select에 가로�
 | `core.go.up` | 상위 폴더 | `Backspace` | `Backspace`, `Alt+Up` | ID 확인 |
 | `core.go.path` | Go To Path | `Mod+G` | `Ctrl+G` | 자체 ID, 키 확인 |
 | `core.move.up` / `core.move.down` | 커서 위/아래 | `Up` / `Down` | 같음 | ID 확인 |
-| `core.move.left` / `core.move.right` | 컬럼 좌/우 | `Left` / `Right` | 같음 | `left`는 ID 확인, `right`는 추정 |
+| `core.move.left` / `core.move.right` | 여러 컬럼 보기: 컬럼 좌/우. 그 밖: `Left`는 상위 폴더, `Right`는 폴더면 들어가고 파일이면 미리보기 | `Left` / `Right` | 같음 | `left`는 ID 확인, `right`는 추정 |
 | `core.move.page_up` / `page_down` | 페이지 이동 | `PageUp` / `PageDown` | 같음 | 자체 |
 | `core.move.half_page_up` / `half_page_down` | 반 페이지 | `Alt+PageUp` / `Alt+PageDown` | 같음 | 자체 ID, 키 확인 |
 | `core.move.home` / `core.move.end` | 처음/끝 | `Home` / `End` | 같음 | 자체 |
@@ -157,7 +157,7 @@ Shift+이동 키(범위의 선택 반전)는 액션이 아니라 `pane` 스코�
 | `core.view.hidden` | 숨김 파일 표시 토글 | `Mod+Shift+.` | `Ctrl+H` | 자체 ID. macOS 키 확인, 나머지는 관례 |
 | `core.view.mode` | 표시 모드 (인수) | 없음 | 없음 | 자체 (인수 이름 미확인) |
 | `core.view.order` | 정렬 (인수) | 없음 | 없음 | 자체 (인수 이름 미확인) |
-| `core.preview` | 미리보기 | `Space` 또는 `Mod+Y` | `Space` 또는 `Ctrl+Y` | 자체 ID, 키 확인 |
+| `core.preview` | 미리보기 (파일에서는 `Right`도 연다) | `Mod+Y` | `Ctrl+Y` | 자체 ID, 키 확인 |
 | `core.lookup.global` | Look Up (전역) | `Mod+P` | `Ctrl+P` | 자체 ID, 키 확인 |
 | `core.lookup.folder` | Look Up (현재 폴더) | `Alt+Mod+P` | `Ctrl+Alt+P` | 자체 ID, 키 확인 |
 | `core.flatten` | Flatten | 없음 | 없음 | 자체 |

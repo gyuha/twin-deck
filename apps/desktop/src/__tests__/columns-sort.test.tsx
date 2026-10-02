@@ -161,10 +161,8 @@ describe("CFG-07 표시 모드 / NAV-05 컬럼 이동 / NAV-02 반 페이지", (
     expect(seen).toEqual(["columns-1", "columns-2", "columns-3", "table", "columns-1"]);
   });
 
-  it("좌/우 키는 컬럼 사이를 오간다 (열 우선 배치, 표 모드에서는 동작하지 않음)", async () => {
+  it("좌/우 키는 여러 컬럼 보기에서 컬럼 사이를 오간다 (열 우선 배치)", async () => {
     const { user } = await renderApp(seed());
-    await user.keyboard("{ArrowRight}");
-    expect(cursorName("left")).toBe("docs"); // 표 모드: 변화 없음
     await user.keyboard("{Control>}{Alt>}2{/Alt}{/Control}");
     await waitFor(() => expect(mode(list("left"))).toBe("columns-2"));
     // 6개 항목, 2열 → 열당 3행: [docs src a.txt] [b.md c.zip d.txt]

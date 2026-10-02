@@ -87,10 +87,10 @@ describe("M2 키보드 전용 종단 시나리오", () => {
     await waitFor(() => expect(backend.exists("/home/a/docs copy/readme.md")).toBe(true));
     await waitFor(() => expect(entryNames("left")).toContain("docs copy"));
 
-    // 7) Space: 미리보기 (d.txt의 내용), Esc로 닫는다
+    // 7) 오른쪽 키: 미리보기 (d.txt의 내용), Esc로 닫는다
     await user.keyboard("{ArrowDown}{ArrowDown}{ArrowDown}");
     expect(cursorName("left")).toBe("d.txt");
-    await user.keyboard(" ");
+    await user.keyboard("{ArrowRight}");
     const preview = await screen.findByRole("dialog", { name: "미리보기: d.txt" });
     expect(within(preview).getByLabelText("텍스트 미리보기")).toHaveTextContent("0123456789");
     await user.keyboard("{Escape}");
