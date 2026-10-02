@@ -142,4 +142,13 @@ describe("파일 행 컨텍스트 메뉴", () => {
     fireEvent.contextMenu(list("left"), { clientX: 5, clientY: 5 });
     expect(menu()).toBeNull();
   });
+
+  it("빈 영역 우클릭은 웹뷰 기본 메뉴도 막고, 입력창은 막지 않는다", async () => {
+    await renderApp(seed());
+    expect(fireEvent.contextMenu(list("left"), { clientX: 5, clientY: 5 })).toBe(false); // preventDefault됨
+    const input = document.createElement("input");
+    document.body.append(input);
+    expect(fireEvent.contextMenu(input)).toBe(true);
+    input.remove();
+  });
 });

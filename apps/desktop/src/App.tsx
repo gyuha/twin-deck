@@ -126,6 +126,15 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
   useKeyboard({ app, keymap, registry });
   useTheme(loaded.config.behavior.theme);
 
+  // 웹뷰 기본 메뉴(Reload, Inspect Element)는 막는다. 입력창의 잘라내기/붙여넣기 메뉴는 남긴다.
+  useEffect(() => {
+    const block = (e: MouseEvent) => {
+      if (!(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) e.preventDefault();
+    };
+    window.addEventListener("contextmenu", block);
+    return () => window.removeEventListener("contextmenu", block);
+  }, []);
+
   // Actions Panel이 쓰는 액션 목록(제목, 분류, 현재 키, 실행 가능 여부)과 실행기.
   useEffect(() => {
     app.api.attachPalette(
