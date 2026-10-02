@@ -62,16 +62,6 @@ export function Dialog() {
                 {dialog.error}
               </p>
             )}
-            {dialog.confirmLabel && (
-              <div className="mt-3 flex justify-end gap-2">
-                <button type="button" className="rounded border border-app-line px-3 py-0.5" onClick={() => api.dialogCancel()}>
-                  취소
-                </button>
-                <button type="button" className="rounded bg-accent px-3 py-0.5 text-white" onClick={() => api.dialogConfirm()}>
-                  {dialog.confirmLabel}
-                </button>
-              </div>
-            )}
           </>
         )}
         {dialog.kind === "progress" && job && (
@@ -125,6 +115,18 @@ export function Dialog() {
               ))}
             </div>
           </>
+        )}
+        {dialog.kind !== "progress" && (
+          <div className="mt-3 flex justify-end gap-2">
+            {dialog.kind !== "info" && (
+              <button type="button" className="rounded border border-app-line px-3 py-0.5" onClick={() => api.dialogCancel()}>
+                취소
+              </button>
+            )}
+            <button type="button" className="rounded bg-accent px-3 py-0.5 text-white" onClick={() => api.dialogConfirm()}>
+              {dialog.kind === "name" && dialog.confirmLabel ? dialog.confirmLabel : "확인"}
+            </button>
+          </div>
         )}
         <p className="mt-3 text-xs text-ink-faint">
           {dialog.kind === "progress"
