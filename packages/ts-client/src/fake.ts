@@ -286,6 +286,7 @@ export class FakeBackend implements Backend {
     const ext = path.slice(path.lastIndexOf(".") + 1).toLowerCase();
     const mime = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", svg: "image/svg+xml" }[ext];
     if (mime) return { ...base, kind: "image", dataUrl: `data:${mime};base64,${btoa(n.content)}` };
+    if (ext === "pdf") return { ...base, kind: "pdf", dataUrl: `data:application/pdf;base64,${btoa(n.content)}` };
     if (n.content.includes("\u0000")) return { ...base, kind: "other" };
     const limit = 64 * 1024;
     return { ...base, kind: "text", text: n.content.slice(0, limit), truncated: n.content.length > limit };

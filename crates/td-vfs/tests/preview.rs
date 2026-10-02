@@ -43,6 +43,7 @@ fn preview_text_reads_prefix_only() {
     let limits = PreviewLimits {
         text_bytes: 10,
         image_bytes: 100,
+        ..PreviewLimits::default()
     };
     let pv = read_preview(&small, limits).unwrap();
     assert!(pv.truncated && pv.text.unwrap().len() <= 10);
@@ -86,6 +87,7 @@ fn preview_image_data_url() {
     let limits = PreviewLimits {
         text_bytes: 64,
         image_bytes: 100,
+        ..PreviewLimits::default()
     };
     let pv = read_preview(&file(&tmp, "huge.gif", &[0u8; 500]), limits).unwrap();
     assert_eq!(
@@ -122,4 +124,44 @@ fn preview_other_dir_and_errors() {
         read_preview(&missing, PreviewLimits::default()),
         Err(VfsError::NotFound(_))
     ));
+}
+
+#[test]
+fn preview_pdf_data_url_and_limit() {
+    let tmp = tempfile::tempdir().unwrap();
+    let p = file(&tmp, "a.PDF", b"%PDF-1.4 x");
+    let pv = read_preview(&p, PreviewLimits::default()).unwrap();
+    assert_eq!(pv.kind, PreviewKind::Pdf);
+    assert!(pv
+        .data_url
+        .unwrap()
+        .starts_with("data:application/pdf;base64,"));
+    assert!(!pv.truncated);
+    // 한도를 넘으면 싣지 않고 truncated로 알린다
+    let limits = PreviewLimits {
+        pdf_bytes: 4,
+        ..PreviewLimits::default()
+    };
+    let pv = read_preview(&p, limits).unwrap();
+    assert_eq!(pv.kind, PreviewKind::Pdf);
+    assert!(pv.data_url.is_none() && pv.truncated);
+}
+
+/// 한도(10MB)짜리 PDF를 읽고 base64로 바꾸는 시간을 잰다. 느리면 PDF 미리보기를 적용하지 않는다는 기준의 측정.
+#[test]
+#[ignore = "측정용"]
+fn measure_pdf_preview_cost() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut data = b"%PDF-1.7\n".to_vec();
+    data.extend((0..10 * 1024 * 1024 - 9).map(|i| (i * 31 % 251) as u8));
+    let p = file(&tmp, "big.pdf", &data);
+    for _ in 0..3 {
+        let t = std::time::Instant::now();
+        let pv = read_preview(&p, PreviewLimits::default()).unwrap();
+        println!(
+            "10MB pdf: {:?}, data_url {} bytes",
+            t.elapsed(),
+            pv.data_url.unwrap().len()
+        );
+    }
 }

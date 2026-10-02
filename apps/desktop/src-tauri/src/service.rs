@@ -102,6 +102,7 @@ pub enum JobKindDto {
 pub enum PreviewKindDto {
     Text,
     Image,
+    Pdf,
     Directory,
     Other,
 }
@@ -123,6 +124,7 @@ impl From<td_vfs::Preview> for PreviewDto {
             kind: match p.kind {
                 td_vfs::PreviewKind::Text => PreviewKindDto::Text,
                 td_vfs::PreviewKind::Image => PreviewKindDto::Image,
+                td_vfs::PreviewKind::Pdf => PreviewKindDto::Pdf,
                 td_vfs::PreviewKind::Directory => PreviewKindDto::Directory,
                 td_vfs::PreviewKind::Other => PreviewKindDto::Other,
             },

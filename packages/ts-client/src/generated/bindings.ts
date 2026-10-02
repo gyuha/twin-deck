@@ -422,7 +422,7 @@ export type PaneSnap = { tabs: TabSnap[]; active: number }
  * 미리보기 (VIEW-01). 텍스트는 앞부분, 이미지는 data URL.
  */
 export type PreviewDto = { kind: PreviewKindDto; text: string | null; truncated: boolean; size: number; dataUrl: string | null }
-export type PreviewKindDto = "text" | "image" | "directory" | "other"
+export type PreviewKindDto = "text" | "image" | "pdf" | "directory" | "other"
 /**
  * 작업 큐의 상태가 바뀔 때마다 전체 스냅샷을 보낸다.
  */

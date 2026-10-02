@@ -11,6 +11,8 @@ use crate::{Result, VfsError, VfsPath};
 pub enum PreviewKind {
     Text,
     Image,
+    /// PDF. 한도 안이면 `data:application/pdf;base64,...`로 싣는다.
+    Pdf,
     Directory,
     /// 텍스트도 이미지도 아니다(바이너리 등). 종류와 크기만 보여 준다.
     Other,
@@ -32,6 +34,7 @@ pub struct Preview {
 pub struct PreviewLimits {
     pub text_bytes: usize,
     pub image_bytes: u64,
+    pub pdf_bytes: u64,
 }
 
 impl Default for PreviewLimits {
@@ -39,6 +42,7 @@ impl Default for PreviewLimits {
         Self {
             text_bytes: 64 * 1024,
             image_bytes: 10 * 1024 * 1024,
+            pdf_bytes: 10 * 1024 * 1024,
         }
     }
 }
@@ -84,6 +88,21 @@ pub fn read_preview(path: &VfsPath, limits: PreviewLimits) -> Result<Preview> {
         return Ok(Preview {
             data_url: Some(format!("data:{mime};base64,{b64}")),
             ..base(PreviewKind::Image)
+        });
+    }
+
+    if name.to_ascii_lowercase().ends_with(".pdf") {
+        if size > limits.pdf_bytes {
+            return Ok(Preview {
+                truncated: true,
+                ..base(PreviewKind::Pdf)
+            });
+        }
+        let bytes = fs::read(path.as_path()).map_err(|e| VfsError::io(path, e))?;
+        let b64 = base64::engine::general_purpose::STANDARD.encode(bytes);
+        return Ok(Preview {
+            data_url: Some(format!("data:application/pdf;base64,{b64}")),
+            ..base(PreviewKind::Pdf)
         });
     }
 

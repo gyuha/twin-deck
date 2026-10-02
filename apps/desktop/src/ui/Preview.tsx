@@ -1,12 +1,13 @@
 import { useApp } from "../state/context";
 import { JsonView } from "./JsonView";
 import { MarkdownView } from "./MarkdownView";
+import { PdfView } from "./PdfView";
 
 const isMarkdown = (name: string) => /\.(md|markdown)$/i.test(name);
 
 const isJson = (name: string) => /\.json$/i.test(name);
 
-const KIND_LABEL = { text: "텍스트", image: "이미지", directory: "폴더", other: "기타" } as const;
+const KIND_LABEL = { text: "텍스트", image: "이미지", pdf: "PDF", directory: "폴더", other: "기타" } as const;
 
 function size(n: number): string {
   return n < 1024 ? `${n} B` : n < 1024 ** 2 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1024 ** 2).toFixed(1)} MB`;
@@ -51,6 +52,12 @@ export function Preview() {
               <img src={d.dataUrl} alt={p.name} className="mx-auto max-h-[60vh] max-w-full object-contain" />
             ) : (
               <p className="text-ink-faint">이미지가 너무 커서 미리 볼 수 없습니다 ({size(d.size)})</p>
+            ))}
+          {d?.kind === "pdf" &&
+            (d.dataUrl ? (
+              <PdfView dataUrl={d.dataUrl} name={p.name} />
+            ) : (
+              <p className="text-ink-faint">PDF가 너무 커서 미리 볼 수 없습니다 ({size(d.size)})</p>
             ))}
           {(d?.kind === "directory" || d?.kind === "other") && (
             <p className="text-ink-faint">
