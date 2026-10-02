@@ -115,6 +115,7 @@ export function menuHandlers({ api }: AppStore): Partial<ActionHandlers> {
     "core.recent.clear": () => api.menuClearRecent(),
     "core.favorites.add": () => api.addFavoriteHere(),
     "core.go.path": () => api.gotoPath(),
+    "core.go.shortcut": (_ctx, args) => api.openShortcut(args),
   };
 }
 

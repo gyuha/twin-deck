@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
@@ -10,6 +12,8 @@ pub struct Config {
     pub layout: LayoutConfig,
     pub view: ViewConfig,
     pub file_systems: FileSystemsConfig,
+    /// 폴더 단축키. 키는 "0"~"9", 값은 경로(`~`, `${user.*}` 허용). 빈 문자열이면 미지정.
+    pub shortcuts: BTreeMap<String, String>,
     /// 병합 후 항목별로 검증해서 채운다(잘못된 항목은 경고와 함께 빠진다).
     #[serde(default)]
     pub favorites: Vec<FavoriteDto>,

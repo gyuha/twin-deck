@@ -44,3 +44,15 @@ additional_extensions = []
 [view.table]
 columns = ["name", "size", "modified"]
 
+# Ctrl+0~9로 바로 가는 폴더. 비워 두면 그 키는 아무 일도 하지 않는다.
+[shortcuts]
+"0" = ""
+"1" = ""
+"2" = ""
+"3" = ""
+"4" = ""
+"5" = ""
+"6" = ""
+"7" = ""
+"8" = ""
+"9" = ""

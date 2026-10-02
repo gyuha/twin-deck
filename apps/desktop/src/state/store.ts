@@ -1766,6 +1766,13 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (typeof src !== "string" || src.trim() === "") return fail("core.open.directory에는 문자열 인수 src가 필요합니다");
       await navigateToPath(src);
     },
+    /** 폴더 단축키(`shortcuts.N`)에 지정된 폴더로 간다. 비어 있으면 알리고 이동하지 않는다. */
+    async openShortcut(args?: Record<string, unknown>) {
+      const n = String(args?.n ?? "");
+      const path = get().loaded.config.shortcuts[n]?.trim();
+      if (!path) return fail(`Ctrl+${n}에 지정된 폴더가 없습니다 (설정 > 폴더 단축키)`);
+      await navigateToPath(path);
+    },
     async gotoComplete() {
       const d = get().dialog;
       if (d?.kind !== "name" || !d.goto) return;

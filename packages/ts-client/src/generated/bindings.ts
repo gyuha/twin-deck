@@ -347,6 +347,10 @@ args: Partial<{ [key in string]: string }>;
 scope: string | null }
 export type Config = { behavior: Behavior; display: Display; environment: Environment; core: CoreConfig; layout: LayoutConfig; view: ViewConfig; file_systems: FileSystemsConfig; 
 /**
+ * 폴더 단축키. 키는 "0"~"9", 값은 경로(`~`, `${user.*}` 허용). 빈 문자열이면 미지정.
+ */
+shortcuts: Partial<{ [key in string]: string }>; 
+/**
  * 병합 후 항목별로 검증해서 채운다(잘못된 항목은 경고와 함께 빠진다).
  */
 favorites?: FavoriteDto[] }

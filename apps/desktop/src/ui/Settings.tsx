@@ -20,7 +20,7 @@ const THEMES = ["system", "dark", "light", "midnight", "noir", "slate", "nord", 
 // size_format의 허용 값은 td-config의 검증 목록과 같아야 한다(crates/td-config/src/load.rs).
 const SIZE_FORMATS = ["adaptive", "adaptive_kibi", "bytes", "KB", "MB"] as const;
 
-const SECTIONS: { title: string; items: Item[] }[] = [
+const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
   {
     title: "모양",
     items: [
@@ -55,6 +55,15 @@ const SECTIONS: { title: string; items: Item[] }[] = [
     ],
   },
   {
+    title: "폴더 단축키",
+    desc: "Ctrl+숫자를 누르면 지정한 폴더로 이동합니다. 비우면 동작하지 않습니다 (~ 사용 가능)",
+    items: Array.from({ length: 10 }, (_, n) => ({
+      key: `shortcuts.${n}`,
+      title: `Ctrl+${n}`,
+      control: { type: "text" } as const,
+    })),
+  },
+  {
     title: "환경",
     items: [{ key: "environment.text_editor", title: "텍스트 편집기", desc: "F4로 여는 프로그램. 비우면 기본 앱", control: { type: "text" } }],
   },
@@ -77,7 +86,7 @@ function EditableControl({ item, value, disabled, onCommit }: { item: Item; valu
       value={draft}
       disabled={disabled}
       size="sm"
-      className="w-40"
+      className={item.control.type === "text" ? "w-full" : "w-40"}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => {
@@ -138,19 +147,21 @@ export function Settings() {
             ))}
           </nav>
           <section role="tabpanel" aria-label={current.title} className="min-w-0 flex-1 overflow-auto px-6 py-3">
-            <h3 className="mb-2 text-sm font-semibold">{current.title}</h3>
+            <h3 className="text-sm font-semibold">{current.title}</h3>
+            {current.desc ? <p className="mb-2 text-xs text-ink-faint">{current.desc}</p> : <div className="mb-2" />}
             {current.items.map((item) => {
               const value = valueAt(config, item.key) as string | number | boolean;
               const isDefault = value === valueAt(defaults, item.key);
+              const wide = item.control.type === "text";
               return (
                 <div key={item.key} role="group" aria-label={item.title} className="flex items-center justify-between gap-4 border-b border-app-line py-2.5">
-                  <div className="min-w-0">
+                  <div className={wide ? "w-48 shrink-0" : "min-w-0"}>
                     <div className="text-sm">{item.title}</div>
                     {item.desc && <div className="text-xs text-ink-faint">{item.desc}</div>}
                   </div>
-                  <div className="flex shrink-0 items-center gap-3">
+                  <div className={"flex items-center gap-3 " + (wide ? "min-w-0 flex-1 justify-end" : "shrink-0")}>
                     {!isDefault && !broken && (
-                      <button type="button" className="text-xs text-accent hover:underline" onClick={() => void api.resetConfigValue(item.key)}>
+                      <button type="button" className="whitespace-nowrap text-xs text-accent hover:underline" onClick={() => void api.resetConfigValue(item.key)}>
                         기본값으로
                       </button>
                     )}
