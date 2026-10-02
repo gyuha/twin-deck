@@ -1,4 +1,7 @@
 import { useApp } from "../state/context";
+import { MarkdownView } from "./MarkdownView";
+
+const isMarkdown = (name: string) => /\.(md|markdown)$/i.test(name);
 
 const KIND_LABEL = { text: "텍스트", image: "이미지", directory: "폴더", other: "기타" } as const;
 
@@ -28,9 +31,13 @@ export function Preview() {
           )}
           {d?.kind === "text" && (
             <>
-              <pre aria-label="텍스트 미리보기" className="whitespace-pre-wrap break-words font-mono text-xs">
-                {d.text}
-              </pre>
+              {isMarkdown(p.name) ? (
+                <MarkdownView text={d.text ?? ""} />
+              ) : (
+                <pre aria-label="텍스트 미리보기" className="whitespace-pre-wrap break-words font-mono text-xs">
+                  {d.text}
+                </pre>
+              )}
               {d.truncated && <p className="mt-1 text-xs text-ink-faint">앞부분만 표시합니다 (전체 {size(d.size)})</p>}
             </>
           )}
