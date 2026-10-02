@@ -10,6 +10,8 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@spacedrive/primitives": "^0.2.4",
+    "@spacedrive/tokens": "^0.2.3",
     "@tanstack/react-virtual": "^3.14.13",
     "@tauri-apps/api": "^2.1.0",
     "@twin-deck/actions": "workspace:*",

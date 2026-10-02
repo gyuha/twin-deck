@@ -83,6 +83,8 @@ export function fileOpHandlers({ api }: AppStore): Partial<ActionHandlers> {
 /** 작업 큐 팝업 액션의 실행 핸들러. */
 export function queueHandlers({ api }: AppStore): Partial<ActionHandlers> {
   return {
+    "core.settings.open": () => api.openSettings(),
+    "core.settings.close": () => api.closeSettings(),
     "core.queue.open": () => api.toggleQueue(),
     "core.queue.close": () => api.toggleQueue(),
     "core.queue.up": () => api.queueMove(-1),

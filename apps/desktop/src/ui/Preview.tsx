@@ -16,13 +16,13 @@ export function Preview() {
       <div
         role="dialog"
         aria-label={`미리보기: ${p.name}`}
-        className="flex max-h-[80vh] w-[44rem] max-w-full flex-col rounded border border-neutral-400 bg-(--td-surface) p-3 text-sm shadow-lg"
+        className="flex max-h-[80vh] w-[44rem] max-w-full flex-col rounded border border-app-line bg-app-box p-3 text-sm shadow-lg"
       >
         <h2 className="mb-2 truncate font-semibold">{p.name}</h2>
         <div className="min-h-0 flex-1 overflow-auto">
-          {p.status === "loading" && <p className="text-neutral-500">불러오는 중…</p>}
+          {p.status === "loading" && <p className="text-ink-faint">불러오는 중…</p>}
           {p.status === "error" && (
-            <p role="alert" className="text-red-700">
+            <p role="alert" className="text-status-error">
               {p.error}
             </p>
           )}
@@ -31,22 +31,22 @@ export function Preview() {
               <pre aria-label="텍스트 미리보기" className="whitespace-pre-wrap break-words font-mono text-xs">
                 {d.text}
               </pre>
-              {d.truncated && <p className="mt-1 text-xs text-neutral-500">앞부분만 표시합니다 (전체 {size(d.size)})</p>}
+              {d.truncated && <p className="mt-1 text-xs text-ink-faint">앞부분만 표시합니다 (전체 {size(d.size)})</p>}
             </>
           )}
           {d?.kind === "image" &&
             (d.dataUrl ? (
               <img src={d.dataUrl} alt={p.name} className="mx-auto max-h-[60vh] max-w-full object-contain" />
             ) : (
-              <p className="text-neutral-500">이미지가 너무 커서 미리 볼 수 없습니다 ({size(d.size)})</p>
+              <p className="text-ink-faint">이미지가 너무 커서 미리 볼 수 없습니다 ({size(d.size)})</p>
             ))}
           {(d?.kind === "directory" || d?.kind === "other") && (
-            <p className="text-neutral-500">
+            <p className="text-ink-faint">
               {KIND_LABEL[d.kind]} — 미리 볼 수 없는 형식입니다{d.kind === "other" ? ` (${size(d.size)})` : ""}
             </p>
           )}
         </div>
-        <p className="mt-2 text-xs text-neutral-500">↑↓ 이전/다음 항목 · Space/Esc 닫기</p>
+        <p className="mt-2 text-xs text-ink-faint">↑↓ 이전/다음 항목 · Space/Esc 닫기</p>
       </div>
     </div>
   );

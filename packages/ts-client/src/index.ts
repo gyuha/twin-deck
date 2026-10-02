@@ -1,6 +1,7 @@
 export type {
   BindingSpec,
   Config,
+  ConfigValue,
   ConflictDto,
   DirChanged,
   EntryDto,

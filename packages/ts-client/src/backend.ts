@@ -1,4 +1,4 @@
-import type { ConflictDto, EntryDto, FileInfoDto, JobDto, JobKindDto, Loaded, LoadedState, PreviewDto, QueueItemDto, SearchStartDto, SearchSummaryDto, Snapshot, UserDirsDto, VolumeDto } from "./generated/bindings";
+import type { ConfigValue, ConflictDto, EntryDto, FileInfoDto, JobDto, JobKindDto, Loaded, LoadedState, PreviewDto, QueueItemDto, SearchStartDto, SearchSummaryDto, Snapshot, UserDirsDto, VolumeDto } from "./generated/bindings";
 
 /** Look Up / Flatten / Disk Usage가 스트리밍으로 보내는 이벤트. 작업마다 마지막은 `done`이다. */
 export type SearchEvent =
@@ -77,6 +77,12 @@ export interface Backend {
   addFavorite(name: string, path: string): Promise<void>;
   /** 현재 설정(기본값 병합 결과)과 키바인딩, 경고. */
   getConfig(): Promise<Loaded>;
+  /** 설정 화면: 사용자 config.toml의 키 하나(`behavior.theme` 같은 점 표기)를 쓰고, 새로 병합된 설정을 돌려준다. */
+  setConfigValue(key: string, value: ConfigValue): Promise<Loaded>;
+  /** 설정 화면: 사용자 config.toml에서 키를 지워 기본값으로 되돌리고, 새로 병합된 설정을 돌려준다. */
+  resetConfigValue(key: string): Promise<Loaded>;
+  /** 설정 폴더를 파일 관리자로 연다. */
+  revealConfigDir(): Promise<void>;
   /** 설정 파일이 바뀔 때마다 호출된다. 문법 오류면 이전 유효 설정과 경고가 온다. */
   onConfigChanged(callback: (loaded: Loaded) => void): () => void;
   /** 큐 상태가 바뀔 때마다 전체 스냅샷과 함께 호출된다. */

@@ -22,17 +22,17 @@ export function ActionsPalette() {
   const items = api.paletteView();
   return (
     <div className="fixed inset-0 flex items-start justify-center bg-black/20 pt-16">
-      <div role="dialog" aria-label="Actions Panel" className="w-[34rem] max-w-full rounded border border-neutral-400 bg-(--td-surface) p-3 text-sm shadow-lg">
+      <div role="dialog" aria-label="Actions Panel" className="w-[34rem] max-w-full rounded border border-app-line bg-app-box p-3 text-sm shadow-lg">
         <input
           ref={input}
           aria-label="액션 검색"
           value={palette.query}
           onChange={(e) => api.paletteSetQuery(e.target.value)}
           placeholder="액션 이름 또는 ID"
-          className="mb-2 w-full border border-neutral-400 px-1 py-0.5"
+          className="mb-2 w-full border border-app-line px-1 py-0.5"
         />
         {items.length === 0 ? (
-          <p className="text-neutral-500">일치하는 액션 없음</p>
+          <p className="text-ink-faint">일치하는 액션 없음</p>
         ) : (
           <div role="listbox" aria-label="액션 목록" className="max-h-80 overflow-auto">
             {items.slice(0, 50).map((it, i) => (
@@ -43,17 +43,17 @@ export function ActionsPalette() {
                 aria-disabled={!it.applicable}
                 className={[
                   "flex justify-between gap-2 border-l-4 px-2 py-0.5",
-                  i === palette.cursor ? "border-blue-600 bg-blue-50" : "border-transparent",
+                  i === palette.cursor ? "border-accent bg-app-selected" : "border-transparent",
                   it.applicable ? "" : "opacity-40",
                 ].join(" ")}
               >
                 <span>{it.title}</span>
-                <span className="font-mono text-xs text-neutral-500">{palette.showIds ? it.id : it.keys}</span>
+                <span className="font-mono text-xs text-ink-faint">{palette.showIds ? it.id : it.keys}</span>
               </div>
             ))}
           </div>
         )}
-        <p className="mt-2 text-xs text-neutral-500">↑↓ 이동 · Enter 실행 · Alt 누르는 동안 ID · Esc 닫기</p>
+        <p className="mt-2 text-xs text-ink-faint">↑↓ 이동 · Enter 실행 · Alt 누르는 동안 ID · Esc 닫기</p>
       </div>
     </div>
   );

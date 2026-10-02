@@ -129,6 +129,39 @@ async addFavorite(name: string, path: string) : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * 설정 화면: 사용자 `config.toml`의 키 하나를 쓰고, 새로 병합된 설정을 바로 돌려준다(변경 이벤트를 기다리지 않는다).
+ */
+async setConfigValue(key: string, value: ConfigValue) : Promise<Result<Loaded, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_config_value", { key, value }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 설정 화면: 사용자 `config.toml`에서 키 하나를 지워 내장 기본값으로 되돌린다.
+ */
+async resetConfigValue(key: string) : Promise<Result<Loaded, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("reset_config_value", { key }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 설정 화면: 설정 폴더를 파일 관리자로 연다.
+ */
+async revealConfigDir() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("reveal_config_dir") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async listDir(path: string, showHidden: boolean) : Promise<Result<EntryDto[], string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("list_dir", { path, showHidden }) };
@@ -310,6 +343,10 @@ favorites?: FavoriteDto[] }
  * 설정이 바뀌었다(파일 감시). 문법 오류가 있으면 이전 유효 설정과 경고가 온다.
  */
 export type ConfigChanged = { loaded: Loaded }
+/**
+ * 설정 화면이 쓰는 값 하나. 배열과 테이블은 다루지 않는다.
+ */
+export type ConfigValue = { kind: "bool"; value: boolean } | { kind: "int"; value: number } | { kind: "str"; value: string }
 /**
  * 삭제/휴지통 확인 대화상자 on/off (OP-13).
  */

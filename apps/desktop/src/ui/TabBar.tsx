@@ -6,7 +6,7 @@ export function TabBar({ pane }: { pane: PaneId }) {
   const { tabs, active } = useApp((s) => s.panes[pane]);
   const { api } = useAppStore();
   return (
-    <div role="tablist" aria-label="탭" className="flex gap-1 border-b border-neutral-300 px-1 text-sm">
+    <div role="tablist" aria-label="탭" className="flex gap-1 border-b border-app-line px-1 text-sm">
       {tabs.map((t, i) => (
         <button
           key={t.id}
@@ -15,7 +15,7 @@ export function TabBar({ pane }: { pane: PaneId }) {
           tabIndex={-1}
           aria-selected={i === active}
           onClick={() => api.activate(pane, i)}
-          className={i === active ? "border-b-2 border-blue-600 px-2 font-semibold" : "px-2 text-neutral-500"}
+          className={i === active ? "border-b-2 border-accent px-2 font-semibold" : "px-2 text-ink-faint"}
         >
           {t.virtual ? t.virtual.title : baseName(t.path) || "/"}
         </button>

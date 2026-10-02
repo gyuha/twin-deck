@@ -35,7 +35,7 @@ export function Dialog() {
         role="dialog"
         aria-modal="true"
         aria-label={dialog.title}
-        className="w-96 max-w-full rounded border border-neutral-400 bg-(--td-surface) p-4 text-sm shadow-lg"
+        className="w-96 max-w-full rounded border border-app-line bg-app-box p-4 text-sm shadow-lg"
       >
         <h2 className="mb-2 font-semibold">{dialog.title}</h2>
         {dialog.kind === "name" && (
@@ -45,19 +45,19 @@ export function Dialog() {
               aria-label={dialog.label ?? "이름"}
               value={dialog.value}
               onChange={(e) => api.dialogSetValue(e.target.value)}
-              className="w-full border border-neutral-400 px-1 py-0.5"
+              className="w-full border border-app-line px-1 py-0.5"
             />
             {dialog.error && (
-              <p role="alert" className="mt-1 text-red-700">
+              <p role="alert" className="mt-1 text-status-error">
                 {dialog.error}
               </p>
             )}
             {dialog.confirmLabel && (
               <div className="mt-3 flex justify-end gap-2">
-                <button type="button" className="rounded border border-neutral-400 px-3 py-0.5" onClick={() => api.dialogCancel()}>
+                <button type="button" className="rounded border border-app-line px-3 py-0.5" onClick={() => api.dialogCancel()}>
                   취소
                 </button>
-                <button type="button" className="rounded bg-blue-600 px-3 py-0.5 text-white" onClick={() => api.dialogConfirm()}>
+                <button type="button" className="rounded bg-accent px-3 py-0.5 text-white" onClick={() => api.dialogConfirm()}>
                   {dialog.confirmLabel}
                 </button>
               </div>
@@ -72,19 +72,19 @@ export function Dialog() {
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={job.filesTotal ? Math.round((job.filesDone / job.filesTotal) * 100) : undefined}
-              className="h-2 w-full overflow-hidden rounded bg-neutral-200"
+              className="h-2 w-full overflow-hidden rounded bg-app-slider"
             >
-              <div className="h-full bg-blue-600" style={{ width: `${job.filesTotal ? (job.filesDone / job.filesTotal) * 100 : 0}%` }} />
+              <div className="h-full bg-accent" style={{ width: `${job.filesTotal ? (job.filesDone / job.filesTotal) * 100 : 0}%` }} />
             </div>
             <p className="mt-1">{job.filesTotal === null ? "집계 중…" : `${job.filesDone}/${job.filesTotal}개`}</p>
-            {job.current && isActiveJob(job) && <p className="truncate text-xs text-neutral-600">{job.current}</p>}
+            {job.current && isActiveJob(job) && <p className="truncate text-xs text-ink-dull">{job.current}</p>}
             {job.errors.map((e) => (
-              <p key={e.path} role="alert" className="text-xs text-red-700">
+              <p key={e.path} role="alert" className="text-xs text-status-error">
                 {e.path}: {e.message}
               </p>
             ))}
             <div className="mt-3 flex justify-end">
-              <button type="button" className="rounded border border-neutral-400 px-3 py-0.5" onClick={() => (isActiveJob(job) ? api.dialogCancel() : api.dialogConfirm())}>
+              <button type="button" className="rounded border border-app-line px-3 py-0.5" onClick={() => (isActiveJob(job) ? api.dialogCancel() : api.dialogConfirm())}>
                 {isActiveJob(job) ? "중단" : "닫기"}
               </button>
             </div>
@@ -116,7 +116,7 @@ export function Dialog() {
             </div>
           </>
         )}
-        <p className="mt-3 text-xs text-neutral-500">
+        <p className="mt-3 text-xs text-ink-faint">
           {dialog.kind === "progress"
             ? "Esc 중단"
             : `Return 확인 · Esc 취소${dialog.kind === "name" && dialog.goto ? " · Tab 완성" : ""}`}

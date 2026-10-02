@@ -2,7 +2,7 @@ import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { BackendError } from "./backend";
 import type { Backend, SearchEvent } from "./backend";
 import { commands, events } from "./generated/bindings";
-import type { ConflictDto, FileInfoDto, JobDto, LoadedState, PreviewDto, Snapshot, JobKindDto, Loaded, QueueItemDto, Result } from "./generated/bindings";
+import type { ConfigValue, ConflictDto, FileInfoDto, JobDto, LoadedState, PreviewDto, Snapshot, JobKindDto, Loaded, QueueItemDto, Result } from "./generated/bindings";
 
 function unwrap<T>(r: Result<T, string>): T {
   if (r.status === "error") throw new BackendError(r.error);
@@ -131,6 +131,15 @@ export class TauriBackend implements Backend {
   }
   getConfig() {
     return commands.getConfig();
+  }
+  async setConfigValue(key: string, value: ConfigValue) {
+    return unwrap(await commands.setConfigValue(key, value));
+  }
+  async resetConfigValue(key: string) {
+    return unwrap(await commands.resetConfigValue(key));
+  }
+  async revealConfigDir() {
+    unwrap(await commands.revealConfigDir());
   }
   onConfigChanged(callback: (loaded: Loaded) => void) {
     const unlisten = events.configChanged.listen((e) => callback(e.payload.loaded));

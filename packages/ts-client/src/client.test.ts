@@ -226,4 +226,26 @@ describe("archive helpers", () => {
     expect(archiveFileName(baseName("/a/x.zip!"))).toBe("x.zip");
     expect(archiveFileName(baseName("/a/plain"))).toBe("plain");
   });
+
+  it("설정 쓰기: 키를 쓰면 병합된 설정을 돌려주고 구독자에게도 알리며, 지우면 기본값으로 돌아간다", async () => {
+    const b = fs();
+    const seen: string[] = [];
+    b.onConfigChanged((l) => seen.push(l.config.behavior.theme));
+    const set = await b.setConfigValue("behavior.theme", { kind: "str", value: "nord" });
+    expect(set.config.behavior.theme).toBe("nord");
+    expect((await b.getConfig()).config.behavior.theme).toBe("nord");
+    const size = await b.setConfigValue("behavior.table.icon_size", { kind: "int", value: 24 });
+    expect(size.config.behavior.table.icon_size).toBe(24);
+    const off = await b.setConfigValue("core.confirm.delete", { kind: "bool", value: false });
+    expect(off.config.core.confirm.delete).toBe(false);
+    const reset = await b.resetConfigValue("behavior.theme");
+    expect(reset.config.behavior.theme).toBe("system");
+    expect(seen).toEqual(["nord", "nord", "nord", "system"]);
+  });
+
+  it("설정 폴더 열기를 기록한다", async () => {
+    const b = fs();
+    await b.revealConfigDir();
+    expect(b.configDirRevealed).toBe(1);
+  });
 });

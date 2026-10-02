@@ -15,6 +15,7 @@ import { Preview } from "./ui/Preview";
 import { Pane } from "./ui/Pane";
 import { PopupMenu } from "./ui/PopupMenu";
 import { QueueIndicator, QueuePopup } from "./ui/Queue";
+import { Settings } from "./ui/Settings";
 import { UiContext } from "./ui/uiContext";
 import { useKeyboard } from "./ui/useKeyboard";
 
@@ -36,13 +37,25 @@ export function detectPlatform(): Platform {
   return "linux";
 }
 
-/** 설정 `behavior.theme`(light | dark | system)을 `<html data-theme>`에 반영한다. system은 OS 설정을 따른다. */
+/** spaceui(@spacedrive/tokens) 테마 이름 → `<html>`에 거는 클래스. */
+const THEME_CLASS: Record<string, string> = {
+  dark: "dark",
+  light: "light",
+  midnight: "midnight-theme",
+  noir: "noir-theme",
+  slate: "slate-theme",
+  nord: "nord-theme",
+  mocha: "mocha-theme",
+};
+
+/** 설정 `behavior.theme`을 `<html data-theme>`과 테마 클래스에 반영한다. system은 OS 설정에 따라 dark/light. */
 function useTheme(theme: string) {
   useEffect(() => {
     const media = typeof window.matchMedia === "function" ? window.matchMedia("(prefers-color-scheme: dark)") : null;
     const apply = () => {
-      const dark = theme === "dark" || (theme === "system" && !!media?.matches);
-      document.documentElement.dataset.theme = dark ? "dark" : "light";
+      const name = theme === "system" ? (media?.matches ? "dark" : "light") : theme in THEME_CLASS ? theme : "light";
+      document.documentElement.dataset.theme = name;
+      document.documentElement.className = THEME_CLASS[name];
     };
     apply();
     if (theme !== "system" || !media) return;
@@ -60,16 +73,16 @@ function StatusBar() {
   const { api } = useAppStore();
   const warnings = fileWarnings + keymapWarnings;
   return (
-    <footer role="status" aria-label="상태 표시줄" className="border-t border-neutral-300 px-2 py-0.5 text-xs">
+    <footer role="status" aria-label="상태 표시줄" className="border-t border-app-line px-2 py-0.5 text-xs">
       선택 {selected}개
-      {flash && <span className="ml-4 text-green-800">{flash}</span>}
+      {flash && <span className="ml-4 text-status-success">{flash}</span>}
       {warnings > 0 && (
-        <button type="button" tabIndex={-1} onClick={() => void api.showConfigWarnings()} className="ml-4 text-amber-700">
+        <button type="button" tabIndex={-1} onClick={() => void api.showConfigWarnings()} className="ml-4 text-status-warning">
           ⚠ 설정 경고 {warnings}개
         </button>
       )}
       {notice && (
-        <span role="alert" className="ml-4 text-red-700">
+        <span role="alert" className="ml-4 text-status-error">
           {notice}
         </span>
       )}
@@ -161,6 +174,7 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
         <PopupMenu />
         <QueueIndicator />
         <QueuePopup />
+        <Settings />
         <Dialog />
       </main>
       </UiContext.Provider>

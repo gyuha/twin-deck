@@ -122,9 +122,10 @@ export function FileTable({ pane }: { pane: PaneId }) {
         }}
         className={[
           "grid",
-          "h-6 cursor-default items-center px-2",
-          cursor ? (isActive ? "bg-blue-600 text-white outline outline-2 outline-blue-800" : "bg-neutral-300") : "",
-          selected ? "font-bold" : "",
+          "h-6 cursor-default items-center border-l-[3px] px-2",
+          // 커서: 은은한 배경 + 왼쪽 막대(활성 패널은 accent). 선택: accent 굵은 글자.
+          cursor ? (isActive ? "border-accent bg-app-selected" : "border-ink-faint bg-app-selected") : "border-transparent",
+          selected ? "font-semibold text-accent" : "",
         ].join(" ")}
       >
         <span aria-hidden>{mark}</span>
@@ -149,7 +150,7 @@ export function FileTable({ pane }: { pane: PaneId }) {
             activate();
             void api.goUp();
           }}
-          className="px-2 py-0.5 text-left text-neutral-500"
+          className="px-2 py-0.5 text-left text-ink-faint"
         >
           ..
         </button>
@@ -159,7 +160,7 @@ export function FileTable({ pane }: { pane: PaneId }) {
           role="row"
           aria-label="컬럼 머리글"
           style={{ gridTemplateColumns: gridTemplate(columns, iconSize) }}
-          className="grid border-b border-neutral-300 px-2 text-xs text-neutral-600"
+          className="grid border-b border-l-[3px] border-app-line border-l-transparent px-2 text-xs text-ink-dull"
         >
           <span aria-hidden />
           <span aria-hidden />
@@ -186,12 +187,12 @@ export function FileTable({ pane }: { pane: PaneId }) {
         </div>
       )}
       {tab.error && (
-        <div role="alert" className="bg-red-100 px-2 py-1 text-red-800">
+        <div role="alert" className="bg-status-error/15 px-2 py-1 text-status-error">
           {tab.error}
         </div>
       )}
       {!tab.error && tab.entries.length === 0 && (
-        <div className="px-2 py-1 text-neutral-500">{tab.virtual?.running ? "찾는 중…" : "항목 없음"}</div>
+        <div className="px-2 py-1 text-ink-faint">{tab.virtual?.running ? "찾는 중…" : "항목 없음"}</div>
       )}
       <div
         ref={listRef}
@@ -229,7 +230,7 @@ export function FileTable({ pane }: { pane: PaneId }) {
         </div>
       </div>
       {tab.quick !== null && (
-        <div role="status" aria-label="빠른 선택" className="border-t border-neutral-300 bg-yellow-50 px-2 py-0.5">
+        <div role="status" aria-label="빠른 선택" className="border-t border-app-line bg-status-warning/15 px-2 py-0.5">
           빠른 선택: <span>{tab.quick}</span>
         </div>
       )}

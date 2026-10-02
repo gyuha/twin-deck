@@ -6,6 +6,8 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, SystemTime};
 
+use serde::{Deserialize, Serialize};
+use specta::Type;
 use td_watch::DirWatcher;
 
 use crate::load::{load_dir, Loaded, Platform};
@@ -15,6 +17,7 @@ use crate::load::{load_dir, Loaded, Platform};
 pub struct ConfigStore {
     current: Arc<Mutex<Loaded>>,
     dir: PathBuf,
+    platform: Platform,
     _watcher: DirWatcher,
 }
 
@@ -85,6 +88,7 @@ impl ConfigStore {
             Self {
                 current,
                 dir: dir.to_path_buf(),
+                platform,
                 _watcher: watcher,
             },
             rx,
@@ -97,6 +101,111 @@ impl ConfigStore {
 
     pub fn dir(&self) -> &Path {
         &self.dir
+    }
+
+    /// 파일을 지금 다시 읽어 최신 설정으로 바꾸고 돌려준다. 설정 화면이 쓴 직후 변경 이벤트를 기다리지 않고 반영할 때 쓴다.
+    /// 문법 오류가 있으면 감시 스레드와 같이 이전 유효 설정을 유지하고 경고만 새로 반영한다.
+    pub fn refresh(&self) -> Loaded {
+        let mut fresh = load_dir(&self.dir, self.platform);
+        let mut guard = self.current.lock().unwrap();
+        if has_syntax_error(&fresh) {
+            fresh.config = guard.config.clone();
+            fresh.bindings = guard.bindings.clone();
+        }
+        *guard = fresh.clone();
+        fresh
+    }
+}
+
+/// 설정 화면이 쓰는 값 하나. 배열과 테이블은 다루지 않는다.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(tag = "kind", content = "value", rename_all = "camelCase")]
+pub enum ConfigValue {
+    Bool(bool),
+    Int(i32),
+    Str(String),
+}
+
+/// 사용자 `config.toml`을 읽어 편집 가능한 문서로 만든다. 없으면 빈 문서. 문법 오류면 파일을 건드리지 않도록 오류.
+fn read_user_doc(dir: &Path) -> Result<toml_edit::DocumentMut, String> {
+    let text = match fs::read_to_string(dir.join("config.toml")) {
+        Ok(s) => s,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(e) => return Err(format!("config.toml을 읽지 못했습니다: {e}")),
+    };
+    text.parse::<toml_edit::DocumentMut>()
+        .map_err(|_| "config.toml에 문법 오류가 있어 설정을 바꾸지 않았습니다".to_string())
+}
+
+fn write_user_doc(dir: &Path, doc: &toml_edit::DocumentMut) -> Result<(), String> {
+    fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    let tmp = dir.join("config.toml.tmp");
+    fs::write(&tmp, doc.to_string()).map_err(|e| e.to_string())?;
+    fs::rename(&tmp, dir.join("config.toml")).map_err(|e| e.to_string())
+}
+
+/// 사용자 `config.toml`의 점으로 이은 키(`behavior.table.icon_size`) 하나를 쓴다.
+/// 그 키만 바꾸고 다른 키, 주석, 순서는 그대로 둔다. 문법 오류가 있는 파일은 건드리지 않고 오류를 돌려준다.
+pub fn set_user_value(dir: &Path, key: &str, value: ConfigValue) -> Result<(), String> {
+    let mut doc = read_user_doc(dir)?;
+    let parts: Vec<&str> = key.split('.').collect();
+    let (leaf, tables) = parts.split_last().ok_or("빈 키입니다")?;
+    let mut table = doc.as_table_mut();
+    for t in tables {
+        let entry = table
+            .entry(t)
+            .or_insert_with(|| toml_edit::Item::Table(toml_edit::Table::new()));
+        // 중간 테이블이 비어 있게 되더라도 `[a]`가 따로 찍히지 않게 암시적 테이블로 만든다.
+        table = entry
+            .as_table_mut()
+            .ok_or_else(|| format!("{key}: {t}이(가) 테이블이 아닙니다"))?;
+        table.set_implicit(true);
+    }
+    let v: toml_edit::Value = match value {
+        ConfigValue::Bool(b) => b.into(),
+        ConfigValue::Int(i) => i64::from(i).into(),
+        ConfigValue::Str(s) => s.into(),
+    };
+    // 기존 값 뒤의 주석을 지키려고, 값만 갈아 끼우고 장식(공백, 주석)은 옮긴다.
+    match table.get_mut(leaf).and_then(|i| i.as_value_mut()) {
+        Some(old) => {
+            let mut new = v;
+            *new.decor_mut() = old.decor().clone();
+            *old = new;
+        }
+        None => {
+            table.insert(leaf, toml_edit::value(v));
+        }
+    }
+    write_user_doc(dir, &doc)
+}
+
+/// 사용자 `config.toml`에서 키 하나를 지워 내장 기본값으로 되돌린다. 없는 키는 오류가 아니다.
+/// 지운 뒤 비게 된 테이블은 함께 정리한다. 문법 오류가 있는 파일은 건드리지 않는다.
+pub fn reset_user_value(dir: &Path, key: &str) -> Result<(), String> {
+    let mut doc = read_user_doc(dir)?;
+    let parts: Vec<&str> = key.split('.').collect();
+    if !remove_key(doc.as_table_mut(), &parts) {
+        return Ok(());
+    }
+    write_user_doc(dir, &doc)
+}
+
+/// 경로의 키를 지우고 비게 된 상위 테이블을 정리한다. 실제로 지웠으면 true.
+fn remove_key(table: &mut toml_edit::Table, path: &[&str]) -> bool {
+    match path {
+        [] => false,
+        [leaf] => table.remove(leaf).is_some(),
+        [head, rest @ ..] => {
+            let Some(child) = table.get_mut(head).and_then(|i| i.as_table_mut()) else {
+                return false;
+            };
+            let removed = remove_key(child, rest);
+            if removed && child.is_empty() {
+                table.remove(head);
+            }
+            removed
+        }
     }
 }
 

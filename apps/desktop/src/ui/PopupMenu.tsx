@@ -7,17 +7,17 @@ export function PopupMenu() {
   let n = 0;
   return (
     <div className="fixed inset-0 flex items-start justify-center bg-black/20 pt-16">
-      <div role="dialog" aria-label={menu.title} className="w-[28rem] max-w-full rounded border border-neutral-400 bg-(--td-surface) p-3 text-sm shadow-lg">
+      <div role="dialog" aria-label={menu.title} className="w-[28rem] max-w-full rounded border border-app-line bg-app-box p-3 text-sm shadow-lg">
         <h2 className="mb-2 font-semibold">{menu.title}</h2>
         {menu.items.length === 0 ? (
-          <p className="text-neutral-500">항목 없음</p>
+          <p className="text-ink-faint">항목 없음</p>
         ) : (
           <div role="listbox" aria-label={`${menu.title} 목록`}>
             {menu.items.map((it, i) => {
-              if (it.separator) return <hr key={i} role="separator" className="my-1 border-neutral-300" />;
+              if (it.separator) return <hr key={i} role="separator" className="my-1 border-app-line" />;
               if (it.path === undefined) {
                 return (
-                  <div key={i} className="mt-1 px-2 text-xs font-semibold text-neutral-500">
+                  <div key={i} className="mt-1 px-2 text-xs font-semibold text-ink-faint">
                     {it.label}
                   </div>
                 );
@@ -29,16 +29,16 @@ export function PopupMenu() {
                   key={i}
                   role="option"
                   aria-selected={i === menu.cursor}
-                  className={i === menu.cursor ? "border-l-4 border-blue-600 bg-blue-50 px-2 py-0.5" : "border-l-4 border-transparent px-2 py-0.5"}
+                  className={i === menu.cursor ? "border-l-4 border-accent bg-app-selected px-2 py-0.5" : "border-l-4 border-transparent px-2 py-0.5"}
                 >
-                  <span className="mr-2 inline-block w-3 text-neutral-500">{hint}</span>
+                  <span className="mr-2 inline-block w-3 text-ink-faint">{hint}</span>
                   {it.label}
                 </div>
               );
             })}
           </div>
         )}
-        <p className="mt-2 text-xs text-neutral-500">
+        <p className="mt-2 text-xs text-ink-faint">
           ↑↓ 이동 · 숫자/Return 선택 · Esc 닫기{menu.kind === "volumes" ? " · U 언마운트 · E 추출" : ""}
           {menu.kind === "recent" ? " · C 비우기" : ""}
         </p>

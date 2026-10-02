@@ -4,7 +4,7 @@
 favorites = []
 
 [behavior]
-theme = "light"
+theme = "system"
 
 [behavior.table]
 icon_size = 16

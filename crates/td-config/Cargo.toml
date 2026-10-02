@@ -10,6 +10,7 @@ serde.workspace = true
 specta = { version = "=2.0.0-rc.22", features = ["derive"] }
 td-watch = { path = "../td-watch" }
 toml = "0.8"
+toml_edit = "0.22"
 
 [dev-dependencies]
 tempfile.workspace = true
