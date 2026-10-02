@@ -1,13 +1,17 @@
 import { useEffect, useState } from "react";
 import { Button, Input, Select, SelectOption, Switch } from "@spacedrive/primitives";
+import { defaultBindingsFor } from "@twin-deck/actions";
 import { defaultLoaded } from "@twin-deck/ts-client";
+import { APP_LAUNCH_ACTION } from "../lib/fkeys";
 import { useApp, useAppStore } from "../state/context";
+import { useUi } from "./uiContext";
 
 type Control =
   | { type: "switch" }
   | { type: "int" }
   | { type: "text" }
-  | { type: "select"; options: readonly string[] };
+  | { type: "select"; options: readonly string[] }
+  | { type: "fkey" };
 
 interface Item {
   key: string;
@@ -64,6 +68,11 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
     })),
   },
   {
+    title: "F키",
+    desc: "F키마다 실행할 동작을 고릅니다. '기본값'은 내장 동작을 그대로 쓰고, 설정 폴더의 keybindings.toml에 같은 키가 있으면 그쪽이 우선합니다.",
+    items: Array.from({ length: 12 }, (_, i) => ({ key: `fkeys.F${i + 1}`, title: `F${i + 1}`, control: { type: "fkey" } as const })),
+  },
+  {
     title: "환경",
     items: [{ key: "environment.text_editor", title: "텍스트 편집기", desc: "F4로 여는 프로그램. 비우면 기본 앱", control: { type: "text" } }],
   },
@@ -93,6 +102,46 @@ function EditableControl({ item, value, disabled, onCommit }: { item: Item; valu
         if (e.key === "Enter") commit();
       }}
     />
+  );
+}
+
+/**
+ * F키 한 줄: 동작 선택 메뉴(기본값 · 해제 · 액션 · 애플리케이션 실행)와, 앱 실행을 고르면 나타나는 앱 경로 입력.
+ * Radix Select는 빈 문자열 값을 허용하지 않아서 저장값 ""(기본값)을 화면에서만 "default"로 쓴다.
+ */
+function FKeyControl({ name, value, disabled }: { name: string; value: string; disabled: boolean }) {
+  const { registry, platform } = useUi();
+  const { api } = useAppStore();
+  const app = useApp((s) => s.loaded.config.fkey_apps[name] ?? "");
+  const builtin = defaultBindingsFor(platform).find((b) => b.scope === "pane" && b.keys.includes(name));
+  const builtinTitle = builtin ? (registry.get(builtin.actionId)?.title ?? builtin.actionId) : "없음";
+  // 인수가 필요한 액션(정렬 기준, 폴더 경로 등)은 F키에 인수 없이 걸 수 없어서 뺀다. 앱 실행만 전용 입력이 있다.
+  const actions = registry
+    .list()
+    .filter((a) => a.scopes.includes("pane") && (a.id === APP_LAUNCH_ACTION || !a.title.includes("(인수:")))
+    .map((a) => ({ id: a.id, label: a.id === APP_LAUNCH_ACTION ? "애플리케이션 실행" : a.title }))
+    .sort((a, b) => a.label.localeCompare(b.label, "ko"));
+  const choose = (v: string) => (v === "default" ? api.resetConfigValue(`fkeys.${name}`) : api.setConfigValue(`fkeys.${name}`, { kind: "str", value: v }));
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-2">
+      <Select value={value === "" ? "default" : value} disabled={disabled} onChange={(v) => void choose(v)}>
+        <SelectOption value="default">{`기본값 (현재: ${builtinTitle})`}</SelectOption>
+        <SelectOption value="none">해제</SelectOption>
+        {actions.map((a) => (
+          <SelectOption key={a.id} value={a.id}>
+            {a.label}
+          </SelectOption>
+        ))}
+      </Select>
+      {value === APP_LAUNCH_ACTION && (
+        <EditableControl
+          item={{ key: `fkey_apps.${name}`, title: `${name} 애플리케이션`, control: { type: "text" } }}
+          value={app}
+          disabled={disabled}
+          onCommit={(v) => void api.setConfigValue(`fkey_apps.${name}`, { kind: "str", value: v })}
+        />
+      )}
+    </div>
   );
 }
 
@@ -152,7 +201,7 @@ export function Settings() {
             {current.items.map((item) => {
               const value = valueAt(config, item.key) as string | number | boolean;
               const isDefault = value === valueAt(defaults, item.key);
-              const wide = item.control.type === "text";
+              const wide = item.control.type === "text" || item.control.type === "fkey";
               return (
                 <div key={item.key} role="group" aria-label={item.title} className="flex items-center justify-between gap-4 border-b border-app-line py-2.5">
                   <div className={wide ? "w-48 shrink-0" : "min-w-0"}>
@@ -161,7 +210,14 @@ export function Settings() {
                   </div>
                   <div className={"flex items-center gap-3 " + (wide ? "min-w-0 flex-1 justify-end" : "shrink-0")}>
                     {!isDefault && !broken && (
-                      <button type="button" className="whitespace-nowrap text-xs text-accent hover:underline" onClick={() => void api.resetConfigValue(item.key)}>
+                      <button type="button" className="whitespace-nowrap text-xs text-accent hover:underline" onClick={() =>
+                          void (async () => {
+                            await api.resetConfigValue(item.key);
+                            // F키는 지정한 앱 경로도 함께 비운다.
+                            if (item.control.type === "fkey") await api.resetConfigValue(item.key.replace("fkeys.", "fkey_apps."));
+                          })()
+                        }
+                      >
                         기본값으로
                       </button>
                     )}
@@ -173,6 +229,7 @@ export function Settings() {
                         onCheckedChange={(v) => void api.setConfigValue(item.key, { kind: "bool", value: v })}
                       />
                     )}
+                    {item.control.type === "fkey" && <FKeyControl name={item.title} value={String(value)} disabled={!!broken} />}
                     {item.control.type === "select" && (
                       <Select value={String(value)} disabled={!!broken} onChange={(v) => void api.setConfigValue(item.key, { kind: "str", value: v })}>
                         {item.control.options.map((o) => (

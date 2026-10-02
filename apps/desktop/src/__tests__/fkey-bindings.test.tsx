@@ -4,6 +4,8 @@ import { FakeBackend } from "@twin-deck/ts-client";
 import { defaultBindingsFor } from "@twin-deck/actions";
 import { cursorName, renderApp, seedBackend } from "./helpers";
 
+const openSettings = (user: Awaited<ReturnType<typeof renderApp>>["user"]) => user.keyboard("{Control>},{/Control}");
+
 const settle = () => act(() => new Promise<void>((r) => setTimeout(r, 50)));
 const nameBox = () => screen.findByRole("textbox", { name: "이름" });
 const setFKeys = (backend: FakeBackend, fkeys: Record<string, string>, apps: Record<string, string> = {}) =>
@@ -149,5 +151,54 @@ describe("애플리케이션 실행 F키", () => {
     await user.keyboard("{F3}");
     expect(await screen.findByText(/F3에 지정된 애플리케이션이 없습니다/)).toBeInTheDocument();
     expect(backend.launched).toEqual([]);
+  });
+});
+
+describe("설정 화면의 F키 섹션", () => {
+  const openFKeys = async (user: Awaited<ReturnType<typeof renderApp>>["user"]) => {
+    await openSettings(user);
+    await screen.findByRole("dialog", { name: "설정" });
+    await user.click(screen.getByRole("tab", { name: "F키" }));
+  };
+
+  it("설정 화면 F키 섹션에 F1~F12와 애플리케이션 실행 메뉴가 있다", async () => {
+    const { user } = await renderApp();
+    await openFKeys(user);
+    for (let n = 1; n <= 12; n++) expect(screen.getByRole("group", { name: `F${n}` })).toBeInTheDocument();
+    // 비워 둔 키가 무엇을 하는지 기본값 항목에 보인다
+    expect(within(screen.getByRole("group", { name: "F5" })).getByRole("combobox")).toHaveTextContent("기본값 (현재: 복사)");
+    await user.click(within(screen.getByRole("group", { name: "F3" })).getByRole("combobox"));
+    expect(await screen.findByRole("option", { name: "애플리케이션 실행" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "해제" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "이름 변경" })).toBeInTheDocument();
+    // 인수가 필요한 액션은 고를 수 없다
+    expect(screen.queryByRole("option", { name: /인수/ })).toBeNull();
+  });
+
+  it("F키 설정을 고르면 config에 저장된다", async () => {
+    const { user, backend } = await renderApp();
+    await openFKeys(user);
+    await user.click(within(screen.getByRole("group", { name: "F3" })).getByRole("combobox"));
+    await user.click(await screen.findByRole("option", { name: "애플리케이션 실행" }));
+    const path = await screen.findByRole("textbox", { name: "F3 애플리케이션" });
+    await user.type(path, "/Applications/Foo.app{Enter}");
+    await waitFor(async () => {
+      const c = (await backend.getConfig()).config;
+      expect(c.fkeys.F3).toBe("core.app.launch");
+      expect(c.fkey_apps.F3).toBe("/Applications/Foo.app");
+    });
+    // 화면에서 고른 값이 실제 키 입력까지 이어진다
+    await user.keyboard("{Escape}");
+    await toATxt(user);
+    await user.keyboard("{F3}");
+    await waitFor(() => expect(backend.launched).toEqual([{ app: "/Applications/Foo.app", paths: ["/home/a/a.txt"] }]));
+    // 기본값으로 되돌리면 앱 경로도 비워진다
+    await openFKeys(user);
+    await user.click(within(screen.getByRole("group", { name: "F3" })).getByRole("button", { name: "기본값으로" }));
+    await waitFor(async () => {
+      const c = (await backend.getConfig()).config;
+      expect(c.fkeys.F3).toBe("");
+      expect(c.fkey_apps.F3).toBe("");
+    });
   });
 });

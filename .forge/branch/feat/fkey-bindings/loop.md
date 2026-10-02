@@ -29,7 +29,7 @@ wall: none
 ## Check progress (updated after EVERY stop-condition run — drives the no-progress & tension walls & fg-status)
 - C1: pass ×0 · regressed: ×0 · last-evidence: "bun run typecheck → exit 0 (task 29 이후)"
 - C2: pass ×0 · regressed: ×0 · last-evidence: "cargo test --workspace → 0 · vitest 비-pdf 실패 0, 420 passed"
-- C3: fail ×1 · regressed: ×0 · last-evidence: "fkey-bindings.test.tsx 아직 없음 (작업 30·31이 만든다 — 남은 멤버 작업이 있으므로 정상)"
+- C3: fail ×2 · regressed: ×0 · last-evidence: "fkey-bindings.test.tsx 10 passed — T9·T10(설정 화면)만 남음, 작업 31이 추가 (남은 멤버 작업이 있으므로 정상, 증거가 전진했으므로 no-progress 아님)"
 - C4: pass ×0 · regressed: ×0 · last-evidence: "launch_app_mac_bundle/direct_exec/spawns_with_paths ... ok"
 - C5: pass ×0 · regressed: ×0 · last-evidence: "fmt 0 · clippy(-p td-config -p td-launch -p twin-deck-desktop) 0 · up_to_date ok"
 
