@@ -255,6 +255,17 @@ pub fn edit_paths(
     edit(&launch, &editor, &paths)
 }
 
+/// F키에 지정한 애플리케이션으로 항목(들)을 연다. 앱은 경로를 인수로 받는다.
+#[tauri::command]
+#[specta::specta]
+pub fn launch_app(
+    launch: State<'_, AppLaunch>,
+    app: String,
+    paths: Vec<String>,
+) -> ServiceResult<()> {
+    crate::service::launch_app(&launch, &app, &paths)
+}
+
 fn config_dir(config: &ConfigState) -> ServiceResult<&std::path::Path> {
     config
         .store
@@ -499,6 +510,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             reveal_path,
             open_path,
             edit_paths,
+            launch_app,
             open_as_archive,
             list_volumes,
             unmount_volume,

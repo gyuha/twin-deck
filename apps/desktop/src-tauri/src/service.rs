@@ -729,6 +729,18 @@ pub fn edit<L: Launcher>(launch: &Launch<L>, editor: &str, paths: &[String]) -> 
     launch.edit(editor, paths)
 }
 
+/// F키에 지정한 애플리케이션으로 항목 열기. 없는 경로가 하나라도 있으면 실행하지 않는다.
+pub fn launch_app<L: Launcher>(
+    launch: &Launch<L>,
+    app: &str,
+    paths: &[String],
+) -> ServiceResult<()> {
+    for p in paths {
+        std::fs::symlink_metadata(p).map_err(|e| format!("{p}: {e}"))?;
+    }
+    launch.launch_app(app, paths)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

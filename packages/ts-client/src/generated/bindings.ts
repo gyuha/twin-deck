@@ -97,6 +97,17 @@ async editPaths(paths: string[]) : Promise<Result<null, string>> {
 }
 },
 /**
+ * F키에 지정한 애플리케이션으로 항목(들)을 연다. 앱은 경로를 인수로 받는다.
+ */
+async launchApp(app: string, paths: string[]) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("launch_app", { app, paths }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * 확장자와 무관하게 파일을 아카이브로 연다 (ARC-04). 아카이브 루트 경로를 돌려준다.
  */
 async openAsArchive(path: string) : Promise<Result<string, string>> {
@@ -350,6 +361,14 @@ export type Config = { behavior: Behavior; display: Display; environment: Enviro
  * 폴더 단축키. 키는 "0"~"9", 값은 경로(`~`, `${user.*}` 허용). 빈 문자열이면 미지정.
  */
 shortcuts: Partial<{ [key in string]: string }>; 
+/**
+ * F1~F12의 동작. 빈 문자열이면 기본 바인딩 유지, "none"이면 해제, 그 밖에는 액션 ID.
+ */
+fkeys: Partial<{ [key in string]: string }>; 
+/**
+ * `fkeys`가 "core.app.launch"인 키가 실행할 애플리케이션. 빈 문자열이면 미지정.
+ */
+fkey_apps: Partial<{ [key in string]: string }>; 
 /**
  * 병합 후 항목별로 검증해서 채운다(잘못된 항목은 경고와 함께 빠진다).
  */

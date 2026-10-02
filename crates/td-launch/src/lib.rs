@@ -88,6 +88,26 @@ pub fn editor_command(os: Os, editor: &str, paths: &[String]) -> Result<Command,
     Ok(Command::new(editor, paths.iter().cloned()))
 }
 
+/// F키에 지정한 애플리케이션으로 `paths`를 여는 명령.
+/// macOS에서 `.app` 번들이거나 경로 구분자가 없는 이름("Preview")이면 `open -a`를 쓰고, 그 밖에는 실행 파일을 직접 실행한다.
+pub fn app_command(os: Os, app: &str, paths: &[String]) -> Result<Command, String> {
+    let app = app.trim();
+    if app.is_empty() {
+        return Err("애플리케이션이 지정되지 않았습니다".into());
+    }
+    if paths.is_empty() {
+        return Err("전달할 항목이 없습니다".into());
+    }
+    let is_bundle = app.trim_end_matches(['/', '\\']).ends_with(".app");
+    let is_name = !app.contains('/') && !app.contains('\\');
+    if os == Os::Mac && (is_bundle || is_name) {
+        let mut args = vec!["-a".to_string(), app.to_string()];
+        args.extend(paths.iter().cloned());
+        return Ok(Command::new("open", args));
+    }
+    Ok(Command::new(app, paths.iter().cloned()))
+}
+
 /// 명령을 실제로 실행한다. 테스트는 기록하는 fake를 쓴다.
 pub trait Launcher {
     fn run(&self, cmd: &Command) -> Result<(), String>;
@@ -128,5 +148,9 @@ impl<L: Launcher> Launch<L> {
 
     pub fn edit(&self, editor: &str, paths: &[String]) -> Result<(), String> {
         self.launcher.run(&editor_command(self.os, editor, paths)?)
+    }
+
+    pub fn launch_app(&self, app: &str, paths: &[String]) -> Result<(), String> {
+        self.launcher.run(&app_command(self.os, app, paths)?)
     }
 }

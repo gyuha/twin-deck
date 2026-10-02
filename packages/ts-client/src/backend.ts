@@ -57,6 +57,8 @@ export interface Backend {
   openPath(path: string): Promise<void>;
   /** 설정한 편집기로 항목을 연다. */
   editPaths(paths: string[]): Promise<void>;
+  /** 지정한 애플리케이션으로 항목(들)을 연다. 앱은 경로를 인수로 받는다. */
+  launchApp(app: string, paths: string[]): Promise<void>;
   /** 확장자와 무관하게 파일을 아카이브로 연다 (ARC-04). 아카이브 루트 경로(`파일!`)를 돌려준다. */
   openAsArchive(path: string): Promise<string>;
   /** Look Up을 시작한다. 질의가 문법에 어긋나면 위치가 든 메시지로 거부된다. 결과는 `onSearchEvent`로 온다. */

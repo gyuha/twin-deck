@@ -430,3 +430,44 @@ fn user_value_syntax_error_is_refused_and_file_untouched() {
         broken
     );
 }
+
+#[test]
+fn fkeys_defaults_merge_and_unknown_key_warning() {
+    // 기본값: F1~F12가 모두 빈 문자열(= 기본 바인딩 유지), 앱도 모두 미지정
+    let none = load_from_strs(None, None, Platform::Linux);
+    assert!(none.warnings.is_empty(), "{:?}", none.warnings);
+    for n in 1..=12 {
+        let key = format!("F{n}");
+        assert_eq!(none.config.fkeys.get(&key).map(String::as_str), Some(""));
+        assert_eq!(
+            none.config.fkey_apps.get(&key).map(String::as_str),
+            Some("")
+        );
+    }
+    assert_eq!(none.config.fkeys.len(), 12);
+
+    // 옛 config.toml(fkeys 없음)은 그대로 읽힌다
+    let old = load("[core.confirm]\ntrash = true\n");
+    assert!(old.warnings.is_empty(), "{:?}", old.warnings);
+    assert_eq!(old.config.fkeys.len(), 12);
+
+    // 사용자 값은 그 키만 덮고 나머지는 기본값을 유지한다
+    let l = load(
+        "[fkeys]\nF2 = \"core.rename\"\nF3 = \"core.app.launch\"\nF5 = \"none\"\n[fkey_apps]\nF3 = \"/Applications/Foo.app\"\n",
+    );
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert_eq!(l.config.fkeys["F2"], "core.rename");
+    assert_eq!(l.config.fkeys["F3"], "core.app.launch");
+    assert_eq!(l.config.fkeys["F5"], "none");
+    assert_eq!(l.config.fkeys["F4"], "", "건드리지 않은 키는 기본값");
+    assert_eq!(l.config.fkey_apps["F3"], "/Applications/Foo.app");
+
+    // F1~F12 밖의 이름은 경고하고 무시한다
+    let l = load("[fkeys]\nF13 = \"core.rename\"\n");
+    assert!(
+        l.warnings.iter().any(|w| w.message.contains("fkeys.F13")),
+        "{:?}",
+        l.warnings
+    );
+    assert!(!l.config.fkeys.contains_key("F13"));
+}

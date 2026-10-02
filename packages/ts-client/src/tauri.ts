@@ -92,6 +92,9 @@ export class TauriBackend implements Backend {
   async editPaths(paths: string[]) {
     unwrap(await commands.editPaths(paths));
   }
+  async launchApp(app: string, paths: string[]) {
+    unwrap(await commands.launchApp(app, paths));
+  }
   async openAsArchive(path: string) {
     return unwrap(await commands.openAsArchive(path));
   }

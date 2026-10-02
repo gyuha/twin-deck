@@ -82,6 +82,8 @@ export class FakeBackend implements Backend {
   readonly revealed: string[] = [];
   readonly edited: string[][] = [];
   readonly opened: string[] = [];
+  /** 테스트용: `launchApp` 호출 기록. */
+  readonly launched: { app: string; paths: string[] }[] = [];
   /** 저장된 창 상태(테스트가 미리 넣거나 앱이 저장한 것)와 저장 이력, 로드 경고. */
   storedState: Snapshot | null = null;
   readonly savedStates: Snapshot[] = [];
@@ -308,6 +310,11 @@ export class FakeBackend implements Backend {
   async openPath(path: string) {
     this.need(path);
     this.opened.push(path);
+  }
+
+  async launchApp(app: string, paths: string[]) {
+    for (const p of paths) this.need(p);
+    this.launched.push({ app, paths: [...paths] });
   }
 
   async editPaths(paths: string[]) {

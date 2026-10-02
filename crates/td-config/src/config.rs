@@ -14,6 +14,10 @@ pub struct Config {
     pub file_systems: FileSystemsConfig,
     /// 폴더 단축키. 키는 "0"~"9", 값은 경로(`~`, `${user.*}` 허용). 빈 문자열이면 미지정.
     pub shortcuts: BTreeMap<String, String>,
+    /// F1~F12의 동작. 빈 문자열이면 기본 바인딩 유지, "none"이면 해제, 그 밖에는 액션 ID.
+    pub fkeys: BTreeMap<String, String>,
+    /// `fkeys`가 "core.app.launch"인 키가 실행할 애플리케이션. 빈 문자열이면 미지정.
+    pub fkey_apps: BTreeMap<String, String>,
     /// 병합 후 항목별로 검증해서 채운다(잘못된 항목은 경고와 함께 빠진다).
     #[serde(default)]
     pub favorites: Vec<FavoriteDto>,
