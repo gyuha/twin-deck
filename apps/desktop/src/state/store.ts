@@ -26,12 +26,15 @@ import type {
   Snapshot,
   TabSnap,
   UserDirsDto,
+  VolumeDto,
+  DiskSpaceDto,
 } from "@twin-deck/ts-client";
 import type { ActionContext } from "@twin-deck/actions";
 import type { Scope } from "@twin-deck/keybinds";
 import { quickMatch } from "../lib/names";
 import { parseColumns } from "../lib/columns";
 import { rankBy } from "../lib/fuzzy";
+import { isInside, volumeOf } from "../lib/volumes";
 import { formatDateTime, formatOctal, formatPermissions, formatSize } from "../lib/format";
 import { DEFAULT_SORT, SORT_KEYS, sortEntries, sortFromColumns } from "../lib/sort";
 import type { SortKey, SortState } from "../lib/sort";
@@ -208,6 +211,10 @@ export interface AppState {
   queue: JobDto[];
   queueOpen: boolean;
   /** 설정 화면이 열려 있는지, 어느 섹션인지, 마지막 저장 오류. */
+  /** 마운트된 볼륨 목록(드라이브 바). */
+  volumes: VolumeDto[];
+  /** 패널별 현재 볼륨의 용량. 알 수 없으면 null. */
+  diskSpace: Record<PaneId, DiskSpaceDto | null>;
   settingsOpen: boolean;
   /** 도움말(단축키 목록) 화면이 열려 있는지. */
   helpOpen: boolean;
@@ -352,6 +359,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     userDirs: { home: null, downloads: null, documents: null, desktop: null, pictures: null, music: null, movies: null },
     queue: [],
     queueOpen: false,
+    volumes: [],
+    diskSpace: { left: null, right: null },
     settingsOpen: false,
     helpOpen: false,
     settingsSection: 0,
@@ -454,10 +463,41 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     }
   }
 
-  const reloadAll = () =>
-    Promise.all(
-      (["left", "right"] as const).flatMap((pane) => get().panes[pane].tabs.map((t) => reload(pane, t.id))),
-    );
+  const reloadAll = () => {
+    // 복사·이동·삭제로 남은 용량이 달라졌을 수 있다.
+    void refreshDiskSpace("left");
+    void refreshDiskSpace("right");
+    return Promise.all((["left", "right"] as const).flatMap((pane) => get().panes[pane].tabs.map((t) => reload(pane, t.id))));
+  };
+
+  /** 패널의 활성 탭이 놓인 볼륨의 용량을 다시 읽는다. 가상 탭이거나 조회에 실패하면 null(오류는 알리지 않는다). */
+  const diskSeq: Record<PaneId, number> = { left: 0, right: 0 };
+  async function refreshDiskSpace(pane: PaneId) {
+    const tab = activeTab(get(), pane);
+    const seq = ++diskSeq[pane];
+    let value: DiskSpaceDto | null = null;
+    if (!tab.virtual) {
+      try {
+        value = await backend.diskSpace(tab.path);
+      } catch {
+        value = null;
+      }
+    }
+    if (seq !== diskSeq[pane]) return;
+    set((s) => ({ diskSpace: { ...s.diskSpace, [pane]: value } }));
+  }
+  // 패널의 활성 탭 위치가 바뀌면(이동, 탭 전환, 복원) 그 볼륨의 용량을 다시 읽는다.
+  const spacePath: Record<PaneId, string | null> = { left: null, right: null };
+  const unsubscribeSpace = store.subscribe((s) => {
+    for (const pane of ["left", "right"] as const) {
+      const t = activeTab(s, pane);
+      const key = t.virtual ? "" : t.path;
+      if (key !== spacePath[pane]) {
+        spacePath[pane] = key;
+        void refreshDiskSpace(pane);
+      }
+    }
+  });
 
   const unsubscribeBackend = backend.onDirChanged((path) => {
     for (const pane of ["left", "right"] as const) {
@@ -729,6 +769,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const moved = snapshot ? await relocateMissingTabs() : 0;
       await reloadAll();
       await syncWatches();
+      void api.refreshVolumes();
       applyQueue(await backend.queueJobs());
       if (moved > 0) fail(`저장된 폴더 ${moved}개가 없어져 가장 가까운 상위 폴더로 옮겼습니다`);
       // 복원이 끝난 상태를 기준으로 삼아, 그 뒤에 달라진 것만 저장한다.
@@ -774,6 +815,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       clearTimeout(flashTimer);
       clearTimeout(saveTimer);
       unsubscribeSave();
+      unsubscribeSpace();
       unsubscribeBackend();
       unsubscribeQueue();
       unsubscribeConfig();
@@ -1742,6 +1784,50 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const selectable = m.items.map((it, i) => (it.path !== undefined ? i : -1)).filter((i) => i >= 0);
       const idx = selectable[n === 0 ? 9 : n - 1];
       if (idx !== undefined) await api.menuSelect(idx);
+    },
+    /** 마운트된 볼륨 목록과 두 패널의 용량을 다시 읽는다(앱 시작, 창이 포커스를 얻을 때). 목록을 못 읽으면 이전 목록을 유지한다. */
+    async refreshVolumes() {
+      try {
+        set({ volumes: await backend.listVolumes() });
+      } catch {
+        /* 이전 목록 유지 */
+      }
+      await Promise.all([refreshDiskSpace("left"), refreshDiskSpace("right")]);
+    },
+    /** 드라이브 바의 볼륨 버튼: 그 패널을 활성화하고 볼륨의 루트로 이동한다. */
+    async selectVolume(pane: PaneId, mountPoint: string) {
+      api.activate(pane);
+      await api.navigate(mountPoint, undefined, "push", pane);
+    },
+    /**
+     * 패널의 현재 볼륨을 언마운트한다. 먼저 언마운트를 시도하고, 성공했을 때만 그 볼륨 안에 있는 모든 탭(양쪽 패널, 배경 탭 포함)을 홈으로 옮긴다.
+     * 실패하면 오류를 알리고 아무 탭도 옮기지 않는다. 루트 볼륨은 시도하지 않는다.
+     */
+    async unmountVolume(pane: PaneId) {
+      const tab = activeTab(get(), pane);
+      const vol = tab.virtual ? null : volumeOf(tab.path, get().volumes);
+      if (!vol || vol.mountPoint === "/") return;
+      set({ notice: null });
+      try {
+        await backend.unmountVolume(vol.mountPoint);
+      } catch (e) {
+        fail(e);
+        return;
+      }
+      const home = get().userDirs.home ?? "/";
+      for (const p of ["left", "right"] as const) {
+        const pn = get().panes[p];
+        for (const [i, t] of pn.tabs.entries()) {
+          if (t.virtual || !isInside(t.path, vol.mountPoint)) continue;
+          if (i === pn.active) await api.navigate(home, undefined, "push", p);
+          else {
+            patchTab(p, t.id, { path: home, history: [...t.history, home], back: [], forward: [], cursor: 0, selection: new Set(), quick: null, entries: [] });
+            await reload(p, t.id);
+          }
+        }
+      }
+      await api.refreshVolumes();
+      await syncWatches();
     },
     /** Volumes 메뉴에서 커서 볼륨을 언마운트/추출한다. */
     async menuVolumeAction(kind: "unmount" | "eject") {

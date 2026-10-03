@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Config, EntryDto } from "@twin-deck/ts-client";
 import { defaultLoaded } from "@twin-deck/ts-client";
 import { parseColumn, parseColumns } from "../lib/columns";
-import { cellText, formatDate, formatOctal, formatPermissions, formatSize, strftime } from "../lib/format";
+import { cellText, formatDate, formatOctal, formatPermissions, formatSize, formatSpace, strftime } from "../lib/format";
 import { DEFAULT_SORT, sortEntries, sortFromColumns } from "../lib/sort";
 
 const display = (over: Partial<Config["display"]> = {}): Config["display"] => ({ ...defaultLoaded().config.display, ...over });
@@ -151,5 +151,17 @@ describe("퍼지 검색 (ACT-01)", () => {
     // 연속 일치가 부분 수열 일치보다 앞선다
     expect(rankBy(["c_o_p_y", "xcopyx"], "copy", (s) => [s])[0]).toBe("xcopyx");
     expect(rankBy(ids, "", (s) => [s])).toEqual(ids); // 빈 질의는 원래 순서
+  });
+});
+
+describe("formatSpace (볼륨 용량)", () => {
+  it("항상 소수 한 자리로, formatSize와 같은 단위 규칙을 쓴다", () => {
+    expect(formatSpace(73.8e9, "adaptive")).toBe("73.8 GB");
+    expect(formatSpace(500e9, "adaptive")).toBe("500.0 GB");
+    expect(formatSpace(1.5e12, "adaptive")).toBe("1.5 TB");
+    expect(formatSpace(2 * 1024 ** 3, "adaptive_kibi")).toBe("2.0 GiB");
+    expect(formatSpace(73.8e9, "MB")).toBe("73800.0 MB");
+    expect(formatSpace(512, "adaptive")).toBe("512 B");
+    expect(formatSpace(1234, "bytes")).toBe("1234 B");
   });
 });

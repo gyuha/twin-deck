@@ -184,8 +184,12 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
     // 창이 닫히기 직전에는 미뤄 둔 저장을 바로 실행한다.
     const flush = () => void app.api.saveNow();
     window.addEventListener("pagehide", flush);
+    // 창으로 돌아올 때 볼륨 목록과 남은 용량을 다시 읽는다(밖에서 마운트·언마운트했을 수 있다).
+    const refresh = () => void app.api.refreshVolumes();
+    window.addEventListener("focus", refresh);
     return () => {
       window.removeEventListener("pagehide", flush);
+      window.removeEventListener("focus", refresh);
       app.api.dispose();
     };
   }, [app, stateWarning]);

@@ -4,6 +4,7 @@ import type { PaneId } from "../state/store";
 import { Breadcrumb } from "./Breadcrumb";
 import { VirtualHeader } from "./VirtualHeader";
 import { FileTable } from "./FileTable";
+import { DriveBar } from "./DriveBar";
 import { TabBar } from "./TabBar";
 
 export function Pane({ pane }: { pane: PaneId }) {
@@ -31,6 +32,7 @@ export function Pane({ pane }: { pane: PaneId }) {
         isActive ? "border-accent" : "border-transparent",
       ].join(" ")}
     >
+      <DriveBar pane={pane} />
       <TabBar pane={pane} />
       {isVirtual ? <VirtualHeader pane={pane} /> : <Breadcrumb pane={pane} path={path} />}
       <FileTable pane={pane} />

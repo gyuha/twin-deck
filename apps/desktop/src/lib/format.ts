@@ -28,6 +28,23 @@ export function formatSize(bytes: number, format: string): string {
   return scale(bytes, 1000, SI);
 }
 
+/** 볼륨의 남은/전체 용량 표기. `formatSize`와 같은 단위 선택이지만 항상 소수 한 자리다(`73.8 GB`). */
+export function formatSpace(bytes: number, format: string): string {
+  if (format === "bytes") return `${bytes} B`;
+  const kibi = format === "adaptive_kibi" || IEC.includes(format);
+  const base = kibi ? 1024 : 1000;
+  const units = kibi ? IEC : SI;
+  const fixed = units.indexOf(format);
+  if (fixed > 0) return `${(bytes / base ** fixed).toFixed(1)} ${format}`;
+  let n = bytes;
+  let k = 0;
+  while (n >= base && k < units.length - 1) {
+    n /= base;
+    k++;
+  }
+  return k === 0 ? `${bytes} B` : `${n.toFixed(1)} ${units[k]}`;
+}
+
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const MONTH_LONG = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
