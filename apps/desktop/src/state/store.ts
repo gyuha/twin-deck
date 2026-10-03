@@ -1892,18 +1892,20 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       return catalogFn().filter((i) => i.keys !== "");
     },
     /**
-     * F키 등에 지정한 애플리케이션으로 항목을 연다 (`core.app.launch`).
-     * 넘기는 경로: 선택한 항목 전체, 없으면 커서 항목, 항목이 하나도 없으면(빈 폴더) 현재 폴더.
+     * F키 등에 지정한 애플리케이션으로 연다.
+     * `items`(`core.app.launch`): 선택한 항목 전체, 없으면 커서 항목, 항목이 하나도 없으면(빈 폴더) 현재 폴더를 넘긴다.
+     * `folder`(`core.app.open_folder`): 선택·커서와 무관하게 항상 현재 패널의 폴더를 넘긴다.
      */
-    async launchApp(args?: Record<string, unknown>) {
+    async launchApp(args?: Record<string, unknown>, target: "items" | "folder" = "items") {
       const app = typeof args?.app === "string" ? args.app.trim() : "";
       const key = typeof args?.key === "string" ? args.key : "이 키";
       if (!app) return fail(`${key}에 지정된 애플리케이션이 없습니다 (설정 > F키)`);
       const tab = activeTab(get());
       const selected = tab.entries.filter((e) => tab.selection.has(e.path)).map((e) => e.path);
       const cursor = cursorEntry(tab);
-      const paths = selected.length > 0 ? selected : cursor ? [cursor.path] : tab.virtual ? [] : [tab.path];
-      if (paths.length === 0) return fail("애플리케이션에 전달할 항목이 없습니다");
+      const paths =
+        target === "folder" ? (tab.virtual ? [] : [tab.path]) : selected.length > 0 ? selected : cursor ? [cursor.path] : tab.virtual ? [] : [tab.path];
+      if (paths.length === 0) return fail(target === "folder" ? "검색 결과 탭에는 열 현재 폴더가 없습니다" : "애플리케이션에 전달할 항목이 없습니다");
       set({ notice: null });
       try {
         await backend.launchApp(app, paths);

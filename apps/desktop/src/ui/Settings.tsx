@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { Button, Input, Select, SelectOption, Switch } from "@spacedrive/primitives";
 import { defaultBindingsFor } from "@twin-deck/actions";
 import { defaultLoaded } from "@twin-deck/ts-client";
-import { APP_LAUNCH_ACTION } from "../lib/fkeys";
+import { APP_ACTIONS, APP_LAUNCH_ACTION, APP_OPEN_FOLDER_ACTION } from "../lib/fkeys";
 import { useApp, useAppStore } from "../state/context";
+import { Combobox } from "./Combobox";
 import { useUi } from "./uiContext";
 
 type Control =
@@ -69,7 +70,7 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
   },
   {
     title: "F키",
-    desc: "F키마다 실행할 동작을 고릅니다. '기본값'은 내장 동작을 그대로 쓰고, 설정 폴더의 keybindings.toml에 같은 키가 있으면 그쪽이 우선합니다.",
+    desc: "F키마다 실행할 동작을 고릅니다. '기본값'은 내장 동작을 그대로 쓰고, 설정 폴더의 keybindings.toml에 같은 키가 있으면 그쪽이 우선합니다. 애플리케이션 항목에는 실행 파일 경로(예: /opt/homebrew/bin/code)나 앱 이름(macOS)을 적습니다.",
     items: Array.from({ length: 12 }, (_, i) => ({ key: `fkeys.F${i + 1}`, title: `F${i + 1}`, control: { type: "fkey" } as const })),
   },
   {
@@ -106,7 +107,7 @@ function EditableControl({ item, value, disabled, onCommit }: { item: Item; valu
 }
 
 /**
- * F키 한 줄: 동작 선택 메뉴(기본값 · 해제 · 액션 · 애플리케이션 실행)와, 앱 실행을 고르면 나타나는 앱 경로 입력.
+ * F키 한 줄: 검색되는 동작 선택 상자(기본값 · 해제 · 액션 · 애플리케이션 실행)와, 앱 실행을 고르면 나타나는 앱 경로 입력.
  * Radix Select는 빈 문자열 값을 허용하지 않아서 저장값 ""(기본값)을 화면에서만 "default"로 쓴다.
  */
 function FKeyControl({ name, value, disabled }: { name: string; value: string; disabled: boolean }) {
@@ -115,25 +116,27 @@ function FKeyControl({ name, value, disabled }: { name: string; value: string; d
   const app = useApp((s) => s.loaded.config.fkey_apps[name] ?? "");
   const builtin = defaultBindingsFor(platform).find((b) => b.scope === "pane" && b.keys.includes(name));
   const builtinTitle = builtin ? (registry.get(builtin.actionId)?.title ?? builtin.actionId) : "없음";
-  // 인수가 필요한 액션(정렬 기준, 폴더 경로 등)은 F키에 인수 없이 걸 수 없어서 뺀다. 앱 실행만 전용 입력이 있다.
+  // 인수가 필요한 액션(정렬 기준, 폴더 경로 등)은 F키에 인수 없이 걸 수 없어서 뺀다. 앱 실행 두 가지만 전용 경로 입력이 있다.
   const actions = registry
     .list()
-    .filter((a) => a.scopes.includes("pane") && (a.id === APP_LAUNCH_ACTION || !a.title.includes("(인수:")))
-    .map((a) => ({ id: a.id, label: a.id === APP_LAUNCH_ACTION ? "애플리케이션 실행" : a.title }))
+    .filter((a) => a.scopes.includes("pane") && (APP_ACTIONS.includes(a.id) || !a.title.includes("(인수:")))
+    .map((a) => ({ id: a.id, label: a.id === APP_LAUNCH_ACTION ? "애플리케이션 실행" : a.id === APP_OPEN_FOLDER_ACTION ? "애플리케이션으로 폴더 열기" : a.title }))
     .sort((a, b) => a.label.localeCompare(b.label, "ko"));
   const choose = (v: string) => (v === "default" ? api.resetConfigValue(`fkeys.${name}`) : api.setConfigValue(`fkeys.${name}`, { kind: "str", value: v }));
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2">
-      <Select value={value === "" ? "default" : value} disabled={disabled} onChange={(v) => void choose(v)}>
-        <SelectOption value="default">{`기본값 (현재: ${builtinTitle})`}</SelectOption>
-        <SelectOption value="none">해제</SelectOption>
-        {actions.map((a) => (
-          <SelectOption key={a.id} value={a.id}>
-            {a.label}
-          </SelectOption>
-        ))}
-      </Select>
-      {value === APP_LAUNCH_ACTION && (
+      <Combobox
+        label={`${name} 동작`}
+        value={value === "" ? "default" : value}
+        disabled={disabled}
+        onChange={(v) => void choose(v)}
+        options={[
+          { value: "default", label: `기본값 (현재: ${builtinTitle})` },
+          { value: "none", label: "해제" },
+          ...actions.map((a) => ({ value: a.id, label: a.label, keywords: a.id })),
+        ]}
+      />
+      {APP_ACTIONS.includes(value) && (
         <EditableControl
           item={{ key: `fkey_apps.${name}`, title: `${name} 애플리케이션`, control: { type: "text" } }}
           value={app}

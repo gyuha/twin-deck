@@ -128,6 +128,7 @@ export const DEFAULT_ACTION_META = [
   { id: "core.palette.close", title: "Actions Panel: 닫기", category: "Navigation", scopes: ["palette"] },
   { id: "core.open.directory", title: "폴더 열기 (인수: src)", category: "Navigation", scopes: ["pane"] },
   { id: "core.app.launch", title: "애플리케이션 실행 (인수: app)", category: "File", scopes: ["pane"] },
+  { id: "core.app.open_folder", title: "애플리케이션으로 현재 폴더 열기 (인수: app)", category: "File", scopes: ["pane"] },
   { id: "core.help", title: "도움말 (단축키 목록)", category: "View", scopes: ["pane"] },
   { id: "core.help.close", title: "도움말 닫기", category: "View", scopes: ["help"] },
   { id: "core.window.new", title: "새 창", category: "View", scopes: ["pane"] },
