@@ -48,13 +48,18 @@ export function useKeyboard({ app, keymap, registry }: Options) {
         void api.menuSelectNth(Number(e.key));
         return;
       }
-      // 충돌 다이얼로그: 방향키로 고르고 O/S/R로 바로 확정한다.
+      // 충돌 다이얼로그: 방향키로 고르고 O/S/R로 바로 확정한다. A는 "남은 항목에도 적용"을 켜고 끈다.
       if (top === "dialog" && s.dialog?.kind === "conflict" && plain) {
         const d = s.dialog;
         const step = { ArrowUp: -1, ArrowLeft: -1, ArrowDown: 1, ArrowRight: 1 }[e.key];
         if (step) {
           e.preventDefault();
           api.dialogSetChoice(d.selected + step);
+          return;
+        }
+        if (e.key.toLowerCase() === "a" && d.remaining > 1) {
+          e.preventDefault();
+          api.dialogSetApplyAll();
           return;
         }
         const shortcut = { o: 0, s: 1, r: 2 }[e.key.toLowerCase()];

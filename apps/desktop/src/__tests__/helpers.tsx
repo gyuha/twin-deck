@@ -75,3 +75,10 @@ export function selectedNames(pane: "left" | "right"): string[] {
 
 export const activePane = () =>
   screen.getByRole("region", { name: "왼쪽 패널" }).getAttribute("data-active") === "true" ? "left" : "right";
+
+/** 복사·이동 진행 창이 뜨면 Enter(백그라운드)로 창만 닫아 작업이 큐에서 계속 돌게 한다. */
+export async function backgroundProgress(user: { keyboard(keys: string): Promise<void> }) {
+  await screen.findByRole("dialog", { name: /복사 중|이동 중/ });
+  await user.keyboard("{Enter}");
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: /복사 중|이동 중/ })).toBeNull());
+}

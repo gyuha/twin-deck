@@ -211,3 +211,159 @@ fn duplicate_suffix() {
 
     assert!(f.ops.duplicate(&f.a.join("missing")).is_err());
 }
+
+// --- 폴더 복사 중 항목 하나가 실패할 때 ---
+
+use std::sync::Mutex;
+use td_ops::{Control, Ops, OpsError};
+use td_vfs::{Entry, Info, ListOptions, LocalFs, Vfs, VfsError, VfsPath};
+
+/// 같은 볼륨이어도 이름 바꾸기가 실패하게 해서(다른 볼륨 이동처럼) 이동이 "복사 후 삭제"를 타게 하는 Vfs.
+struct NoRenameFs;
+
+impl Vfs for NoRenameFs {
+    fn list(&self, dir: &VfsPath, opts: &ListOptions) -> td_vfs::Result<Vec<Entry>> {
+        LocalFs.list(dir, opts)
+    }
+    fn stat(&self, path: &VfsPath) -> td_vfs::Result<Entry> {
+        LocalFs.stat(path)
+    }
+    fn mkdir(&self, path: &VfsPath) -> td_vfs::Result<()> {
+        LocalFs.mkdir(path)
+    }
+    fn create_file(&self, path: &VfsPath) -> td_vfs::Result<()> {
+        LocalFs.create_file(path)
+    }
+    fn rename(&self, from: &VfsPath, _to: &VfsPath) -> td_vfs::Result<()> {
+        Err(VfsError::Io {
+            path: from.clone(),
+            source: std::io::Error::other("cross-device"),
+        })
+    }
+    fn remove_file(&self, path: &VfsPath) -> td_vfs::Result<()> {
+        LocalFs.remove_file(path)
+    }
+    fn remove_dir_all(&self, path: &VfsPath) -> td_vfs::Result<()> {
+        LocalFs.remove_dir_all(path)
+    }
+    fn copy_file(&self, from: &VfsPath, to: &VfsPath) -> td_vfs::Result<u64> {
+        LocalFs.copy_file(from, to)
+    }
+    fn info(&self, path: &VfsPath) -> td_vfs::Result<Info> {
+        LocalFs.info(path)
+    }
+    fn read_link(&self, path: &VfsPath) -> td_vfs::Result<VfsPath> {
+        LocalFs.read_link(path)
+    }
+    fn symlink(&self, target: &VfsPath, link: &VfsPath, is_dir: bool) -> td_vfs::Result<()> {
+        LocalFs.symlink(target, link, is_dir)
+    }
+    fn read_head(&self, path: &VfsPath, max: usize) -> td_vfs::Result<Vec<u8>> {
+        LocalFs.read_head(path, max)
+    }
+}
+
+/// 항목 하나가 실패해도 멈추지 않고 실패를 모아 두는 제어(작업 큐처럼).
+#[derive(Default)]
+struct Collect(Mutex<Vec<(String, String)>>);
+
+impl Control for Collect {
+    fn on_item(&self, _path: &VfsPath) {}
+    fn should_stop(&self) -> bool {
+        false
+    }
+    fn collects_errors(&self) -> bool {
+        true
+    }
+    fn on_error(&self, path: &VfsPath, message: &str) {
+        self.0
+            .lock()
+            .unwrap()
+            .push((path.to_string(), message.to_string()));
+    }
+}
+
+/// a.txt, b.txt(읽을 수 없음), c.txt가 든 폴더 `d`가 있는 tempdir.
+#[cfg(unix)]
+fn dir_with_unreadable_child() -> (tempfile::TempDir, VfsPath, VfsPath, std::path::PathBuf) {
+    use std::os::unix::fs::PermissionsExt;
+    let tmp = tempfile::tempdir().unwrap();
+    let (src, dst) = (tmp.path().join("src"), tmp.path().join("dst"));
+    std::fs::create_dir_all(src.join("d")).unwrap();
+    std::fs::create_dir(&dst).unwrap();
+    for f in ["a.txt", "b.txt", "c.txt"] {
+        std::fs::write(src.join("d").join(f), f).unwrap();
+    }
+    let bad = src.join("d/b.txt");
+    std::fs::set_permissions(&bad, std::fs::Permissions::from_mode(0o000)).unwrap();
+    (tmp, VfsPath::new(src.join("d")), VfsPath::new(dst), bad)
+}
+
+#[cfg(unix)]
+fn restore(bad: &std::path::Path) {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(bad, std::fs::Permissions::from_mode(0o644)).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn copy_dir_collects_failed_children_and_keeps_going() {
+    let (_tmp, d, dst, bad) = dir_with_unreadable_child();
+    let ops = Ops::new(
+        NoRenameFs,
+        FakeTrash {
+            bin: dst.as_path().to_path_buf(),
+            trashed: Default::default(),
+        },
+    );
+    let ctl = Collect::default();
+    let out = ops.copy_with(&d, &dst, ConflictPolicy::Skip, &ctl).unwrap();
+    restore(&bad);
+    assert_eq!(out, Outcome::Done(dst.join("d")));
+    let errors = ctl.0.lock().unwrap().clone();
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    assert!(errors[0].0.ends_with("d/b.txt"));
+    assert_eq!(read(&dst.join("d/a.txt")), "a.txt");
+    assert_eq!(
+        read(&dst.join("d/c.txt")),
+        "c.txt",
+        "실패한 파일 뒤의 파일도 복사된다"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn copy_dir_without_collector_stops_at_first_error() {
+    let (_tmp, d, dst, bad) = dir_with_unreadable_child();
+    let f = Ops::new(
+        NoRenameFs,
+        FakeTrash {
+            bin: dst.as_path().to_path_buf(),
+            trashed: Default::default(),
+        },
+    );
+    let res = f.copy(&d, &dst, ConflictPolicy::Skip); // 큐가 아닌 직접 호출은 첫 오류를 그대로 돌려준다
+    restore(&bad);
+    assert!(res.is_err());
+}
+
+#[cfg(unix)]
+#[test]
+fn move_dir_keeps_source_when_some_files_fail_to_copy() {
+    let (_tmp, d, dst, bad) = dir_with_unreadable_child();
+    let ops = Ops::new(
+        NoRenameFs,
+        FakeTrash {
+            bin: dst.as_path().to_path_buf(),
+            trashed: Default::default(),
+        },
+    );
+    let ctl = Collect::default();
+    let res = ops.move_with(&d, &dst, ConflictPolicy::Skip, &ctl);
+    restore(&bad);
+    assert!(matches!(res, Err(OpsError::PartialCopy(1))), "{res:?}");
+    // 복사하지 못한 파일이 있으면 원본을 지우지 않는다(지우면 b.txt를 잃는다).
+    for f in ["a.txt", "b.txt", "c.txt"] {
+        assert!(d.join(f).as_path().exists(), "{f}가 원본에서 사라졌다");
+    }
+}

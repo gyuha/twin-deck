@@ -124,3 +124,26 @@ fn sort_entries_matches_compare_names_semantics() {
     let b: Vec<String> = cached.iter().map(|e| e.name.to_lowercase()).collect();
     assert_eq!(a, b);
 }
+
+#[test]
+fn copy_file_not_found_names_the_missing_side() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = VfsPath::new(tmp.path());
+    std::fs::write(tmp.path().join("src.txt"), "x").unwrap();
+    // 원본은 있는데 대상 폴더가 없으면 대상 경로를 알려 준다(원본 경로를 탓하지 않는다).
+    let missing_dest = root.join("nope/dst.txt");
+    let err = LocalFs
+        .copy_file(&root.join("src.txt"), &missing_dest)
+        .unwrap_err();
+    assert!(
+        matches!(&err, VfsError::NotFound(p) if *p == missing_dest),
+        "{err:?}"
+    );
+    // 원본이 없으면 원본 경로다.
+    let gone = root.join("gone.txt");
+    let err = LocalFs.copy_file(&gone, &root.join("dst.txt")).unwrap_err();
+    assert!(
+        matches!(&err, VfsError::NotFound(p) if *p == gone),
+        "{err:?}"
+    );
+}

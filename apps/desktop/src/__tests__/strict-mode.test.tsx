@@ -56,4 +56,19 @@ describe("StrictMode(개발 모드)에서도 백엔드 이벤트가 UI에 닿는
     await waitFor(() => expect(entryNames("left").sort()).toEqual(["a.txt", "b.txt"]));
     expect(screen.getByRole("status", { name: "검색 상태" })).toHaveTextContent("완료");
   });
+
+  it("오래 걸리는 복사에는 진행 창이 뜨고 끝나면 닫힌다", async () => {
+    const b = backend();
+    b.queueMode = "manual"; // 작업이 끝나지 않고 계속 진행 중인 상태
+    const user = await mount(b);
+    await user.keyboard("{Control>}a{/Control}{F5}");
+    await screen.findByRole("dialog", { name: /복사/ });
+    await user.keyboard("{Enter}");
+    const d = await screen.findByRole("dialog", { name: "복사 중" });
+    expect(within(d).getByRole("progressbar")).toBeInTheDocument();
+    await act(async () => {
+      for (let i = 0; i < 6; i++) await b.advance();
+    });
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "복사 중" })).toBeNull());
+  });
 });

@@ -14,6 +14,8 @@ pub enum OpsError {
     Trash(String),
     #[error("작업이 중단되었습니다")]
     Aborted,
+    #[error("{0}개 항목을 복사하지 못해 원본을 지우지 않았습니다")]
+    PartialCopy(usize),
     #[error("{0}")]
     Archive(String),
 }

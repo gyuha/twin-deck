@@ -97,6 +97,66 @@ describe("전송 진행 창", () => {
     return { ...r, backend };
   }
 
+  it("확인 창을 거친 복사는 300ms를 기다리지 않고 진행 창을 바로 띄운다", async () => {
+    const backend = seedBackend();
+    backend.queueMode = "manual";
+    const { user } = await renderApp(backend);
+    await user.keyboard("{Control>}a{/Control}{F5}");
+    await confirmDialog(/복사/);
+    const t0 = Date.now();
+    await user.keyboard("{Enter}");
+    const d = await screen.findByRole("dialog", { name: "복사 중" });
+    expect(Date.now() - t0).toBeLessThan(250);
+    expect(within(d).getByRole("button", { name: "백그라운드" })).toBeInTheDocument();
+    expect(within(d).getByRole("button", { name: "중단" })).toBeInTheDocument();
+    expect(d).toHaveTextContent("Return 백그라운드 · Esc 중단");
+  });
+
+  it("Enter(백그라운드)는 창만 닫고 작업은 큐에서 계속 돌며 창이 다시 뜨지 않는다", async () => {
+    const backend = seedBackend();
+    backend.queueMode = "manual";
+    const { user } = await renderApp(backend);
+    await user.keyboard("{Control>}a{/Control}{F5}");
+    await confirmDialog(/복사/);
+    await user.keyboard("{Enter}");
+    await screen.findByRole("dialog", { name: "복사 중" });
+    await user.keyboard("{Enter}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("status", { name: "작업 큐 진행" })).toHaveTextContent("작업 1개"); // 작업은 그대로 진행 중
+    await sleep(350); // 진행 창을 다시 띄우지 않는다
+    expect(screen.queryByRole("dialog")).toBeNull();
+    for (let i = 0; i < 5; i++) await advance(backend);
+    await waitFor(() => expect(backend.exists("/home/b/docs/readme.md")).toBe(true));
+    expect(screen.queryByRole("status", { name: "작업 큐 진행" })).toBeNull();
+  });
+
+  it("백그라운드로 보낸 뒤에도 큐 팝업(=)을 열 수 있다", async () => {
+    const backend = seedBackend();
+    backend.queueMode = "manual";
+    const { user } = await renderApp(backend);
+    await user.keyboard("{Control>}a{/Control}{F5}");
+    await confirmDialog(/복사/);
+    await user.keyboard("{Enter}");
+    await screen.findByRole("dialog", { name: "복사 중" });
+    await user.keyboard("{Enter}=");
+    expect(await screen.findByRole("dialog", { name: "작업 큐" })).toBeInTheDocument();
+  });
+
+  it("Esc는 진행 중인 복사를 중단한다", async () => {
+    const backend = seedBackend();
+    backend.queueMode = "manual";
+    const { user } = await renderApp(backend);
+    await user.keyboard("{Control>}a{/Control}{F5}");
+    await confirmDialog(/복사/);
+    await user.keyboard("{Enter}");
+    await screen.findByRole("dialog", { name: "복사 중" });
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await act(async () => void (await backend.advance()));
+    await waitFor(() => expect(screen.queryByRole("status", { name: "작업 큐 진행" })).toBeNull());
+    expect(backend.exists("/home/b/docs/readme.md")).toBe(false); // 중단되어 나머지는 복사되지 않았다
+  });
+
   it("빨리 끝나는 작업에는 뜨지 않는다", async () => {
     const { user, backend } = await renderApp();
     await user.keyboard("{ArrowDown}{ArrowDown}{F5}");

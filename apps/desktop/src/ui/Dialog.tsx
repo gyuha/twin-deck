@@ -84,19 +84,41 @@ export function Dialog() {
               aria-valuenow={job.filesTotal ? Math.round((job.filesDone / job.filesTotal) * 100) : undefined}
               className="h-2 w-full overflow-hidden rounded bg-app-slider"
             >
-              <div className="h-full bg-accent" style={{ width: `${job.filesTotal ? (job.filesDone / job.filesTotal) * 100 : 0}%` }} />
+              {/* 아직 한 개도 끝나지 않았으면 막대가 죽어 보이지 않게 깜빡이는 진행 중 표시를 한다. */}
+              {isActiveJob(job) && job.filesDone === 0 ? (
+                <div className="h-full w-full animate-pulse bg-accent opacity-40" />
+              ) : (
+                <div className="h-full bg-accent" style={{ width: `${job.filesTotal ? (job.filesDone / job.filesTotal) * 100 : 0}%` }} />
+              )}
             </div>
             <p className="mt-1">{job.filesTotal === null ? "집계 중…" : `${job.filesDone}/${job.filesTotal}개`}</p>
             {job.current && isActiveJob(job) && <p className="truncate text-xs text-ink-dull">{job.current}</p>}
-            {job.errors.map((e) => (
-              <p key={e.path} role="alert" className="text-xs text-status-error">
-                {e.path}: {e.message}
-              </p>
-            ))}
-            <div className="mt-3 flex justify-end">
-              <button type="button" className="rounded border border-app-line px-3 py-0.5" onClick={() => (isActiveJob(job) ? api.dialogCancel() : api.dialogConfirm())}>
-                {isActiveJob(job) ? "중단" : "닫기"}
-              </button>
+            {job.errors.length > 0 && (
+              <div className="mt-1 max-h-40 overflow-auto">
+                <p className="text-xs text-ink-dull">{job.errors.length}개 항목에 실패했습니다</p>
+                {job.errors.map((e) => (
+                  <p key={e.path} role="alert" className="break-all text-xs text-status-error">
+                    {e.path}: {e.message}
+                  </p>
+                ))}
+              </div>
+            )}
+            <div className="mt-3 flex justify-end gap-2">
+              {isActiveJob(job) ? (
+                <>
+                  {/* 창만 닫고 작업은 큐에서 계속 돈다. 그동안 큐 팝업(=)을 열거나 다른 복사를 걸 수 있다. */}
+                  <button type="button" className="rounded border border-app-line px-3 py-0.5" onClick={() => api.dialogConfirm()}>
+                    백그라운드
+                  </button>
+                  <button type="button" className="rounded border border-app-line px-3 py-0.5" onClick={() => api.dialogCancel()}>
+                    중단
+                  </button>
+                </>
+              ) : (
+                <button type="button" className="rounded border border-app-line px-3 py-0.5" onClick={() => api.dialogConfirm()}>
+                  닫기
+                </button>
+              )}
             </div>
           </>
         )}
@@ -124,6 +146,12 @@ export function Dialog() {
                 </div>
               ))}
             </div>
+            {dialog.remaining > 1 && (
+              <label className="mt-2 flex items-center gap-2">
+                <input type="checkbox" checked={dialog.all} onChange={(e) => api.dialogSetApplyAll(e.target.checked)} />
+                남은 {dialog.remaining - 1}개 항목에도 같은 선택 적용 (A)
+              </label>
+            )}
           </>
         )}
         {dialog.kind !== "progress" && (
@@ -150,7 +178,9 @@ export function Dialog() {
         )}
         <p className="mt-3 text-xs text-ink-faint">
           {dialog.kind === "progress"
-            ? "Esc 중단"
+            ? job && isActiveJob(job)
+              ? "Return 백그라운드 · Esc 중단"
+              : "Return 닫기"
             : `Return 확인 · Esc 취소${dialog.kind === "name" && dialog.goto ? " · Tab 완성" : ""}`}
         </p>
       </div>

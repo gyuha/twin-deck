@@ -437,3 +437,33 @@ fn file_progress_counts_trashed_items() {
     assert_eq!(info.files_total, Some(2));
     assert_eq!(info.files_done, 2);
 }
+
+/// 폴더 안 파일 하나가 실패해도 나머지는 계속 복사하고, 실패한 파일은 작업 오류 목록에 남는다.
+#[cfg(unix)]
+#[test]
+fn queue_folder_copy_continues_past_failed_child() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let a = dirs(&[]);
+    let d = a.src.as_path().join("d");
+    std::fs::create_dir(&d).unwrap();
+    for f in ["a.txt", "b.txt", "c.txt"] {
+        std::fs::write(d.join(f), f).unwrap();
+    }
+    std::fs::set_permissions(d.join("b.txt"), std::fs::Permissions::from_mode(0o000)).unwrap(); // 읽을 수 없어 복사가 실패한다
+    let (q, rx) = Queue::new(ops());
+    let id = q.enqueue(copy_spec(&a, &["d"]));
+    wait_for(
+        &rx,
+        |e| matches!(e, QueueEvent::Finished { job, .. } if *job == id),
+    );
+    std::fs::set_permissions(d.join("b.txt"), std::fs::Permissions::from_mode(0o644)).unwrap(); // tempdir 정리를 위해
+
+    let job = q.job(id).unwrap();
+    assert_eq!(job.status, JobStatus::Failed);
+    assert_eq!(job.errors.len(), 1, "{:?}", job.errors);
+    assert!(job.errors[0].0.ends_with("d/b.txt"), "{:?}", job.errors);
+    // 실패한 파일 하나 때문에 폴더 전체를 포기하지 않는다: 나머지는 복사되어 있다.
+    assert!(a.dst.join("d/a.txt").as_path().exists());
+    assert!(a.dst.join("d/c.txt").as_path().exists());
+}

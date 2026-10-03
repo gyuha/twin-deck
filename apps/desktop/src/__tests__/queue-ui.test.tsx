@@ -1,6 +1,6 @@
 import { act, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { cursorName, renderApp, seedBackend } from "./helpers";
+import { backgroundProgress, cursorName, renderApp, seedBackend } from "./helpers";
 
 const indicator = () => screen.queryByRole("status", { name: "작업 큐 진행" });
 const popup = () => screen.queryByRole("dialog", { name: "작업 큐" });
@@ -12,6 +12,7 @@ async function manualCopyAll() {
   const r = await renderApp(backend);
   await r.user.keyboard("{Control>}a{/Control}{F5}{Enter}"); // 5개 항목을 큐에
   await waitFor(() => expect(indicator()).toBeInTheDocument());
+  await backgroundProgress(r.user); // 진행 창이 바로 뜨므로 백그라운드로 보내야 큐 팝업(=)을 쓸 수 있다
   return { ...r, backend };
 }
 
@@ -83,6 +84,7 @@ describe("Q-03 큐 팝업과 키보드 조작", () => {
     const { user, backend } = await manualCopyAll();
     await user.keyboard("{Escape}"); // 선택 해제 후 두 번째 작업
     await user.keyboard("{F5}{Enter}"); // 커서 항목 하나를 또 큐에
+    await backgroundProgress(user); // 두 번째 복사의 진행 창도 백그라운드로 보낸다
     await waitFor(() => expect(backend.queueJobs().then((j) => j.length)).resolves.toBe(2));
     await user.keyboard("=");
     await screen.findByRole("dialog", { name: "작업 큐" });
@@ -116,6 +118,7 @@ describe("실패 요약", () => {
     const { user } = await renderApp(backend);
     await user.keyboard("{ArrowDown}{ArrowDown}{F5}{Enter}"); // a.txt
     await waitFor(() => expect(indicator()).toBeInTheDocument());
+    await backgroundProgress(user);
     await backend.deletePermanent("/home/a/a.txt"); // 실행 전에 원본이 사라짐
     await advance(backend);
     await waitFor(() => expect(indicator()).toBeNull());

@@ -1,5 +1,6 @@
 use std::fs;
 use std::io::Read;
+use std::path::PathBuf;
 
 use crate::symlink_error_message;
 use crate::{Entry, EntryKind, FileId, Info, ListOptions, Result, Vfs, VfsError, VfsPath};
@@ -91,40 +92,60 @@ impl Vfs for LocalFs {
     }
 
     fn stat(&self, path: &VfsPath) -> Result<Entry> {
-        let meta = fs::symlink_metadata(path.as_path()).map_err(|e| VfsError::io(path, e))?;
+        let meta = retry_nfd(path.as_path(), |p| fs::symlink_metadata(p))
+            .map_err(|e| VfsError::io(path, e))?;
         Ok(to_entry(path, &meta))
     }
 
     fn mkdir(&self, path: &VfsPath) -> Result<()> {
-        if path.as_path().exists() {
+        if retry_nfd(path.as_path(), |p| fs::symlink_metadata(p)).is_ok() {
             return Err(VfsError::AlreadyExists(path.clone()));
         }
-        fs::create_dir_all(path.as_path()).map_err(|e| VfsError::io(path, e))
+        retry_nfd(path.as_path(), |p| fs::create_dir_all(p)).map_err(|e| VfsError::io(path, e))
     }
 
     fn create_file(&self, path: &VfsPath) -> Result<()> {
-        fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(path.as_path())
-            .map(|_| ())
-            .map_err(|e| VfsError::io(path, e))
+        retry_nfd(path.as_path(), |p| {
+            fs::OpenOptions::new().write(true).create_new(true).open(p)
+        })
+        .map(|_| ())
+        .map_err(|e| VfsError::io(path, e))
     }
 
     fn rename(&self, from: &VfsPath, to: &VfsPath) -> Result<()> {
-        fs::rename(from.as_path(), to.as_path()).map_err(|e| VfsError::io(from, e))
+        match fs::rename(from.as_path(), to.as_path()) {
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                match (nfd_path(from.as_path()), nfd_path(to.as_path())) {
+                    (None, None) => Err(e),
+                    (f, t) => fs::rename(
+                        f.as_deref().unwrap_or(from.as_path()),
+                        t.as_deref().unwrap_or(to.as_path()),
+                    )
+                    .map_err(|_| e),
+                }
+            }
+            r => r,
+        }
+        .map_err(|e| VfsError::io(from, e))
     }
 
     fn remove_file(&self, path: &VfsPath) -> Result<()> {
-        fs::remove_file(path.as_path()).map_err(|e| VfsError::io(path, e))
+        retry_nfd(path.as_path(), |p| fs::remove_file(p)).map_err(|e| VfsError::io(path, e))
     }
 
     fn remove_dir_all(&self, path: &VfsPath) -> Result<()> {
-        fs::remove_dir_all(path.as_path()).map_err(|e| VfsError::io(path, e))
+        retry_nfd(path.as_path(), |p| fs::remove_dir_all(p)).map_err(|e| VfsError::io(path, e))
     }
 
     fn copy_file(&self, from: &VfsPath, to: &VfsPath) -> Result<u64> {
-        fs::copy(from.as_path(), to.as_path()).map_err(|e| VfsError::io(from, e))
+        retry_nfd(to.as_path(), |t| fs::copy(from.as_path(), t)).map_err(|e| {
+            // 원본이 있는데 "찾을 수 없음"이면 없는 것은 대상 쪽(대상 폴더나 이름)이다. 원본 경로를 탓하면 원인을 잘못 짚게 된다.
+            if e.kind() == std::io::ErrorKind::NotFound && from.as_path().exists() {
+                VfsError::io(to, e)
+            } else {
+                VfsError::io(from, e)
+            }
+        })
     }
 
     fn info(&self, path: &VfsPath) -> Result<Info> {
@@ -195,5 +216,38 @@ impl Vfs for LocalFs {
                 _ => VfsError::io(link, e),
             }
         })
+    }
+}
+
+/// 경로를 모두 NFD(분해형)로 바꾼 경로. 바뀐 것이 없으면 `None`.
+/// macOS의 SMB 공유는 NFC(조합형) 한글 경로를 못 찾는다: 있는 항목도 "없음"으로 나오고(겹침을 못 알아본다),
+/// 폴더를 읽어 목록을 캐시한 뒤에는 그 폴더 안에 파일도 못 만든다. NFD 경로로는 된다.
+/// APFS는 두 형태를 같은 이름으로 다루지만 형태를 그대로 저장하는 파일 시스템도 있어, NFC가 실패했을 때만 쓴다.
+#[cfg(target_os = "macos")]
+fn nfd_path(path: &std::path::Path) -> Option<PathBuf> {
+    use unicode_normalization::UnicodeNormalization;
+    let out: PathBuf = path
+        .components()
+        .map(|c| c.as_os_str().to_string_lossy().nfd().collect::<String>())
+        .collect();
+    (out != path).then_some(out)
+}
+
+#[cfg(not(target_os = "macos"))]
+fn nfd_path(_path: &std::path::Path) -> Option<PathBuf> {
+    None
+}
+
+/// `op`를 `path`로 해 보고, 찾을 수 없음이면 NFD 경로로 한 번 더 한다.
+fn retry_nfd<T>(
+    path: &std::path::Path,
+    op: impl Fn(&std::path::Path) -> std::io::Result<T>,
+) -> std::io::Result<T> {
+    match op(path) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => match nfd_path(path) {
+            Some(alt) => op(&alt).map_err(|_| e),
+            None => Err(e),
+        },
+        r => r,
     }
 }

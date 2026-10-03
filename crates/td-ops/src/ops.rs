@@ -24,6 +24,13 @@ pub trait Control {
     fn should_stop(&self) -> bool;
     /// 파일(또는 심볼릭 링크) 하나를 다 처리한 직후에 호출된다.
     fn on_file_done(&self) {}
+    /// true이면 폴더 안의 항목 하나가 실패해도 거기서 멈추지 않고 `on_error`로 알린 뒤 나머지를 계속 처리한다(작업 큐).
+    /// false(기본)이면 첫 오류에서 바로 돌려준다.
+    fn collects_errors(&self) -> bool {
+        false
+    }
+    /// `collects_errors`가 true일 때 실패한 항목의 경로와 오류를 알린다.
+    fn on_error(&self, _path: &VfsPath, _message: &str) {}
 }
 
 /// 진행 알림도 중단도 없는 기본 제어.
@@ -221,7 +228,8 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
         Ok(())
     }
 
-    fn copy_entry(&self, entry: &Entry, dest: &VfsPath, ctl: &dyn Control) -> Result<()> {
+    /// 항목 하나(폴더면 그 안 전부)를 복사한다. 돌려주는 값은 `ctl.collects_errors()`일 때 건너뛰고 알린 실패 개수다.
+    fn copy_entry(&self, entry: &Entry, dest: &VfsPath, ctl: &dyn Control) -> Result<usize> {
         if ctl.should_stop() {
             return Err(OpsError::Aborted);
         }
@@ -242,12 +250,23 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
             EntryKind::Dir => {
                 self.vfs.mkdir(dest)?;
                 let opts = ListOptions { show_hidden: true };
+                let mut failed = 0;
                 for child in self.vfs.list(&entry.path, &opts)? {
-                    self.copy_entry(&child, &dest.join(&child.name), ctl)?;
+                    match self.copy_entry(&child, &dest.join(&child.name), ctl) {
+                        Ok(n) => failed += n,
+                        Err(OpsError::Aborted) => return Err(OpsError::Aborted),
+                        // 항목 하나가 실패해도 폴더 전체를 포기하지 않고 나머지를 계속 복사한다.
+                        Err(e) if ctl.collects_errors() => {
+                            ctl.on_error(&child.path, &e.to_string());
+                            failed += 1;
+                        }
+                        Err(e) => return Err(e),
+                    }
                 }
+                return Ok(failed);
             }
         }
-        Ok(())
+        Ok(0)
     }
 
     /// `src` 아래의 파일 수(심볼릭 링크 포함, 폴더는 세지 않는다). 진행률의 분모로 쓴다.
@@ -441,7 +460,11 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
             Ok(()) => {}
             Err(VfsError::Io { .. }) => {
                 let entry = self.vfs.stat(src)?;
-                self.copy_entry(&entry, &dest, ctl)?;
+                // 일부라도 복사하지 못했으면 원본을 지우지 않는다(지우면 복사되지 않은 파일을 잃는다).
+                let failed = self.copy_entry(&entry, &dest, ctl)?;
+                if failed > 0 {
+                    return Err(OpsError::PartialCopy(failed));
+                }
                 self.remove_any(src)?;
             }
             Err(e) => return Err(e.into()),

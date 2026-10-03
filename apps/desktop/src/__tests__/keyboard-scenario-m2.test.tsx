@@ -1,7 +1,7 @@
 import { act, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { FakeBackend } from "@twin-deck/ts-client";
-import { cursorName, entryNames, list, renderApp, selectedNames } from "./helpers";
+import { backgroundProgress, cursorName, entryNames, list, renderApp, selectedNames } from "./helpers";
 
 /**
  * M2 성공 기준 종단 시나리오. 마우스 없이 키보드만으로:
@@ -57,6 +57,7 @@ describe("M2 키보드 전용 종단 시나리오", () => {
 
     // 5) F5: 비활성 패널로 복사 → 큐. 일시정지 중에는 진행하지 않고 재개하면 끝난다
     await user.keyboard("{F5}{Enter}");
+    await backgroundProgress(user); // 복사 진행 창이 바로 뜨므로 백그라운드로 보낸다
     await waitFor(() => expect(screen.getByRole("status", { name: "작업 큐 진행" })).toHaveTextContent("0/2"));
     await user.keyboard("=");
     await screen.findByRole("dialog", { name: "작업 큐" });

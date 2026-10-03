@@ -91,6 +91,14 @@ impl Control for JobControl<'_> {
             j.info.files_done += 1;
         }
     }
+    fn collects_errors(&self) -> bool {
+        true
+    }
+    fn on_error(&self, path: &VfsPath, message: &str) {
+        if let Some(j) = self.shared.state.lock().unwrap().jobs.get_mut(&self.job) {
+            j.info.errors.push((path.to_string(), message.to_string()));
+        }
+    }
     fn should_stop(&self) -> bool {
         self.shared
             .state

@@ -136,7 +136,7 @@ export type DialogState =
   | { kind: "name"; title: string; value: string; error: string | null; selectStem: boolean; goto?: boolean; label?: string; confirmLabel?: string; option?: { label: string; checked: boolean } }
   | { kind: "multirename"; title: string; items: { path: string; name: string; isDir: boolean; modifiedMs: number | null }[]; existing: string[]; options: RenameOptions }
   | { kind: "confirm"; title: string; lines: string[] }
-  | { kind: "conflict"; title: string; existing: string; selected: number }
+  | { kind: "conflict"; title: string; existing: string; selected: number; remaining: number; all: boolean }
   | { kind: "info"; title: string; lines: string[] }
   /** 실행 중인 전송(복사/이동) 작업의 진행 창. */
   | { kind: "progress"; title: string; jobId: number };
@@ -276,8 +276,10 @@ export interface AppState {
 
 export const PAGE_SIZE = 10;
 const VIRTUAL_NO_CREATE = "검색/분석 결과 탭에서는 새로 만들 수 없습니다. 폴더 탭에서 시도하세요";
-/** 전송이 이 시간을 넘겨 계속 실행 중일 때만 진행 창을 띄운다. */
+/** 삭제·휴지통·압축은 이 시간을 넘겨 계속 실행 중일 때만 진행 창을 띄운다(자주 쓰는 작업이라 깜빡이지 않게). */
 const TRANSFER_PROGRESS_DELAY_MS = 300;
+/** 확인 창을 거친 복사·이동은 기다리지 않는다: 첫 조회에서 아직 진행 중이면 바로 진행 창을 띄운다. */
+const TRANSFER_PROGRESS_DELAY_COPY_MS = 0;
 /** 전송이 끝날 때까지 큐를 직접 조회하는 간격. */
 const TRANSFER_POLL_MS = 100;
 const VIRTUAL_NO_DEST = "검색/분석 결과 탭은 복사·이동의 대상이 될 수 없습니다. 반대편 패널을 폴더로 바꾸세요";
@@ -784,10 +786,13 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
    * 전송 작업이 끝날 때까지 큐를 직접 조회해서 진행 창을 띄우고, 끝나면 목록을 다시 읽는다.
    * 큐/디렉터리 이벤트가 웹뷰에 닿는지는 실제 Tauri 런타임에서 검증된 적이 없어서(docs/m1-status.md) 이벤트에 기대지 않는다.
    */
-  async function trackTransfer(jobId: number, verb: string) {
+  async function trackTransfer(jobId: number, verb: string, delayMs = TRANSFER_PROGRESS_DELAY_MS) {
     const started = Date.now();
+    let first = delayMs === 0; // 지연이 없으면 첫 조회를 기다리지 않고 바로 확인한다
+    let shownOnce = false; // 사용자가 백그라운드로 보낸(닫은) 진행 창을 다시 띄우지 않는다
     for (;;) {
-      await new Promise((r) => setTimeout(r, TRANSFER_POLL_MS));
+      if (!first) await new Promise((r) => setTimeout(r, TRANSFER_POLL_MS));
+      first = false;
       let jobs: JobDto[];
       try {
         jobs = await backend.queueJobs();
@@ -800,7 +805,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         await reloadAll();
         return;
       }
-      if (!get().dialog && Date.now() - started >= TRANSFER_PROGRESS_DELAY_MS) {
+      if (!shownOnce && !get().dialog && Date.now() - started >= delayMs) {
+        shownOnce = true;
         set({ dialog: { kind: "progress", title: `${verb} 중`, jobId } });
       }
     }
@@ -1250,13 +1256,16 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
           : {},
       );
     },
+    /** 충돌 창의 "남은 항목에도 같은 선택 적용"을 켜고 끈다. */
+    dialogSetApplyAll(all?: boolean) {
+      set((s) => (s.dialog?.kind === "conflict" ? { dialog: { ...s.dialog, all: all ?? !s.dialog.all } } : {}));
+    },
     dialogConfirm() {
       const d = get().dialog;
       if (!d) return;
       if (d.kind === "progress") {
-        // 진행 중에는 Return이 아무 일도 하지 않고, 끝난(실패) 뒤에는 닫는다.
-        const job = get().queue.find((j) => j.id === d.jobId);
-        if (!job || !isActiveJob(job)) set({ dialog: null });
+        // Return: 진행 중이면 창만 닫고 작업은 큐에서 계속 돌게 하고(백그라운드), 끝난(실패) 뒤에는 그냥 닫는다.
+        set({ dialog: null });
         return;
       }
       let result: unknown = true;
@@ -1273,7 +1282,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         }
         result = d.option ? { value: d.value, checked: d.option.checked } : d.value;
       } else if (d.kind === "conflict") {
-        result = CONFLICT_CHOICES[d.selected];
+        result = { choice: CONFLICT_CHOICES[d.selected], all: d.all };
       }
       set({ dialog: null });
       pending?.(result);
@@ -1425,19 +1434,26 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         if (!error) break;
       }
       const items: QueueItemDto[] = [];
-      for (const t of targets) {
+      let sticky: ConflictDto | null = null; // "남은 항목에도 같은 선택 적용"으로 정해진 처리
+      for (const [i, t] of targets.entries()) {
         try {
           let policy: ConflictDto = "skip";
           const existing = await backend.detectConflict(t.path, destDir);
           if (existing !== null) {
-            const choice = await ask<ConflictDto>({
-              kind: "conflict",
-              title: `${verb}: 이름이 겹칩니다`,
-              existing,
-              selected: CONFLICT_CHOICES.indexOf("rename"),
-            });
-            if (choice === null) break; // 취소: 지금까지 정한 항목만 실행한다
-            policy = choice;
+            if (sticky) policy = sticky;
+            else {
+              const answer = await ask<{ choice: ConflictDto; all: boolean }>({
+                kind: "conflict",
+                title: `${verb}: 이름이 겹칩니다`,
+                existing,
+                selected: CONFLICT_CHOICES.indexOf("rename"),
+                remaining: targets.length - i,
+                all: false,
+              });
+              if (answer === null) break; // 취소: 지금까지 정한 항목만 실행한다
+              policy = answer.choice;
+              if (answer.all) sticky = policy;
+            }
           }
           items.push({ src: t.path, destDir, policy });
         } catch (e) {
@@ -1449,7 +1465,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (items.length > 0) {
         if (kind === "move") api.recheckVirtual(items.map((i) => i.src));
         const jobId = await backend.enqueue(kind, items);
-        void trackTransfer(jobId, verb);
+        void trackTransfer(jobId, verb, confirm ? TRANSFER_PROGRESS_DELAY_COPY_MS : TRANSFER_PROGRESS_DELAY_MS);
       }
       await reloadAll();
     },
@@ -1555,14 +1571,16 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         let policy: ConflictDto = "skip";
         const existing = await backend.detectConflict(entry.path, inactive.path);
         if (existing !== null) {
-          const choice = await ask<ConflictDto>({
+          const answer = await ask<{ choice: ConflictDto; all: boolean }>({
             kind: "conflict",
             title: "링크: 이름이 겹칩니다",
             existing,
             selected: CONFLICT_CHOICES.indexOf("rename"),
+            remaining: 1,
+            all: false,
           });
-          if (choice === null) return;
-          policy = choice;
+          if (answer === null) return;
+          policy = answer.choice;
         }
         const made = await backend.createSymlink(entry.path, inactive.path, policy);
         if (made) flash(`링크를 만들었습니다: ${made}`);

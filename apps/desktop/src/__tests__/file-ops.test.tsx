@@ -191,6 +191,36 @@ describe("OP-03/04 충돌 처리 (이름 겹침)", () => {
     expect(backend.exists("/home/b/docs/readme.md")).toBe(true);
     expect(backend.read("/home/b/a.txt")).toBe("old");
   });
+
+  it("A로 '남은 항목에도 같은 선택 적용'을 켜면 다시 묻지 않는다", async () => {
+    const backend = seedBackend().seed({ "/home/b/a.txt": "old", "/home/b/b.txt": "oldb" });
+    const { user } = await renderApp(backend);
+    await user.keyboard("{Control>}a{/Control}{F5}{Enter}");
+    await dialog();
+    expect(screen.getByRole("checkbox", { name: /남은 \d+개 항목에도 같은 선택 적용/ })).not.toBeChecked();
+    await user.keyboard("as"); // 모두 건너뜀
+    await waitFor(() => expect(backend.exists("/home/b/docs/readme.md")).toBe(true));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(backend.read("/home/b/a.txt")).toBe("old");
+    expect(backend.read("/home/b/b.txt")).toBe("oldb");
+  });
+
+  it("체크 박스를 클릭하고 덮어쓰기를 고르면 겹치는 항목을 모두 덮어쓴다", async () => {
+    const backend = seedBackend().seed({ "/home/b/a.txt": "old", "/home/b/b.txt": "oldb" });
+    const { user } = await renderApp(backend);
+    await user.keyboard("{Control>}a{/Control}{F5}{Enter}");
+    await dialog();
+    await user.click(screen.getByRole("checkbox", { name: /남은 \d+개 항목에도 같은 선택 적용/ }));
+    await user.keyboard("o");
+    await waitFor(() => expect(backend.read("/home/b/b.txt")).not.toBe("oldb"));
+    expect(backend.read("/home/b/a.txt")).toBe("aaa");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("항목이 하나뿐이면 체크 박스가 없다", async () => {
+    await onAtxt("{F5}");
+    expect(screen.queryByRole("checkbox")).toBeNull();
+  });
 });
 
 describe("외부 변경 감시", () => {
