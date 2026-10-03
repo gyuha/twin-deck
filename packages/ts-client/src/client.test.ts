@@ -1,3 +1,4 @@
+import type { SearchEvent } from "./backend";
 import { describe, expect, it, vi } from "vitest";
 import { FakeBackend, archiveFileName, archiveRoot, baseName, expandPath, globMatch, isArchiveName, isArchivePath, joinPath, parentPath } from "./index";
 
@@ -258,5 +259,68 @@ describe("archive helpers", () => {
     expect(await b.diskSpace("/Volumes/USB2/x")).toEqual({ free: 10, total: 100 }); // 접두 문자열이 아니라 경로 경계
     b.diskSpaces = { "/Volumes/USB": { free: 1, total: 8 } };
     await expect(b.diskSpace("/home")).rejects.toThrow();
+  });
+
+  describe("startFind (Rust Finder와 같은 규칙)", () => {
+    const spec = (over: Partial<import("./generated/bindings").FindSpecDto> = {}): import("./generated/bindings").FindSpecDto => ({
+      roots: ["/r"],
+      onlyItems: null,
+      followSymlinks: false,
+      excludeDirs: "",
+      maxDepth: null,
+      mask: "",
+      substring: true,
+      regex: false,
+      excludeFiles: "",
+      text: null,
+      ...over,
+    });
+    const tree = () =>
+      new FakeBackend().seed({
+        "/r/a.txt": "hello world",
+        "/r/b.md": "hello",
+        "/r/bin.dat": "hello\0x",
+        "/r/sub/c.txt": "goodbye",
+        "/r/sub/x.tmp": "hello",
+        "/r/sub/deep/d.txt": "hello deep",
+        "/r/node_modules/e.txt": "hello",
+      });
+    /** 결과는 `startFind` 안에서 바로 도착하므로(즉시 전달 모드) 먼저 구독하고, 돌려받은 id로 걸러 낸다. */
+    const names = async (b: FakeBackend, s: ReturnType<typeof spec>) => {
+      const events: SearchEvent[] = [];
+      const off = b.onSearchEvent((e) => events.push(e));
+      try {
+        const { id } = await b.startFind(s);
+        expect(events.some((e) => e.type === "done" && e.id === id)).toBe(true);
+        return events.flatMap((e) => (e.type === "chunk" && e.id === id ? e.entries.map((x) => x.name) : [])).sort();
+      } finally {
+        off();
+      }
+    };
+
+    it("마스크(부분 일치/정확히/정규식), 깊이, 제외", async () => {
+      const b = tree();
+      expect(await names(b, spec({ mask: "*.txt;*.md" }))).toEqual(["a.txt", "b.md", "c.txt", "d.txt", "e.txt"]);
+      expect(await names(b, spec({ mask: "*.txt", maxDepth: 0 }))).toEqual(["a.txt"]);
+      expect(await names(b, spec({ mask: "*.txt", maxDepth: 1 }))).toEqual(["a.txt", "c.txt", "e.txt"]);
+      expect(await names(b, spec({ mask: "C", substring: true }))).toEqual(["c.txt"]);
+      expect(await names(b, spec({ mask: "c", substring: false }))).toEqual([]);
+      expect(await names(b, spec({ mask: "C.TXT", substring: false }))).toEqual(["c.txt"]);
+      expect(await names(b, spec({ mask: "^[ab]\\.(txt|md)$", regex: true }))).toEqual(["a.txt", "b.md"]);
+      const ex = await names(b, spec({ excludeDirs: "node_modules", excludeFiles: "*.tmp" }));
+      expect(ex).not.toContain("e.txt");
+      expect(ex).not.toContain("x.tmp");
+      expect(ex).toContain("c.txt");
+      await expect(b.startFind(spec({ mask: "(", regex: true }))).rejects.toThrow(/정규식/);
+    });
+
+    it("파일 안 텍스트와 invert, 선택 항목만", async () => {
+      const b = tree();
+      const text = (over = {}) => ({ pattern: "HELLO", caseSensitive: false, regex: false, invert: false, ...over });
+      expect(await names(b, spec({ text: text() }))).toEqual(["a.txt", "b.md", "d.txt", "e.txt", "x.tmp"]);
+      expect(await names(b, spec({ text: text({ caseSensitive: true }) }))).toEqual([]);
+      expect(await names(b, spec({ text: text({ pattern: "hello", invert: true }) }))).toEqual(["c.txt"]);
+      expect(await names(b, spec({ onlyItems: ["/r/sub", "/r/a.txt"], mask: "*.txt" }))).toEqual(["a.txt", "c.txt", "d.txt"]);
+    });
   });
 });

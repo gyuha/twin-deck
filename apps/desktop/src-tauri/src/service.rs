@@ -277,6 +277,33 @@ pub struct SearchStartDto {
     pub warnings: Vec<String>,
 }
 
+/// 파일 찾기의 "파일에서 텍스트 찾기" 조건.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct TextSpecDto {
+    pub pattern: String,
+    pub case_sensitive: bool,
+    pub regex: bool,
+    /// 텍스트를 포함하지 않는 파일을 찾는다.
+    pub invert: bool,
+}
+
+/// 파일 찾기 다이얼로그(기본 탭)의 조건. 필드의 뜻은 `td_search::FindSpec`과 같다.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct FindSpecDto {
+    pub roots: Vec<String>,
+    pub only_items: Option<Vec<String>>,
+    pub follow_symlinks: bool,
+    pub exclude_dirs: String,
+    pub max_depth: Option<u32>,
+    pub mask: String,
+    pub substring: bool,
+    pub regex: bool,
+    pub exclude_files: String,
+    pub text: Option<TextSpecDto>,
+}
+
 /// 작업이 끝났을 때(정상, 취소 모두)의 요약.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -469,6 +496,46 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
             }
         });
         Ok(SearchStartDto { id, warnings })
+    }
+
+    /// 파일 찾기: 구조화된 조건으로 하위 폴더까지 찾아 `Chunk`로 흘려 보낸다.
+    /// 잘못된 정규식 같은 조건 오류는 시작 즉시 오류 문자열로 거부한다.
+    pub fn start_find(&self, spec: FindSpecDto) -> ServiceResult<SearchStartDto> {
+        let paths = |v: Vec<String>| v.iter().map(|p| vp(p)).collect::<Vec<_>>();
+        let finder = td_search::Finder::new(td_search::FindSpec {
+            roots: paths(spec.roots),
+            only_items: spec.only_items.map(paths),
+            follow_symlinks: spec.follow_symlinks,
+            exclude_dirs: spec.exclude_dirs,
+            max_depth: spec.max_depth,
+            mask: spec.mask,
+            substring: spec.substring,
+            regex: spec.regex,
+            exclude_files: spec.exclude_files,
+            text: spec.text.map(|t| td_search::TextSpec {
+                pattern: t.pattern,
+                case_sensitive: t.case_sensitive,
+                regex: t.regex,
+                invert: t.invert,
+            }),
+        })?;
+        let fs = self.fs.clone();
+        let id = self.spawn_job(move |id, cancel, tx| {
+            let mut batch = Batcher::new(id, tx.clone());
+            let report = finder.run(&fs, cancel, &mut |e| batch.push(e));
+            batch.flush();
+            SearchSummaryDto {
+                visited: report.visited as f64,
+                matched: report.matched as f64,
+                unreadable: report.unreadable as f64,
+                cancelled: report.cancelled,
+                warnings: report.warnings,
+            }
+        });
+        Ok(SearchStartDto {
+            id,
+            warnings: Vec::new(),
+        })
     }
 
     /// Flatten (FIND-05): `root` 아래의 모든 파일을 평면 목록으로 흘려 보낸다.
@@ -1112,6 +1179,81 @@ mod tests {
                 _ => {}
             }
         }
+    }
+
+    #[test]
+    fn start_find_streams_matches() {
+        let (_t, svc, ch, root) = setup();
+        for (rel, body) in [
+            ("a/one.txt", "hello one"),
+            ("a/deep/two.txt", "bye"),
+            ("b/three.md", "hello three"),
+            ("top.txt", "HELLO top"),
+        ] {
+            let p = format!("{root}/{rel}");
+            std::fs::create_dir_all(Path::new(&p).parent().unwrap()).unwrap();
+            std::fs::write(&p, body).unwrap();
+        }
+        let spec = |f: &dyn Fn(&mut FindSpecDto)| {
+            let mut s = FindSpecDto {
+                roots: vec![root.clone()],
+                only_items: None,
+                follow_symlinks: false,
+                exclude_dirs: String::new(),
+                max_depth: None,
+                mask: String::new(),
+                substring: true,
+                regex: false,
+                exclude_files: String::new(),
+                text: None,
+            };
+            f(&mut s);
+            s
+        };
+        let names = |s: FindSpecDto| {
+            let start = svc.start_find(s).unwrap();
+            let (entries, _, summary) = collect_search(&ch, start.id);
+            let mut n: Vec<_> = entries.iter().map(|e| e.name.clone()).collect();
+            n.sort();
+            (n, summary)
+        };
+        // 하위 폴더까지 마스크에 맞는 파일
+        let (n, summary) = names(spec(&|s| s.mask = "*.txt".into()));
+        assert_eq!(n, ["one.txt", "top.txt", "two.txt"]);
+        assert_eq!((summary.matched, summary.cancelled), (3.0, false));
+        // 깊이: 현재 폴더만
+        assert_eq!(
+            names(spec(&|s| {
+                s.mask = "*.txt".into();
+                s.max_depth = Some(0);
+            }))
+            .0,
+            ["top.txt"]
+        );
+        // 파일 안 텍스트(대소문자 무시)
+        let (n, _) = names(spec(&|s| {
+            s.text = Some(TextSpecDto {
+                pattern: "hello".into(),
+                case_sensitive: false,
+                regex: false,
+                invert: false,
+            });
+        }));
+        assert_eq!(n, ["one.txt", "three.md", "top.txt"]);
+        // 선택 항목만
+        let only = vec![format!("{root}/b")];
+        assert_eq!(
+            names(spec(&|s| s.only_items = Some(only.clone()))).0,
+            ["three.md"]
+        );
+        // 잘못된 정규식은 시작 즉시 거부
+        let err = svc
+            .start_find(spec(&|s| {
+                s.mask = "(".into();
+                s.regex = true;
+            }))
+            .unwrap_err();
+        assert!(err.contains("정규식"), "{err}");
     }
 
     #[test]

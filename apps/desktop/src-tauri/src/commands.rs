@@ -11,8 +11,8 @@ use td_state::{LoadedState, Snapshot, Spawner};
 use td_volumes::{SystemUnmounter, Volumes};
 
 use crate::service::{
-    edit, open_file, reveal, ConflictDto, EntryDto, FileInfoDto, JobDto, JobKindDto, PreviewDto,
-    QueueItemDto, SearchStartDto, SearchSummaryDto, Service, ServiceResult,
+    edit, open_file, reveal, ConflictDto, EntryDto, FileInfoDto, FindSpecDto, JobDto, JobKindDto,
+    PreviewDto, QueueItemDto, SearchStartDto, SearchSummaryDto, Service, ServiceResult,
 };
 
 pub type AppService = Service<SystemTrash>;
@@ -482,6 +482,13 @@ pub fn start_lookup(
     svc.start_lookup(&root, &query)
 }
 
+/// 파일 찾기를 시작한다. 결과는 `SearchChunk` 이벤트로 온다. 정규식 오류 등 조건 오류는 문자열이다.
+#[tauri::command]
+#[specta::specta]
+pub fn start_find(svc: State<'_, AppService>, spec: FindSpecDto) -> ServiceResult<SearchStartDto> {
+    svc.start_find(spec)
+}
+
 /// Flatten을 시작한다. 결과는 `SearchChunk` 이벤트로 온다.
 #[tauri::command]
 #[specta::specta]
@@ -556,6 +563,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             watch_dir,
             unwatch_dir,
             start_lookup,
+            start_find,
             start_flatten,
             start_disk_usage,
             cancel_search

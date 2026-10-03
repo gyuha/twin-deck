@@ -17,6 +17,7 @@ import type {
   UserDirsDto,
   VolumeDto,
   DiskSpaceDto,
+  FindSpecDto,
 } from "./generated/bindings";
 import { globMatch } from "./glob";
 import defaultConfigJson from "./generated/default-config.json";
@@ -449,6 +450,77 @@ export class FakeBackend implements Backend {
           })
           .map(([k, n]) => this.dto(k, n));
     return { id: this.register("chunk", entries, warnings), warnings };
+  }
+
+  /**
+   * 파일 찾기. Rust `td_search::Finder`와 같은 규칙을 메모리 파일시스템에서 구현한다:
+   * 마스크는 `;` 토큰(와일드카드 없으면 부분 일치/정확히 같음), 정규식, 제외 마스크(항상 glob, 정확히 같음),
+   * 깊이(0 = 시작 폴더 바로 아래만), 선택 항목만, 심볼릭 링크 따라가기(순환 방지), 파일 안 텍스트(invert 포함).
+   */
+  async startFind(spec: FindSpecDto): Promise<SearchStartDto> {
+    const fold = (s: string) => s.normalize("NFC").toLowerCase();
+    const tokens = (m: string) => m.split(";").map((t) => t.trim()).filter(Boolean);
+    const build = (src: string, flags: string, what: string) => {
+      try {
+        return new RegExp(src, flags);
+      } catch (e) {
+        throw new BackendError(`${what} 정규식 오류: ${e instanceof Error ? e.message : e}`);
+      }
+    };
+    const nameRe = spec.regex && spec.mask.trim() ? build(spec.mask.trim(), "i", "파일 마스크") : null;
+    const textRe = spec.text?.regex ? build(spec.text.pattern, spec.text.caseSensitive ? "" : "i", "텍스트") : null;
+    if (spec.text && !spec.text.pattern) throw new BackendError("찾을 텍스트가 비었습니다");
+    const maskTokens = tokens(spec.mask);
+    const wild = (t: string) => /[*?[]/.test(t);
+    const nameOk = (name: string) => {
+      if (nameRe) return nameRe.test(name.normalize("NFC"));
+      if (maskTokens.length === 0) return true;
+      return maskTokens.some((t) => (wild(t) ? globMatch(t, name) : spec.substring ? fold(name).includes(fold(t)) : fold(name) === fold(t)));
+    };
+    const excluded = (mask: string, name: string) => tokens(mask).some((t) => (wild(t) ? globMatch(t, name) : fold(name) === fold(t)));
+    const textOk = (node: Node) => {
+      const t = spec.text;
+      if (!t) return true;
+      if (node.kind !== "file" || node.content.slice(0, 8192).includes("\0")) return false;
+      const has = textRe ? textRe.test(node.content) : t.caseSensitive ? node.content.includes(t.pattern) : node.content.toLowerCase().includes(t.pattern.toLowerCase());
+      return has !== t.invert;
+    };
+    this.searchesStarted.push(["find", (spec.onlyItems ?? spec.roots).join(";"), JSON.stringify(spec)]);
+
+    const found: EntryDto[] = [];
+    const seen = new Set<string>();
+    const target = (path: string, node: Node): [string, Node] => (node.link && spec.followSymlinks ? [node.link, this.nodes.get(node.link) ?? node] : [path, node]);
+    const consider = (path: string, node: Node) => {
+      const name = baseName(path);
+      if (!nameOk(name) || excluded(spec.excludeFiles, name)) return;
+      if (!textOk(target(path, node)[1])) return;
+      found.push(this.dto(path, node));
+    };
+    const walk = (dir: string, depth: number) => {
+      if (spec.followSymlinks) {
+        if (seen.has(dir)) return;
+        seen.add(dir);
+      }
+      const prefix = dir === "/" ? "/" : `${dir}/`;
+      const children = this.below(dir).filter(([k]) => !k.slice(prefix.length).includes("/"));
+      for (const [path, node] of children) {
+        const [real, resolved] = target(path, node);
+        const isDir = resolved.kind === "dir" && (!node.link || spec.followSymlinks);
+        if (isDir && excluded(spec.excludeDirs, baseName(path))) continue;
+        consider(path, node);
+        if (isDir && (spec.maxDepth === null || depth < spec.maxDepth)) walk(real, depth + 1);
+      }
+    };
+    if (spec.onlyItems) {
+      for (const p of spec.onlyItems) {
+        const node = this.need(p);
+        if (node.kind === "dir") walk(p, 0);
+        else consider(p, node);
+      }
+    } else {
+      for (const r of spec.roots) walk(r, 0);
+    }
+    return { id: this.register("chunk", found), warnings: [] };
   }
 
   async startFlatten(root: string) {

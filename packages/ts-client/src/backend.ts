@@ -1,4 +1,4 @@
-import type { ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, FileInfoDto, JobDto, JobKindDto, Loaded, LoadedState, PreviewDto, QueueItemDto, SearchStartDto, SearchSummaryDto, Snapshot, UserDirsDto, VolumeDto } from "./generated/bindings";
+import type { ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, LoadedState, PreviewDto, QueueItemDto, SearchStartDto, SearchSummaryDto, Snapshot, UserDirsDto, VolumeDto } from "./generated/bindings";
 
 /** Look Up / Flatten / Disk Usage가 스트리밍으로 보내는 이벤트. 작업마다 마지막은 `done`이다. */
 export type SearchEvent =
@@ -63,6 +63,8 @@ export interface Backend {
   openAsArchive(path: string): Promise<string>;
   /** Look Up을 시작한다. 질의가 문법에 어긋나면 위치가 든 메시지로 거부된다. 결과는 `onSearchEvent`로 온다. */
   startLookup(root: string, query: string): Promise<SearchStartDto>;
+  /** 파일 찾기(기본 탭의 조건). 잘못된 정규식 같은 조건 오류는 거부된다. 결과는 `onSearchEvent`로 온다. */
+  startFind(spec: FindSpecDto): Promise<SearchStartDto>;
   /** `root` 아래의 모든 파일을 평면 목록으로 흘려 보낸다. */
   startFlatten(root: string): Promise<number>;
   /** `root`의 하위 항목별 총 크기를 계산해 크기 내림차순 스냅샷으로 흘려 보낸다. */

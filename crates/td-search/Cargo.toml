@@ -9,6 +9,7 @@ license.workspace = true
 td-vfs = { path = "../td-vfs" }
 td-archive = { path = "../td-archive" }
 thiserror.workspace = true
+regex = "1"
 
 [dev-dependencies]
 tempfile.workspace = true

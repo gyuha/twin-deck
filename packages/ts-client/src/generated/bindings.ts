@@ -307,6 +307,17 @@ async startLookup(root: string, query: string) : Promise<Result<SearchStartDto, 
 }
 },
 /**
+ * 파일 찾기를 시작한다. 결과는 `SearchChunk` 이벤트로 온다. 정규식 오류 등 조건 오류는 문자열이다.
+ */
+async startFind(spec: FindSpecDto) : Promise<Result<SearchStartDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("start_find", { spec }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Flatten을 시작한다. 결과는 `SearchChunk` 이벤트로 온다.
  */
 async startFlatten(root: string) : Promise<number> {
@@ -443,6 +454,10 @@ export type FileInfoDto = { name: string; path: string; kind: KindDto; size: num
  */
 childCount: number | null }
 export type FileSystemsConfig = { zip: ZipConfig }
+/**
+ * 파일 찾기 다이얼로그(기본 탭)의 조건. 필드의 뜻은 `td_search::FindSpec`과 같다.
+ */
+export type FindSpecDto = { roots: string[]; onlyItems: string[] | null; followSymlinks: boolean; excludeDirs: string; maxDepth: number | null; mask: string; substring: boolean; regex: boolean; excludeFiles: string; text: TextSpecDto | null }
 export type JobDto = { id: number; kind: JobKindDto; status: JobStatusDto; total: number; completed: number; 
 /**
  * 복사/이동의 전체 파일 수. 집계 전이거나 해당 없는 작업이면 `None`.
@@ -523,6 +538,14 @@ export type TableView = {
  * 컬럼 명세 `[<|>]이름[:너비]`.
  */
 columns: string[] }
+/**
+ * 파일 찾기의 "파일에서 텍스트 찾기" 조건.
+ */
+export type TextSpecDto = { pattern: string; caseSensitive: boolean; regex: boolean; 
+/**
+ * 텍스트를 포함하지 않는 파일을 찾는다.
+ */
+invert: boolean }
 /**
  * Disk Usage의 부분(또는 최종) 결과. 크기 내림차순 전체 스냅샷이다.
  */

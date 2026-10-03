@@ -28,6 +28,8 @@ export type {
   SearchSummaryDto,
   UserDirsDto,
   VolumeDto,
+  FindSpecDto,
+  TextSpecDto,
   DiskSpaceDto,
 } from "./generated/bindings";
 export * from "./backend";

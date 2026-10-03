@@ -1,14 +1,16 @@
-//! Look Up(질의 파서 + 라이브 순회 검색), Flatten, Disk Usage (docs/08 §5~7).
+//! Look Up(질의 파서 + 라이브 순회 검색), 파일 찾기(구조화된 명세), Flatten, Disk Usage (docs/08 §5~7).
 //!
 //! 질의 문법과 그 가정은 [ADR-0013](../../docs/adr/0013-lookup-query-syntax.md)에 있다.
 
 mod eval;
+mod find;
 mod flatten;
 mod kinds;
 mod query;
 mod search;
 mod usage;
 
+pub use find::{FindSpec, Finder, TextSpec};
 pub use flatten::flatten;
 pub use kinds::{KindName, SimpleKind};
 pub use query::{parse, Cond, Field, Op, ParseError, Query, TextOp, TextTest};
