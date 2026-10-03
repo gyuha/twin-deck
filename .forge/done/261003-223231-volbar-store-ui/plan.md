@@ -1,5 +1,5 @@
 <!-- forge-slug: volbar-store-ui -->
-<!-- task: 33 -->
+<!-- task: 12 -->
 <!-- part: 2/2 -->
 <!-- tdd: off -->
 # 드라이브 바: 볼륨 선택·언마운트·남은 용량 표시 (스토어 + UI)
