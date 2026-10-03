@@ -1,5 +1,5 @@
 <!-- forge-slug: fkeys-settings-ui -->
-<!-- task: 31 -->
+<!-- task: 10 -->
 <!-- part: 3/3 -->
 <!-- tdd: off -->
 # 설정 화면 "F키" 섹션

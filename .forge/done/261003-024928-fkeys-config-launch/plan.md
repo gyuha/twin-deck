@@ -1,5 +1,5 @@
 <!-- forge-slug: fkeys-config-launch -->
-<!-- task: 29 -->
+<!-- task: 8 -->
 <!-- part: 1/3 -->
 <!-- tdd: off -->
 # F키 설정값과 외부 앱 실행 기반 (Rust · 백엔드)

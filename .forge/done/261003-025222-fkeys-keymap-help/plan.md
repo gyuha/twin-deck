@@ -1,5 +1,5 @@
 <!-- forge-slug: fkeys-keymap-help -->
-<!-- task: 30 -->
+<!-- task: 9 -->
 <!-- part: 2/3 -->
 <!-- tdd: off -->
 # F키 설정을 키맵에 반영하고 앱 실행·도움말 액션 추가
