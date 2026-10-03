@@ -517,6 +517,17 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     return Promise.all((["left", "right"] as const).flatMap((pane) => get().panes[pane].tabs.map((t) => reload(pane, t.id))));
   };
 
+  /**
+   * 백엔드·스토어 구독 목록. `dispose()`가 모두 끊고 `init()`이 다시 만든다.
+   * React StrictMode(개발 모드)는 효과를 마운트 → 정리(dispose) → 마운트(init)로 두 번 실행하는데, 구독을 한 번만 만들면
+   * 정리 단계에서 끊긴 뒤 되살아나지 않아 디렉터리·설정·검색 이벤트와 자동 저장이 모두 죽는다.
+   */
+  const subscriptions: { make: () => () => void; off: (() => void) | null }[] = [];
+  const subscribe = (make: () => () => void) => subscriptions.push({ make, off: make() });
+  const resubscribe = () => {
+    for (const sub of subscriptions) sub.off ??= sub.make();
+  };
+
   /** 패널의 활성 탭이 놓인 볼륨의 용량을 다시 읽는다. 가상 탭이거나 조회에 실패하면 null(오류는 알리지 않는다). */
   const diskSeq: Record<PaneId, number> = { left: 0, right: 0 };
   async function refreshDiskSpace(pane: PaneId) {
@@ -535,7 +546,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
   }
   // 패널의 활성 탭 위치가 바뀌면(이동, 탭 전환, 복원) 그 볼륨의 용량을 다시 읽는다.
   const spacePath: Record<PaneId, string | null> = { left: null, right: null };
-  const unsubscribeSpace = store.subscribe((s) => {
+  subscribe(() => store.subscribe((s) => {
     for (const pane of ["left", "right"] as const) {
       const t = activeTab(s, pane);
       const key = t.virtual ? "" : t.path;
@@ -544,13 +555,13 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         void refreshDiskSpace(pane);
       }
     }
-  });
+  }));
 
-  const unsubscribeBackend = backend.onDirChanged((path) => {
+  subscribe(() => backend.onDirChanged((path) => {
     for (const pane of ["left", "right"] as const) {
       for (const t of get().panes[pane].tabs) if (t.path === path) void reload(pane, t.id);
     }
-  });
+  }));
 
   // Look Up / Flatten / Disk Usage 이벤트. 응답(작업 id)보다 이벤트가 먼저 올 수 있어서, 탭이 생기기 전 이벤트는 모아 둔다.
   const earlySearchEvents = new Map<number, SearchEvent[]>();
@@ -593,11 +604,11 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       };
     });
   }
-  const unsubscribeSearch = backend.onSearchEvent((e) => {
+  subscribe(() => backend.onSearchEvent((e) => {
     const hit = findVirtual(e.id);
     if (hit) return applySearchEvent(hit.pane, hit.tab.id, e);
     earlySearchEvents.set(e.id, [...(earlySearchEvents.get(e.id) ?? []), e]);
-  });
+  }));
   /** 탭이 실행 중인 검색/순회를 취소한다. */
   const stopSearch = (tab: TabState) => {
     if (tab.virtual?.running) void backend.cancelSearch(tab.virtual.jobId).catch(() => {});
@@ -639,18 +650,18 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     }
   };
   let sawQueueEvent = false;
-  const unsubscribeQueue = backend.onQueueChanged((jobs) => {
+  subscribe(() => backend.onQueueChanged((jobs) => {
     if (!sawQueueEvent) {
       sawQueueEvent = true;
       console.info("[twin-deck] 큐 이벤트를 처음 받았습니다");
     }
     applyQueue(jobs);
-  });
+  }));
   // 설정이 바뀌면 컬럼 명세(정렬 표시)나 표시 옵션이 달라질 수 있으니 목록을 다시 정렬한다.
-  const unsubscribeConfig = backend.onConfigChanged((loaded) => {
+  subscribe(() => backend.onConfigChanged((loaded) => {
     set({ loaded });
     void reloadAll();
-  });
+  }));
   const cfg = () => get().loaded.config;
 
   /** 지금 화면 상태를 저장 형식으로 만든다. */
@@ -708,9 +719,9 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       fail(`상태를 저장하지 못했습니다: ${e instanceof Error ? e.message : e}`);
     }
   }
-  const unsubscribeSave = store.subscribe(() => {
+  subscribe(() => store.subscribe(() => {
     if (saveEnabled && saveTimer === undefined) saveTimer = setTimeout(() => void saveNow(), SAVE_DELAY_MS);
-  });
+  }));
 
   /** 저장된 폴더가 사라졌으면 가장 가까운 존재하는 상위 폴더로 옮긴다(docs/07 §10). 옮긴 탭 수를 돌려준다. */
   async function relocateMissingTabs(): Promise<number> {
@@ -811,6 +822,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
 
   const api = {
     async init() {
+      resubscribe(); // StrictMode의 마운트 → 정리 → 마운트에서 dispose가 끊은 구독을 되살린다
       // 설정(컬럼 명세의 정렬 표시 등)을 먼저 읽고 첫 목록을 만든다.
       set({ loaded: await backend.getConfig(), userDirs: await backend.userDirs() });
       const moved = snapshot ? await relocateMissingTabs() : 0;
@@ -861,12 +873,10 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     dispose() {
       clearTimeout(flashTimer);
       clearTimeout(saveTimer);
-      unsubscribeSave();
-      unsubscribeSpace();
-      unsubscribeBackend();
-      unsubscribeQueue();
-      unsubscribeConfig();
-      unsubscribeSearch();
+      for (const sub of subscriptions) {
+        sub.off?.();
+        sub.off = null;
+      }
       for (const pane of ["left", "right"] as const) for (const t of get().panes[pane].tabs) stopSearch(t);
       for (const p of watched) void backend.unwatch(p);
       watched.clear();
