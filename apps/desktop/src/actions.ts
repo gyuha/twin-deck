@@ -47,6 +47,8 @@ export function navigationHandlers({ api }: AppStore): Partial<ActionHandlers> {
     "core.tab.next": () => api.cycleTab(1),
     "core.tab.prev": () => api.cycleTab(-1),
     "core.view.hidden": () => api.toggleHidden(),
+    "core.view.drive_bar": () => api.toggleLayoutFlag("show_drive_bar"),
+    "core.view.action_bar": () => api.toggleLayoutFlag("show_action_bar"),
     "core.quickselect.start": () => api.quickStart(),
     "core.config.warnings": () => api.showConfigWarnings(),
     "core.quickselect.accept": () => api.quickAccept(),

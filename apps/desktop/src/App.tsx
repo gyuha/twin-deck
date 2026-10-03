@@ -159,7 +159,10 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
     );
   }, [app, registry, keymap, platform]);
 
-  // macOS 상단 메뉴바의 File 메뉴에 파일 항목(다중 이름 바꾸기 포함)을 붙인다. 열려 있는 창·메뉴 위에서는 실행하지 않는다.
+  // macOS 상단 메뉴바의 File 메뉴에 파일 항목(다중 이름 바꾸기 포함)을, View 메뉴에 화면 요소 켜고 끄기를 붙인다.
+  // 열려 있는 창·메뉴 위에서는 실행하지 않는다. 화면 요소 설정이 바뀌면 체크 표시를 맞추려고 메뉴를 다시 만든다.
+  const driveBar = loaded.config.behavior.layout.show_drive_bar;
+  const actionBar = loaded.config.behavior.layout.show_action_bar;
   useEffect(() => {
     if (platform !== "mac" || !isTauri()) return;
     let off: (() => void) | undefined;
@@ -168,14 +171,14 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
       const s = app.store.getState();
       if (scopeStack(s)[0] !== "pane") return;
       void registry.dispatch(id, actionContext(s));
-    })
+    }, { driveBar, actionBar })
       .then((unlisten) => (gone ? unlisten() : (off = unlisten)))
       .catch((e) => console.warn("[twin-deck] 메뉴바를 설정하지 못했습니다", e));
     return () => {
       gone = true;
       off?.();
     };
-  }, [app, registry, platform]);
+  }, [app, registry, platform, driveBar, actionBar]);
 
   useEffect(() => {
     void app.api.init().then(() => {

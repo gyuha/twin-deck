@@ -15,7 +15,8 @@
         "shift_mode": "invert"
       },
       "layout": {
-        "show_action_bar": true
+        "show_action_bar": true,
+        "show_drive_bar": true
       }
     },
     "display": {

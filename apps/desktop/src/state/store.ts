@@ -2008,6 +2008,10 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     setSettingsSection(settingsSection: number) {
       set({ settingsSection });
     },
+    /** 화면 요소(Action Bar, 드라이브 바)를 켜고 끈다. 설정 파일에 저장되어 다음 실행에도 유지된다. */
+    async toggleLayoutFlag(flag: "show_action_bar" | "show_drive_bar") {
+      await api.setConfigValue(`behavior.layout.${flag}`, { kind: "bool", value: !get().loaded.config.behavior.layout[flag] });
+    },
     /** 설정 하나를 사용자 config.toml에 즉시 쓰고, 돌려받은 새 설정을 바로 적용한다(변경 이벤트를 기다리지 않는다). */
     async setConfigValue(key: string, value: ConfigValue) {
       try {

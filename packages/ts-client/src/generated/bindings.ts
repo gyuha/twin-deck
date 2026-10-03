@@ -349,7 +349,11 @@ usageUpdate: "usage-update"
 /** user-defined types **/
 
 export type Behavior = { theme: string; table: BehaviorTable; quick_select: QuickSelect; selection: SelectionConfig; layout: BehaviorLayout }
-export type BehaviorLayout = { show_action_bar: boolean }
+export type BehaviorLayout = { show_action_bar: boolean; 
+/**
+ * 패널 위의 드라이브 바(볼륨 버튼, 남은 용량, 언마운트).
+ */
+show_drive_bar: boolean }
 export type BehaviorTable = { icon_size: number; 
 /**
  * 끝에서 처음으로 순환 (NAV-06).

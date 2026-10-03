@@ -20,6 +20,7 @@ shift_mode = "invert"
 
 [behavior.layout]
 show_action_bar = true
+show_drive_bar = true
 
 [display]
 relative_date = true

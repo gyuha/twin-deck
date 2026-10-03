@@ -100,6 +100,8 @@ export const DEFAULT_ACTION_META = [
   { id: "core.tab.close", title: "탭 닫기", category: "Tab", scopes: ["pane"], isApplicable: (c) => c.tabCount > 1 },
   { id: "core.tab.next", title: "다음 탭", category: "Tab", scopes: ["pane"], isApplicable: (c) => c.tabCount > 1 },
   { id: "core.tab.prev", title: "이전 탭", category: "Tab", scopes: ["pane"], isApplicable: (c) => c.tabCount > 1 },
+  { id: "core.view.drive_bar", title: "드라이브 바 표시 토글", category: "View", scopes: ["pane"] },
+  { id: "core.view.action_bar", title: "Action Bar 표시 토글", category: "View", scopes: ["pane"] },
   { id: "core.view.hidden", title: "숨김 파일 표시 토글", category: "View", scopes: ["pane"] },
   { id: "core.quickselect.start", title: "Quick Select 시작", category: "Navigation", scopes: ["pane"] },
   { id: "core.config.warnings", title: "설정 경고 보기", category: "View", scopes: ["pane"] },

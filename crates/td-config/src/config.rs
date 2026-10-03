@@ -55,6 +55,8 @@ pub struct SelectionConfig {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct BehaviorLayout {
     pub show_action_bar: bool,
+    /// 패널 위의 드라이브 바(볼륨 버튼, 남은 용량, 언마운트).
+    pub show_drive_bar: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

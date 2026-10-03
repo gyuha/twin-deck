@@ -8,6 +8,8 @@ let submenus: FakeSubmenu[] = [];
 let prepended: unknown[] = [];
 
 const renamed: string[] = [];
+const viewAdds: unknown[] = [];
+const checks: { id: string; text: string; checked: boolean; action: () => void }[] = [];
 class FakeItem {
   constructor(public label: string) {}
   async text() {
@@ -30,6 +32,9 @@ class FakeSubmenu {
   }
   async items() {
     return this.children;
+  }
+  async append(item: unknown) {
+    viewAdds.push(item);
   }
   async prepend(items: unknown[]) {
     calls.push(`prepend:${this.label}:${items.length}`);
@@ -58,6 +63,12 @@ vi.mock("@tauri-apps/api/menu", () => ({
       return o;
     },
   },
+  CheckMenuItem: {
+    new: async (o: { id: string; text: string; checked: boolean; action: () => void }) => {
+      checks.push(o);
+      return o;
+    },
+  },
   PredefinedMenuItem: { new: async (o: { item: string }) => ({ separator: o.item === "Separator" }) },
   Menu: {
     default: async () => ({
@@ -79,7 +90,9 @@ beforeEach(() => {
   created.length = 0;
   prepended = [];
   renamed.length = 0;
-  submenus = [new FakeSubmenu("twin-deck"), new FakeSubmenu("File"), new FakeSubmenu("Edit")];
+  viewAdds.length = 0;
+  checks.length = 0;
+  submenus = [new FakeSubmenu("twin-deck"), new FakeSubmenu("File"), new FakeSubmenu("Edit"), new FakeSubmenu("View")];
 });
 
 describe("상단 메뉴바 File 메뉴", () => {
@@ -143,6 +156,31 @@ describe("상단 메뉴바 File 메뉴", () => {
     ]);
   });
 
+  it("View 메뉴 끝에 드라이브 바와 Action Bar를 켜고 끄는 체크 항목이 붙고 체크 표시는 현재 설정을 따른다", async () => {
+    await installFileMenu(() => {}, { driveBar: true, actionBar: false });
+    expect(checks.map((c) => [c.id, c.text, c.checked])).toEqual([
+      ["core.view.drive_bar", "드라이브 바 표시", true],
+      ["core.view.action_bar", "Action Bar 표시", false],
+    ]);
+    expect(viewAdds).toHaveLength(3); // 구분선 + 항목 2개
+    expect(viewAdds[0]).toEqual({ separator: true });
+  });
+
+  it("체크 항목을 누르면 대응하는 액션 ID로 실행기를 부른다", async () => {
+    const run = vi.fn();
+    await installFileMenu(run);
+    checks[0].action();
+    checks[1].action();
+    expect(run.mock.calls).toEqual([["core.view.drive_bar"], ["core.view.action_bar"]]);
+  });
+
+  it("View 메뉴가 없으면 만들어 세 번째 자리에 넣는다", async () => {
+    submenus = [new FakeSubmenu("twin-deck"), new FakeSubmenu("File"), new FakeSubmenu("Edit")];
+    await installFileMenu(() => {});
+    expect(calls).toContain("newSubmenu:View");
+    expect(calls).toContain("insert:View@2");
+  });
+
   it("appItemLabel: 앱 이름이 든 항목만 바꾼다", () => {
     expect(appItemLabel("About twin-deck-desktop")).toBe("About Twin Deck");
     expect(appItemLabel("Quit Foo Bar")).toBe("Quit Twin Deck");
@@ -152,7 +190,7 @@ describe("상단 메뉴바 File 메뉴", () => {
   });
 
   it("File 메뉴가 없으면 만들어 두 번째 자리에 넣는다", async () => {
-    submenus = [new FakeSubmenu("twin-deck"), new FakeSubmenu("Edit")];
+    submenus = [new FakeSubmenu("twin-deck"), new FakeSubmenu("Edit"), new FakeSubmenu("View")];
     await installFileMenu(() => {});
     expect(calls).toEqual(["newSubmenu:File", "insert:File@1", `prepend:File:${FILE_MENU.length}`, "setAsAppMenu"]);
   });

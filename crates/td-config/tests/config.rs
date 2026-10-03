@@ -19,6 +19,10 @@ fn config_merge_precedence() {
     let none = load_from_strs(None, None, Platform::Linux);
     assert!(none.warnings.is_empty());
     assert!(none.config.behavior.layout.show_action_bar);
+    assert!(
+        none.config.behavior.layout.show_drive_bar,
+        "드라이브 바는 기본으로 보인다"
+    );
     assert!(none.config.core.confirm.delete);
 
     // 사용자 값이 기본값을 덮고, 건드리지 않은 키는 기본값을 유지한다(테이블 깊은 병합)
@@ -470,4 +474,15 @@ fn fkeys_defaults_merge_and_unknown_key_warning() {
         l.warnings
     );
     assert!(!l.config.fkeys.contains_key("F13"));
+}
+
+#[test]
+fn drive_bar_can_be_turned_off() {
+    let l = load("[behavior.layout]\nshow_drive_bar = false\n");
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert!(!l.config.behavior.layout.show_drive_bar);
+    assert!(
+        l.config.behavior.layout.show_action_bar,
+        "건드리지 않은 Action Bar는 기본값"
+    );
 }
