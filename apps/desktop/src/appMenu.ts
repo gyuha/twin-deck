@@ -1,6 +1,30 @@
 import { Menu, MenuItem, PredefinedMenuItem, Submenu } from "@tauri-apps/api/menu";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
+export const APP_NAME = "Twin Deck";
+
+/**
+ * 기본 앱 메뉴의 "About/Hide/Quit <앱 이름>" 항목을 `Twin Deck`으로 바꾼 글자. 바꿀 필요가 없으면 null.
+ * 이 항목들의 이름은 실행 파일 이름(개발 중에는 twin-deck-desktop)에서 와서, 직접 지정하지 않으면 그 이름이 보인다.
+ * "Hide Others"처럼 앱 이름이 없는 항목은 그대로 둔다.
+ */
+export function appItemLabel(text: string): string | null {
+  const m = /^(About|Hide|Quit) (.+)$/.exec(text);
+  if (!m || m[2] === "Others" || m[2] === APP_NAME) return null;
+  return `${m[1]} ${APP_NAME}`;
+}
+
+/** 첫 번째 메뉴(앱 메뉴)의 제목과 About/Hide/Quit 항목 이름을 `Twin Deck`으로 맞춘다. */
+async function renameAppMenu(menu: Menu): Promise<void> {
+  const app = (await menu.items())[0];
+  if (!(app instanceof Submenu)) return;
+  await app.setText(APP_NAME);
+  for (const item of await app.items()) {
+    const label = appItemLabel(await item.text());
+    if (label) await item.setText(label);
+  }
+}
+
 /** 상단 메뉴바 File 메뉴에 넣는 항목. `null`은 구분선이다. 앱 안의 액션 ID로 실행한다. */
 export const FILE_MENU: ({ text: string; actionId: string } | null)[] = [
   { text: "새 폴더", actionId: "core.file.new_folder" },
@@ -25,7 +49,7 @@ export const FILE_MENU: ({ text: string; actionId: string } | null)[] = [
 ];
 
 /**
- * 기본 앱 메뉴(앱·File·Edit·View·Window·Help)를 가져와 File 메뉴의 맨 앞에 파일 항목을 끼워 넣고 앱 메뉴로 지정한다.
+ * 기본 앱 메뉴(앱·File·Edit·View·Window·Help)를 가져와 앱 이름을 `Twin Deck`으로 맞추고, File 메뉴의 맨 앞에 파일 항목을 끼워 넣고 앱 메뉴로 지정한다.
  * 기본 메뉴를 쓰는 이유는 Edit의 복사/붙여넣기 같은 기본 동작(입력창 단축키)을 잃지 않기 위해서다.
  * 항목에 단축키(accelerator)는 달지 않는다: 앱이 이미 키를 직접 처리하고, 메뉴가 먼저 가로채면 열려 있는 창 위에서도 실행된다.
  */
@@ -45,6 +69,7 @@ export async function installFileMenu(run: (actionId: string) => void): Promise<
     ),
   );
   await file.prepend(entries);
+  await renameAppMenu(menu);
   await menu.setAsAppMenu();
 }
 

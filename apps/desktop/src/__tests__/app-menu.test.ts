@@ -7,10 +7,29 @@ const created: { id?: string; text?: string; action?: () => void }[] = [];
 let submenus: FakeSubmenu[] = [];
 let prepended: unknown[] = [];
 
-class FakeSubmenu {
+const renamed: string[] = [];
+class FakeItem {
   constructor(public label: string) {}
   async text() {
     return this.label;
+  }
+  async setText(t: string) {
+    renamed.push(`${this.label}->${t}`);
+    this.label = t;
+  }
+}
+
+class FakeSubmenu {
+  constructor(public label: string, public children: FakeItem[] = []) {}
+  async text() {
+    return this.label;
+  }
+  async setText(t: string) {
+    renamed.push(`${this.label}->${t}`);
+    this.label = t;
+  }
+  async items() {
+    return this.children;
   }
   async prepend(items: unknown[]) {
     calls.push(`prepend:${this.label}:${items.length}`);
@@ -52,13 +71,14 @@ vi.mock("@tauri-apps/api/menu", () => ({
   },
 }));
 
-const { FILE_MENU, installFileMenu, installFileMenuForWindow } = await import("../appMenu");
+const { FILE_MENU, installFileMenu, installFileMenuForWindow, appItemLabel } = await import("../appMenu");
 
 beforeEach(() => {
   calls.length = 0;
   focusHandlers.length = 0;
   created.length = 0;
   prepended = [];
+  renamed.length = 0;
   submenus = [new FakeSubmenu("twin-deck"), new FakeSubmenu("File"), new FakeSubmenu("Edit")];
 });
 
@@ -101,6 +121,34 @@ describe("상단 메뉴바 File 메뉴", () => {
   it("단축키(accelerator)를 달지 않는다", async () => {
     await installFileMenu(() => {});
     for (const c of created) expect(c).not.toHaveProperty("accelerator");
+  });
+
+  it("앱 메뉴의 제목과 About/Hide/Quit 항목을 Twin Deck으로 바꾼다", async () => {
+    submenus = [
+      new FakeSubmenu("twin-deck", [
+        new FakeItem("About twin-deck-desktop"),
+        new FakeItem("Services"),
+        new FakeItem("Hide twin-deck-desktop"),
+        new FakeItem("Hide Others"),
+        new FakeItem("Quit twin-deck-desktop"),
+      ]),
+      new FakeSubmenu("File"),
+    ];
+    await installFileMenu(() => {});
+    expect(renamed).toEqual([
+      "twin-deck->Twin Deck",
+      "About twin-deck-desktop->About Twin Deck",
+      "Hide twin-deck-desktop->Hide Twin Deck",
+      "Quit twin-deck-desktop->Quit Twin Deck",
+    ]);
+  });
+
+  it("appItemLabel: 앱 이름이 든 항목만 바꾼다", () => {
+    expect(appItemLabel("About twin-deck-desktop")).toBe("About Twin Deck");
+    expect(appItemLabel("Quit Foo Bar")).toBe("Quit Twin Deck");
+    expect(appItemLabel("Hide Others")).toBeNull();
+    expect(appItemLabel("Services")).toBeNull();
+    expect(appItemLabel("About Twin Deck")).toBeNull(); // 이미 맞다
   });
 
   it("File 메뉴가 없으면 만들어 두 번째 자리에 넣는다", async () => {

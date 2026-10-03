@@ -315,7 +315,7 @@ impl Spawner for TauriSpawner {
             label,
             tauri::WebviewUrl::App("index.html".into()),
         )
-        .title("twin-deck")
+        .title("Twin Deck")
         .inner_size(1200.0, 760.0)
         .build()
         .map(|_| ())
