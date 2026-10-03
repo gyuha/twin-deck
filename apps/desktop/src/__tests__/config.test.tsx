@@ -151,13 +151,13 @@ describe("NAV-06 표시/선택 옵션", () => {
     expect(cursorName("left")).toBe("b.txt");
   });
 
-  it("activate_on_any_character = false: 문자 입력만으로는 시작하지 않고 Mod+F로 시작한다", async () => {
+  it("activate_on_any_character = false: 문자 입력만으로는 시작하지 않고 Mod+Shift+F로 시작한다", async () => {
     const b = withConfig((l) => (l.config.behavior.quick_select.activate_on_any_character = false));
     const { user } = await renderApp(b);
     await user.keyboard("b");
     expect(screen.queryByRole("status", { name: "빠른 선택" })).toBeNull();
     expect(cursorName("left")).toBe("docs");
-    await user.keyboard("{Control>}f{/Control}b");
+    await user.keyboard("{Control>}{Shift>}f{/Shift}{/Control}b");
     expect(screen.getByRole("status", { name: "빠른 선택" })).toHaveTextContent("b");
     expect(cursorName("left")).toBe("b.txt");
   });

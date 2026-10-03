@@ -15,6 +15,7 @@ import { ActionsPalette } from "./ui/ActionsPalette";
 import { Dialog } from "./ui/Dialog";
 import { Preview } from "./ui/Preview";
 import { fkeyBindings } from "./lib/fkeys";
+import { FindDialog } from "./ui/FindDialog";
 import { Help } from "./ui/Help";
 import { PaneSplit } from "./ui/PaneSplit";
 import { ContextMenu } from "./ui/ContextMenu";
@@ -213,6 +214,7 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
         <QueuePopup />
         <Settings />
         <Help />
+        <FindDialog />
         <Dialog />
       </main>
       </UiContext.Provider>

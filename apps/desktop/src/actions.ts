@@ -12,6 +12,8 @@ export function navigationHandlers({ api }: AppStore): Partial<ActionHandlers> {
   return {
     "core.open": () => api.open(),
     "core.open.as_archive": () => api.openAsArchive(),
+    "core.find.open": () => api.openFind(),
+    "core.find.close": () => api.closeFind(),
     "core.lookup.global": () => api.lookup("global"),
     "core.lookup.folder": () => api.lookup("folder"),
     "core.flatten": () => api.flatten(),

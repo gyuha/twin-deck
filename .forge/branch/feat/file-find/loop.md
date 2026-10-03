@@ -7,8 +7,8 @@ budget-spent: 0 · since: 2026-10-03T13:57:01Z
 wall: none
 
 ## Stop-condition checks (ALL must pass)
-- [ ] C1. `bun run typecheck` 종료 코드 0. (회귀 방지: 지금도 통과 — 사전 통과 허용)
-- [ ] C2. 회귀 없음. (a) `cargo test --workspace` 종료 코드 0. (b) `cd apps/desktop && out=$(bunx vitest run 2>&1); echo "$out" | grep -E "^ FAIL" | grep -vc "pdf-preview"` → 0 이면서 `echo "$out" | grep -c "Test Files"` ≥ 1 (기존 pdf-preview 1건만 허용, vitest가 실제로 돌았다는 증거 포함). 기존 테스트의 기대값은 약하게 고치지 않는다. 단, Quick Select 키가 Mod+F → Mod+Shift+F로 바뀌는 의도된 변경에 따라 `config.test.tsx`(160행)·`navigation.test.tsx`의 그 키 입력은 새 키로 고친다(이유를 `run.md`에 남긴다). (사전 통과 허용: 회귀 방지)
+- [x] C1. `bun run typecheck` 종료 코드 0. (회귀 방지: 지금도 통과 — 사전 통과 허용)
+- [x] C2. 회귀 없음. (a) `cargo test --workspace` 종료 코드 0. (b) `cd apps/desktop && out=$(bunx vitest run 2>&1); echo "$out" | grep -E "^ FAIL" | grep -vc "pdf-preview"` → 0 이면서 `echo "$out" | grep -c "Test Files"` ≥ 1 (기존 pdf-preview 1건만 허용, vitest가 실제로 돌았다는 증거 포함). 기존 테스트의 기대값은 약하게 고치지 않는다. 단, Quick Select 키가 Mod+F → Mod+Shift+F로 바뀌는 의도된 변경에 따라 `config.test.tsx`(160행)·`navigation.test.tsx`의 그 키 입력은 새 키로 고친다(이유를 `run.md`에 남긴다). (사전 통과 허용: 회귀 방지)
 - [ ] C3. `cd apps/desktop && bunx vitest run src/__tests__/file-find.test.tsx --reporter=verbose`가 종료 코드 0이고 출력에 아래 15개 테스트 이름이 각각 ✓로 나온다(`grep -c` 각각 ≥ 1):
       F1 "Mod+F가 파일 찾기 다이얼로그를 열고 Esc로 닫는다"
       F2 "Quick Select는 Mod+Shift+F로 시작한다"
@@ -26,15 +26,15 @@ wall: none
       F14 "새 검색은 입력을 비우고 마지막 검색은 직전 조건을 되살린다"
       F15 "아직 지원하지 않는 항목은 비활성이고 찾는 중에 다시 열면 취소할 수 있다"
       (사전: 파일 없음 → 실패. 전진 확인. 이름이 고정이라 빈 테스트로 통과시킬 수 없다.)
-- [ ] C4. `cargo test -p td-search 2>&1` 종료 코드 0이고 출력에 아래 8개가 각각 `... ok`로 1회 이상 나온다: `find_matches_masks_recursively` · `find_respects_max_depth` · `find_excludes_dirs_and_files` · `find_substring_vs_exact_name` · `find_regex_name` · `find_text_in_files` · `find_text_inverted` · `find_follow_symlinks_without_looping`. 그리고 `cargo test -p twin-deck-desktop start_find 2>&1`에 `start_find_streams_matches ... ok`. 모두 임시 폴더의 실제 파일시스템으로 검증한다. (사전: 테스트 없음 → 실패. 전진 확인)
-- [ ] C5. `cargo fmt --all --check` 0, `cargo clippy -p td-search -p twin-deck-desktop -- -D warnings` 0(라이브러리/바이너리 대상. td-archive 테스트의 기존 clippy 경고는 범위 밖), `cargo test -p twin-deck-desktop up_to_date` 0(UPDATE_BINDINGS 없이 — 바인딩 fixture가 최신). (사전 통과 허용: 회귀 방지)
+- [x] C4. `cargo test -p td-search 2>&1` 종료 코드 0이고 출력에 아래 8개가 각각 `... ok`로 1회 이상 나온다: `find_matches_masks_recursively` · `find_respects_max_depth` · `find_excludes_dirs_and_files` · `find_substring_vs_exact_name` · `find_regex_name` · `find_text_in_files` · `find_text_inverted` · `find_follow_symlinks_without_looping`. 그리고 `cargo test -p twin-deck-desktop start_find 2>&1`에 `start_find_streams_matches ... ok`. 모두 임시 폴더의 실제 파일시스템으로 검증한다. (사전: 테스트 없음 → 실패. 전진 확인)
+- [x] C5. `cargo fmt --all --check` 0, `cargo clippy -p td-search -p twin-deck-desktop -- -D warnings` 0(라이브러리/바이너리 대상. td-archive 테스트의 기존 clippy 경고는 범위 밖), `cargo test -p twin-deck-desktop up_to_date` 0(UPDATE_BINDINGS 없이 — 바인딩 fixture가 최신). (사전 통과 허용: 회귀 방지)
 
 ## Check progress (updated after EVERY stop-condition run — drives the no-progress & tension walls & fg-status)
-- C1: not run yet
-- C2: not run yet
-- C3: not run yet
-- C4: not run yet
-- C5: not run yet
+- C1: pass ×0 · regressed: ×0 · last-evidence: "bun run typecheck → exit 0 (작업 34 이후)"
+- C2: pass ×0 · regressed: ×0 · last-evidence: "cargo test --workspace → 0 · vitest 비-pdf 실패 0, 470 passed"
+- C3: fail ×1 · regressed: ×0 · last-evidence: "file-find.test.tsx 아직 없음 (작업 35가 만든다 — 남은 멤버 작업이 있으므로 정상)"
+- C4: pass ×0 · regressed: ×0 · last-evidence: "find_* 9종 ok · start_find_streams_matches ok"
+- C5: pass ×0 · regressed: ×0 · last-evidence: "fmt 0 · clippy(-p td-search -p twin-deck-desktop) 0 · up_to_date 0"
 
 ## Authorized replan scope
 - 위 검사 C1~C5 중 실패한 것을 직접 고치는 fix-forward 작업만. 변경 범위는 `apps/desktop/**`, `crates/td-search/**`, `crates/td-vfs/**`(glob 재사용), `packages/**`, `apps/desktop/src-tauri/**`, `Cargo.toml`/`Cargo.lock`(`regex` 의존성 추가), `docs/05-actions-keybindings.md` 안으로 한정한다.

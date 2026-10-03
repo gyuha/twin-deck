@@ -28,6 +28,7 @@ import type {
   UserDirsDto,
   VolumeDto,
   DiskSpaceDto,
+  FindSpecDto,
 } from "@twin-deck/ts-client";
 import type { ActionContext } from "@twin-deck/actions";
 import type { Scope } from "@twin-deck/keybinds";
@@ -66,7 +67,7 @@ export interface TabState {
   virtual?: VirtualTab;
 }
 
-export type VirtualKind = "lookup" | "flatten" | "usage";
+export type VirtualKind = "lookup" | "flatten" | "usage" | "find";
 
 /** Look Up / Flatten / Disk Usage 결과를 담은 탭의 부가 상태. 탭을 닫으면 결과를 버린다. */
 export interface VirtualTab {
@@ -85,6 +86,44 @@ export interface VirtualTab {
   /** 삭제/이동/휴지통을 보낸 뒤 실제로 사라졌는지 확인할 경로들. */
   recheck: string[];
 }
+
+/** 파일 찾기 다이얼로그(기본 탭)의 입력값. */
+export interface FindForm {
+  start: string;
+  openTabs: boolean;
+  selectedOnly: boolean;
+  followSymlinks: boolean;
+  excludeDirs: string;
+  /** "all"(무제한) 또는 "0"(현재 디렉터리만)~"9". */
+  depth: string;
+  mask: string;
+  substring: boolean;
+  regex: boolean;
+  excludeFiles: string;
+  textOn: boolean;
+  text: string;
+  invert: boolean;
+  caseSensitive: boolean;
+  textRegex: boolean;
+}
+
+export const defaultFindForm = (start: string): FindForm => ({
+  start,
+  openTabs: false,
+  selectedOnly: false,
+  followSymlinks: false,
+  excludeDirs: "",
+  depth: "all",
+  mask: "",
+  substring: true,
+  regex: false,
+  excludeFiles: "",
+  textOn: false,
+  text: "",
+  invert: false,
+  caseSensitive: false,
+  textRegex: false,
+});
 
 export interface PaneState {
   tabs: TabState[];
@@ -218,6 +257,10 @@ export interface AppState {
   settingsOpen: boolean;
   /** 도움말(단축키 목록) 화면이 열려 있는지. */
   helpOpen: boolean;
+  /** 파일 찾기 다이얼로그. 닫혀 있으면 null. `error`는 시작을 거부당한 이유(잘못된 정규식 등). */
+  find: { form: FindForm; error: string | null } | null;
+  /** 직전에 시작한 파일 찾기 조건("마지막 검색"). 메모리에만 보관한다. */
+  lastFind: FindForm | null;
   settingsSection: number;
   settingsError: string | null;
   queueCursor: number;
@@ -295,6 +338,8 @@ export function scopeStack(s: AppState): Scope[] {
   if (s.settingsOpen) return ["settings", "global"];
   // 도움말(단축키 목록)도 메인 창을 덮는 모달이다(help 스코프).
   if (s.helpOpen) return ["help", "global"];
+  // 파일 찾기 다이얼로그도 모달이다(find 스코프).
+  if (s.find) return ["find", "global"];
   // Actions Panel은 입력창이 있는 모달이다(palette 스코프).
   if (s.palette) return ["palette", "global"];
   // 미리보기가 열려 있으면 패널 키는 받지 않는다(preview 스코프).
@@ -363,6 +408,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     diskSpace: { left: null, right: null },
     settingsOpen: false,
     helpOpen: false,
+    find: null,
+    lastFind: null,
     settingsSection: 0,
     settingsError: null,
     queueCursor: 0,
@@ -2094,6 +2141,74 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       earlySearchEvents.delete(started.id);
     },
 
+    /** 파일 찾기 다이얼로그를 연다(`core.find.open`). 시작 디렉터리의 기본값은 활성 패널의 현재 폴더다. */
+    openFind() {
+      set({ find: { form: defaultFindForm(hereOf(activeTab(get()))), error: null } });
+    },
+    closeFind() {
+      set({ find: null });
+    },
+    setFindForm(patch: Partial<FindForm>) {
+      set((s) => (s.find ? { find: { form: { ...s.find.form, ...patch }, error: null } } : {}));
+    },
+    /** "새 검색": 입력을 기본값으로 되돌린다. */
+    findReset() {
+      set((s) => (s.find ? { find: { form: defaultFindForm(hereOf(activeTab(s))), error: null } } : {}));
+    },
+    /** "마지막 검색": 직전에 시작한 조건을 되살린다. */
+    findRestoreLast() {
+      set((s) => (s.find && s.lastFind ? { find: { form: { ...s.lastFind }, error: null } } : {}));
+    },
+    /**
+     * "시작": 입력값으로 `FindSpec`을 만들어 검색을 시작하고 결과를 새 가상 탭에 스트리밍한다.
+     * 입력 오류(빈 텍스트, 잘못된 정규식, 선택 항목 없음 등)는 다이얼로그를 닫지 않고 그 안에 보여 준다.
+     */
+    async findStart() {
+      const f = get().find;
+      if (!f) return;
+      const { form } = f;
+      const reject = (error: string) => set({ find: { form, error } });
+      const s = get();
+      const tab = activeTab(s);
+      let roots: string[];
+      if (form.openTabs) {
+        roots = [...new Set((["left", "right"] as const).flatMap((p) => s.panes[p].tabs.filter((t) => !t.virtual).map((t) => t.path)))];
+      } else {
+        const start = expandPath(form.start.trim(), s.userDirs);
+        if (!start) return reject("시작 디렉터리를 입력하세요");
+        roots = [start];
+      }
+      const selected = tab.entries.filter((e) => tab.selection.has(e.path)).map((e) => e.path);
+      if (form.selectedOnly && selected.length === 0) return reject("선택한 디렉터리나 파일이 없습니다");
+      if (form.textOn && form.text === "") return reject("찾을 텍스트를 입력하세요");
+      const spec: FindSpecDto = {
+        roots,
+        onlyItems: form.selectedOnly ? selected : null,
+        followSymlinks: form.followSymlinks,
+        excludeDirs: form.excludeDirs,
+        maxDepth: form.depth === "all" ? null : Number(form.depth),
+        mask: form.mask,
+        substring: form.substring,
+        regex: form.regex,
+        excludeFiles: form.excludeFiles,
+        text: form.textOn ? { pattern: form.text, caseSensitive: form.caseSensitive, regex: form.textRegex, invert: form.invert } : null,
+      };
+      let rejected: string | null = null;
+      const label = form.mask.trim() || (form.textOn ? form.text : "*");
+      await api.openVirtual("find", `Find: ${label}`, roots[0], async () => {
+        try {
+          return await backend.startFind(spec);
+        } catch (e) {
+          rejected = String(e instanceof Error ? e.message : e);
+          throw e;
+        }
+      });
+      if (rejected !== null) {
+        set({ notice: null }); // 오류는 다이얼로그 안에서 보여 준다
+        return reject(rejected);
+      }
+      set({ find: null, lastFind: { ...form } });
+    },
     /** Look Up (FIND-01): 질의를 물어보고 결과를 새 가상 탭에 스트리밍한다. 전역은 홈 아래, 폴더는 현재 위치 아래. */
     async lookup(scope: "global" | "folder") {
       const s = get();
@@ -2128,6 +2243,10 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     /** 진행 중인 검색/분석을 취소한다. 그때까지 온 결과는 남는다. */
     cancelSearch() {
       stopSearch(activeTab(get()));
+    },
+    /** 파일 찾기 다이얼로그의 "취소": 진행 중인 파일 찾기를 모두 멈춘다(결과 탭은 그대로 남는다). */
+    cancelFinds() {
+      for (const p of ["left", "right"] as const) for (const t of get().panes[p].tabs) if (t.virtual?.running && t.virtual.kind === "find") stopSearch(t);
     },
 
     /** 가상 탭의 커서 항목이 있는 폴더를 새 탭으로 연다. 커서는 그 항목에 놓인다. */
