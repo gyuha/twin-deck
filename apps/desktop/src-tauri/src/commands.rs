@@ -94,6 +94,24 @@ pub struct VolumeDto {
     pub mount_point: String,
 }
 
+/// 경로가 놓인 파일시스템의 남은 용량과 전체 용량(바이트).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct DiskSpaceDto {
+    pub free: f64,
+    pub total: f64,
+}
+
+/// 경로가 놓인 파일시스템의 용량(드라이브 바의 "남음" 표시).
+#[tauri::command]
+#[specta::specta]
+pub fn disk_space(path: String) -> ServiceResult<DiskSpaceDto> {
+    let s = td_volumes::disk_space(&path)?;
+    Ok(DiskSpaceDto {
+        free: s.free as f64,
+        total: s.total as f64,
+    })
+}
+
 /// 경로 변수(`${user.downloads}` 등)와 `~` 확장에 쓰는 사용자 폴더. 알 수 없으면 null.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 pub struct UserDirsDto {
@@ -513,6 +531,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             launch_app,
             open_as_archive,
             list_volumes,
+            disk_space,
             unmount_volume,
             eject_volume,
             user_dirs,

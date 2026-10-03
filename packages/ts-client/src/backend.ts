@@ -1,4 +1,4 @@
-import type { ConfigValue, ConflictDto, EntryDto, FileInfoDto, JobDto, JobKindDto, Loaded, LoadedState, PreviewDto, QueueItemDto, SearchStartDto, SearchSummaryDto, Snapshot, UserDirsDto, VolumeDto } from "./generated/bindings";
+import type { ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, FileInfoDto, JobDto, JobKindDto, Loaded, LoadedState, PreviewDto, QueueItemDto, SearchStartDto, SearchSummaryDto, Snapshot, UserDirsDto, VolumeDto } from "./generated/bindings";
 
 /** Look Up / Flatten / Disk Usage가 스트리밍으로 보내는 이벤트. 작업마다 마지막은 `done`이다. */
 export type SearchEvent =
@@ -72,6 +72,8 @@ export interface Backend {
   onSearchEvent(callback: (event: SearchEvent) => void): () => void;
   /** 마운트된 볼륨. 루트가 첫 항목이다. */
   listVolumes(): Promise<VolumeDto[]>;
+  /** 경로가 놓인 파일시스템의 남은 용량과 전체 용량(바이트). 조회할 수 없으면 거부된다. */
+  diskSpace(path: string): Promise<DiskSpaceDto>;
   /** 언마운트/추출. 루트나 목록에 없는 경로는 거부된다. */
   unmountVolume(mountPoint: string): Promise<void>;
   ejectVolume(mountPoint: string): Promise<void>;

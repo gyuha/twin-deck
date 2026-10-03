@@ -248,4 +248,15 @@ describe("archive helpers", () => {
     await b.revealConfigDir();
     expect(b.configDirRevealed).toBe(1);
   });
+
+  it("diskSpace: 경로가 속한 볼륨(가장 긴 마운트 경로)의 용량을 돌려주고 값이 없으면 거부한다", async () => {
+    const b = new FakeBackend();
+    b.diskSpaces = { "/": { free: 10, total: 100 }, "/Volumes/USB": { free: 1, total: 8 } };
+    expect(await b.diskSpace("/Volumes/USB/a")).toEqual({ free: 1, total: 8 });
+    expect(await b.diskSpace("/Volumes/USB")).toEqual({ free: 1, total: 8 });
+    expect(await b.diskSpace("/home")).toEqual({ free: 10, total: 100 });
+    expect(await b.diskSpace("/Volumes/USB2/x")).toEqual({ free: 10, total: 100 }); // 접두 문자열이 아니라 경로 경계
+    b.diskSpaces = { "/Volumes/USB": { free: 1, total: 8 } };
+    await expect(b.diskSpace("/home")).rejects.toThrow();
+  });
 });

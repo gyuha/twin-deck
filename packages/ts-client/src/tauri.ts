@@ -123,6 +123,9 @@ export class TauriBackend implements Backend {
   listVolumes() {
     return commands.listVolumes();
   }
+  async diskSpace(path: string) {
+    return unwrap(await commands.diskSpace(path));
+  }
   async unmountVolume(mountPoint: string) {
     unwrap(await commands.unmountVolume(mountPoint));
   }

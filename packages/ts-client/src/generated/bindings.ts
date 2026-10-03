@@ -121,6 +121,17 @@ async openAsArchive(path: string) : Promise<Result<string, string>> {
 async listVolumes() : Promise<VolumeDto[]> {
     return await TAURI_INVOKE("list_volumes");
 },
+/**
+ * 경로가 놓인 파일시스템의 용량(드라이브 바의 "남음" 표시).
+ */
+async diskSpace(path: string) : Promise<Result<DiskSpaceDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("disk_space", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async unmountVolume(mountPoint: string) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("unmount_volume", { mountPoint }) };
@@ -391,6 +402,10 @@ export type CoreConfig = { confirm: ConfirmConfig }
  * 감시 중인 디렉터리의 내용이 바뀌었다.
  */
 export type DirChanged = { path: string }
+/**
+ * 경로가 놓인 파일시스템의 남은 용량과 전체 용량(바이트).
+ */
+export type DiskSpaceDto = { free: number; total: number }
 export type Display = { relative_date: boolean; date_format: string; time_format: string; size_format: string }
 export type EntryDto = { name: string; path: string; kind: KindDto; 
 /**

@@ -16,6 +16,7 @@ import type {
   Snapshot,
   UserDirsDto,
   VolumeDto,
+  DiskSpaceDto,
 } from "./generated/bindings";
 import { globMatch } from "./glob";
 import defaultConfigJson from "./generated/default-config.json";
@@ -77,6 +78,8 @@ export class FakeBackend implements Backend {
     { name: "/", mountPoint: "/" },
     { name: "USB", mountPoint: "/Volumes/USB" },
   ];
+  /** 테스트용: 마운트 경로별 용량(바이트). 없는 볼륨의 경로는 조회가 거부된다. */
+  diskSpaces: Record<string, DiskSpaceDto> = {};
   /** 클립보드에 쓴 텍스트, 파일 관리자로 보여 준 경로, 편집기로 연 경로 묶음. */
   readonly clipboard: string[] = [];
   readonly revealed: string[] = [];
@@ -478,6 +481,16 @@ export class FakeBackend implements Backend {
 
   async listVolumes() {
     return this.volumes.map((v) => ({ ...v }));
+  }
+
+  /** 경로가 속한 볼륨(가장 긴 마운트 경로 접두)의 용량. 값이 없으면 거부한다. */
+  async diskSpace(path: string): Promise<DiskSpaceDto> {
+    const inside = (mp: string) => mp === "/" || path === mp || path.startsWith(`${mp}/`);
+    const mp = Object.keys(this.diskSpaces)
+      .filter(inside)
+      .sort((a, b) => b.length - a.length)[0];
+    if (mp === undefined) throw new BackendError(`용량을 알 수 없음: ${path}`);
+    return { ...this.diskSpaces[mp] };
   }
 
   private checkVolume(mountPoint: string) {
