@@ -1,5 +1,5 @@
 <!-- forge-slug: find-dialog-ui -->
-<!-- task: 35 -->
+<!-- task: 14 -->
 <!-- part: 2/2 -->
 <!-- tdd: off -->
 # 파일 찾기 다이얼로그(기본 탭)와 Cmd/Ctrl+F
