@@ -100,6 +100,21 @@ fn unescape(s: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
+/// 마운트 플래그에 `MNT_DONTBROWSE`(Finder에 보이지 않음, `nobrowse`)가 있는가. 조회할 수 없으면 숨기지 않는다.
+#[cfg(target_os = "macos")]
+fn is_hidden_mount(path: &Path) -> bool {
+    use std::ffi::CString;
+    use std::os::unix::ffi::OsStrExt;
+
+    let Ok(c) = CString::new(path.as_os_str().as_bytes()) else {
+        return false;
+    };
+    let mut st: libc::statfs = unsafe { std::mem::zeroed() };
+    // SAFETY: `c`는 NUL로 끝나는 유효한 C 문자열이고 `st`는 쓸 수 있는 statfs 구조체다.
+    let rc = unsafe { libc::statfs(c.as_ptr(), &mut st) };
+    rc == 0 && st.f_flags & libc::MNT_DONTBROWSE as u32 != 0
+}
+
 /// 현재 OS의 마운트된 볼륨. 루트가 항상 첫 항목이다.
 pub fn list_volumes() -> Vec<Volume> {
     #[cfg(target_os = "macos")]
@@ -117,7 +132,8 @@ pub fn list_volumes() -> Vec<Volume> {
                 if std::fs::canonicalize(&path).is_ok_and(|p| p == Path::new("/")) {
                     continue;
                 }
-                if path.is_dir() {
+                // Recovery, Preboot처럼 Finder에도 보이지 않게 마운트된(nobrowse) 시스템 볼륨은 사용자가 고를 대상이 아니다.
+                if path.is_dir() && !is_hidden_mount(&path) {
                     out.push(Volume {
                         name: e.file_name().to_string_lossy().into_owned(),
                         mount_point: path.to_string_lossy().into_owned(),
@@ -160,5 +176,29 @@ pub fn list_volumes() -> Vec<Volume> {
             name: "/".into(),
             mount_point: "/".into(),
         }]
+    }
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod macos_tests {
+    use super::*;
+
+    #[test]
+    fn nobrowse_system_volumes_are_hidden_and_root_is_not() {
+        // 실제 마운트 플래그를 읽는다: Data 볼륨은 nobrowse이고 루트는 아니다.
+        assert!(is_hidden_mount(Path::new("/System/Volumes/Data")));
+        assert!(!is_hidden_mount(Path::new("/")));
+        assert!(
+            !is_hidden_mount(Path::new("/no/such/path")),
+            "조회할 수 없으면 숨기지 않는다"
+        );
+        // 목록에는 루트가 있고, nobrowse 볼륨은 하나도 없다.
+        let vols = list_volumes();
+        assert_eq!(vols[0].mount_point, "/");
+        assert!(
+            vols.iter()
+                .all(|v| !is_hidden_mount(Path::new(&v.mount_point))),
+            "{vols:?}"
+        );
     }
 }
