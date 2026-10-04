@@ -388,6 +388,20 @@ pub fn detect_conflict(
     svc.detect_conflict(&src, &dest_dir)
 }
 
+/// 파일 경로 목록을 운영체제 파일 클립보드에 쓴다. 빈 목록이면 클립보드를 비운다.
+#[tauri::command]
+#[specta::specta]
+pub fn set_clipboard_files(svc: State<'_, AppService>, paths: Vec<String>) -> ServiceResult<()> {
+    svc.set_clipboard_files(&paths)
+}
+
+/// 운영체제 파일 클립보드에 든 파일 경로(지금 있는 것만).
+#[tauri::command]
+#[specta::specta]
+pub fn get_clipboard_files(svc: State<'_, AppService>) -> ServiceResult<Vec<String>> {
+    svc.clipboard_files()
+}
+
 /// 복사/이동/휴지통/삭제를 작업 큐에 넣는다. 작업 id를 돌려준다.
 #[tauri::command]
 #[specta::specta]
@@ -550,6 +564,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             mkdir,
             touch,
             detect_conflict,
+            set_clipboard_files,
+            get_clipboard_files,
             enqueue_job,
             enqueue_compress,
             enqueue_extract,

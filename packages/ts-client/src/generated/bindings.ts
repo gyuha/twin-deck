@@ -223,6 +223,28 @@ async detectConflict(src: string, destDir: string) : Promise<string | null> {
     return await TAURI_INVOKE("detect_conflict", { src, destDir });
 },
 /**
+ * 파일 경로 목록을 운영체제 파일 클립보드에 쓴다. 빈 목록이면 클립보드를 비운다.
+ */
+async setClipboardFiles(paths: string[]) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_clipboard_files", { paths }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 운영체제 파일 클립보드에 든 파일 경로(지금 있는 것만).
+ */
+async getClipboardFiles() : Promise<Result<string[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_clipboard_files") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * 복사/이동/휴지통/삭제를 작업 큐에 넣는다. 작업 id를 돌려준다.
  */
 async enqueueJob(kind: JobKindDto, items: QueueItemDto[]) : Promise<number> {

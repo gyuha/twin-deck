@@ -83,6 +83,12 @@ export class TauriBackend implements Backend {
   copyText(text: string) {
     return writeText(text);
   }
+  async setClipboardFiles(paths: string[]) {
+    unwrap(await commands.setClipboardFiles(paths));
+  }
+  async getClipboardFiles() {
+    return unwrap(await commands.getClipboardFiles());
+  }
   async revealPath(path: string) {
     unwrap(await commands.revealPath(path));
   }

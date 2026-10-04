@@ -26,6 +26,7 @@ td-queue = { path = "../../../crates/td-queue" }
 td-state = { path = "../../../crates/td-state" }
 td-volumes = { path = "../../../crates/td-volumes" }
 td-watch = { path = "../../../crates/td-watch" }
+clipboard-rs = "0.3.5"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"

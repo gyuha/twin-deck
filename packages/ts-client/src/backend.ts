@@ -51,6 +51,10 @@ export interface Backend {
   globFilter(pattern: string, names: string[]): Promise<number[]>;
   /** 클립보드에 텍스트를 쓴다. */
   copyText(text: string): Promise<void>;
+  /** 운영체제 파일 클립보드에 파일 경로 목록을 쓴다(Finder/탐색기에 붙여 넣을 수 있다). 빈 목록이면 비운다. */
+  setClipboardFiles(paths: string[]): Promise<void>;
+  /** 운영체제 파일 클립보드에 든 파일 경로(지금 있는 것만). 파일이 없으면 빈 목록. */
+  getClipboardFiles(): Promise<string[]>;
   /** 파일 관리자에서 항목을 보여 준다. */
   revealPath(path: string): Promise<void>;
   /** 파일을 운영체제 기본 프로그램으로 실행한다. */

@@ -453,6 +453,35 @@ pub struct Channels {
 }
 
 /// 파일 작업과 감시, 작업 큐를 묶은 서비스. 앱 상태로 보관한다.
+/// 운영체제의 파일 클립보드. Finder/탐색기와 파일 목록을 주고받는다. 테스트에서는 메모리 구현으로 바꾼다.
+pub trait FileClipboard: Send + Sync {
+    /// 경로 목록을 파일로 클립보드에 쓴다. 빈 목록이면 클립보드를 비운다.
+    fn set_files(&self, paths: &[String]) -> ServiceResult<()>;
+    /// 클립보드에 든 파일 경로. 파일이 없으면 빈 목록이다.
+    fn get_files(&self) -> ServiceResult<Vec<String>>;
+}
+
+/// `clipboard-rs`로 운영체제 클립보드를 쓰는 구현.
+pub struct SystemFileClipboard;
+
+impl FileClipboard for SystemFileClipboard {
+    fn set_files(&self, paths: &[String]) -> ServiceResult<()> {
+        use clipboard_rs::Clipboard;
+        let ctx = clipboard_rs::ClipboardContext::new().map_err(|e| e.to_string())?;
+        if paths.is_empty() {
+            return ctx.clear().map_err(|e| e.to_string());
+        }
+        ctx.set_files(paths.to_vec()).map_err(|e| e.to_string())
+    }
+
+    fn get_files(&self) -> ServiceResult<Vec<String>> {
+        use clipboard_rs::Clipboard;
+        let ctx = clipboard_rs::ClipboardContext::new().map_err(|e| e.to_string())?;
+        // 파일이 아닌 내용이 들어 있으면 오류로 오므로 "파일 없음"으로 본다.
+        Ok(ctx.get_files().unwrap_or_default())
+    }
+}
+
 pub struct Service<T: Trasher> {
     /// 즉시 실행하는 짧은 작업(폴더/파일 만들기, 이름 변경, 충돌 확인).
     ops: Ops<CompositeFs, T>,
@@ -466,6 +495,7 @@ pub struct Service<T: Trasher> {
     searches: Arc<Mutex<HashMap<u32, CancelToken>>>,
     next_search: AtomicU32,
     search_tx: Sender<SearchMsg>,
+    file_clipboard: Box<dyn FileClipboard>,
 }
 
 impl<T: Trasher + Clone + Send + 'static> Service<T> {
@@ -484,6 +514,7 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
                 searches: Arc::default(),
                 next_search: AtomicU32::new(0),
                 search_tx,
+                file_clipboard: Box::new(SystemFileClipboard),
             },
             Channels {
                 dir_changes,
@@ -491,6 +522,25 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
                 search_events,
             },
         ))
+    }
+
+    /// 파일 클립보드 구현을 바꾼다(테스트용).
+    #[cfg(test)]
+    pub fn with_file_clipboard(mut self, clipboard: Box<dyn FileClipboard>) -> Self {
+        self.file_clipboard = clipboard;
+        self
+    }
+
+    /// 경로 목록을 운영체제 파일 클립보드에 쓴다 (Mod+C/X). 빈 목록이면 비운다.
+    pub fn set_clipboard_files(&self, paths: &[String]) -> ServiceResult<()> {
+        self.file_clipboard.set_files(paths)
+    }
+
+    /// 운영체제 파일 클립보드의 파일 경로 (Mod+V). 지금 없는 경로는 뺀다.
+    pub fn clipboard_files(&self) -> ServiceResult<Vec<String>> {
+        let mut paths = self.file_clipboard.get_files()?;
+        paths.retain(|p| self.fs.stat(&vp(p)).is_ok());
+        Ok(paths)
     }
 
     /// 별도 스레드에서 `work`를 돌리고, 끝나면 `Done`을 보낸다. 작업 id를 돌려준다.
@@ -1563,6 +1613,66 @@ mod tests {
         );
         assert_eq!(svc.preview(&root).unwrap().kind, PreviewKindDto::Directory);
         assert!(svc.preview(&format!("{root}/nope")).is_err());
+    }
+
+    /// 메모리에만 있는 파일 클립보드(테스트에서 운영체제 클립보드를 건드리지 않는다).
+    #[derive(Default)]
+    struct MemClipboard(Mutex<Vec<String>>);
+    impl FileClipboard for Arc<MemClipboard> {
+        fn set_files(&self, paths: &[String]) -> ServiceResult<()> {
+            *self.0.lock().unwrap() = paths.to_vec();
+            Ok(())
+        }
+        fn get_files(&self) -> ServiceResult<Vec<String>> {
+            Ok(self.0.lock().unwrap().clone())
+        }
+    }
+
+    fn with_mem_clipboard() -> (tempfile::TempDir, Service<FakeTrash>, String) {
+        let (t, svc, _ch, root) = setup();
+        (
+            t,
+            svc.with_file_clipboard(Box::new(Arc::new(MemClipboard::default()))),
+            root,
+        )
+    }
+
+    #[test]
+    fn clipboard_files_round_trip_keeps_order_and_korean_names() {
+        let (_t, svc, root) = with_mem_clipboard();
+        let names = ["b.txt", "한글 파일.txt", "a.txt"];
+        let paths: Vec<String> = names.iter().map(|n| format!("{root}/{n}")).collect();
+        for p in &paths {
+            std::fs::write(p, "x").unwrap();
+        }
+        svc.set_clipboard_files(&paths).unwrap();
+        assert_eq!(
+            svc.clipboard_files().unwrap(),
+            paths,
+            "순서와 한글 이름이 그대로여야 한다"
+        );
+    }
+
+    #[test]
+    fn clipboard_files_drops_paths_that_no_longer_exist() {
+        let (_t, svc, root) = with_mem_clipboard();
+        let (keep, gone) = (format!("{root}/keep.txt"), format!("{root}/gone.txt"));
+        std::fs::write(&keep, "x").unwrap();
+        std::fs::write(&gone, "x").unwrap();
+        svc.set_clipboard_files(&[gone.clone(), keep.clone()])
+            .unwrap();
+        std::fs::remove_file(&gone).unwrap();
+        assert_eq!(svc.clipboard_files().unwrap(), vec![keep]);
+    }
+
+    #[test]
+    fn clipboard_files_empty_list_clears() {
+        let (_t, svc, root) = with_mem_clipboard();
+        let p = format!("{root}/a.txt");
+        std::fs::write(&p, "x").unwrap();
+        svc.set_clipboard_files(&[p]).unwrap();
+        svc.set_clipboard_files(&[]).unwrap();
+        assert!(svc.clipboard_files().unwrap().is_empty());
     }
 
     /// `files`(이름, 내용)를 담은 ZIP을 `dest`에 만든다. `zip` 도구가 없으면 테스트가 실패한다.

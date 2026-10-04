@@ -306,6 +306,17 @@ export class FakeBackend implements Backend {
     this.clipboard.push(text);
   }
 
+  /** 운영체제 파일 클립보드(메모리). 테스트가 직접 채워 "다른 앱에서 복사한 파일"을 흉내 낼 수 있다. */
+  fileClipboard: string[] = [];
+
+  async setClipboardFiles(paths: string[]) {
+    this.fileClipboard = [...paths];
+  }
+
+  async getClipboardFiles() {
+    return this.fileClipboard.filter((p) => this.nodes.has(p));
+  }
+
   async revealPath(path: string) {
     this.need(path);
     this.revealed.push(path);
