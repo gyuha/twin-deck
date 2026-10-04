@@ -29,8 +29,26 @@ fn main() {
     );
 
     tauri::Builder::default()
+        // 창은 숨긴 채 만들어지고(tauri.conf.json), 저장된 위치로 복원된 뒤 화면이 처음 그려졌을 때 보인다.
+        // 기본 위치에 보였다가 옮겨지는 깜빡임을 막는다.
+        .on_page_load(|webview, payload| {
+            if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
+                let _ = webview.window().show();
+            }
+        })
         .invoke_handler(builder.invoke_handler())
         .plugin(tauri_plugin_clipboard_manager::init())
+        // 창 위치·크기·최대화를 창 레이블별로 저장하고 다음 실행 때 복원한다.
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(
+                    tauri_plugin_window_state::StateFlags::SIZE
+                        | tauri_plugin_window_state::StateFlags::POSITION
+                        | tauri_plugin_window_state::StateFlags::MAXIMIZED
+                        | tauri_plugin_window_state::StateFlags::FULLSCREEN,
+                )
+                .build(),
+        )
         .manage(service)
         .manage(AppLaunch::new(
             td_launch::SystemLauncher,

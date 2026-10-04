@@ -10,7 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [{ "title": "Twin Deck", "width": 1200, "height": 760, "acceptFirstMouse": true }],
+    "windows": [{ "title": "Twin Deck", "width": 1200, "height": 760, "acceptFirstMouse": true, "visible": false }],
     "security": { "csp": null, "assetProtocol": { "enable": true, "scope": ["**"] } }
   },
   "bundle": {

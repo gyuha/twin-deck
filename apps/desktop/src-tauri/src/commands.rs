@@ -335,6 +335,7 @@ impl Spawner for TauriSpawner {
         )
         .title("Twin Deck")
         .inner_size(1200.0, 760.0)
+        .visible(false) // 위치 복원 뒤 화면이 그려지면 on_page_load가 보여 준다
         .build()
         .map(|_| ())
         .map_err(|e| e.to_string())
