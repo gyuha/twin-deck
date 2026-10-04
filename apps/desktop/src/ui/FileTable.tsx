@@ -57,8 +57,12 @@ function useRows(count: number, ref: React.RefObject<HTMLDivElement | null>): Vi
       if (!el) return;
       const top = offset + adjustments;
       el.scrollTop = top;
-      // jsdom은 scrollTop 설정이 값도 이벤트도 남기지 않는다. 실제 브라우저에서는 이 분기에 들어오지 않는다.
-      if (el.scrollTop !== top) Object.defineProperty(el, "scrollTop", { configurable: true, writable: true, value: top });
+      // jsdom은 scrollTop 설정이 값도 이벤트도 남기지 않는다. 이 보정은 jsdom에서만 해야 한다: 실제 브라우저에서는
+      // 화면 배율이 100%가 아닌 Windows가 scrollTop을 물리 픽셀로 반올림해 읽은 값이 늘 달라지고, 그때 가짜 속성으로
+      // 덮으면 그 뒤로 실제 스크롤이 영영 막힌다.
+      if (navigator.userAgent.includes("jsdom") && el.scrollTop !== top) {
+        Object.defineProperty(el, "scrollTop", { configurable: true, writable: true, value: top });
+      }
       el.dispatchEvent(new Event("scroll"));
     },
   });
