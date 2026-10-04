@@ -132,7 +132,7 @@ export function FileTable({ pane }: { pane: PaneId }) {
             return;
           }
           api.setCursor(i);
-          if (ev.ctrlKey || ev.metaKey) api.toggleSelect();
+          if (ev.ctrlKey || ev.metaKey) api.toggleSelectAt(i); // 키보드와 달리 클릭한 행에 커서가 머문다
         }}
         onDoubleClick={() => {
           activate();
