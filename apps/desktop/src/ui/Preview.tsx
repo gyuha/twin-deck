@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { languageFor } from "../lib/highlight";
 import { useApp } from "../state/context";
 import { CodeView } from "./CodeView";
@@ -23,6 +24,11 @@ export function Preview() {
   const p = useApp((s) => s.preview);
   const previewConfig = useApp((s) => s.loaded.config.preview);
   const previewFont = usePreviewFont();
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  // 다른 파일로 넘어가면 스크롤을 맨 위로 되돌린다(이전 파일의 위치를 이어받지 않게).
+  useEffect(() => {
+    if (bodyRef.current) bodyRef.current.scrollTop = 0;
+  }, [p?.path]);
   if (!p) return null;
   const d = p.data;
   return (
@@ -33,7 +39,7 @@ export function Preview() {
         className="flex h-[80vh] w-[44rem] max-w-full flex-col rounded border border-app-line bg-app-box py-3 pl-3 pr-0 text-sm shadow-lg"
       >
         <h2 className="mb-2 shrink-0 break-all pr-3 font-semibold">{p.name}</h2>
-        <div className={`td-thin-scroll min-h-0 flex-1 overflow-auto pr-3 ${p.status === "loading" && d ? "opacity-60" : ""}`}>
+        <div ref={bodyRef} data-preview-body className={`td-thin-scroll min-h-0 flex-1 overflow-auto pr-3 ${p.status === "loading" && d ? "opacity-60" : ""}`}>
           {p.status === "loading" && !d && <p className="text-ink-faint">불러오는 중…</p>}
           {p.status === "error" && (
             <p role="alert" className="text-status-error">
@@ -83,7 +89,7 @@ export function Preview() {
             </p>
           )}
         </div>
-        <p className="mt-2 pr-3 text-xs text-ink-faint">↑↓ 이전/다음 항목 · Enter 열기 · Delete 삭제 · Space/Esc 닫기</p>
+        <p className="mt-2 pr-3 text-xs text-ink-faint">↑↓ 이전/다음 항목 · PageUp/PageDown 스크롤 · Enter 열기 · Delete 삭제 · Space/Esc 닫기</p>
       </div>
     </div>
   );
