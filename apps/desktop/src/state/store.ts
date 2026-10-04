@@ -9,8 +9,10 @@ import {
   expandPath,
   isArchiveName,
   isArchivePath,
+  isDriveRoot,
   joinPath,
   parentPath,
+  trimTrailingSep,
 } from "@twin-deck/ts-client";
 import type {
   Backend,
@@ -795,7 +797,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
   async function navigateToPath(raw: string) {
     const dest = expandPath(raw.trim(), get().userDirs);
     if (dest === null) return fail("사용자 폴더를 알 수 없어 경로를 확장하지 못했습니다");
-    const clean = dest.length > 1 ? dest.replace(/\/+$/, "") : dest;
+    const clean = trimTrailingSep(dest);
     set({ notice: null });
     try {
       await backend.listDir(clean, true);
@@ -837,8 +839,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
 
   /** 전송 확인 창의 대상 폴더가 쓸 수 없으면 사유를, 괜찮으면 null을 돌려준다. */
   async function transferDestError(dest: string, targets: Pick<EntryDto, "path" | "kind">[]): Promise<string | null> {
-    const clean = dest.length > 1 ? dest.replace(/\/+$/, "") : dest;
-    if (targets.some((t) => t.kind === "dir" && (clean === t.path || clean.startsWith(t.path + "/")))) {
+    const clean = trimTrailingSep(dest);
+    if (targets.some((t) => t.kind === "dir" && (clean === t.path || (clean.startsWith(t.path) && /[\\/]/.test(clean.charAt(t.path.length)))))) {
       return "원본 폴더 안으로는 보낼 수 없습니다";
     }
     try {
@@ -2167,9 +2169,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const d = get().dialog;
       if (d?.kind !== "name" || !d.goto) return;
       const raw = expandPath(d.value, get().userDirs) ?? d.value;
-      const cut = raw.lastIndexOf("/");
-      const dir = cut <= 0 ? "/" : raw.slice(0, cut);
-      const prefix = raw.slice(cut + 1);
+      const dir = isDriveRoot(raw) ? raw : (parentPath(raw) ?? "/");
+      const prefix = baseName(raw);
       let names: string[];
       try {
         names = (await backend.listDir(dir, true)).filter((e) => e.kind === "dir" && quickMatch(e.name, prefix, true)).map((e) => e.name);
@@ -2184,7 +2185,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         while (i < common.length && i < nn.length && common[i] === nn[i]) i++;
         common = common.slice(0, i);
       }
-      api.dialogSetValue(joinPath(dir, common) + (names.length === 1 ? "/" : ""));
+      api.dialogSetValue(joinPath(dir, common) + (names.length === 1 ? (dir.includes("\\") ? "\\" : "/") : ""));
     },
 
     /** 미리보기 열기/닫기 (Space, Mod+Y). 열려 있는 동안 ↑↓로 항목을 넘긴다. */

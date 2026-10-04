@@ -17,7 +17,7 @@ export function TabBar({ pane }: { pane: PaneId }) {
           onClick={() => api.activate(pane, i)}
           className={i === active ? "border-b-2 border-accent px-2 font-semibold" : "px-2 text-ink-faint"}
         >
-          {t.virtual ? t.virtual.title : baseName(t.path) || "/"}
+          {t.virtual ? t.virtual.title : baseName(t.path) || t.path}
         </button>
       ))}
     </div>

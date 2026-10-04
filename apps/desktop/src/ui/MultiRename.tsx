@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { parentPath } from "@twin-deck/ts-client";
 import { useAppStore } from "../state/context";
 import { buildNewNames, findPattern, MASK_HELP, validateNames } from "../lib/multiRename";
 import type { CaseMode, RenameItem, RenameOptions } from "../lib/multiRename";
@@ -17,7 +18,7 @@ const CASES: { value: CaseMode; label: string }[] = [
 ];
 
 const input = "w-full border border-app-line bg-app px-1 py-0.5";
-const parentOf = (path: string) => path.slice(0, Math.max(path.lastIndexOf("/"), 1)) || "/";
+const parentOf = (path: string) => parentPath(path) ?? "/";
 
 /** 다중 이름 바꾸기 도구(미리보기 표와 입력). 새 이름과 오류는 입력이 바뀔 때마다 다시 계산한다. */
 export function MultiRename({ items, existing, options: o }: Props) {

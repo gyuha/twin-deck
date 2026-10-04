@@ -1,6 +1,6 @@
 import type { SearchEvent } from "./backend";
 import { describe, expect, it, vi } from "vitest";
-import { FakeBackend, archiveFileName, archiveRoot, baseName, expandPath, globMatch, isArchiveName, isArchivePath, joinPath, parentPath } from "./index";
+import { FakeBackend, archiveFileName, archiveRoot, baseName, expandPath, globMatch, isArchiveName, isArchivePath, joinPath, parentPath, trimTrailingSep } from "./index";
 
 const fs = () =>
   new FakeBackend().seed({
@@ -18,6 +18,36 @@ describe("경로 유틸", () => {
     expect(parentPath("/a")).toBe("/");
     expect(parentPath("/")).toBeNull();
     expect(baseName("/a/b.txt")).toBe("b.txt");
+  });
+
+  it("Windows 경로: 역슬래시와 드라이브 루트", () => {
+    expect(parentPath("C:\\a\\b")).toBe("C:\\a");
+    expect(parentPath("C:\\a")).toBe("C:\\");
+    expect(parentPath("C:\\")).toBeNull();
+    expect(parentPath("C:/a")).toBe("C:/");
+    expect(parentPath("C:/")).toBeNull();
+    expect(baseName("C:\\a\\b")).toBe("b");
+    expect(baseName("C:\\")).toBe("");
+    expect(joinPath("C:\\a", "b")).toBe("C:\\a\\b");
+    expect(joinPath("C:\\", "b")).toBe("C:\\b");
+    expect(joinPath("C:/a", "b")).toBe("C:/a/b");
+  });
+
+  it("끝의 구분자는 떼지만 루트(/, C:\\)는 남긴다", () => {
+    expect(trimTrailingSep("C:\\Users\\a\\")).toBe("C:\\Users\\a");
+    expect(trimTrailingSep("C:\\Users\\a\\\\")).toBe("C:\\Users\\a");
+    expect(trimTrailingSep("C:/Users/a/")).toBe("C:/Users/a");
+    expect(trimTrailingSep("C:\\")).toBe("C:\\");
+    expect(trimTrailingSep("/a/b/")).toBe("/a/b");
+    expect(trimTrailingSep("/")).toBe("/");
+    expect(trimTrailingSep("/a/b")).toBe("/a/b");
+  });
+
+  it("Windows 경로: 아카이브 경계 뒤는 /로 잇는다", () => {
+    expect(parentPath("C:\\a\\x.zip!")).toBe("C:\\a");
+    expect(parentPath("C:\\a\\x.zip!/d")).toBe("C:\\a\\x.zip!");
+    expect(joinPath("C:\\a\\x.zip!", "d")).toBe("C:\\a\\x.zip!/d");
+    expect(joinPath("C:\\a\\x.zip!/d", "e")).toBe("C:\\a\\x.zip!/d/e");
   });
 });
 

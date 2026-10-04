@@ -109,18 +109,33 @@ export interface Backend {
   onDirChanged(callback: (path: string) => void): () => void;
 }
 
+/** 마지막 경로 구분자(`/` 또는 `\`)의 위치. 없으면 -1. */
+const lastSep = (path: string) => Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
+
+/** `C:\`, `C:/` 같은 Windows 드라이브 루트. */
+export const isDriveRoot = (path: string) => /^[A-Za-z]:[\\/]?$/.test(path);
+
+/** 경로 끝의 구분자를 뗀다. 루트(`/`, `C:\`)는 그대로 둔다. */
+export const trimTrailingSep = (path: string) => (path.length > 1 && !isDriveRoot(path) ? path.replace(/[\\/]+$/, "") : path);
+
 export function joinPath(dir: string, name: string): string {
-  return dir.endsWith("/") ? dir + name : `${dir}/${name}`;
+  if (/[\\/]$/.test(dir)) return dir + name;
+  // 아카이브 경계(`x.zip!`) 뒤는 항상 `/`다. 그 밖에는 경로가 쓰던 구분자를 따른다.
+  const sep = !dir.includes("!") && dir.includes("\\") ? "\\" : "/";
+  return dir + sep + name;
 }
 
 export function parentPath(path: string): string | null {
-  const i = path.lastIndexOf("/");
+  if (isDriveRoot(path)) return null;
+  const i = lastSep(path);
   if (i < 0) return null;
-  return i === 0 ? (path.length > 1 ? "/" : null) : path.slice(0, i);
+  if (i === 0) return path.length > 1 ? "/" : null;
+  // `C:\a`의 부모는 `C:`가 아니라 드라이브 루트 `C:\`다.
+  return /^[A-Za-z]:$/.test(path.slice(0, i)) ? path.slice(0, i + 1) : path.slice(0, i);
 }
 
 export function baseName(path: string): string {
-  return path.slice(path.lastIndexOf("/") + 1);
+  return path.slice(lastSep(path) + 1);
 }
 
 /**

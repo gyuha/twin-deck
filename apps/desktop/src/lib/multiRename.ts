@@ -87,7 +87,7 @@ function slice(text: string, x?: number, y?: number): string {
 const two = (n: number) => String(n).padStart(2, "0");
 
 const parentName = (path: string) => {
-  const parts = path.split("/").filter(Boolean);
+  const parts = path.split(/[\\/]/).filter(Boolean);
   return parts.length >= 2 ? parts[parts.length - 2] : "";
 };
 
