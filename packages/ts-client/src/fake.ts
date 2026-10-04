@@ -313,6 +313,13 @@ export class FakeBackend implements Backend {
     this.clipboard.push(text);
   }
 
+  /** 창 밖으로 끌어 간 파일 목록들(`startNativeDrag` 호출 기록). */
+  nativeDrags: string[][] = [];
+
+  async startNativeDrag(paths: string[]) {
+    this.nativeDrags.push([...paths]);
+  }
+
   /** 운영체제 파일 클립보드(메모리). 테스트가 직접 채워 "다른 앱에서 복사한 파일"을 흉내 낼 수 있다. */
   fileClipboard: string[] = [];
 

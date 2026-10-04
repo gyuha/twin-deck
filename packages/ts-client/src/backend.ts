@@ -51,6 +51,8 @@ export interface Backend {
   globFilter(pattern: string, names: string[]): Promise<number[]>;
   /** 웹뷰가 파일을 직접 읽어 재생할 수 있는 주소(비디오처럼 큰 파일을 데이터로 싣지 않고 스트리밍한다). */
   fileUrl(path: string): string;
+  /** 파일을 창 밖(Finder, 탐색기, 다른 앱)으로 끌어 간다: 운영체제의 드래그를 시작한다. 마우스 단추를 누르고 있는 동안 불러야 한다. */
+  startNativeDrag(paths: string[]): Promise<void>;
   /** 클립보드에 텍스트를 쓴다. */
   copyText(text: string): Promise<void>;
   /** 운영체제 파일 클립보드에 파일 경로 목록을 쓴다(Finder/탐색기에 붙여 넣을 수 있다). 빈 목록이면 비운다. */

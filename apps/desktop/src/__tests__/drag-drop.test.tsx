@@ -193,3 +193,52 @@ describe("드래그 & 드롭으로 복사·이동", () => {
     expect(later.defaultPrevented).toBe(false);
   });
 });
+
+describe("창 밖으로 끌어 가기(Finder 같은 다른 앱에 놓기)", () => {
+  const outside = () => ({ x: window.innerWidth + 50, y: 20 });
+
+  it("끌던 마우스가 창 밖으로 나가면 운영체제 드래그로 넘기고 앱 안의 드래그는 접는다", async () => {
+    const { backend } = await renderApp(seed());
+    const src = rowByText("left", "a.txt");
+    down(src);
+    moveTo(src, 40, 40);
+    expect(ghost()).not.toBeNull();
+    const o = outside();
+    moveTo(document.body, o.x, o.y);
+    await waitFor(() => expect(backend.nativeDrags).toEqual([["/home/a/a.txt"]]));
+    expect(ghost()).toBeNull(); // 앱이 그리던 표시는 사라진다
+    // 같은 끌기에서 더 움직여도 다시 시작하지 않는다
+    moveTo(document.body, o.x + 10, o.y);
+    expect(backend.nativeDrags).toHaveLength(1);
+  });
+
+  it("선택된 항목을 끌면 선택 전체를 넘긴다", async () => {
+    const { user, backend } = await renderApp(seed());
+    await user.keyboard("{ArrowDown}{ArrowDown}{Insert}{Insert}"); // a.txt, b.txt 선택
+    const src = rowByText("left", "b.txt");
+    down(src);
+    moveTo(src, 40, 40);
+    moveTo(document.body, -20, 30);
+    await waitFor(() => expect(backend.nativeDrags).toEqual([["/home/a/a.txt", "/home/a/b.txt"]]));
+  });
+
+  it("창 안에서 움직이는 동안에는 넘기지 않는다", async () => {
+    const { backend } = await renderApp(seed());
+    const src = rowByText("left", "a.txt");
+    dragOver(src, section("right"));
+    expect(backend.nativeDrags).toEqual([]);
+    up(section("right"));
+  });
+
+  it("운영체제 드래그를 시작하지 못하면 알림을 보여 준다", async () => {
+    const { backend } = await renderApp(seed());
+    backend.startNativeDrag = async () => {
+      throw new Error("이 운영체제에서는 파일을 다른 앱으로 끌어 갈 수 없습니다");
+    };
+    const src = rowByText("left", "a.txt");
+    down(src);
+    moveTo(src, 40, 40);
+    moveTo(document.body, window.innerWidth + 50, 20);
+    await waitFor(() => expect(status()).toHaveTextContent("다른 앱으로 끌어 갈 수 없습니다"));
+  });
+});

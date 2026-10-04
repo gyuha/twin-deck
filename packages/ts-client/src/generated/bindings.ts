@@ -223,6 +223,18 @@ async detectConflict(src: string, destDir: string) : Promise<string | null> {
     return await TAURI_INVOKE("detect_conflict", { src, destDir });
 },
 /**
+ * 파일을 창 밖(Finder, 탐색기, 다른 앱)으로 끌어 간다: 운영체제의 드래그를 시작한다. 놓는 쪽에서 복사된다.
+ * 마우스 단추를 누르고 있는 동안 불러야 한다. macOS와 Windows에서만 지원한다.
+ */
+async startNativeDrag(paths: string[]) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("start_native_drag", { paths }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * 파일 경로 목록을 운영체제 파일 클립보드에 쓴다. 빈 목록이면 클립보드를 비운다.
  */
 async setClipboardFiles(paths: string[]) : Promise<Result<null, string>> {

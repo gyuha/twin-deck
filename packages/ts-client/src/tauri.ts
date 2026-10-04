@@ -87,6 +87,9 @@ export class TauriBackend implements Backend {
   copyText(text: string) {
     return writeText(text);
   }
+  async startNativeDrag(paths: string[]) {
+    unwrap(await commands.startNativeDrag(paths));
+  }
   async setClipboardFiles(paths: string[]) {
     unwrap(await commands.setClipboardFiles(paths));
   }

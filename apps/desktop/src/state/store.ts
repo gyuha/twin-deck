@@ -1556,7 +1556,25 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         const paths = tab.selection.has(entry.path) ? tab.entries.filter((e) => tab.selection.has(e.path)).map((e) => e.path) : [entry.path];
         drag = { paths, sourcePane: p.pane, x, y, ctrl, target: null };
       }
+      // 마우스가 창 밖으로 나갔다: 앱 안의 드래그를 접고 운영체제 드래그로 넘겨 Finder 같은 다른 앱에 놓을 수 있게 한다.
+      // 단추를 누른 채 창 밖으로 나가도 웹뷰가 좌표를 계속 준다.
+      if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) {
+        set({ drag: null });
+        justDragged = true;
+        setTimeout(() => (justDragged = false), 0);
+        void api.dragOutOfWindow(drag.paths);
+        return;
+      }
       set({ drag: { ...drag, x, y, ctrl, target: dropTargetAt(el, drag) } });
+    },
+    /** 끌던 파일을 운영체제 드래그로 넘긴다(창 밖으로 나갔을 때). 아카이브 안의 항목은 실제 파일이 아니라 보낼 수 없다. */
+    async dragOutOfWindow(paths: string[]) {
+      if (paths.some((p) => isArchivePath(p))) return fail("아카이브 안의 항목은 다른 앱으로 끌어 갈 수 없습니다");
+      try {
+        await backend.startNativeDrag(paths);
+      } catch (e) {
+        fail(e);
+      }
     },
     /** 웹뷰가 파일을 직접 읽어 재생할 수 있는 주소(비디오 미리보기). */
     fileUrl(path: string): string {

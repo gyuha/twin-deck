@@ -388,6 +388,38 @@ pub fn detect_conflict(
     svc.detect_conflict(&src, &dest_dir)
 }
 
+/// 파일을 창 밖(Finder, 탐색기, 다른 앱)으로 끌어 간다: 운영체제의 드래그를 시작한다. 놓는 쪽에서 복사된다.
+/// 마우스 단추를 누르고 있는 동안 불러야 한다. macOS와 Windows에서만 지원한다.
+#[tauri::command]
+#[specta::specta]
+pub fn start_native_drag(window: tauri::WebviewWindow, paths: Vec<String>) -> ServiceResult<()> {
+    #[cfg(any(target_os = "macos", windows))]
+    {
+        let files: Vec<std::path::PathBuf> = paths
+            .into_iter()
+            .map(std::path::PathBuf::from)
+            .filter(|p| p.exists())
+            .collect();
+        if files.is_empty() {
+            return Err("끌어 갈 파일이 없습니다".to_string());
+        }
+        let icon = drag::Image::Raw(include_bytes!("../icons/32x32.png").to_vec());
+        drag::start_drag(
+            &window,
+            drag::DragItem::Files(files),
+            icon,
+            |_, _| {},
+            drag::Options::default(),
+        )
+        .map_err(|e| e.to_string())
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
+    {
+        let _ = (window, paths);
+        Err("이 운영체제에서는 파일을 다른 앱으로 끌어 갈 수 없습니다".to_string())
+    }
+}
+
 /// 파일 경로 목록을 운영체제 파일 클립보드에 쓴다. 빈 목록이면 클립보드를 비운다.
 #[tauri::command]
 #[specta::specta]
@@ -564,6 +596,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             mkdir,
             touch,
             detect_conflict,
+            start_native_drag,
             set_clipboard_files,
             get_clipboard_files,
             enqueue_job,
