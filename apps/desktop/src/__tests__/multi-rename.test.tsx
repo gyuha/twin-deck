@@ -180,3 +180,50 @@ describe("다중 이름 바꾸기 도구", () => {
     expect(await dlg()).toBeTruthy();
   });
 });
+
+describe("다중 이름 바꾸기 단축키와 F2", () => {
+  it("2개 이상 선택하고 Ctrl+Shift+R을 누르면 다중 이름 바꾸기 도구가 열린다", async () => {
+    const r = await renderApp(seed());
+    await r.user.keyboard("{Insert}{Insert}");
+    await r.user.keyboard("{Control>}{Shift>}r{/Shift}{/Control}");
+    expect(await dlg()).toBeTruthy();
+  });
+
+  it("macOS에서는 Cmd+Shift+R이다", async () => {
+    const r = await renderApp(seed(), "mac");
+    await r.user.keyboard("{Insert}{Insert}");
+    await r.user.keyboard("{Meta>}{Shift>}r{/Shift}{/Meta}");
+    expect(await dlg()).toBeTruthy();
+  });
+
+  it("선택이 2개 미만이면 Ctrl+Shift+R은 아무 일도 하지 않는다", async () => {
+    const { user } = await renderApp(seed());
+    await user.keyboard("{Control>}{Shift>}r{/Shift}{/Control}");
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await user.keyboard("{Insert}"); // 1개
+    await user.keyboard("{Control>}{Shift>}r{/Shift}{/Control}");
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("F2는 이름 변경이다: 선택이 없으면 단일 이름 변경 창, 2개 이상이면 다중 이름 바꾸기", async () => {
+    const one = await renderApp(seed());
+    await one.user.keyboard("{F2}");
+    expect(await screen.findByRole("dialog", { name: "이름 변경" })).toBeTruthy();
+  });
+
+  it("F2로 2개 이상 선택했을 때는 다중 이름 바꾸기 도구가 열린다", async () => {
+    const r = await renderApp(seed());
+    await r.user.keyboard("{Insert}{Insert}{F2}");
+    expect(await dlg()).toBeTruthy();
+  });
+
+  it("도움말에 다중 이름 바꾸기 단축키가 보인다", async () => {
+    const r = await renderApp(seed());
+    await r.user.keyboard("{F1}");
+    const help = await screen.findByRole("dialog", { name: "도움말" });
+    const row = within(help).getByText("다중 이름 바꾸기").parentElement;
+    expect(row?.textContent).toBe("Ctrl+Shift+R:다중 이름 바꾸기");
+  });
+});

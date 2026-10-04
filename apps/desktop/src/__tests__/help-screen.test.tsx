@@ -20,10 +20,10 @@ describe("F1 도움말 화면", () => {
     expect(within(dialog).getByRole("heading", { name: "키보드 단축키" })).toBeInTheDocument();
     for (const name of ["파일", "이동", "보기", "선택", "탭"]) expect(within(dialog).getByRole("region", { name })).toBeInTheDocument();
     const file = within(dialog).getByRole("region", { name: "파일" });
-    expect(row(file, "이름 변경")).toBe("Shift+F6:이름 변경");
+    expect(row(file, "이름 변경")).toBe("Shift+F6또는F2:이름 변경");
     expect(row(file, "복사")).toBe("F5:복사");
     // 키 하나하나가 칩(kbd)이다
-    expect([...(within(file).getByText("이름 변경").parentElement?.querySelectorAll("kbd") ?? [])].map((k) => k.textContent)).toEqual(["Shift", "F6"]);
+    expect([...(within(file).getByText("이름 변경").parentElement?.querySelectorAll("kbd") ?? [])].map((k) => k.textContent)).toEqual(["Shift", "F6", "F2"]);
   });
 
   it("키가 여러 개인 동작은 '또는'으로 잇는다", async () => {

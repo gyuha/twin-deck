@@ -84,7 +84,8 @@ Marta에서는 수정자 없는 단일 키 바인딩이 Quick Select에 가로�
 |---|---|---|---|---|---|
 | `core.copy` | 복사 (비활성 패널로) | `F5` | `F5` | pane | ID 추정, 키 확인 |
 | `core.move` | 이동 | `F6` | `F6` | pane | ID 추정, 키 확인 |
-| `core.rename` | 이름 변경 | `Shift+F6` | `Shift+F6` | pane | ID 추정, 키 확인 |
+| `core.rename` | 이름 변경 (2개 이상 선택하면 다중 이름 바꾸기) | `Shift+F6`, `F2` | `Shift+F6`, `F2` | pane | ID 추정, 키 확인 |
+| `core.rename.multi` | 다중 이름 바꾸기 (2개 이상 선택했을 때) | `Mod+Shift+R` | `Ctrl+Shift+R` | pane | 자체 ID |
 | `core.file.new_folder` | 새 폴더 | `F7` | `F7` | pane | 자체 ID, 키 확인 |
 | `core.file.new_file` | 새 파일 | `Shift+F7` | `Shift+F7` | pane | 자체 ID, 키 확인 |
 | `core.trash` | 휴지통으로 이동 | `F8` | `F8` | pane | 자체 ID, 키 확인 |

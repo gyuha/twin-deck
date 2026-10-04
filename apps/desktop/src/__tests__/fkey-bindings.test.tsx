@@ -69,6 +69,7 @@ describe("F키 설정이 키맵에 반영된다", () => {
         .sort();
     const expected = [
       "F1=core.help@pane",
+      "F2=core.rename@pane",
       "F1=core.help.close@help",
       "F12=core.path.copy_folder@pane",
       "F4=core.edit@pane",

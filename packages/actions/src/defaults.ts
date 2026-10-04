@@ -190,7 +190,8 @@ const ba = (
 export const DEFAULT_BINDINGS: Binding[] = [
   b("pane", "core.copy", "F5"),
   b("pane", "core.move", "F6"),
-  b("pane", "core.rename", "Shift+F6"),
+  b("pane", "core.rename", "Shift+F6", "F2"),
+  b("pane", "core.rename.multi", "Mod+Shift+R"),
   b("pane", "core.clipboard.copy", "Mod+C"),
   b("pane", "core.clipboard.cut", "Mod+X"),
   b("pane", "core.clipboard.paste", "Mod+V"),
