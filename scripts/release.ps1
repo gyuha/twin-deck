@@ -27,7 +27,8 @@ function Invoke-Gh { param([string[]]$GhArgs)
 function Get-ReleaseInfo {
   $json = gh api "repos/{owner}/{repo}/releases?per_page=100"
   if ($LASTEXITCODE -ne 0) { throw "gh api 실패" }
-  $json | ConvertFrom-Json | Where-Object { $_.tag_name -eq $Tag } | Select-Object -First 1
+  # Windows PowerShell 5.1은 JSON 배열을 객체 하나로 돌려주므로 ForEach-Object로 펼친 뒤 거른다.
+  $json | ConvertFrom-Json | ForEach-Object { $_ } | Where-Object { $_.tag_name -eq $Tag } | Select-Object -First 1
 }
 
 if ((git branch --show-current) -ne "main") { throw "main 브랜치에서만 릴리스합니다" }
