@@ -19,7 +19,7 @@ export function MarkdownView({ text }: { text: string }) {
           ul: ({ children }) => <ul className="my-2 list-disc pl-5">{children}</ul>,
           ol: ({ children }) => <ol className="my-2 list-decimal pl-5">{children}</ol>,
           pre: ({ children }) => (
-            <pre style={previewFont} className="my-2 overflow-auto rounded bg-app-line/30 p-2 font-mono text-xs">{children}</pre>
+            <pre style={previewFont} className="td-thin-scroll my-2 overflow-auto rounded bg-app-line/30 p-2 font-mono text-xs">{children}</pre>
           ),
           code: ({ children }) => (
             <code style={previewFont} className="font-mono text-xs">

@@ -65,4 +65,13 @@ describe("마크다운 미리보기", () => {
     expect(within(view).getByRole("heading", { level: 1, name: "큰 문서" })).toBeTruthy();
     expect(within(dlg).getByText(/앞부분만 표시합니다/)).toBeTruthy();
   });
+
+  it("코드 블록의 스크롤바는 얇은 스타일(td-thin-scroll)이다", async () => {
+    const { user } = await renderApp(new FakeBackend().seed({ "/home/a/a.md": MD, "/home/b": null }));
+    await user.keyboard("{ArrowRight}");
+    const d = within(await screen.findByRole("dialog", { name: "미리보기: a.md" }));
+    const pre = (await d.findByLabelText("마크다운 미리보기")).querySelector("pre")!;
+    expect(pre.className).toContain("td-thin-scroll");
+    expect(pre.className).toContain("overflow-auto");
+  });
 });
