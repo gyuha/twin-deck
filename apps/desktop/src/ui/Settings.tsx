@@ -81,7 +81,7 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
   },
   {
     title: "F키",
-    desc: "F키마다 실행할 동작을 고릅니다. '기본값'은 내장 동작을 그대로 쓰고, 설정 폴더의 keybindings.toml에 같은 키가 있으면 그쪽이 우선합니다. 애플리케이션 항목에는 실행 파일 경로(예: /opt/homebrew/bin/code)나 앱 이름(macOS)을 적습니다.",
+    desc: "F키마다 실행할 동작을 고릅니다. '기본값'은 내장 동작을 그대로 쓰고, 설정 폴더의 keybindings.toml에 같은 키가 있으면 그쪽이 우선합니다. 애플리케이션 항목에는 실행 파일 경로(예: /opt/homebrew/bin/code)나 앱 이름(macOS)을 적습니다. 옵션이 필요하면 뒤에 이어 적습니다(예: wt -d, wezterm start --cwd). 폴더 경로는 그 뒤에 붙습니다.",
     items: Array.from({ length: 12 }, (_, i) => ({ key: `fkeys.F${i + 1}`, title: `F${i + 1}`, control: { type: "fkey" } as const })),
   },
   {

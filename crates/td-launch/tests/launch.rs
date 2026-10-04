@@ -217,3 +217,92 @@ fn launch_app_spawns_with_paths() {
     };
     assert_eq!(got.lines().collect::<Vec<_>>(), paths);
 }
+
+#[test]
+fn launch_app_with_extra_options() {
+    let paths = vec!["C:\\x y".to_string()];
+    // 이름만 있는 명령은 첫 단어가 프로그램이고 나머지는 옵션이다(터미널의 `wt -d <폴더>`)
+    assert_eq!(
+        app_command(Os::Windows, "wt -d", &paths).unwrap(),
+        cmd("wt", &["-d", "C:\\x y"])
+    );
+    assert_eq!(
+        app_command(Os::Linux, "wezterm start --cwd", &paths).unwrap(),
+        cmd("wezterm", &["start", "--cwd", "C:\\x y"])
+    );
+    // 공백이 든 실행 파일 경로는 따옴표 없이도 그대로 프로그램이다
+    let code = "C:\\Program Files\\Microsoft VS Code\\bin\\code";
+    assert_eq!(
+        app_command(Os::Windows, code, &paths).unwrap(),
+        cmd(code, &["C:\\x y"])
+    );
+    // 경로 뒤의 첫 `-옵션`부터가 인수다
+    assert_eq!(
+        app_command(Os::Windows, &format!("{code} -r --new-window"), &paths).unwrap(),
+        cmd(code, &["-r", "--new-window", "C:\\x y"])
+    );
+    // 따옴표로 감싸면 어디까지가 프로그램인지 분명하다. 인수의 따옴표도 풀린다
+    assert_eq!(
+        app_command(
+            Os::Windows,
+            "\"C:\\Program Files\\Git\\git-bash.exe\" --title \"My Term\"",
+            &paths
+        )
+        .unwrap(),
+        cmd(
+            "C:\\Program Files\\Git\\git-bash.exe",
+            &["--title", "My Term", "C:\\x y"]
+        )
+    );
+    // 닫히지 않은 따옴표는 실행하지 않는다
+    assert!(app_command(Os::Windows, "\"C:\\x -d", &paths).is_err());
+}
+
+#[test]
+fn launch_app_mac_with_extra_options() {
+    let paths = vec!["/p/a b".to_string()];
+    // 공백이 든 앱 이름은 그대로 앱 이름이다
+    assert_eq!(
+        app_command(Os::Mac, "Visual Studio Code", &paths).unwrap(),
+        cmd("open", &["-a", "Visual Studio Code", "/p/a b"])
+    );
+    // 옵션이 있으면 새 인스턴스로 `--args` 뒤에 옵션과 경로를 넘긴다(`open -na Alacritty --args --working-directory <폴더>`)
+    assert_eq!(
+        app_command(Os::Mac, "Alacritty --working-directory", &paths).unwrap(),
+        cmd(
+            "open",
+            &[
+                "-n",
+                "-a",
+                "Alacritty",
+                "--args",
+                "--working-directory",
+                "/p/a b"
+            ]
+        )
+    );
+    assert_eq!(
+        app_command(
+            Os::Mac,
+            "/Applications/Alacritty.app --working-directory",
+            &paths
+        )
+        .unwrap(),
+        cmd(
+            "open",
+            &[
+                "-n",
+                "-a",
+                "/Applications/Alacritty.app",
+                "--args",
+                "--working-directory",
+                "/p/a b"
+            ]
+        )
+    );
+    // 실행 파일 경로는 직접 실행한다
+    assert_eq!(
+        app_command(Os::Mac, "/usr/local/bin/code -r", &paths).unwrap(),
+        cmd("/usr/local/bin/code", &["-r", "/p/a b"])
+    );
+}

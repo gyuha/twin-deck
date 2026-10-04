@@ -88,8 +88,75 @@ pub fn editor_command(os: Os, editor: &str, paths: &[String]) -> Result<Command,
     Ok(Command::new(editor, paths.iter().cloned()))
 }
 
-/// F키에 지정한 애플리케이션으로 `paths`를 여는 명령.
-/// macOS에서 `.app` 번들이거나 경로 구분자가 없는 이름("Preview")이면 `open -a`를 쓰고, 그 밖에는 실행 파일을 직접 실행한다.
+/// 따옴표(`"`, `'`)를 풀면서 공백으로 나눈다. 닫히지 않은 따옴표는 오류.
+fn split_args(s: &str) -> Result<Vec<String>, String> {
+    let mut out = Vec::new();
+    let mut cur = String::new();
+    let mut quote: Option<char> = None;
+    let mut started = false;
+    for c in s.chars() {
+        match quote {
+            Some(q) if c == q => quote = None,
+            Some(_) => cur.push(c),
+            None if c == '"' || c == '\'' => {
+                quote = Some(c);
+                started = true;
+            }
+            None if c.is_whitespace() => {
+                if started {
+                    out.push(std::mem::take(&mut cur));
+                    started = false;
+                }
+            }
+            None => {
+                cur.push(c);
+                started = true;
+            }
+        }
+    }
+    if quote.is_some() {
+        return Err("애플리케이션 값의 따옴표가 닫히지 않았습니다".into());
+    }
+    if started {
+        out.push(cur);
+    }
+    Ok(out)
+}
+
+/// F키 애플리케이션 값을 실행 파일(또는 앱)과 추가 옵션으로 나눈다(`wt -d`, `code -r`).
+/// - 따옴표로 시작하면 따옴표 안이 프로그램이다.
+/// - 경로 형태(첫 단어에 `/`나 `\`가 있음)이거나 macOS면 공백이 든 경로/앱 이름일 수 있으므로, 첫 `-옵션` 앞까지를 프로그램으로 본다.
+/// - 그 밖에는 첫 단어가 프로그램이고 나머지가 옵션이다(`wezterm start --cwd`).
+fn split_app(os: Os, app: &str) -> Result<(String, Vec<String>), String> {
+    if let Some(q) = app.chars().next().filter(|c| *c == '"' || *c == '\'') {
+        let rest = &app[1..];
+        let end = rest
+            .find(q)
+            .ok_or("애플리케이션 값의 따옴표가 닫히지 않았습니다")?;
+        return Ok((rest[..end].to_string(), split_args(&rest[end + 1..])?));
+    }
+    let first = app.split_whitespace().next().unwrap_or("");
+    let path_like = first.contains('/') || first.contains('\\');
+    if path_like || os == Os::Mac {
+        // 첫 단어가 아닌 단어 중 `-`로 시작하는 첫 단어의 위치
+        let mut offset = 0;
+        for (i, word) in app.split_whitespace().enumerate() {
+            let at = offset + app[offset..].find(word).unwrap_or(0);
+            if i > 0 && word.starts_with('-') {
+                return Ok((app[..at].trim().to_string(), split_args(&app[at..])?));
+            }
+            offset = at + word.len();
+        }
+        return Ok((app.to_string(), Vec::new()));
+    }
+    let mut words = split_args(app)?.into_iter();
+    let program = words.next().unwrap_or_default();
+    Ok((program, words.collect()))
+}
+
+/// F키에 지정한 애플리케이션으로 `paths`를 여는 명령. 값에 `wt -d`처럼 옵션이 붙어 있으면 `paths` 앞에 넣는다.
+/// macOS에서 `.app` 번들이거나 경로 구분자가 없는 이름("Preview")이면 `open -a`를 쓰고(옵션이 있으면 `open -n -a <앱> --args <옵션> <경로>`),
+/// 그 밖에는 실행 파일을 직접 실행한다.
 pub fn app_command(os: Os, app: &str, paths: &[String]) -> Result<Command, String> {
     let app = app.trim();
     if app.is_empty() {
@@ -98,14 +165,27 @@ pub fn app_command(os: Os, app: &str, paths: &[String]) -> Result<Command, Strin
     if paths.is_empty() {
         return Err("전달할 항목이 없습니다".into());
     }
-    let is_bundle = app.trim_end_matches(['/', '\\']).ends_with(".app");
-    let is_name = !app.contains('/') && !app.contains('\\');
+    let (program, options) = split_app(os, app)?;
+    if program.is_empty() {
+        return Err("애플리케이션이 지정되지 않았습니다".into());
+    }
+    let is_bundle = program.trim_end_matches(['/', '\\']).ends_with(".app");
+    let is_name = !program.contains('/') && !program.contains('\\');
     if os == Os::Mac && (is_bundle || is_name) {
-        let mut args = vec!["-a".to_string(), app.to_string()];
+        let mut args = vec!["-a".to_string(), program];
+        if !options.is_empty() {
+            // 옵션은 새 인스턴스에만 전달된다
+            args.insert(0, "-n".to_string());
+            args.push("--args".to_string());
+            args.extend(options);
+        }
         args.extend(paths.iter().cloned());
         return Ok(Command::new("open", args));
     }
-    Ok(Command::new(app, paths.iter().cloned()))
+    Ok(Command::new(
+        &program,
+        options.into_iter().chain(paths.iter().cloned()),
+    ))
 }
 
 /// 명령을 실제로 실행한다. 테스트는 기록하는 fake를 쓴다.
