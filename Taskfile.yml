@@ -43,3 +43,78 @@ tasks:
     cmds:
       - bun run build
       - cargo build --workspace --release
+
+  bundle:
+    desc: 현재 OS용 설치 파일 만들기 (macOS는 .app, Windows는 NSIS 설치 파일) → target/release/bundle
+    cmds:
+      - task: bundle:mac
+      - task: bundle:win
+
+  bundle:mac:
+    internal: true
+    platforms: [darwin]
+    cmds:
+      - bun run --cwd apps/desktop tauri build --bundles app
+
+  bundle:win:
+    internal: true
+    platforms: [windows]
+    cmds:
+      - bun run --cwd apps/desktop tauri build --bundles nsis
+
+  install:
+    desc: 설치 파일을 만들어 이 PC에 설치 (macOS는 /Applications, Windows는 NSIS 조용히 설치)
+    cmds:
+      - task: bundle
+      - task: install:mac
+      - task: install:win
+
+  install:mac:
+    internal: true
+    platforms: [darwin]
+    cmds:
+      - scripts/install.sh install
+
+  install:win:
+    internal: true
+    platforms: [windows]
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install.ps1 install
+
+  uninstall:
+    desc: 설치한 앱 삭제 (설정은 남김)
+    cmds:
+      - task: uninstall:mac
+      - task: uninstall:win
+
+  uninstall:mac:
+    internal: true
+    platforms: [darwin]
+    cmds:
+      - scripts/install.sh uninstall
+
+  uninstall:win:
+    internal: true
+    platforms: [windows]
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install.ps1 uninstall
+
+  release:
+    desc: 현재 OS용 설치 파일을 GitHub 릴리스(v<버전>)에 올림 (macOS와 Windows에서 각각 실행하면 같은 릴리스에 모인다)
+    prompt: GitHub에 릴리스를 올립니다. 계속할까요?
+    cmds:
+      - task: bundle
+      - task: release:mac
+      - task: release:win
+
+  release:mac:
+    internal: true
+    platforms: [darwin]
+    cmds:
+      - scripts/release.sh
+
+  release:win:
+    internal: true
+    platforms: [windows]
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1
