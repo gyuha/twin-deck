@@ -199,12 +199,54 @@ pub struct SystemLauncher;
 
 impl Launcher for SystemLauncher {
     fn run(&self, cmd: &Command) -> Result<(), String> {
-        Process::new(&cmd.program)
-            .args(&cmd.args)
+        let mut program = cmd.program.clone();
+        if cfg!(windows) {
+            let dirs: Vec<_> = std::env::var_os("PATH")
+                .map(|p| std::env::split_paths(&p).collect())
+                .unwrap_or_default();
+            program = resolve_windows_program(&program, &dirs);
+        }
+        let mut process = Process::new(&program);
+        process.args(&cmd.args);
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            let lower = program.to_ascii_lowercase();
+            if lower.ends_with(".cmd") || lower.ends_with(".bat") {
+                process.creation_flags(0x0800_0000); // CREATE_NO_WINDOW: cmd.exe 창이 깜빡이지 않게 한다
+            }
+        }
+        process
             .spawn()
             .map(|_| ())
-            .map_err(|e| format!("{} 실행 실패: {e}", cmd.program))
+            .map_err(|e| format!("{program} 실행 실패: {e}"))
     }
+}
+
+/// Windows는 확장자가 없으면 `.exe`만 찾는다. VS Code의 `bin\code`처럼 쉘 스크립트와 `code.cmd`만 있는 경우를 위해
+/// `.exe`, `.com`, `.cmd`, `.bat` 순으로 실제 파일을 찾아 돌려준다. 경로가 없는 이름은 `search` 폴더들에서 찾는다.
+/// 확장자가 있거나 찾지 못하면 그대로 돌려준다.
+pub fn resolve_windows_program(program: &str, search: &[std::path::PathBuf]) -> String {
+    if std::path::Path::new(program).extension().is_some() {
+        return program.to_string();
+    }
+    let has_dir = program.contains('/') || program.contains('\\');
+    let bases: Vec<std::path::PathBuf> = if has_dir {
+        vec![std::path::PathBuf::from(program)]
+    } else {
+        search.iter().map(|d| d.join(program)).collect()
+    };
+    for base in bases {
+        for ext in ["exe", "com", "cmd", "bat"] {
+            let mut candidate = base.clone().into_os_string();
+            candidate.push(format!(".{ext}"));
+            let candidate = std::path::PathBuf::from(candidate);
+            if candidate.is_file() {
+                return candidate.to_string_lossy().into_owned();
+            }
+        }
+    }
+    program.to_string()
 }
 
 /// 명령 조립과 실행을 묶은 진입점.

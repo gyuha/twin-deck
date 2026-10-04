@@ -306,3 +306,39 @@ fn launch_app_mac_with_extra_options() {
         cmd("/usr/local/bin/code", &["-r", "/p/a b"])
     );
 }
+
+#[test]
+fn windows_program_without_extension_is_resolved() {
+    use std::path::PathBuf;
+    use td_launch::resolve_windows_program;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let bin = tmp.path().join("VS Code").join("bin");
+    std::fs::create_dir_all(&bin).unwrap();
+    // VS Code처럼 확장자 없는 쉘 스크립트와 code.cmd만 있다
+    std::fs::write(bin.join("code"), "#!/bin/sh").unwrap();
+    std::fs::write(bin.join("code.cmd"), "@echo off").unwrap();
+    let code = bin.join("code").to_string_lossy().into_owned();
+    assert_eq!(
+        resolve_windows_program(&code, &[]),
+        bin.join("code.cmd").to_string_lossy()
+    );
+
+    // .exe가 있으면 .exe를 우선한다
+    std::fs::write(bin.join("code.exe"), "").unwrap();
+    assert_eq!(
+        resolve_windows_program(&code, &[]),
+        bin.join("code.exe").to_string_lossy()
+    );
+
+    // 경로 없는 이름은 검색 폴더에서 찾는다
+    let dirs: Vec<PathBuf> = vec![tmp.path().to_path_buf(), bin.clone()];
+    assert_eq!(
+        resolve_windows_program("code", &dirs),
+        bin.join("code.exe").to_string_lossy()
+    );
+
+    // 확장자가 있거나 찾지 못하면 그대로 둔다
+    assert_eq!(resolve_windows_program("notepad.exe", &dirs), "notepad.exe");
+    assert_eq!(resolve_windows_program("nope", &dirs), "nope");
+}
