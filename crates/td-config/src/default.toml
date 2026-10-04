@@ -5,6 +5,8 @@ favorites = []
 
 [behavior]
 theme = "system"
+ui_font = ""
+preview_font = ""
 
 [behavior.table]
 icon_size = 16

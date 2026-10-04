@@ -486,3 +486,52 @@ fn drive_bar_can_be_turned_off() {
         "건드리지 않은 Action Bar는 기본값"
     );
 }
+
+#[test]
+fn font_settings_default_empty_and_stay_independent() {
+    let none = load("");
+    assert_eq!(none.config.behavior.ui_font, "");
+    assert_eq!(none.config.behavior.preview_font, "");
+
+    // 한쪽만 지정하면 다른 쪽은 기본값을 유지한다.
+    let l = load("[behavior]\nui_font = \"Pretendard, sans-serif\"\n");
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert_eq!(l.config.behavior.ui_font, "Pretendard, sans-serif");
+    assert_eq!(l.config.behavior.preview_font, "");
+    let l = load("[behavior]\npreview_font = \"D2Coding\"\n");
+    assert_eq!(l.config.behavior.ui_font, "");
+    assert_eq!(l.config.behavior.preview_font, "D2Coding");
+}
+
+#[test]
+fn font_settings_round_trip_through_user_config() {
+    use td_config::{set_user_value, ConfigValue};
+    let dir = tempfile::tempdir().unwrap();
+    set_user_value(
+        dir.path(),
+        "behavior.ui_font",
+        ConfigValue::Str("Pretendard".into()),
+    )
+    .unwrap();
+    set_user_value(
+        dir.path(),
+        "behavior.preview_font",
+        ConfigValue::Str("D2Coding".into()),
+    )
+    .unwrap();
+    let l = load_dir(dir.path(), Platform::Linux);
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert_eq!(l.config.behavior.ui_font, "Pretendard");
+    assert_eq!(l.config.behavior.preview_font, "D2Coding");
+
+    // 하나만 바꿔도 다른 하나는 그대로다.
+    set_user_value(
+        dir.path(),
+        "behavior.ui_font",
+        ConfigValue::Str(String::new()),
+    )
+    .unwrap();
+    let l = load_dir(dir.path(), Platform::Linux);
+    assert_eq!(l.config.behavior.ui_font, "");
+    assert_eq!(l.config.behavior.preview_font, "D2Coding");
+}

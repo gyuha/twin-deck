@@ -11,6 +11,7 @@ import { installFileMenuForWindow } from "./appMenu";
 import { StoreContext, useApp, useAppStore } from "./state/context";
 import { actionContext, activeTab, createAppStore, scopeStack } from "./state/store";
 import { ActionBar, useBarIds } from "./ui/ActionBar";
+import { useUiFont } from "./ui/fonts";
 import { ActionsPalette } from "./ui/ActionsPalette";
 import { Dialog } from "./ui/Dialog";
 import { Preview } from "./ui/Preview";
@@ -128,6 +129,7 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
   }, [platform, loaded, registry]);
   useKeyboard({ app, keymap, registry });
   useTheme(loaded.config.behavior.theme);
+  useUiFont(loaded.config.behavior.ui_font);
 
   // 웹뷰 기본 메뉴(Reload, Inspect Element)는 막는다. 입력창의 잘라내기/붙여넣기 메뉴는 남긴다.
   useEffect(() => {

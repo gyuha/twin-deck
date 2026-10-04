@@ -26,6 +26,10 @@ pub struct Config {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct Behavior {
     pub theme: String,
+    /// 앱 UI의 글꼴. CSS `font-family` 값이고 비우면 기본 글꼴이다.
+    pub ui_font: String,
+    /// 미리보기 본문의 글꼴. CSS `font-family` 값이고 비우면 기본 글꼴이다.
+    pub preview_font: String,
     pub table: BehaviorTable,
     pub quick_select: QuickSelect,
     pub selection: SelectionConfig,

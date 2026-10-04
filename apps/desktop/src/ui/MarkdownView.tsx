@@ -1,10 +1,12 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { usePreviewFont } from "./fonts";
 
 /** 마크다운 미리보기. 원시 HTML은 렌더링하지 않고, 링크는 이동하지 않으며, 이미지는 대체 텍스트만 보여 준다. */
 export function MarkdownView({ text }: { text: string }) {
+  const previewFont = usePreviewFont();
   return (
-    <div aria-label="마크다운 미리보기" className="markdown-preview text-sm leading-relaxed">
+    <div aria-label="마크다운 미리보기" style={previewFont} className="markdown-preview text-sm leading-relaxed">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -17,9 +19,13 @@ export function MarkdownView({ text }: { text: string }) {
           ul: ({ children }) => <ul className="my-2 list-disc pl-5">{children}</ul>,
           ol: ({ children }) => <ol className="my-2 list-decimal pl-5">{children}</ol>,
           pre: ({ children }) => (
-            <pre className="my-2 overflow-auto rounded bg-app-line/30 p-2 font-mono text-xs">{children}</pre>
+            <pre style={previewFont} className="my-2 overflow-auto rounded bg-app-line/30 p-2 font-mono text-xs">{children}</pre>
           ),
-          code: ({ children }) => <code className="font-mono text-xs">{children}</code>,
+          code: ({ children }) => (
+            <code style={previewFont} className="font-mono text-xs">
+              {children}
+            </code>
+          ),
           blockquote: ({ children }) => (
             <blockquote className="my-2 border-l-2 border-app-line pl-3 text-ink-faint">{children}</blockquote>
           ),

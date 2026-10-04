@@ -1,6 +1,7 @@
 import { languageFor } from "../lib/highlight";
 import { useApp } from "../state/context";
 import { CodeView } from "./CodeView";
+import { usePreviewFont } from "./fonts";
 import { JsonView } from "./JsonView";
 import { MarkdownView } from "./MarkdownView";
 import { PdfView } from "./PdfView";
@@ -18,6 +19,7 @@ function size(n: number): string {
 /** 미리보기 (VIEW-01): 텍스트는 앞부분, 이미지는 그림, 그 밖은 종류와 크기. 키 조작은 `preview` 스코프가 처리한다. */
 export function Preview() {
   const p = useApp((s) => s.preview);
+  const previewFont = usePreviewFont();
   if (!p) return null;
   const d = p.data;
   return (
@@ -44,7 +46,7 @@ export function Preview() {
               ) : languageFor(p.name) ? (
                 <CodeView name={p.name} text={d.text ?? ""} />
               ) : (
-                <pre aria-label="텍스트 미리보기" className="whitespace-pre-wrap break-words font-mono text-xs">
+                <pre aria-label="텍스트 미리보기" style={previewFont} className="whitespace-pre-wrap break-words font-mono text-xs">
                   {d.text}
                 </pre>
               )}

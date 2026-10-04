@@ -30,6 +30,8 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
     title: "모양",
     items: [
       { key: "behavior.theme", title: "테마", desc: "system은 OS의 밝기 설정을 따릅니다", control: { type: "select", options: THEMES } },
+      { key: "behavior.ui_font", title: "UI 글꼴", desc: "앱 화면 전체의 글꼴. CSS font-family 값(예: Pretendard, sans-serif). 비우면 기본 글꼴", control: { type: "text" } },
+      { key: "behavior.preview_font", title: "미리보기 글꼴", desc: "텍스트·코드·JSON·Markdown 미리보기 본문의 글꼴. 비우면 기본 글꼴", control: { type: "text" } },
       { key: "behavior.table.icon_size", title: "아이콘 크기", desc: "파일 목록 행의 아이콘(px)", control: { type: "int" } },
       { key: "behavior.layout.show_action_bar", title: "Action Bar 표시", desc: "아래쪽 단축키 버튼 줄", control: { type: "switch" } },
       { key: "behavior.layout.show_drive_bar", title: "드라이브 바 표시", desc: "패널 위의 볼륨 버튼, 남은 용량, 언마운트 줄", control: { type: "switch" } },

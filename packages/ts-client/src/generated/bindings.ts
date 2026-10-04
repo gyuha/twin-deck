@@ -359,7 +359,15 @@ usageUpdate: "usage-update"
 
 /** user-defined types **/
 
-export type Behavior = { theme: string; table: BehaviorTable; quick_select: QuickSelect; selection: SelectionConfig; layout: BehaviorLayout }
+export type Behavior = { theme: string; 
+/**
+ * 앱 UI의 글꼴. CSS `font-family` 값이고 비우면 기본 글꼴이다.
+ */
+ui_font: string; 
+/**
+ * 미리보기 본문의 글꼴. CSS `font-family` 값이고 비우면 기본 글꼴이다.
+ */
+preview_font: string; table: BehaviorTable; quick_select: QuickSelect; selection: SelectionConfig; layout: BehaviorLayout }
 export type BehaviorLayout = { show_action_bar: boolean; 
 /**
  * 패널 위의 드라이브 바(볼륨 버튼, 남은 용량, 언마운트).

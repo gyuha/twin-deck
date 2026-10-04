@@ -2,6 +2,8 @@
   "config": {
     "behavior": {
       "theme": "system",
+      "ui_font": "",
+      "preview_font": "",
       "table": {
         "icon_size": 16,
         "circular_selection": false,
