@@ -118,6 +118,44 @@ pub struct PreviewDto {
     pub data_url: Option<String>,
 }
 
+/// cbz(이미지를 ZIP으로 묶은 만화 파일)의 미리보기: 안의 첫 이미지. 이미지가 없거나 ZIP이 아니면 "기타"(종류와 크기)다.
+fn cbz_preview(path: &str) -> td_vfs::Preview {
+    let limit = td_vfs::PreviewLimits::default().image_bytes;
+    let other = |size| td_vfs::Preview {
+        kind: td_vfs::PreviewKind::Other,
+        text: None,
+        truncated: false,
+        size,
+        data_url: None,
+    };
+    let file_size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
+    let Ok(zip) = td_archive::Archive::open_as(std::path::Path::new(path), td_archive::Kind::Zip)
+    else {
+        return other(file_size);
+    };
+    let Some(first) = zip.first_image() else {
+        return other(file_size);
+    };
+    let image = |data_url, truncated| td_vfs::Preview {
+        kind: td_vfs::PreviewKind::Image,
+        text: None,
+        truncated,
+        size: first.size,
+        data_url,
+    };
+    if first.size > limit {
+        return image(None, true);
+    }
+    match zip
+        .read(&first.name)
+        .ok()
+        .and_then(|bytes| td_vfs::image_data_url(&first.name, &bytes))
+    {
+        Some(url) => image(Some(url), false),
+        None => other(file_size),
+    }
+}
+
 impl From<td_vfs::Preview> for PreviewDto {
     fn from(p: td_vfs::Preview) -> Self {
         PreviewDto {
@@ -723,6 +761,9 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
     }
 
     pub fn preview(&self, path: &str) -> ServiceResult<PreviewDto> {
+        if path.to_ascii_lowercase().ends_with(".cbz") && std::path::Path::new(path).is_file() {
+            return Ok(cbz_preview(path).into());
+        }
         td_vfs::read_preview(&vp(path), td_vfs::PreviewLimits::default())
             .map(PreviewDto::from)
             .map_err(|e| e.to_string())
@@ -1522,6 +1563,80 @@ mod tests {
         );
         assert_eq!(svc.preview(&root).unwrap().kind, PreviewKindDto::Directory);
         assert!(svc.preview(&format!("{root}/nope")).is_err());
+    }
+
+    /// `files`(이름, 내용)를 담은 ZIP을 `dest`에 만든다. `zip` 도구가 없으면 테스트가 실패한다.
+    fn make_cbz(dir: &std::path::Path, dest: &str, files: &[(&str, Vec<u8>)]) {
+        let src = dir.join("cbz-src");
+        std::fs::create_dir_all(&src).unwrap();
+        for (name, body) in files {
+            std::fs::write(src.join(name), body).unwrap();
+        }
+        let names: Vec<&str> = files.iter().map(|(n, _)| *n).collect();
+        let status = std::process::Command::new("zip")
+            .arg("-q")
+            .arg(dest)
+            .args(&names)
+            .current_dir(&src)
+            .status()
+            .expect("zip 실행 불가");
+        assert!(status.success());
+        std::fs::remove_dir_all(&src).unwrap();
+    }
+
+    #[test]
+    fn preview_cbz_shows_first_image() {
+        let (t, svc, _ch, root) = setup();
+        let page1 = vec![0xFFu8, 0xD8, 0xFF, 1, 2, 3];
+        let dest = format!("{root}/book.cbz");
+        make_cbz(
+            t.path(),
+            &dest,
+            &[
+                ("010.jpg", vec![9, 9]),
+                ("002.jpg", page1.clone()),
+                ("notes.txt", b"hi".to_vec()),
+            ],
+        );
+        let p = svc.preview(&dest).unwrap();
+        assert_eq!(p.kind, PreviewKindDto::Image);
+        assert!(!p.truncated);
+        // 첫 쪽(002)의 내용이어야 한다: 010.jpg나 txt가 아니라 002.jpg의 바이트를 data URL로 만든 것과 같다.
+        assert_eq!(p.data_url, td_vfs::image_data_url("002.jpg", &page1));
+        assert!(p.data_url.unwrap().starts_with("data:image/jpeg;base64,"));
+
+        // 확장자 대소문자는 무시한다.
+        let upper = format!("{root}/BOOK.CBZ");
+        std::fs::rename(&dest, &upper).unwrap();
+        assert_eq!(svc.preview(&upper).unwrap().kind, PreviewKindDto::Image);
+    }
+
+    #[test]
+    fn preview_cbz_without_image_or_not_a_zip_is_other() {
+        let (t, svc, _ch, root) = setup();
+        let none = format!("{root}/text.cbz");
+        make_cbz(t.path(), &none, &[("a.txt", b"hi".to_vec())]);
+        let p = svc.preview(&none).unwrap();
+        assert_eq!((p.kind, p.data_url), (PreviewKindDto::Other, None));
+        assert!(p.size > 0.0);
+
+        let broken = format!("{root}/broken.cbz");
+        std::fs::write(&broken, "이건 ZIP이 아니다").unwrap();
+        let p = svc.preview(&broken).unwrap();
+        assert_eq!((p.kind, p.data_url), (PreviewKindDto::Other, None));
+    }
+
+    #[test]
+    fn preview_cbz_too_large_image_is_truncated_without_data() {
+        let (t, svc, _ch, root) = setup();
+        let dest = format!("{root}/big.cbz");
+        let big = vec![0u8; 10 * 1024 * 1024 + 1];
+        make_cbz(t.path(), &dest, &[("001.png", big)]);
+        let p = svc.preview(&dest).unwrap();
+        assert_eq!(p.kind, PreviewKindDto::Image);
+        assert!(p.truncated);
+        assert_eq!(p.data_url, None);
+        assert_eq!(p.size, (10 * 1024 * 1024 + 1) as f64);
     }
 
     /// 디스크 없이 메모리에서 10만 항목 DTO를 만들어 IPC로 나가는 JSON의 크기와 직렬화 시간을 잰다.

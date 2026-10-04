@@ -36,6 +36,45 @@ pub struct Archive {
     zip_index: Vec<usize>,
 }
 
+/// 숫자 덩어리는 크기로, 나머지는 소문자 글자로 비교하는 자연 정렬.
+fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
+    let (a, b) = (a.to_lowercase(), b.to_lowercase());
+    let (mut x, mut y) = (a.chars().peekable(), b.chars().peekable());
+    loop {
+        match (x.peek().copied(), y.peek().copied()) {
+            (None, None) => return Ordering::Equal,
+            (None, _) => return Ordering::Less,
+            (_, None) => return Ordering::Greater,
+            (Some(c), Some(d)) if c.is_ascii_digit() && d.is_ascii_digit() => {
+                let num = |it: &mut std::iter::Peekable<std::str::Chars>| {
+                    let mut s = String::new();
+                    while let Some(&ch) = it.peek() {
+                        if !ch.is_ascii_digit() {
+                            break;
+                        }
+                        s.push(ch);
+                        it.next();
+                    }
+                    s.trim_start_matches('0').to_string()
+                };
+                let (p, q) = (num(&mut x), num(&mut y));
+                let ord = p.len().cmp(&q.len()).then_with(|| p.cmp(&q));
+                if ord != Ordering::Equal {
+                    return ord;
+                }
+            }
+            (Some(c), Some(d)) => {
+                if c != d {
+                    return c.cmp(&d);
+                }
+                x.next();
+                y.next();
+            }
+        }
+    }
+}
+
 fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
     let y = if m <= 2 { y - 1 } else { y };
     let era = if y >= 0 { y } else { y - 399 } / 400;
@@ -238,6 +277,23 @@ impl Archive {
         let mut v = Vec::new();
         self.read_to(path, &mut v)?;
         Ok(v)
+    }
+
+    /// 이미지 파일 중 이름이 자연 정렬(`2.jpg` < `10.jpg`, 대소문자 무시)로 가장 앞선 것. cbz 미리보기용.
+    /// 폴더, `__MACOSX/`, 점으로 시작하는 파일(`._1.jpg`, `.DS_Store`)은 건너뛴다. 이미지가 없으면 None.
+    pub fn first_image(&self) -> Option<&EntryInfo> {
+        self.entries
+            .iter()
+            .filter(|e| {
+                let name = e.name.as_str();
+                !e.is_dir
+                    && !e.is_symlink
+                    && !name
+                        .split('/')
+                        .any(|p| p.starts_with('.') || p == "__MACOSX")
+                    && td_vfs::image_mime(name).is_some()
+            })
+            .min_by(|a, b| natural_cmp(&a.name, &b.name))
     }
 
     /// 안에 든 아카이브(중첩)를 임시 파일로 꺼내 연다 (ARC-03).

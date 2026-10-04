@@ -47,7 +47,8 @@ impl Default for PreviewLimits {
     }
 }
 
-fn image_mime(name: &str) -> Option<&'static str> {
+/// 확장자로 이미지 MIME을 판별한다. 이미지가 아니면 None.
+pub fn image_mime(name: &str) -> Option<&'static str> {
     let ext = name.rsplit_once('.')?.1.to_ascii_lowercase();
     Some(match ext.as_str() {
         "png" => "image/png",
@@ -58,6 +59,13 @@ fn image_mime(name: &str) -> Option<&'static str> {
         "svg" => "image/svg+xml",
         _ => return None,
     })
+}
+
+/// 이미지 바이트를 `data:image/…;base64,…`로 만든다. 이름의 확장자가 이미지가 아니면 None.
+pub fn image_data_url(name: &str, bytes: &[u8]) -> Option<String> {
+    let mime = image_mime(name)?;
+    let b64 = base64::engine::general_purpose::STANDARD.encode(bytes);
+    Some(format!("data:{mime};base64,{b64}"))
 }
 
 /// 경로(심볼릭 링크는 따라간다)의 미리보기를 읽는다. 파일 전체를 읽지 않는다.
