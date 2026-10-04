@@ -99,7 +99,8 @@ task test       # Rust와 TS 테스트
 task check      # fmt, clippy, 타입 검사
 task bundle     # 설치용 번들 만들기 (macOS는 .app, Windows는 NSIS 설치 파일)
 task install    # 번들을 만들어 이 PC에 설치 (macOS는 /Applications)
-task release    # GitHub 릴리스에 올리기 (gh 로그인 필요)
+task release:draft  # 드래프트 배포: 이 OS의 파일을 비공개 초안에 올린다(공개·태그 없음. gh 로그인 필요)
+task release        # 배포: 이 OS의 파일을 올리고 공개한다(macOS·Windows 파일이 모두 있을 때만, 태그가 만들어진다)
 ```
 
 ## 설정 파일
