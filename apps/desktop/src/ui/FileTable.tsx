@@ -6,6 +6,7 @@ import type { EntryDto } from "@twin-deck/ts-client";
 import { parseColumns } from "../lib/columns";
 import type { ColumnSpec } from "../lib/columns";
 import { COLUMN_TITLES, cellText } from "../lib/format";
+import { quickMatchRange } from "../lib/names";
 import { SORT_KEYS } from "../lib/sort";
 import { FileIcon } from "./FileIcon";
 import type { SortKey } from "../lib/sort";
@@ -61,6 +62,22 @@ function useRows(count: number, ref: React.RefObject<HTMLDivElement | null>): Vi
       el.dispatchEvent(new Event("scroll"));
     },
   });
+}
+
+/** 빠른 선택으로 일치한 부분을 색으로 칠한 이름. 일치하지 않으면 이름 그대로다. */
+function QuickHighlight({ name, input, prefixOnly }: { name: string; input: string; prefixOnly: boolean }) {
+  const range = quickMatchRange(name, input, prefixOnly);
+  if (!range) return <>{name}</>;
+  const shown = name.normalize("NFC");
+  return (
+    <>
+      {shown.slice(0, range[0])}
+      <mark data-quick-match className="rounded-sm bg-status-warning/55 font-semibold text-inherit">
+        {shown.slice(range[0], range[1])}
+      </mark>
+      {shown.slice(range[1])}
+    </>
+  );
 }
 
 export function FileTable({ pane }: { pane: PaneId }) {
@@ -145,7 +162,11 @@ export function FileTable({ pane }: { pane: PaneId }) {
         <FileIcon name={e.name} kind={e.kind} size={iconSize} />
         {(multi ? [{ name: "name" } as ColumnSpec] : columns).map((c, k) => (
           <span key={`${c.name}-${k}`} className={c.name === "name" ? "truncate" : "truncate text-right tabular-nums"}>
-            {cellText(e, c.name, config.display, undefined, tab.virtual?.kind === "usage")}
+            {c.name === "name" && tab.quick ? (
+              <QuickHighlight name={e.name} input={tab.quick} prefixOnly={config.behavior.quick_select.match_only_prefix} />
+            ) : (
+              cellText(e, c.name, config.display, undefined, tab.virtual?.kind === "usage")
+            )}
           </span>
         ))}
       </div>
