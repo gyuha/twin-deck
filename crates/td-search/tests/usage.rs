@@ -138,7 +138,7 @@ fn flatten_lists_files_only() {
                 .strip_prefix(root)
                 .unwrap()
                 .to_string_lossy()
-                .into_owned(),
+                .replace('\\', "/"),
             e.kind,
         ))
     });

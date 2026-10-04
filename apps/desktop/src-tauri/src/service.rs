@@ -973,9 +973,12 @@ mod tests {
         svc.touch(&a).unwrap();
         assert!(svc.touch(&a).is_err());
         svc.mkdir(&format!("{root}/dest")).unwrap();
-        assert_eq!(svc.detect_conflict(&a, &root), Some(a.clone()));
+        assert_eq!(
+            svc.detect_conflict(&a, &root).map(|p| p.replace('\\', "/")),
+            Some(a.replace('\\', "/"))
+        );
         let renamed = svc.rename(&a, "b.txt").unwrap();
-        assert!(renamed.ends_with("root/b.txt"));
+        assert!(renamed.replace('\\', "/").ends_with("root/b.txt"));
         assert!(svc.rename(&renamed, "x/y").is_err());
     }
 

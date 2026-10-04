@@ -342,7 +342,7 @@ fn run(root: &Path, query: &str) -> (Vec<String>, td_search::SearchReport) {
                     .strip_prefix(root)
                     .unwrap()
                     .to_string_lossy()
-                    .into_owned(),
+                    .replace('\\', "/"),
             )
         },
     );

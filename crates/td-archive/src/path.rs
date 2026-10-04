@@ -15,6 +15,14 @@ fn base_name(p: &str) -> &str {
     p.rsplit('/').next().unwrap_or(p)
 }
 
+/// 첫 아카이브 경계(`!/` 또는 `!\`) 뒤의 `\`를 `/`로 바꾼다. Windows의 `PathBuf::join`이 `x.zip!\inner`를 만들기 때문이다.
+fn normalize_separators(path: &str) -> String {
+    match path.find("!\\").into_iter().chain(path.find("!/")).min() {
+        Some(i) => format!("{}{}", &path[..i], path[i..].replace('\\', "/")),
+        None => path.to_string(),
+    }
+}
+
 /// 경계 후보 위치들: `!/`의 시작 인덱스, 그리고 문자열이 `!`로 끝나면 그 위치(루트 표기 `x.zip!`).
 fn boundaries(s: &str) -> Vec<(usize, usize)> {
     let mut out: Vec<(usize, usize)> = s.match_indices("!/").map(|(i, _)| (i, i + 2)).collect();
@@ -41,6 +49,13 @@ pub fn split_archive_path_with(
     outer_is_file: &dyn Fn(&str) -> bool,
     forced_outer: &dyn Fn(&str) -> bool,
 ) -> Option<ArchivePath> {
+    let normalized;
+    let path = if cfg!(windows) {
+        normalized = normalize_separators(path);
+        normalized.as_str()
+    } else {
+        path
+    };
     for (start, end) in boundaries(path) {
         let prefix = &path[..start];
         let by_name = kind_for_name(base_name(prefix), extra_zip_exts).is_some();
@@ -77,4 +92,23 @@ pub fn join_archive_path(ap: &ArchivePath) -> String {
     }
     s.push_str(&ap.inner);
     s
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_separators;
+
+    #[test]
+    fn 경계_뒤의_역슬래시만_슬래시로_바꾼다() {
+        assert_eq!(
+            normalize_separators("C:\\a\\x.zip!\\d\\e.txt"),
+            "C:\\a\\x.zip!/d/e.txt"
+        );
+        assert_eq!(
+            normalize_separators("C:\\a\\x.zip!/d\\e"),
+            "C:\\a\\x.zip!/d/e"
+        );
+        assert_eq!(normalize_separators("C:\\a\\x.zip!"), "C:\\a\\x.zip!");
+        assert_eq!(normalize_separators("C:\\a\\b"), "C:\\a\\b");
+    }
 }

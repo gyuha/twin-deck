@@ -17,6 +17,14 @@ impl VfsPath {
     }
 
     pub fn join(&self, name: &str) -> Self {
+        // 아카이브 경계(`x.zip!`) 뒤는 OS와 무관하게 `/`다. Windows의 `PathBuf::join`은 `\`를 쓴다.
+        if cfg!(windows) {
+            let s = self.0.to_string_lossy();
+            if s.ends_with('!') || s.contains("!/") {
+                let sep = if s.ends_with('/') { "" } else { "/" };
+                return Self(PathBuf::from(format!("{s}{sep}{name}")));
+            }
+        }
         Self(self.0.join(name))
     }
 
@@ -38,5 +46,23 @@ impl fmt::Display for VfsPath {
 impl From<&Path> for VfsPath {
     fn from(p: &Path) -> Self {
         Self(p.to_path_buf())
+    }
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::VfsPath;
+
+    #[test]
+    fn 아카이브_경계_뒤는_슬래시로_잇는다() {
+        assert_eq!(
+            VfsPath::new("C:\\a\\x.zip!").join("d").to_string(),
+            "C:\\a\\x.zip!/d"
+        );
+        assert_eq!(
+            VfsPath::new("C:\\a\\x.zip!/d").join("e").to_string(),
+            "C:\\a\\x.zip!/d/e"
+        );
+        assert_eq!(VfsPath::new("C:\\a").join("b").to_string(), "C:\\a\\b");
     }
 }
