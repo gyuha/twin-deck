@@ -14,7 +14,7 @@
   ![드래그로 복사](docs/screenshots/drag-copy.png)
 
 - **파일 클립보드**: `Cmd/Ctrl+C`, `Cmd/Ctrl+X`, `Cmd/Ctrl+V`가 운영체제의 파일 클립보드와 연동돼서 Finder·탐색기와 파일을 주고받을 수 있습니다. 잘라낸 파일은 붙여 넣을 때 이동합니다.
-- **미리보기**: `→` 또는 `Cmd/Ctrl+Y`로 텍스트, 코드(구문 강조), Markdown, JSON, 이미지, PDF를 바로 봅니다. 만화 압축 파일(`.cbz`)은 안의 첫 이미지를 보여 줍니다.
+- **미리보기**: `→` 또는 `Cmd/Ctrl+Y`로 텍스트, 코드(구문 강조), Markdown, JSON, 이미지, PDF를 바로 봅니다. 만화 압축 파일(`.cbz`)은 안의 첫 이미지를 보여 주고, 사운드 파일(mp3·wav·ogg·flac·m4a 등)은 재생 UI만 띄운 뒤 재생 버튼을 클릭해야 재생합니다.
 
   ![코드 미리보기](docs/screenshots/preview-code.png)
 

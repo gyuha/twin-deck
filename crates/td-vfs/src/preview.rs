@@ -11,6 +11,8 @@ use crate::{Result, VfsError, VfsPath};
 pub enum PreviewKind {
     Text,
     Image,
+    /// 사운드 파일. 한도 안이면 `data:audio/...;base64,...`로 싣는다(재생은 화면이 한다).
+    Audio,
     /// PDF. 한도 안이면 `data:application/pdf;base64,...`로 싣는다.
     Pdf,
     Directory,
@@ -35,6 +37,7 @@ pub struct PreviewLimits {
     pub text_bytes: usize,
     pub image_bytes: u64,
     pub pdf_bytes: u64,
+    pub audio_bytes: u64,
 }
 
 impl Default for PreviewLimits {
@@ -43,6 +46,7 @@ impl Default for PreviewLimits {
             text_bytes: 64 * 1024,
             image_bytes: 10 * 1024 * 1024,
             pdf_bytes: 10 * 1024 * 1024,
+            audio_bytes: 20 * 1024 * 1024,
         }
     }
 }
@@ -57,6 +61,21 @@ pub fn image_mime(name: &str) -> Option<&'static str> {
         "webp" => "image/webp",
         "bmp" => "image/bmp",
         "svg" => "image/svg+xml",
+        _ => return None,
+    })
+}
+
+/// 확장자로 오디오 MIME을 판별한다. 오디오가 아니면 None.
+pub fn audio_mime(name: &str) -> Option<&'static str> {
+    let ext = name.rsplit_once('.')?.1.to_ascii_lowercase();
+    Some(match ext.as_str() {
+        "mp3" => "audio/mpeg",
+        "wav" => "audio/wav",
+        "ogg" | "oga" | "opus" => "audio/ogg",
+        "flac" => "audio/flac",
+        "m4a" => "audio/mp4",
+        "aac" => "audio/aac",
+        "weba" => "audio/webm",
         _ => return None,
     })
 }
@@ -96,6 +115,21 @@ pub fn read_preview(path: &VfsPath, limits: PreviewLimits) -> Result<Preview> {
         return Ok(Preview {
             data_url: Some(format!("data:{mime};base64,{b64}")),
             ..base(PreviewKind::Image)
+        });
+    }
+
+    if let Some(mime) = audio_mime(&name) {
+        if size > limits.audio_bytes {
+            return Ok(Preview {
+                truncated: true,
+                ..base(PreviewKind::Audio)
+            });
+        }
+        let bytes = fs::read(path.as_path()).map_err(|e| VfsError::io(path, e))?;
+        let b64 = base64::engine::general_purpose::STANDARD.encode(bytes);
+        return Ok(Preview {
+            data_url: Some(format!("data:{mime};base64,{b64}")),
+            ..base(PreviewKind::Audio)
         });
     }
 

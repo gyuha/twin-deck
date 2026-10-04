@@ -102,6 +102,7 @@ pub enum JobKindDto {
 pub enum PreviewKindDto {
     Text,
     Image,
+    Audio,
     Pdf,
     Directory,
     Other,
@@ -162,6 +163,7 @@ impl From<td_vfs::Preview> for PreviewDto {
             kind: match p.kind {
                 td_vfs::PreviewKind::Text => PreviewKindDto::Text,
                 td_vfs::PreviewKind::Image => PreviewKindDto::Image,
+                td_vfs::PreviewKind::Audio => PreviewKindDto::Audio,
                 td_vfs::PreviewKind::Pdf => PreviewKindDto::Pdf,
                 td_vfs::PreviewKind::Directory => PreviewKindDto::Directory,
                 td_vfs::PreviewKind::Other => PreviewKindDto::Other,
@@ -1747,6 +1749,16 @@ mod tests {
         assert!(p.truncated);
         assert_eq!(p.data_url, None);
         assert_eq!(p.size, (10 * 1024 * 1024 + 1) as f64);
+    }
+
+    #[test]
+    fn preview_dto_maps_audio() {
+        let (_t, svc, _ch, root) = setup();
+        std::fs::write(format!("{root}/s.mp3"), [1u8, 2, 3]).unwrap();
+        let a = svc.preview(&format!("{root}/s.mp3")).unwrap();
+        assert_eq!(a.kind, PreviewKindDto::Audio);
+        assert!(!a.truncated);
+        assert!(a.data_url.unwrap().starts_with("data:audio/mpeg;base64,"));
     }
 
     /// 디스크 없이 메모리에서 10만 항목 DTO를 만들어 IPC로 나가는 JSON의 크기와 직렬화 시간을 잰다.

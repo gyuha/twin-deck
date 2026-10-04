@@ -4,6 +4,7 @@ import { CodeView } from "./CodeView";
 import { usePreviewFont } from "./fonts";
 import { JsonView } from "./JsonView";
 import { MarkdownView } from "./MarkdownView";
+import { AudioView } from "./AudioView";
 import { PdfView } from "./PdfView";
 
 const isMarkdown = (name: string) => /\.(md|markdown)$/i.test(name);
@@ -60,6 +61,12 @@ export function Preview() {
               </div>
             ) : (
               <p className="text-ink-faint">이미지가 너무 커서 미리 볼 수 없습니다 ({size(d.size)})</p>
+            ))}
+          {d?.kind === "audio" &&
+            (d.dataUrl ? (
+              <AudioView dataUrl={d.dataUrl} name={p.name} />
+            ) : (
+              <p className="text-ink-faint">사운드 파일이 너무 커서 미리 들을 수 없습니다 ({size(d.size)})</p>
             ))}
           {d?.kind === "pdf" &&
             (d.dataUrl ? (

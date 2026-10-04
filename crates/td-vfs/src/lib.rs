@@ -17,7 +17,9 @@ pub use info::Info;
 pub use local::LocalFs;
 pub use names::{compare_names, matches_prefix, normalize_name, sort_entries};
 pub use path::VfsPath;
-pub use preview::{image_data_url, image_mime, read_preview, Preview, PreviewKind, PreviewLimits};
+pub use preview::{
+    audio_mime, image_data_url, image_mime, read_preview, Preview, PreviewKind, PreviewLimits,
+};
 pub use symlink_error::symlink_error_message;
 
 /// 파일시스템 추상화. `LocalFs`가 기본 구현이고, 아카이브는 td-archive의 `CompositeFs`가 라우팅한다.

@@ -147,3 +147,92 @@ fn copy_file_not_found_names_the_missing_side() {
         "{err:?}"
     );
 }
+
+#[test]
+fn preview_audio_files_carry_a_data_url_with_the_right_mime() {
+    let (t, _root) = root();
+    let cases = [
+        ("a.mp3", "audio/mpeg"),
+        ("b.WAV", "audio/wav"),
+        ("c.ogg", "audio/ogg"),
+        ("d.oga", "audio/ogg"),
+        ("e.opus", "audio/ogg"),
+        ("f.flac", "audio/flac"),
+        ("g.m4a", "audio/mp4"),
+        ("h.aac", "audio/aac"),
+        ("i.weba", "audio/webm"),
+    ];
+    for (name, mime) in cases {
+        let body = format!("RIFF-{name}").into_bytes();
+        std::fs::write(t.path().join(name), &body).unwrap();
+        let p = read_preview(&VfsPath::new(t.path().join(name)), PreviewLimits::default()).unwrap();
+        assert_eq!(p.kind, PreviewKind::Audio, "{name}");
+        assert!(!p.truncated);
+        let url = p.data_url.unwrap();
+        let b64 = url
+            .strip_prefix(&format!("data:{mime};base64,"))
+            .unwrap_or_else(|| panic!("{name}: {url}"));
+        // 원본 바이트 그대로: 같은 바이트로 만든 data URL과 같다.
+        assert_eq!(Some(url.clone()), td_vfs_audio_url(mime, &body), "{name}");
+        assert!(!b64.is_empty());
+    }
+}
+
+/// 테스트용: 기대하는 data URL을 표준 base64로 직접 만든다.
+fn td_vfs_audio_url(mime: &str, bytes: &[u8]) -> Option<String> {
+    const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::new();
+    for c in bytes.chunks(3) {
+        let n = (u32::from(c[0]) << 16)
+            | (u32::from(*c.get(1).unwrap_or(&0)) << 8)
+            | u32::from(*c.get(2).unwrap_or(&0));
+        out.push(T[(n >> 18) as usize & 63] as char);
+        out.push(T[(n >> 12) as usize & 63] as char);
+        out.push(if c.len() > 1 {
+            T[(n >> 6) as usize & 63] as char
+        } else {
+            '='
+        });
+        out.push(if c.len() > 2 {
+            T[n as usize & 63] as char
+        } else {
+            '='
+        });
+    }
+    Some(format!("data:{mime};base64,{out}"))
+}
+
+#[test]
+fn preview_audio_over_the_limit_is_truncated_without_data() {
+    let (t, _root) = root();
+    std::fs::write(t.path().join("big.mp3"), vec![0u8; 2049]).unwrap();
+    let limits = PreviewLimits {
+        audio_bytes: 2048,
+        ..PreviewLimits::default()
+    };
+    let p = read_preview(&VfsPath::new(t.path().join("big.mp3")), limits).unwrap();
+    assert_eq!(p.kind, PreviewKind::Audio);
+    assert!(p.truncated);
+    assert_eq!(p.data_url, None);
+    assert_eq!(p.size, 2049);
+}
+
+#[test]
+fn preview_audio_extension_with_empty_content_does_not_fail() {
+    let (t, _root) = root();
+    std::fs::write(t.path().join("empty.wav"), b"").unwrap();
+    let p = read_preview(
+        &VfsPath::new(t.path().join("empty.wav")),
+        PreviewLimits::default(),
+    )
+    .unwrap();
+    assert_eq!(p.kind, PreviewKind::Audio);
+    assert_eq!(p.data_url.as_deref(), Some("data:audio/wav;base64,"));
+}
+
+#[test]
+fn audio_mime_is_none_for_non_audio() {
+    assert_eq!(audio_mime("a.txt"), None);
+    assert_eq!(audio_mime("noext"), None);
+    assert_eq!(audio_mime("a.png"), None);
+}
