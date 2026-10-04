@@ -83,7 +83,7 @@ export function Preview() {
             </p>
           )}
         </div>
-        <p className="mt-2 pr-3 text-xs text-ink-faint">↑↓ 이전/다음 항목 · Enter 열기 · Space/Esc 닫기</p>
+        <p className="mt-2 pr-3 text-xs text-ink-faint">↑↓ 이전/다음 항목 · Enter 열기 · Delete 삭제 · Space/Esc 닫기</p>
       </div>
     </div>
   );

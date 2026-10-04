@@ -140,6 +140,7 @@ export function paletteHandlers({ api }: AppStore): Partial<ActionHandlers> {
     },
     "core.preview.prev": () => api.previewMove(-1),
     "core.preview.next": () => api.previewMove(1),
+    "core.preview.delete": () => api.previewDelete(),
     "core.actions.panel": () => api.paletteOpen(),
     "core.palette.up": () => api.paletteMove(-1),
     "core.palette.down": () => api.paletteMove(1),

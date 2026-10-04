@@ -2186,6 +2186,34 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (entry) await loadPreview(entry);
     },
 
+    /**
+     * 미리보기 중인 파일을 영구 삭제하고 다음 파일로 넘어간다(`core.confirm.delete`가 켜져 있으면 확인을 거친다).
+     * 다음이 없으면(맨 끝) 앞 파일로, 남은 파일이 없으면 미리보기를 닫는다.
+     */
+    async previewDelete() {
+      const p = get().preview;
+      if (!p) return;
+      const tab = activeTab(get());
+      const idx = tab.entries.findIndex((e) => e.path === p.path);
+      const entry = tab.entries[idx];
+      if (!entry) return;
+      if (cfg().core.confirm.delete && !(await api.confirmTargets("이 항목을 영구 삭제할까요?", [entry]))) return;
+      // 삭제는 큐에서 비동기로 끝나므로, 지금 목록에서 다음(없으면 이전) 항목을 미리 정해 그 쪽으로 옮긴다.
+      const next = tab.entries[idx + 1] ?? tab.entries[idx - 1];
+      set({ notice: null });
+      patchActive({ selection: new Set() });
+      api.recheckVirtual([entry.path]);
+      const jobId = await backend.enqueue("delete", [{ src: entry.path, destDir: null, policy: "skip" }]);
+      void trackTransfer(jobId, "삭제");
+      if (next) {
+        api.setCursor(tab.entries.indexOf(next));
+        await loadPreview(next);
+      } else {
+        api.previewClose();
+      }
+      await reloadAll();
+    },
+
     /** Actions Panel에 액션 목록과 실행기를 연결한다. */
     attachPalette(catalog: () => CatalogItem[], run: (id: string) => Promise<unknown>) {
       catalogFn = catalog;

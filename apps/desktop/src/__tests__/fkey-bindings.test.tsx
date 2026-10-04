@@ -81,6 +81,7 @@ describe("F키 설정이 키맵에 반영된다", () => {
       "Shift+F6=core.rename@pane",
       "Shift+F7=core.file.new_file@pane",
       "Shift+F8=core.delete@pane",
+      "Shift+F8=core.preview.delete@preview", // 미리보기 안에서는 그 파일을 지운다
     ].sort();
     expect(keysOf("linux")).toEqual(expected);
     expect(keysOf("mac")).toEqual(expected);

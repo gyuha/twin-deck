@@ -161,6 +161,7 @@ Shift+이동 키(범위의 선택 반전)는 액션이 아니라 `pane` 스코�
 | `core.view.mode` | 표시 모드 (인수) | 없음 | 없음 | 자체 (인수 이름 미확인) |
 | `core.view.order` | 정렬 (인수) | 없음 | 없음 | 자체 (인수 이름 미확인) |
 | `core.preview` | 미리보기 (파일에서는 `Right`도 연다) | `Mod+Y` | `Ctrl+Y` | 자체 ID, 키 확인 |
+| `core.preview.delete` | 미리보기: 파일 삭제 (영구 삭제 확인을 거친다. 다음 파일로 넘어가고 남은 파일이 없으면 닫는다) | `Delete`, `Shift+F8` | `Delete`, `Shift+F8` | preview | 자체 ID |
 | `core.find.open` | 파일 찾기(Double Commander "파일 찾기" 기본 탭, 하위 폴더 검색) | `Mod+F` | `Ctrl+F` | 자체 ID. 결과는 새 가상 탭. Quick Select는 이 키를 내주고 `Mod+Shift+F`로 옮겼다 |
 | `core.quickselect.start` | Quick Select 시작 | `Mod+Shift+F` | `Ctrl+Shift+F` | pane | 자체 ID. 문자 키를 치면 자동으로 시작되므로(`activate_on_any_character`) 이 키는 그 설정을 껐을 때 쓴다. 이전 기본 키 `Mod+F`는 파일 찾기가 가져갔다 |
 | `core.lookup.global` | Look Up (전역) | `Mod+P` | `Ctrl+P` | 자체 ID, 키 확인 |
