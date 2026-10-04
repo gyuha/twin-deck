@@ -826,6 +826,18 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     return null;
   }
 
+  /** 지금 끌고 있는 항목들(앱 안에서 시작한 드래그). 없으면 null. */
+  let dragPaths: string[] | null = null;
+  let dragPane: PaneId | null = null;
+  /** 드래그 중 운영체제에 물어 둔 Ctrl 상태. macOS 웹뷰는 드래그 도중의 Ctrl을 DOM 이벤트로 주지 않는다. */
+  let nativeCtrl = false;
+  let ctrlPoll: ReturnType<typeof setInterval> | null = null;
+  const stopCtrlPoll = () => {
+    if (ctrlPoll) clearInterval(ctrlPoll);
+    ctrlPoll = null;
+    nativeCtrl = false;
+  };
+
   /** 잘라내기(Mod+X)로 표시한 경로들. 붙여 넣을 때 클립보드 내용이 이것과 같으면 이동으로 처리한다. */
   let cutPaths: string[] = [];
 
@@ -1493,6 +1505,57 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         if (!error) break;
       }
       await runTransfer(kind, targets, destDir, confirm ? TRANSFER_PROGRESS_DELAY_COPY_MS : TRANSFER_PROGRESS_DELAY_MS, true);
+    },
+    /** 드래그 시작: 끄는 행이 선택에 들어 있으면 선택 전체, 아니면 그 행만 끈다. 끄는 경로들을 돌려준다. */
+    dragBegin(pane: PaneId, index: number): string[] {
+      const tab = activeTab(get(), pane);
+      const entry = tab.entries[index];
+      if (!entry) return [];
+      dragPane = pane;
+      stopCtrlPoll();
+      ctrlPoll = setInterval(() => void backend.isCtrlDown().then((v) => (nativeCtrl = v), () => {}), 50);
+      dragPaths = tab.selection.has(entry.path) ? tab.entries.filter((e) => tab.selection.has(e.path)).map((e) => e.path) : [entry.path];
+      return dragPaths;
+    },
+    dragEnd() {
+      dragPaths = null;
+      dragPane = null;
+      stopCtrlPoll();
+    },
+    /** 드래그 중 Ctrl이 눌려 있는지(DOM 이벤트가 주는 값과 운영체제에 물어 둔 값 중 하나라도 참이면 참). */
+    ctrlHeld(domCtrl: boolean): boolean {
+      return domCtrl || nativeCtrl;
+    },
+    /** 끌기를 시작한 패널. */
+    dragSourcePane(): PaneId | null {
+      return dragPane;
+    },
+    /** 앱 안에서 끌고 있는 항목이 있는지(드롭 대상이 받아들일지 정할 때). */
+    isDragging() {
+      return dragPaths !== null;
+    },
+    /** 끌어 놓기: `destDir`로 복사하거나(`move`면 이동). 확인 창 없이 겹친 이름만 묻고 작업 큐에 넣는다. */
+    async dropTransfer(destDir: string, move: boolean) {
+      const paths = dragPaths;
+      dragPaths = null;
+      dragPane = null;
+      stopCtrlPoll();
+      // 놓는 순간의 Ctrl은 운영체제에 한 번 더 묻는다(웹뷰가 drop 이벤트에도 주지 않을 수 있다).
+      move = move || (await backend.isCtrlDown().catch(() => false));
+      if (!paths || paths.length === 0) return;
+      set({ notice: null });
+      // 이동인데 이미 그 폴더에 있는 항목은 할 일이 없다. 복사는 같은 폴더여도 이름을 바꿔 복제할 수 있다.
+      const srcs = move ? paths.filter((p) => parentPath(p) !== destDir) : paths;
+      if (srcs.length === 0) return;
+      let entries: Pick<EntryDto, "path" | "kind">[];
+      try {
+        entries = await Promise.all(srcs.map(async (p) => ({ path: p, kind: (await backend.fileInfo(p)).kind })));
+      } catch (e) {
+        return fail(e);
+      }
+      const error = await transferDestError(destDir, entries);
+      if (error) return fail(error);
+      await runTransfer(move ? "move" : "copy", entries, destDir, TRANSFER_PROGRESS_DELAY_COPY_MS, false);
     },
     /** 클립보드로 복사 (Mod+C): 대상 항목을 운영체제 파일 클립보드에 쓴다. */
     async clipboardCopy() {

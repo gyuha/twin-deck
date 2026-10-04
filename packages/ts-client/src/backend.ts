@@ -51,6 +51,8 @@ export interface Backend {
   globFilter(pattern: string, names: string[]): Promise<number[]>;
   /** 클립보드에 텍스트를 쓴다. */
   copyText(text: string): Promise<void>;
+  /** 지금 Ctrl 키가 눌려 있는지(운영체제 기준, macOS만. 그 밖은 false). 웹뷰가 드래그 중 Ctrl 상태를 주지 않을 때 쓴다. */
+  isCtrlDown(): Promise<boolean>;
   /** 운영체제 파일 클립보드에 파일 경로 목록을 쓴다(Finder/탐색기에 붙여 넣을 수 있다). 빈 목록이면 비운다. */
   setClipboardFiles(paths: string[]): Promise<void>;
   /** 운영체제 파일 클립보드에 든 파일 경로(지금 있는 것만). 파일이 없으면 빈 목록. */

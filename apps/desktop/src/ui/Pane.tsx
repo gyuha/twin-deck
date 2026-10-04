@@ -20,6 +20,19 @@ export function Pane({ pane }: { pane: PaneId }) {
         api.activate(pane);
         if (e.button === 3 || e.button === 4) e.preventDefault(); // 웹뷰가 자체 뒤로가기를 하지 않게
       }}
+      onDragOver={(e) => {
+        // 폴더 행이 아닌 곳(빈 곳, 파일 행)에 놓으면 이 패널의 현재 폴더로 들어간다. 검색 결과 같은 가상 탭에는 놓을 수 없다.
+        if (isVirtual || !api.isDragging()) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = api.ctrlHeld(e.ctrlKey) ? "move" : "copy";
+      }}
+      onDrop={(e) => {
+        if (isVirtual || !api.isDragging()) return;
+        e.preventDefault();
+        // 같은 패널의 빈 곳에 놓는 것은 제자리라 아무 일도 하지 않는다(폴더 행에 놓는 것은 위에서 따로 처리한다).
+        if (api.dragSourcePane() === pane) return api.dragEnd();
+        void api.dropTransfer(path, e.ctrlKey);
+      }}
       onMouseUp={(e) => {
         // 마우스 뒤로(3)/앞으로(4) 버튼: 이 패널 탭의 이전/다음 폴더로
         if (e.button === 3) void api.goBack();

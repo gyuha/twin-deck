@@ -306,6 +306,13 @@ export class FakeBackend implements Backend {
     this.clipboard.push(text);
   }
 
+  /** 운영체제 기준 Ctrl 키 상태(테스트가 직접 바꾼다). */
+  ctrlDown = false;
+
+  async isCtrlDown() {
+    return this.ctrlDown;
+  }
+
   /** 운영체제 파일 클립보드(메모리). 테스트가 직접 채워 "다른 앱에서 복사한 파일"을 흉내 낼 수 있다. */
   fileClipboard: string[] = [];
 
