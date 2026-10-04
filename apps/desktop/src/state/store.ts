@@ -130,6 +130,26 @@ export interface PaneState {
   active: number;
 }
 
+/** 마우스를 누른 채 이만큼(px) 움직여야 드래그가 시작된다. 그보다 작으면 클릭이다. */
+const DRAG_START_PX = 5;
+
+/** 드롭 대상: 폴더 행(`row`, 그 폴더 안으로)이거나 패널(그 패널의 현재 폴더). */
+export interface DropTarget {
+  pane: PaneId;
+  dir: string;
+  row: boolean;
+}
+
+export interface DragState {
+  paths: string[];
+  sourcePane: PaneId;
+  x: number;
+  y: number;
+  /** Control 키가 눌려 있다(이동). 아니면 복사. */
+  ctrl: boolean;
+  target: DropTarget | null;
+}
+
 export const CONFLICT_CHOICES: readonly ConflictDto[] = ["overwrite", "skip", "rename"];
 
 export type DialogState =
@@ -238,6 +258,8 @@ export interface AppState {
   dialog: DialogState | null;
   /** 열려 있는 미리보기 (VIEW-01). */
   preview: PreviewState | null;
+  /** 진행 중인 드래그(행을 끌어 다른 폴더·패널에 놓기). 없으면 null. */
+  drag: DragState | null;
   /** 열려 있는 Actions Panel. */
   palette: PaletteState | null;
   /** 마지막 검색어. 다시 열면 이어서 보이고, 재시작 복원의 대상이다 (PANE-05). */
@@ -399,6 +421,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     showHidden: snapshot?.showHidden ?? false,
     dialog: null,
     preview: null,
+    drag: null,
     palette: null,
     lastPaletteQuery: snapshot?.paletteQuery ?? "",
     menu: null,
@@ -826,17 +849,10 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     return null;
   }
 
-  /** 지금 끌고 있는 항목들(앱 안에서 시작한 드래그). 없으면 null. */
-  let dragPaths: string[] | null = null;
-  let dragPane: PaneId | null = null;
-  /** 드래그 중 운영체제에 물어 둔 Ctrl 상태. macOS 웹뷰는 드래그 도중의 Ctrl을 DOM 이벤트로 주지 않는다. */
-  let nativeCtrl = false;
-  let ctrlPoll: ReturnType<typeof setInterval> | null = null;
-  const stopCtrlPoll = () => {
-    if (ctrlPoll) clearInterval(ctrlPoll);
-    ctrlPoll = null;
-    nativeCtrl = false;
-  };
+  /** 눌렀지만 아직 드래그가 시작되지 않은 행(5px 이상 움직이면 드래그가 된다). */
+  let pendingDrag: { pane: PaneId; index: number; x: number; y: number } | null = null;
+  /** 드래그를 막 끝냈다는 표시: 놓은 직후에 오는 click이 커서 이동·선택을 일으키지 않게 한다. */
+  let justDragged = false;
 
   /** 잘라내기(Mod+X)로 표시한 경로들. 붙여 넣을 때 클립보드 내용이 이것과 같으면 이동으로 처리한다. */
   let cutPaths: string[] = [];
@@ -895,6 +911,22 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     }
     cutPaths = mode === "cut" ? paths : [];
     flash(mode === "cut" ? `${paths.length}개 항목을 잘라냈습니다. 붙여 넣으면 이동합니다` : `${paths.length}개 항목을 클립보드에 복사했습니다`);
+  }
+
+  /** 커서 아래 요소에서 드롭 대상을 정한다: 폴더 행이면 그 폴더 안으로, 아니면 그 패널의 현재 폴더(같은 패널·가상 탭은 받지 않는다). */
+  function dropTargetAt(el: Element | null, drag: { paths: string[]; sourcePane: PaneId }): DropTarget | null {
+    const row = el?.closest<HTMLElement>("[data-row-kind='dir']");
+    if (row) {
+      const path = row.dataset.path;
+      const pane = row.dataset.pane as PaneId | undefined;
+      if (path && pane && !drag.paths.includes(path)) return { pane, dir: path, row: true };
+      return null;
+    }
+    const section = el?.closest<HTMLElement>("section[data-pane]");
+    const pane = section?.dataset.pane as PaneId | undefined;
+    if (!pane || pane === drag.sourcePane) return null;
+    const tab = activeTab(get(), pane);
+    return tab.virtual ? null : { pane, dir: tab.path, row: false };
   }
 
   const api = {
@@ -1506,43 +1538,59 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       }
       await runTransfer(kind, targets, destDir, confirm ? TRANSFER_PROGRESS_DELAY_COPY_MS : TRANSFER_PROGRESS_DELAY_MS, true);
     },
-    /** 드래그 시작: 끄는 행이 선택에 들어 있으면 선택 전체, 아니면 그 행만 끈다. 끄는 경로들을 돌려준다. */
-    dragBegin(pane: PaneId, index: number): string[] {
-      const tab = activeTab(get(), pane);
-      const entry = tab.entries[index];
-      if (!entry) return [];
-      dragPane = pane;
-      stopCtrlPoll();
-      ctrlPoll = setInterval(() => void backend.isCtrlDown().then((v) => (nativeCtrl = v), () => {}), 50);
-      dragPaths = tab.selection.has(entry.path) ? tab.entries.filter((e) => tab.selection.has(e.path)).map((e) => e.path) : [entry.path];
-      return dragPaths;
+    /** 행에서 마우스를 눌렀다: 5px 이상 움직이면 드래그가 시작된다. */
+    dragPress(pane: PaneId, index: number, x: number, y: number) {
+      pendingDrag = { pane, index, x, y };
     },
-    dragEnd() {
-      dragPaths = null;
-      dragPane = null;
-      stopCtrlPoll();
+    /** 마우스가 움직였다. 드래그 중이면 표시와 대상을 갱신하고, 누른 상태면 거리를 재어 드래그를 시작한다. `el`은 커서 아래 요소. */
+    dragMove(x: number, y: number, ctrl: boolean, el: Element | null) {
+      let drag = get().drag;
+      if (!drag) {
+        const p = pendingDrag;
+        if (!p || Math.hypot(x - p.x, y - p.y) < DRAG_START_PX) return;
+        const tab = activeTab(get(), p.pane);
+        const entry = tab.entries[p.index];
+        pendingDrag = null;
+        if (!entry) return;
+        // 끄는 행이 선택에 들어 있으면 선택 전체, 아니면 그 행만 끈다.
+        const paths = tab.selection.has(entry.path) ? tab.entries.filter((e) => tab.selection.has(e.path)).map((e) => e.path) : [entry.path];
+        drag = { paths, sourcePane: p.pane, x, y, ctrl, target: null };
+      }
+      set({ drag: { ...drag, x, y, ctrl, target: dropTargetAt(el, drag) } });
     },
-    /** 드래그 중 Ctrl이 눌려 있는지(DOM 이벤트가 주는 값과 운영체제에 물어 둔 값 중 하나라도 참이면 참). */
-    ctrlHeld(domCtrl: boolean): boolean {
-      return domCtrl || nativeCtrl;
+    isDragActive(): boolean {
+      return get().drag !== null;
     },
-    /** 끌기를 시작한 패널. */
-    dragSourcePane(): PaneId | null {
-      return dragPane;
+    /** Control 키를 눌렀다 뗐다(마우스가 안 움직여도 표시가 바뀐다). */
+    dragSetCtrl(ctrl: boolean) {
+      set((s) => (s.drag ? { drag: { ...s.drag, ctrl } } : {}));
     },
-    /** 앱 안에서 끌고 있는 항목이 있는지(드롭 대상이 받아들일지 정할 때). */
-    isDragging() {
-      return dragPaths !== null;
+    /** 마우스를 뗐다: 드래그 중이면 대상에 놓고, 아니면 눌림만 풀린다. 드래그였는지 돌려준다. */
+    dragRelease(ctrl: boolean): boolean {
+      pendingDrag = null;
+      const drag = get().drag;
+      if (!drag) return false;
+      set({ drag: null });
+      justDragged = true;
+      setTimeout(() => (justDragged = false), 0);
+      if (drag.target) void api.dropTransfer(drag.paths, drag.target.dir, ctrl || drag.ctrl);
+      return true;
+    },
+    /** Esc나 창 포커스를 잃어 드래그를 취소한다. */
+    dragCancel() {
+      pendingDrag = null;
+      if (!get().drag) return;
+      set({ drag: null });
+      justDragged = true;
+      setTimeout(() => (justDragged = false), 0);
+    },
+    /** 드래그를 막 끝냈으면 그 직후의 click을 무시하라고 알려 준다. */
+    consumeDragClick(): boolean {
+      return justDragged;
     },
     /** 끌어 놓기: `destDir`로 복사하거나(`move`면 이동). 확인 창 없이 겹친 이름만 묻고 작업 큐에 넣는다. */
-    async dropTransfer(destDir: string, move: boolean) {
-      const paths = dragPaths;
-      dragPaths = null;
-      dragPane = null;
-      stopCtrlPoll();
-      // 놓는 순간의 Ctrl은 운영체제에 한 번 더 묻는다(웹뷰가 drop 이벤트에도 주지 않을 수 있다).
-      move = move || (await backend.isCtrlDown().catch(() => false));
-      if (!paths || paths.length === 0) return;
+    async dropTransfer(paths: string[], destDir: string, move: boolean) {
+      if (paths.length === 0) return;
       set({ notice: null });
       // 이동인데 이미 그 폴더에 있는 항목은 할 일이 없다. 복사는 같은 폴더여도 이름을 바꿔 복제할 수 있다.
       const srcs = move ? paths.filter((p) => parentPath(p) !== destDir) : paths;

@@ -14,6 +14,7 @@ import { ActionBar, useBarIds } from "./ui/ActionBar";
 import { useUiFont } from "./ui/fonts";
 import { ActionsPalette } from "./ui/ActionsPalette";
 import { Dialog } from "./ui/Dialog";
+import { DragLayer } from "./ui/DragLayer";
 import { Preview } from "./ui/Preview";
 import { fkeyBindings } from "./lib/fkeys";
 import { FindDialog } from "./ui/FindDialog";
@@ -210,6 +211,7 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
         <ActionBar />
         <ActionsPalette />
         <Preview />
+        <DragLayer />
         <PopupMenu />
         <ContextMenu />
         <QueueIndicator />

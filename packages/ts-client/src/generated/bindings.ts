@@ -223,13 +223,6 @@ async detectConflict(src: string, destDir: string) : Promise<string | null> {
     return await TAURI_INVOKE("detect_conflict", { src, destDir });
 },
 /**
- * 지금 Ctrl 키가 눌려 있는지(macOS만, 그 밖은 항상 false).
- * macOS 웹뷰는 드래그 도중의 Ctrl 상태를 DOM 이벤트(`ctrlKey`)로 주지 않아, 끌어 놓기에서 운영체제에 직접 묻는다.
- */
-async isCtrlDown() : Promise<boolean> {
-    return await TAURI_INVOKE("is_ctrl_down");
-},
-/**
  * 파일 경로 목록을 운영체제 파일 클립보드에 쓴다. 빈 목록이면 클립보드를 비운다.
  */
 async setClipboardFiles(paths: string[]) : Promise<Result<null, string>> {

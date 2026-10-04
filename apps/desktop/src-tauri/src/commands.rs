@@ -388,22 +388,6 @@ pub fn detect_conflict(
     svc.detect_conflict(&src, &dest_dir)
 }
 
-/// 지금 Ctrl 키가 눌려 있는지(macOS만, 그 밖은 항상 false).
-/// macOS 웹뷰는 드래그 도중의 Ctrl 상태를 DOM 이벤트(`ctrlKey`)로 주지 않아, 끌어 놓기에서 운영체제에 직접 묻는다.
-#[tauri::command]
-#[specta::specta]
-pub fn is_ctrl_down() -> bool {
-    #[cfg(target_os = "macos")]
-    {
-        use objc2_app_kit::{NSEvent, NSEventModifierFlags};
-        NSEvent::modifierFlags_class().contains(NSEventModifierFlags::Control)
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        false
-    }
-}
-
 /// 파일 경로 목록을 운영체제 파일 클립보드에 쓴다. 빈 목록이면 클립보드를 비운다.
 #[tauri::command]
 #[specta::specta]
@@ -580,7 +564,6 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             mkdir,
             touch,
             detect_conflict,
-            is_ctrl_down,
             set_clipboard_files,
             get_clipboard_files,
             enqueue_job,

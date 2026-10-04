@@ -1,4 +1,4 @@
-import { createEvent, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, createEvent, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { FakeBackend } from "@twin-deck/ts-client";
 import { list, renderApp } from "./helpers";
@@ -15,116 +15,115 @@ const seed = () =>
     "/home/b/x.txt": "xxx",
   });
 
-const row = (pane: "left" | "right", name: string) => within(list(pane)).getByRole("option", { name: new RegExp(`^.?${name}`) });
-const rowByText = (pane: "left" | "right", name: string) =>
-  within(list(pane)).getAllByRole("option").find((o) => o.textContent?.includes(name))!;
-const section = (pane: "left" | "right") => screen.getByRole("region", { name: pane === "left" ? "왼쪽 패널" : "오른쪽 패널" });
-
-/** dataTransfer를 흉내 낸다(jsdom에는 없다). dropEffect를 읽어 볼 수 있다. */
-function dt() {
-  const data: Record<string, string> = {};
-  return { data, dropEffect: "none", effectAllowed: "uninitialized", setData: (k: string, v: string) => (data[k] = v), getData: (k: string) => data[k] ?? "" };
-}
-const start = (el: Element, t = dt()) => {
-  fireEvent.dragStart(el, { dataTransfer: t });
-  return t;
-};
-/** jsdom에는 DragEvent가 없어 ctrlKey 초기값이 버려지므로 이벤트를 만든 뒤 직접 건다. */
-const withCtrl = <E extends Event>(ev: E, ctrl: boolean): E => {
-  Object.defineProperty(ev, "ctrlKey", { value: ctrl });
-  return ev;
-};
-const over = (el: Element, t: ReturnType<typeof dt>, ctrl = false) => fireEvent(el, withCtrl(createEvent.dragOver(el, { dataTransfer: t }), ctrl));
-const drop = (el: Element, t: ReturnType<typeof dt>, ctrl = false) => fireEvent(el, withCtrl(createEvent.drop(el, { dataTransfer: t }), ctrl));
+type Pane = "left" | "right";
+const rowByText = (pane: Pane, name: string) => within(list(pane)).getAllByRole("option").find((o) => o.textContent?.includes(name))!;
+const section = (pane: Pane) => screen.getByRole("region", { name: pane === "left" ? "왼쪽 패널" : "오른쪽 패널" });
 const status = () => screen.getByRole("status", { name: "상태 표시줄" });
+const badge = () => document.querySelector("[data-drag-badge]");
+const ghost = () => document.querySelector("[data-drag-ghost]");
+
+/** 행에서 누르고(좌표 지정) 움직이는 동작. 실제 브라우저처럼 마우스 이벤트는 커서 아래 요소로 간다. */
+const down = (el: Element, x = 10, y = 10) => fireEvent.mouseDown(el, { button: 0, clientX: x, clientY: y });
+const moveTo = (el: Element, x: number, y: number, ctrl = false) => fireEvent.mouseMove(el, { clientX: x, clientY: y, ctrlKey: ctrl });
+const up = (el: Element, ctrl = false) => fireEvent.mouseUp(el, { button: 0, ctrlKey: ctrl });
+/** 행을 끌어 대상 위까지 움직인다(아직 놓지 않는다). */
+const dragOver = (src: Element, target: Element, ctrl = false) => {
+  down(src);
+  moveTo(src, 40, 40, ctrl); // 5px 넘게 움직여 드래그 시작
+  moveTo(target, 300, 300, ctrl);
+};
+const dragDrop = (src: Element, target: Element, ctrl = false) => {
+  dragOver(src, target, ctrl);
+  up(target, ctrl);
+};
 
 describe("드래그 & 드롭으로 복사·이동", () => {
-  it("행은 끌 수 있다", async () => {
-    await renderApp(seed());
-    expect(rowByText("left", "a.txt")).toHaveAttribute("draggable", "true");
-  });
-
   it("반대 패널에 놓으면 그 패널의 현재 폴더로 복사한다 (원본 유지)", async () => {
     const { backend } = await renderApp(seed());
-    const t = start(rowByText("left", "a.txt"));
-    over(section("right"), t);
-    drop(section("right"), t);
+    dragDrop(rowByText("left", "a.txt"), section("right"));
     await waitFor(() => expect(backend.read("/home/b/a.txt")).toBe("aaa"));
     expect(backend.exists("/home/a/a.txt")).toBe(true);
   });
 
-  it("드롭 때 Ctrl이 눌려 있으면 이동한다 (원본이 사라진다)", async () => {
+  it("놓을 때 Ctrl이 눌려 있으면 이동한다 (원본이 사라진다)", async () => {
     const { backend } = await renderApp(seed());
-    const t = start(rowByText("left", "a.txt"));
-    over(section("right"), t, true);
-    drop(section("right"), t, true);
+    dragDrop(rowByText("left", "a.txt"), section("right"), true);
     await waitFor(() => expect(backend.read("/home/b/a.txt")).toBe("aaa"));
     expect(backend.exists("/home/a/a.txt")).toBe(false);
   });
 
-  it("끄는 동안 커서 표시(dropEffect)는 Ctrl이 없으면 copy, 있으면 move다", async () => {
+  it("끄는 동안 커서 옆 표시는 Ctrl이 없으면 +, 있으면 −이고 마우스 이동과 Control 키로 바뀐다", async () => {
     await renderApp(seed());
-    const t = start(rowByText("left", "a.txt"));
-    over(section("right"), t, false);
-    expect(t.dropEffect).toBe("copy");
-    over(section("right"), t, true);
-    expect(t.dropEffect).toBe("move");
-    const folder = rowByText("right", "dest");
-    over(folder, t, false);
-    expect(t.dropEffect).toBe("copy");
-    over(folder, t, true);
-    expect(t.dropEffect).toBe("move");
+    const src = rowByText("left", "a.txt");
+    expect(badge()).toBeNull(); // 끌기 전에는 없다
+    dragOver(src, section("right"), false);
+    expect(badge()).toHaveTextContent("+");
+    moveTo(section("right"), 310, 310, true); // 마우스가 움직이며 Ctrl
+    expect(badge()).toHaveTextContent("−");
+    moveTo(section("right"), 320, 320, false);
+    expect(badge()).toHaveTextContent("+");
+    fireEvent.keyDown(window, { key: "Control", ctrlKey: true }); // 마우스가 멈춘 채 Ctrl을 눌러도 바뀐다
+    expect(badge()).toHaveTextContent("−");
+    fireEvent.keyUp(window, { key: "Control" });
+    expect(badge()).toHaveTextContent("+");
+    expect(ghost()).toHaveTextContent("a.txt");
+    up(section("right"));
+  });
+
+  it("표시는 끝나면(놓기·Esc) 사라진다", async () => {
+    await renderApp(seed());
+    dragDrop(rowByText("left", "a.txt"), section("right"));
+    expect(badge()).toBeNull();
+    dragOver(rowByText("left", "b.txt"), section("right"));
+    expect(badge()).not.toBeNull();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(badge()).toBeNull();
   });
 
   it("선택된 행을 끌면 선택 전체가, 선택에 없는 행을 끌면 그 행만 간다", async () => {
     const { user, backend } = await renderApp(seed());
     await user.keyboard("{ArrowDown}{ArrowDown}{Insert}{Insert}"); // a.txt, b.txt 선택
-    const t = start(rowByText("left", "b.txt"));
-    drop(section("right"), t);
+    dragOver(rowByText("left", "b.txt"), section("right"));
+    expect(ghost()).toHaveTextContent("2개 항목");
+    up(section("right"));
     await waitFor(() => expect(backend.exists("/home/b/b.txt")).toBe(true));
     expect(backend.exists("/home/b/a.txt")).toBe(true);
 
-    const t2 = start(rowByText("left", "docs")); // 선택에 없는 행
-    drop(section("right"), t2);
+    dragDrop(rowByText("left", "docs"), section("right")); // 선택에 없는 행
     await waitFor(() => expect(backend.exists("/home/b/docs/readme.md")).toBe(true));
     expect(backend.exists("/home/b/other")).toBe(false);
   });
 
   it("반대 패널의 폴더 행에 놓으면 그 폴더 안으로 들어간다", async () => {
     const { backend } = await renderApp(seed());
-    const t = start(rowByText("left", "a.txt"));
-    drop(rowByText("right", "dest"), t);
+    dragDrop(rowByText("left", "a.txt"), rowByText("right", "dest"));
     await waitFor(() => expect(backend.read("/home/b/dest/a.txt")).toBe("aaa"));
     expect(backend.exists("/home/b/a.txt")).toBe(false);
   });
 
   it("같은 패널 안의 폴더 행에 놓아도 그 폴더 안으로 들어간다 (Ctrl이면 이동)", async () => {
     const { backend } = await renderApp(seed());
-    const t = start(rowByText("left", "a.txt"));
-    drop(rowByText("left", "other"), t, true);
+    dragDrop(rowByText("left", "a.txt"), rowByText("left", "other"), true);
     await waitFor(() => expect(backend.read("/home/a/other/a.txt")).toBe("aaa"));
     expect(backend.exists("/home/a/a.txt")).toBe(false);
   });
 
   it("같은 패널의 빈 곳에 놓거나 자기 자신·자기 하위 폴더에 놓으면 아무 일도 없다", async () => {
     const { backend } = await renderApp(seed());
-    const t = start(rowByText("left", "a.txt"));
-    drop(section("left"), t); // 제자리
+    dragDrop(rowByText("left", "a.txt"), section("left")); // 제자리
     await new Promise((r) => setTimeout(r, 50));
     expect(backend.exists("/home/a/a (1).txt")).toBe(false);
     expect(screen.queryByRole("dialog")).toBeNull();
 
-    const t2 = start(rowByText("left", "docs"));
-    drop(rowByText("left", "docs"), t2); // 자기 자신 안으로
-    await waitFor(() => expect(status()).toHaveTextContent("원본 폴더 안으로는 보낼 수 없습니다"));
+    dragDrop(rowByText("left", "docs"), rowByText("left", "docs")); // 자기 자신 안으로: 대상이 되지 않는다
+    await new Promise((r) => setTimeout(r, 50));
     expect(backend.exists("/home/a/docs/docs")).toBe(false);
   });
 
   it("이름이 겹치면 충돌 창이 뜨고 고른 대로 처리한다", async () => {
     const backend = seed().seed({ "/home/b/a.txt": "old" });
     await renderApp(backend);
-    const t = start(rowByText("left", "a.txt"));
-    drop(section("right"), t);
+    dragDrop(rowByText("left", "a.txt"), section("right"));
     await screen.findByRole("dialog", { name: "복사: 이름이 겹칩니다" });
     fireEvent.keyDown(document.body, { key: "o" });
     await waitFor(() => expect(backend.read("/home/b/a.txt")).toBe("aaa"));
@@ -136,61 +135,61 @@ describe("드래그 & 드롭으로 복사·이동", () => {
     await user.keyboard("{Control>}p{/Control}"); // 왼쪽 패널에 Look Up 결과(가상 탭)
     await submitQuery(user, "report");
     await waitDone();
-    const t = start(rowByText("right", "x.txt")); // 오른쪽 패널의 파일을 왼쪽 가상 탭에 놓는다
-    over(section("left"), t);
-    expect(t.dropEffect).toBe("none"); // 받지 않는다
-    drop(section("left"), t);
+    dragOver(rowByText("right", "x.txt"), section("left"));
+    expect(ghost()).toHaveAttribute("data-valid", "false"); // 받지 않는다
+    up(section("left"));
     await new Promise((r) => setTimeout(r, 50));
     expect(backend.exists("/home/a/x.txt")).toBe(false);
-    // 같은 끌기를 일반 폴더에는 놓을 수 있다(대조): 오른쪽 패널의 다른 폴더가 없으니 상위 패널 규칙만 확인한다.
-    const t2 = start(rowByText("right", "x.txt"));
-    over(section("right"), t2);
-    expect(t2.dropEffect).toBe("copy");
-  });
-
-  it("웹뷰가 Ctrl을 주지 않아도(운영체제 기준 Ctrl이 눌려 있으면) 이동한다", async () => {
-    const { backend } = await renderApp(seed());
-    const t = start(rowByText("left", "a.txt"));
-    backend.ctrlDown = true; // 이벤트의 ctrlKey는 false지만 운영체제는 Ctrl이 눌려 있다고 답한다
-    await new Promise((r) => setTimeout(r, 120)); // 드래그 중 운영체제 상태를 읽어 두는 주기
-    over(section("right"), t, false);
-    expect(t.dropEffect).toBe("move");
-    drop(section("right"), t, false);
-    await waitFor(() => expect(backend.read("/home/b/a.txt")).toBe("aaa"));
-    expect(backend.exists("/home/a/a.txt")).toBe(false);
-  });
-
-  it("운영체제 기준으로도 Ctrl이 아니면 복사다", async () => {
-    const { backend } = await renderApp(seed());
-    const t = start(rowByText("left", "a.txt"));
-    await new Promise((r) => setTimeout(r, 120));
-    over(section("right"), t, false);
-    expect(t.dropEffect).toBe("copy");
-    drop(section("right"), t, false);
-    await waitFor(() => expect(backend.read("/home/b/a.txt")).toBe("aaa"));
-    expect(backend.exists("/home/a/a.txt")).toBe(true);
   });
 
   it("폴더 행 위에서는 강조 표시(data-drop-target)가 켜지고 떠나면 꺼진다", async () => {
     await renderApp(seed());
-    const t = start(rowByText("left", "a.txt"));
     const folder = rowByText("right", "dest");
     expect(folder).not.toHaveAttribute("data-drop-target");
-    over(folder, t);
+    dragOver(rowByText("left", "a.txt"), folder);
     expect(folder).toHaveAttribute("data-drop-target", "true");
-    fireEvent.dragLeave(folder);
+    moveTo(section("right"), 400, 400); // 폴더 행을 벗어난다
     expect(folder).not.toHaveAttribute("data-drop-target");
-    // 파일 행은 드롭 대상이 아니라 강조되지 않는다
-    over(rowByText("right", "x.txt"), t);
+    moveTo(rowByText("right", "x.txt"), 410, 410); // 파일 행은 대상이 아니다(패널이 대상)
     expect(rowByText("right", "x.txt")).not.toHaveAttribute("data-drop-target");
+    up(section("right"));
   });
 
-  it("앱 밖에서 시작한 드래그(끌고 있는 항목이 없음)는 받지 않는다", async () => {
-    const { backend } = await renderApp(seed());
-    const t = dt();
-    drop(section("right"), t);
-    await new Promise((r) => setTimeout(r, 50));
-    expect(backend.exists("/home/b/a.txt")).toBe(false);
-    void row;
+  it("5px보다 적게 움직이면 드래그가 아니라 클릭이다 (커서 이동은 그대로)", async () => {
+    const { user } = await renderApp(seed());
+    const row = rowByText("left", "b.txt");
+    down(row, 10, 10);
+    moveTo(row, 12, 12);
+    expect(ghost()).toBeNull();
+    up(row);
+    await user.click(row);
+    expect(row).toHaveAttribute("data-cursor", "true");
+  });
+
+  it("Ctrl+클릭과 Shift+클릭 선택은 드래그를 시작하지 않는다", async () => {
+    await renderApp(seed());
+    const row = rowByText("left", "b.txt");
+    fireEvent.mouseDown(row, { button: 0, ctrlKey: true, clientX: 10, clientY: 10 });
+    moveTo(row, 80, 80);
+    expect(ghost()).toBeNull();
+    fireEvent.mouseUp(row, { button: 0, ctrlKey: true });
+    fireEvent.mouseDown(row, { button: 0, shiftKey: true, clientX: 10, clientY: 10 });
+    moveTo(row, 80, 80);
+    expect(ghost()).toBeNull();
+  });
+
+  it("드래그를 끝낸 직후의 click은 커서 이동·선택을 일으키지 않는다", async () => {
+    await renderApp(seed());
+    const src = rowByText("left", "b.txt");
+    dragOver(src, src); // 같은 행 위에서 끝낸다(대상은 없다)
+    up(src);
+    // 브라우저가 놓은 직후에 보내는 click
+    const ev = createEvent.click(src);
+    act(() => void src.dispatchEvent(ev));
+    expect(ev.defaultPrevented).toBe(true);
+    await new Promise((r) => setTimeout(r, 10));
+    const later = createEvent.click(src); // 시간이 지난 뒤의 click은 정상이다
+    act(() => void src.dispatchEvent(later));
+    expect(later.defaultPrevented).toBe(false);
   });
 });

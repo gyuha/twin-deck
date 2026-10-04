@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Rect, Virtualizer } from "@tanstack/react-virtual";
 import { parentPath } from "@twin-deck/ts-client";
@@ -86,8 +86,7 @@ export function FileTable({ pane }: { pane: PaneId }) {
   }, [tab.cursor, rows, tab.entries.length, virtualizer]);
 
   const activate = () => api.activate(pane);
-  /** 지금 드롭을 받으려고 강조한 폴더 행의 인덱스. */
-  const [dropIndex, setDropIndex] = useState<number | null>(null);
+  const drag = useApp((s) => s.drag);
 
   const renderRow = (e: EntryDto, i: number) => {
     const selected = tab.selection.has(e.path);
@@ -101,40 +100,14 @@ export function FileTable({ pane }: { pane: PaneId }) {
         aria-selected={selected}
         aria-rowindex={i + 1}
         data-cursor={cursor}
-        data-drop-target={dropIndex === i ? "true" : undefined}
-        draggable
-        onDragStart={(ev) => {
-          activate();
-          const paths = api.dragBegin(pane, i);
-          ev.dataTransfer.setData("text/plain", paths.join("\n"));
-          ev.dataTransfer.effectAllowed = "copyMove";
+        data-path={e.path}
+        data-pane={pane}
+        data-row-kind={e.kind}
+        data-drop-target={drag?.target?.row && drag.target.pane === pane && drag.target.dir === e.path ? "true" : undefined}
+        onMouseDown={(ev) => {
+          // 왼쪽 단추만, 수정자 없이 눌렀을 때 드래그의 시작점이 된다(Ctrl/Shift/Cmd+클릭은 선택용이다).
+          if (ev.button === 0 && !ev.ctrlKey && !ev.shiftKey && !ev.metaKey) api.dragPress(pane, i, ev.clientX, ev.clientY);
         }}
-        onDragEnd={() => {
-          api.dragEnd();
-          setDropIndex(null);
-        }}
-        onDragOver={
-          e.kind === "dir"
-            ? (ev) => {
-                if (!api.isDragging()) return;
-                ev.preventDefault();
-                ev.stopPropagation();
-                ev.dataTransfer.dropEffect = api.ctrlHeld(ev.ctrlKey) ? "move" : "copy";
-                setDropIndex(i);
-              }
-            : undefined
-        }
-        onDragLeave={e.kind === "dir" ? () => setDropIndex((cur) => (cur === i ? null : cur)) : undefined}
-        onDrop={
-          e.kind === "dir"
-            ? (ev) => {
-                ev.preventDefault();
-                ev.stopPropagation();
-                setDropIndex(null);
-                void api.dropTransfer(e.path, ev.ctrlKey);
-              }
-            : undefined
-        }
         onClick={(ev) => {
           activate();
           if (ev.shiftKey) {
