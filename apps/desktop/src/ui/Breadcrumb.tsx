@@ -1,10 +1,29 @@
+import { useEffect, useRef, useState } from "react";
 import { joinPath } from "@twin-deck/ts-client";
 import { useAppStore } from "../state/context";
 import type { PaneId } from "../state/store";
 
-/** 경로를 조각으로 나눈 이동 링크 (NAV-12). */
+/**
+ * 경로를 조각으로 나눈 이동 링크 (NAV-12).
+ * 오른쪽 클릭하면 입력 상자로 바뀌어 현재 폴더 경로를 글자로 보여 주고, 경로를 고쳐 Enter를 누르면 그 폴더로 이동한다(Esc·포커스를 잃으면 취소).
+ */
 export function Breadcrumb({ pane, path }: { pane: PaneId; path: string }) {
   const { api } = useAppStore();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(path);
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (editing) input.current?.select();
+  }, [editing]);
+  const startEdit = () => {
+    api.activate(pane);
+    setValue(path);
+    setEditing(true);
+  };
+  const finish = (go: boolean) => {
+    setEditing(false);
+    if (go && value.trim() !== "" && value.trim() !== path) void api.goToPath(value);
+  };
   // Windows 드라이브(`C:\`, `C:/`)는 그 자체가 루트이고, 그 밖에는 `/`가 루트다.
   const drive = /^[A-Za-z]:[\\/]?/.exec(path)?.[0];
   const root = drive ? (/[\\/]$/.test(drive) ? drive : drive + "\\") : "/";
@@ -16,8 +35,42 @@ export function Breadcrumb({ pane, path }: { pane: PaneId; path: string }) {
     api.activate(pane);
     void api.navigate(target);
   };
+  if (editing) {
+    return (
+      <nav aria-label="경로" className="px-2 py-1 text-sm" onContextMenu={(e) => e.preventDefault()}>
+        <input
+          ref={input}
+          data-path-edit
+          aria-label="경로 입력"
+          autoFocus
+          spellCheck={false}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={() => setEditing(false)}
+          onKeyDown={(e) => {
+            if (e.nativeEvent.isComposing) return;
+            if (e.key === "Enter") {
+              e.preventDefault();
+              finish(true);
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              finish(false);
+            }
+          }}
+          className="w-full rounded border border-accent bg-app-box px-1 py-0.5 text-sm outline-none"
+        />
+      </nav>
+    );
+  }
   return (
-    <nav aria-label="경로" className="flex flex-wrap items-center px-2 py-1 text-sm">
+    <nav
+      aria-label="경로"
+      onContextMenu={(e) => {
+        e.preventDefault();
+        startEdit();
+      }}
+      className="flex flex-wrap items-center px-2 py-1 text-sm"
+    >
       {segments.map((seg, i) => {
         // `x.zip!`는 아카이브 경계다. 이름은 버튼에, 경계 표시는 그 뒤에 따로 둔다.
         const isArchive = seg.label.endsWith("!");

@@ -2161,6 +2161,10 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (value === null) return;
       await navigateToPath(value);
     },
+    /** 입력한 경로(`~`, `${user.*}` 허용)로 이동한다. 폴더가 아니거나 없으면 알리고 이동하지 않는다(경로 표시줄의 직접 입력). */
+    async goToPath(raw: string) {
+      await navigateToPath(raw);
+    },
     /** `core.open.directory` (ACT-03): 인수 `src`의 폴더로 이동한다. `~`와 `${user.*}`를 확장한다. */
     async openDirectory(args?: Record<string, unknown>) {
       const src = args?.src;

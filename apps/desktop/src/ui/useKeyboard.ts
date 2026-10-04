@@ -20,6 +20,8 @@ export function useKeyboard({ app, keymap, registry }: Options) {
     const onKeyDown = (e: KeyboardEvent) => {
       // IME 조합 중 입력은 건드리지 않는다.
       if (e.isComposing) return;
+      // 경로 표시줄의 직접 입력 중에는 글자·방향키가 단축키로 가지 않게 한다(입력창이 처리한다).
+      if (e.target instanceof Element && e.target.closest("[data-path-edit]")) return;
       const s = store.getState();
       const stack = scopeStack(s);
       const top = stack[0];
