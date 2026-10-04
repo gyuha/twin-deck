@@ -89,6 +89,9 @@ Marta에서는 수정자 없는 단일 키 바인딩이 Quick Select에 가로�
 | `core.file.new_file` | 새 파일 | `Shift+F7` | `Shift+F7` | pane | 자체 ID, 키 확인 |
 | `core.trash` | 휴지통으로 이동 | `F8` | `F8` | pane | 자체 ID, 키 확인 |
 | `core.delete` | 영구 삭제 | `Shift+F8` 또는 `Delete` | `Shift+F8` 또는 `Delete` | pane | 자체 ID, 키 확인 |
+| `core.clipboard.copy` | 클립보드로 복사 | `Mod+C` | `Ctrl+C` | pane | 운영체제 파일 클립보드에 쓴다(Finder/탐색기에 붙여 넣을 수 있다) |
+| `core.clipboard.cut` | 클립보드로 잘라내기 | `Mod+X` | `Ctrl+X` | pane | 붙여 넣을 때 이동한다(붙여 넣기 전에는 원본 유지) |
+| `core.clipboard.paste` | 클립보드에서 붙여넣기 | `Mod+V` | `Ctrl+V` | pane | 클립보드의 파일을 현재 폴더로 복사/이동. 이름이 겹치면 충돌 창 |
 | `core.duplicate` | 복제 | `Mod+D` | `Ctrl+D` | pane | 자체 ID, 키 확인 |
 | `core.edit` | 편집 | `F4` | `F4` | pane | ID 확인, 키 확인 |
 | `core.edit.folder` | 폴더 편집 | `Shift+F4` | `Shift+F4` | pane | 자체 ID, 키 확인 |

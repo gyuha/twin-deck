@@ -66,6 +66,9 @@ export function fileOpHandlers({ api }: AppStore): Partial<ActionHandlers> {
     // F5/F6(`core.copy`/`core.move`)은 전송 확인 창을 거치고, `*.to_inactive`는 창 없이 바로 비활성 패널로 보낸다.
     "core.copy.to_inactive": () => api.copyOrMove("copy", false),
     "core.move.to_inactive": () => api.copyOrMove("move", false),
+    "core.clipboard.copy": () => api.clipboardCopy(),
+    "core.clipboard.cut": () => api.clipboardCut(),
+    "core.clipboard.paste": () => api.clipboardPaste(),
     "core.duplicate": () => api.duplicateTargets(),
     "core.compress": () => api.compress(),
     "core.extract": () => api.extract(false),

@@ -813,7 +813,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
   }
 
   /** 전송 확인 창의 대상 폴더가 쓸 수 없으면 사유를, 괜찮으면 null을 돌려준다. */
-  async function transferDestError(dest: string, targets: EntryDto[]): Promise<string | null> {
+  async function transferDestError(dest: string, targets: Pick<EntryDto, "path" | "kind">[]): Promise<string | null> {
     const clean = dest.length > 1 ? dest.replace(/\/+$/, "") : dest;
     if (targets.some((t) => t.kind === "dir" && (clean === t.path || clean.startsWith(t.path + "/")))) {
       return "원본 폴더 안으로는 보낼 수 없습니다";
@@ -824,6 +824,65 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       return String(e instanceof Error ? e.message : e);
     }
     return null;
+  }
+
+  /** 잘라내기(Mod+X)로 표시한 경로들. 붙여 넣을 때 클립보드 내용이 이것과 같으면 이동으로 처리한다. */
+  let cutPaths: string[] = [];
+
+  /** 겹치는 이름은 항목마다(또는 "남은 항목에도 적용"으로) 정한 뒤 작업 큐에 넣는다. 복사/이동의 공통 부분. */
+  async function runTransfer(kind: "copy" | "move", targets: { path: string }[], destDir: string, progressDelayMs: number, clearSelection: boolean) {
+    const verb = kind === "copy" ? "복사" : "이동";
+    const items: QueueItemDto[] = [];
+    let sticky: ConflictDto | null = null; // "남은 항목에도 같은 선택 적용"으로 정해진 처리
+    for (const [i, t] of targets.entries()) {
+      try {
+        let policy: ConflictDto = "skip";
+        const existing = await backend.detectConflict(t.path, destDir);
+        if (existing !== null) {
+          if (sticky) policy = sticky;
+          else {
+            const answer = await ask<{ choice: ConflictDto; all: boolean }>({
+              kind: "conflict",
+              title: `${verb}: 이름이 겹칩니다`,
+              existing,
+              selected: CONFLICT_CHOICES.indexOf("rename"),
+              remaining: targets.length - i,
+              all: false,
+            });
+            if (answer === null) break; // 취소: 지금까지 정한 항목만 실행한다
+            policy = answer.choice;
+            if (answer.all) sticky = policy;
+          }
+        }
+        items.push({ src: t.path, destDir, policy });
+      } catch (e) {
+        fail(e);
+        break;
+      }
+    }
+    if (clearSelection) patchActive({ selection: new Set() });
+    if (items.length > 0) {
+      if (kind === "move") api.recheckVirtual(items.map((i) => i.src));
+      const jobId = await backend.enqueue(kind, items);
+      void trackTransfer(jobId, verb, progressDelayMs);
+    }
+    await reloadAll();
+  }
+
+  /** Mod+C/Mod+X: 대상 항목(선택, 없으면 커서)의 경로를 운영체제 파일 클립보드에 쓴다. */
+  async function writeClipboard(mode: "copy" | "cut") {
+    const targets = targetsOf(activeTab(get()));
+    if (targets.length === 0) return;
+    if (targets.some((t) => isArchivePath(t.path))) return fail("아카이브 안의 항목은 클립보드로 복사할 수 없습니다");
+    set({ notice: null });
+    const paths = targets.map((t) => t.path);
+    try {
+      await backend.setClipboardFiles(paths);
+    } catch (e) {
+      return fail(e);
+    }
+    cutPaths = mode === "cut" ? paths : [];
+    flash(mode === "cut" ? `${paths.length}개 항목을 잘라냈습니다. 붙여 넣으면 이동합니다` : `${paths.length}개 항목을 클립보드에 복사했습니다`);
   }
 
   const api = {
@@ -1433,41 +1492,47 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         error = await transferDestError(destDir, targets);
         if (!error) break;
       }
-      const items: QueueItemDto[] = [];
-      let sticky: ConflictDto | null = null; // "남은 항목에도 같은 선택 적용"으로 정해진 처리
-      for (const [i, t] of targets.entries()) {
-        try {
-          let policy: ConflictDto = "skip";
-          const existing = await backend.detectConflict(t.path, destDir);
-          if (existing !== null) {
-            if (sticky) policy = sticky;
-            else {
-              const answer = await ask<{ choice: ConflictDto; all: boolean }>({
-                kind: "conflict",
-                title: `${verb}: 이름이 겹칩니다`,
-                existing,
-                selected: CONFLICT_CHOICES.indexOf("rename"),
-                remaining: targets.length - i,
-                all: false,
-              });
-              if (answer === null) break; // 취소: 지금까지 정한 항목만 실행한다
-              policy = answer.choice;
-              if (answer.all) sticky = policy;
-            }
-          }
-          items.push({ src: t.path, destDir, policy });
-        } catch (e) {
-          fail(e);
-          break;
-        }
+      await runTransfer(kind, targets, destDir, confirm ? TRANSFER_PROGRESS_DELAY_COPY_MS : TRANSFER_PROGRESS_DELAY_MS, true);
+    },
+    /** 클립보드로 복사 (Mod+C): 대상 항목을 운영체제 파일 클립보드에 쓴다. */
+    async clipboardCopy() {
+      await writeClipboard("copy");
+    },
+    /** 클립보드로 잘라내기 (Mod+X): 파일 클립보드에 쓰고, 붙여 넣을 때 이동하도록 기억한다. 붙여 넣기 전에는 원본이 그대로다. */
+    async clipboardCut() {
+      await writeClipboard("cut");
+    },
+    /** 붙여넣기 (Mod+V): 클립보드의 파일을 활성 패널의 현재 폴더로 복사한다. 잘라낸 것이면 이동한다. */
+    async clipboardPaste() {
+      const tab = activeTab(get());
+      if (tab.virtual) return fail(VIRTUAL_NO_DEST);
+      set({ notice: null });
+      let paths: string[];
+      try {
+        paths = await backend.getClipboardFiles();
+      } catch (e) {
+        return fail(e);
       }
-      patchTab(s.activePane, activeTab(s).id, { selection: new Set() });
-      if (items.length > 0) {
-        if (kind === "move") api.recheckVirtual(items.map((i) => i.src));
-        const jobId = await backend.enqueue(kind, items);
-        void trackTransfer(jobId, verb, confirm ? TRANSFER_PROGRESS_DELAY_COPY_MS : TRANSFER_PROGRESS_DELAY_MS);
+      if (paths.length === 0) return flash("클립보드에 붙여 넣을 파일이 없습니다");
+      const destDir = tab.path;
+      const cut = paths.length === cutPaths.length && paths.every((p) => cutPaths.includes(p));
+      const kind = cut ? "move" : "copy";
+      // 잘라낸 파일을 원래 폴더에 붙여 넣으면 할 일이 없다.
+      const srcs = kind === "move" ? paths.filter((p) => parentPath(p) !== destDir) : paths;
+      if (srcs.length === 0) return;
+      let entries: Pick<EntryDto, "path" | "kind">[];
+      try {
+        entries = await Promise.all(srcs.map(async (p) => ({ path: p, kind: (await backend.fileInfo(p)).kind })));
+      } catch (e) {
+        return fail(e);
       }
-      await reloadAll();
+      const error = await transferDestError(destDir, entries);
+      if (error) return fail(error);
+      await runTransfer(kind, entries, destDir, TRANSFER_PROGRESS_DELAY_COPY_MS, false);
+      if (kind === "move") {
+        cutPaths = [];
+        await backend.setClipboardFiles([]).catch(() => {}); // 이동한 파일은 더 이상 그 자리에 없으니 비운다
+      }
     },
     /** 휴지통으로 이동 (OP-06). 기본 설정에서는 확인하지 않는다. */
     async trashTargets() {
