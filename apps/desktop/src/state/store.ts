@@ -1558,6 +1558,10 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       }
       set({ drag: { ...drag, x, y, ctrl, target: dropTargetAt(el, drag) } });
     },
+    /** 웹뷰가 파일을 직접 읽어 재생할 수 있는 주소(비디오 미리보기). */
+    fileUrl(path: string): string {
+      return backend.fileUrl(path);
+    },
     isDragActive(): boolean {
       return get().drag !== null;
     },

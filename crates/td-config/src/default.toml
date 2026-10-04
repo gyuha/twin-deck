@@ -38,6 +38,10 @@ terminal = "default"
 delete = true
 trash = false
 
+[preview]
+audio_autoplay = false
+video_autoplay = false
+
 [layout]
 action_bar = ["core.edit", "core.copy", "core.move", "core.file.new_folder", "core.trash", "core.delete"]
 

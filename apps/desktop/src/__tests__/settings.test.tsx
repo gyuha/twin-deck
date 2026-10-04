@@ -32,12 +32,12 @@ describe("설정 화면 열기와 닫기", () => {
     expect(cursorName("left")).toBe("docs");
   });
 
-  it("섹션 7개가 왼쪽에 있고 처음에는 모양이 열린다", async () => {
+  it("섹션 8개가 왼쪽에 있고 처음에는 모양이 열린다", async () => {
     const { user } = await renderApp();
     await open(user);
     await dialog();
     const tabs = within(screen.getByRole("tablist", { name: "설정 섹션" })).getAllByRole("tab").map((t) => t.textContent);
-    expect(tabs).toEqual(["모양", "목록과 선택", "표시 형식", "확인", "폴더 단축키", "F키", "환경"]);
+    expect(tabs).toEqual(["모양", "목록과 선택", "표시 형식", "미리보기", "확인", "폴더 단축키", "F키", "환경"]);
     expect(screen.getByRole("tab", { name: "모양" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("switch", { name: "Action Bar 표시" })).toBeInTheDocument();
   });

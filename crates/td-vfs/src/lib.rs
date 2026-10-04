@@ -18,7 +18,8 @@ pub use local::LocalFs;
 pub use names::{compare_names, matches_prefix, normalize_name, sort_entries};
 pub use path::VfsPath;
 pub use preview::{
-    audio_mime, image_data_url, image_mime, read_preview, Preview, PreviewKind, PreviewLimits,
+    audio_mime, image_data_url, image_mime, is_video, read_preview, Preview, PreviewKind,
+    PreviewLimits,
 };
 pub use symlink_error::symlink_error_message;
 

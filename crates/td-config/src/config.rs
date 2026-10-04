@@ -9,6 +9,8 @@ pub struct Config {
     pub display: Display,
     pub environment: Environment,
     pub core: CoreConfig,
+    /// 미리보기 옵션.
+    pub preview: PreviewConfig,
     pub layout: LayoutConfig,
     pub view: ViewConfig,
     pub file_systems: FileSystemsConfig,
@@ -75,6 +77,15 @@ pub struct Display {
 pub struct Environment {
     pub text_editor: String,
     pub terminal: String,
+}
+
+/// 미리보기 옵션. 사운드/비디오는 기본으로 자동 재생하지 않고 재생 UI만 띄운다.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct PreviewConfig {
+    /// 사운드 파일의 미리보기를 열면 바로 재생한다.
+    pub audio_autoplay: bool,
+    /// 비디오 파일의 미리보기를 열면 바로 재생한다.
+    pub video_autoplay: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

@@ -37,6 +37,10 @@
         "trash": false
       }
     },
+    "preview": {
+      "audio_autoplay": false,
+      "video_autoplay": false
+    },
     "layout": {
       "action_bar": [
         "core.edit",

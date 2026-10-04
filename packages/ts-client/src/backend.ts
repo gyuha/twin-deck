@@ -49,6 +49,8 @@ export interface Backend {
   preview(path: string): Promise<PreviewDto>;
   /** glob 패턴과 일치하는 이름의 인덱스 (Select Group). */
   globFilter(pattern: string, names: string[]): Promise<number[]>;
+  /** 웹뷰가 파일을 직접 읽어 재생할 수 있는 주소(비디오처럼 큰 파일을 데이터로 싣지 않고 스트리밍한다). */
+  fileUrl(path: string): string;
   /** 클립보드에 텍스트를 쓴다. */
   copyText(text: string): Promise<void>;
   /** 운영체제 파일 클립보드에 파일 경로 목록을 쓴다(Finder/탐색기에 붙여 넣을 수 있다). 빈 목록이면 비운다. */

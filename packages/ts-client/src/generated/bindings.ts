@@ -412,7 +412,11 @@ args: Partial<{ [key in string]: string }>;
  * 스코프를 강제로 지정할 때만 값이 있다.
  */
 scope: string | null }
-export type Config = { behavior: Behavior; display: Display; environment: Environment; core: CoreConfig; layout: LayoutConfig; view: ViewConfig; file_systems: FileSystemsConfig; 
+export type Config = { behavior: Behavior; display: Display; environment: Environment; core: CoreConfig; 
+/**
+ * 미리보기 옵션.
+ */
+preview: PreviewConfig; layout: LayoutConfig; view: ViewConfig; file_systems: FileSystemsConfig; 
 /**
  * 폴더 단축키. 키는 "0"~"9", 값은 경로(`~`, `${user.*}` 허용). 빈 문자열이면 미지정.
  */
@@ -506,10 +510,22 @@ export type LoadedState = { snapshot: Snapshot | null;
 warning: string | null }
 export type PaneSnap = { tabs: TabSnap[]; active: number }
 /**
+ * 미리보기 옵션. 사운드/비디오는 기본으로 자동 재생하지 않고 재생 UI만 띄운다.
+ */
+export type PreviewConfig = { 
+/**
+ * 사운드 파일의 미리보기를 열면 바로 재생한다.
+ */
+audio_autoplay: boolean; 
+/**
+ * 비디오 파일의 미리보기를 열면 바로 재생한다.
+ */
+video_autoplay: boolean }
+/**
  * 미리보기 (VIEW-01). 텍스트는 앞부분, 이미지는 data URL.
  */
 export type PreviewDto = { kind: PreviewKindDto; text: string | null; truncated: boolean; size: number; dataUrl: string | null }
-export type PreviewKindDto = "text" | "image" | "audio" | "pdf" | "directory" | "other"
+export type PreviewKindDto = "text" | "image" | "audio" | "video" | "pdf" | "directory" | "other"
 /**
  * 작업 큐의 상태가 바뀔 때마다 전체 스냅샷을 보낸다.
  */

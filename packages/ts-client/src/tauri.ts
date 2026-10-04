@@ -1,3 +1,4 @@
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { BackendError } from "./backend";
 import type { Backend, SearchEvent } from "./backend";
@@ -79,6 +80,9 @@ export class TauriBackend implements Backend {
   }
   globFilter(pattern: string, names: string[]) {
     return commands.globFilter(pattern, names);
+  }
+  fileUrl(path: string) {
+    return convertFileSrc(path);
   }
   copyText(text: string) {
     return writeText(text);

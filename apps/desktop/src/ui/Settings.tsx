@@ -56,6 +56,14 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
     ],
   },
   {
+    title: "미리보기",
+    desc: "사운드와 비디오 미리보기를 열었을 때 바로 재생할지 정합니다. 끄면 재생 UI만 보이고 재생 버튼을 눌러야 재생됩니다",
+    items: [
+      { key: "preview.audio_autoplay", title: "사운드 자동 재생", desc: "mp3, wav, ogg 같은 사운드 파일의 미리보기를 열면 바로 재생합니다", control: { type: "switch" } },
+      { key: "preview.video_autoplay", title: "비디오 자동 재생", desc: "mp4, mov, webm 같은 비디오 파일의 미리보기를 열면 바로 재생합니다", control: { type: "switch" } },
+    ],
+  },
+  {
     title: "확인",
     items: [
       { key: "core.confirm.delete", title: "영구 삭제 전에 확인", control: { type: "switch" } },

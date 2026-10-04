@@ -103,6 +103,7 @@ pub enum PreviewKindDto {
     Text,
     Image,
     Audio,
+    Video,
     Pdf,
     Directory,
     Other,
@@ -164,6 +165,7 @@ impl From<td_vfs::Preview> for PreviewDto {
                 td_vfs::PreviewKind::Text => PreviewKindDto::Text,
                 td_vfs::PreviewKind::Image => PreviewKindDto::Image,
                 td_vfs::PreviewKind::Audio => PreviewKindDto::Audio,
+                td_vfs::PreviewKind::Video => PreviewKindDto::Video,
                 td_vfs::PreviewKind::Pdf => PreviewKindDto::Pdf,
                 td_vfs::PreviewKind::Directory => PreviewKindDto::Directory,
                 td_vfs::PreviewKind::Other => PreviewKindDto::Other,
@@ -1749,6 +1751,17 @@ mod tests {
         assert!(p.truncated);
         assert_eq!(p.data_url, None);
         assert_eq!(p.size, (10 * 1024 * 1024 + 1) as f64);
+    }
+
+    #[test]
+    fn preview_dto_maps_video_without_data() {
+        let (_t, svc, _ch, root) = setup();
+        std::fs::write(format!("{root}/v.mp4"), [1u8, 2, 3, 4]).unwrap();
+        let v = svc.preview(&format!("{root}/v.mp4")).unwrap();
+        assert_eq!(
+            (v.kind, v.data_url.is_none(), v.size),
+            (PreviewKindDto::Video, true, 4.0)
+        );
     }
 
     #[test]

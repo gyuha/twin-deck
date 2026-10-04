@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from "react";
 
 /**
  * 사운드 파일 미리보기. 열어도 바로 재생하지 않고, 웹뷰의 기본 재생 UI(▶, 시간, 진행 막대, 볼륨)만 띄운다.
- * 재생 버튼을 클릭해야 재생된다. data URL은 Blob URL로 바꿔 쓴다(탐색이 빠르다).
+ * 재생 버튼을 클릭해야 재생된다(설정 `preview.audio_autoplay`를 켜면 바로 재생한다). data URL은 Blob URL로 바꿔 쓴다(탐색이 빠르다).
  */
-export function AudioView({ dataUrl, name }: { dataUrl: string; name: string }) {
+export function AudioView({ dataUrl, name, autoplay = false }: { dataUrl: string; name: string; autoplay?: boolean }) {
   const [src, setSrc] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -32,15 +32,22 @@ export function AudioView({ dataUrl, name }: { dataUrl: string; name: string }) 
     return () => {
       if (!el) return;
       el.pause();
-      el.removeAttribute("src");
-      el.load();
+      // 요소가 이미 DOM에서 떨어졌을 때만 소리 자원을 놓는다(개발 모드의 가짜 정리에서 src를 지우지 않게).
+      if (!el.isConnected) {
+        el.removeAttribute("src");
+        el.load();
+      }
     };
   }, [src]);
   if (failed) return <p className="text-ink-faint">이 형식은 이 시스템에서 재생할 수 없습니다 ({name})</p>;
   if (!src) return <p className="text-ink-faint">여는 중…</p>;
   return (
     <div className="flex h-full items-center justify-center">
-      <audio ref={audioRef} key={src} aria-label={`오디오 미리보기: ${name}`} controls preload="metadata" src={src} onError={() => setFailed(true)} />
+      <audio ref={audioRef} key={src} aria-label={`오디오 미리보기: ${name}`} controls preload="metadata" autoPlay={autoplay} src={src} onCanPlay={() => {
+          const el = audioRef.current;
+          if (autoplay && el?.paused) void el.play().catch(() => {});
+        }}
+        onError={() => setFailed(true)} />
     </div>
   );
 }

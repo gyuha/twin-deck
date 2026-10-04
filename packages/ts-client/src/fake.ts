@@ -294,6 +294,7 @@ export class FakeBackend implements Backend {
     if (mime) return { ...base, kind: "image", dataUrl: `data:${mime};base64,${btoa(n.content)}` };
     const audio = { mp3: "audio/mpeg", wav: "audio/wav", ogg: "audio/ogg", oga: "audio/ogg", opus: "audio/ogg", flac: "audio/flac", m4a: "audio/mp4", aac: "audio/aac", weba: "audio/webm" }[ext];
     if (audio) return { ...base, kind: "audio", dataUrl: `data:${audio};base64,${btoa(n.content)}` };
+    if (["mp4", "m4v", "mov", "webm", "ogv", "mkv", "avi"].includes(ext)) return { ...base, kind: "video" };
     if (ext === "pdf") return { ...base, kind: "pdf", dataUrl: `data:application/pdf;base64,${btoa(n.content)}` };
     if (n.content.includes("\u0000")) return { ...base, kind: "other" };
     const limit = 64 * 1024;
@@ -302,6 +303,10 @@ export class FakeBackend implements Backend {
 
   async globFilter(pattern: string, names: string[]) {
     return names.flatMap((n, i) => (globMatch(pattern, n) ? [i] : []));
+  }
+
+  fileUrl(path: string) {
+    return `fake-asset://localhost${path}`;
   }
 
   async copyText(text: string) {

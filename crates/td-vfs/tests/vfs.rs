@@ -236,3 +236,19 @@ fn audio_mime_is_none_for_non_audio() {
     assert_eq!(audio_mime("noext"), None);
     assert_eq!(audio_mime("a.png"), None);
 }
+
+#[test]
+fn preview_video_files_are_video_kind_without_data() {
+    let (t, _root) = root();
+    for name in [
+        "a.mp4", "b.M4V", "c.mov", "d.webm", "e.ogv", "f.mkv", "g.avi",
+    ] {
+        std::fs::write(t.path().join(name), b"not-a-real-video").unwrap();
+        let p = read_preview(&VfsPath::new(t.path().join(name)), PreviewLimits::default()).unwrap();
+        assert_eq!(p.kind, PreviewKind::Video, "{name}");
+        assert_eq!(p.data_url, None, "{name}: 비디오는 데이터를 싣지 않는다");
+        assert!(!p.truncated);
+        assert_eq!(p.size, 16);
+    }
+    assert!(!is_video("a.mp3") && !is_video("noext") && !is_video("a.txt"));
+}

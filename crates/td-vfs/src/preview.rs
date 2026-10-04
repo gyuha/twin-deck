@@ -13,6 +13,8 @@ pub enum PreviewKind {
     Image,
     /// 사운드 파일. 한도 안이면 `data:audio/...;base64,...`로 싣는다(재생은 화면이 한다).
     Audio,
+    /// 비디오 파일. 데이터는 싣지 않는다(크기가 커서). 화면이 파일을 직접 읽어 재생한다.
+    Video,
     /// PDF. 한도 안이면 `data:application/pdf;base64,...`로 싣는다.
     Pdf,
     Directory,
@@ -80,6 +82,17 @@ pub fn audio_mime(name: &str) -> Option<&'static str> {
     })
 }
 
+/// 확장자로 비디오인지 판별한다. 웹뷰가 풀 수 있는지는 재생해 봐야 안다(mkv·avi 등은 못 푸는 경우가 많다).
+pub fn is_video(name: &str) -> bool {
+    let Some((_, ext)) = name.rsplit_once('.') else {
+        return false;
+    };
+    matches!(
+        ext.to_ascii_lowercase().as_str(),
+        "mp4" | "m4v" | "mov" | "webm" | "ogv" | "mkv" | "avi"
+    )
+}
+
 /// 이미지 바이트를 `data:image/…;base64,…`로 만든다. 이름의 확장자가 이미지가 아니면 None.
 pub fn image_data_url(name: &str, bytes: &[u8]) -> Option<String> {
     let mime = image_mime(name)?;
@@ -116,6 +129,10 @@ pub fn read_preview(path: &VfsPath, limits: PreviewLimits) -> Result<Preview> {
             data_url: Some(format!("data:{mime};base64,{b64}")),
             ..base(PreviewKind::Image)
         });
+    }
+
+    if is_video(&name) {
+        return Ok(base(PreviewKind::Video));
     }
 
     if let Some(mime) = audio_mime(&name) {

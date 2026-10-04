@@ -11,7 +11,7 @@
   },
   "app": {
     "windows": [{ "title": "Twin Deck", "width": 1200, "height": 760, "acceptFirstMouse": true }],
-    "security": { "csp": null }
+    "security": { "csp": null, "assetProtocol": { "enable": true, "scope": ["**"] } }
   },
   "bundle": {
     "active": true,

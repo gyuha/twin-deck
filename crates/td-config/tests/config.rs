@@ -535,3 +535,45 @@ fn font_settings_round_trip_through_user_config() {
     assert_eq!(l.config.behavior.ui_font, "");
     assert_eq!(l.config.behavior.preview_font, "D2Coding");
 }
+
+#[test]
+fn preview_autoplay_defaults_off_and_stays_independent() {
+    let none = load("");
+    assert!(!none.config.preview.audio_autoplay);
+    assert!(!none.config.preview.video_autoplay);
+    let l = load("[preview]\naudio_autoplay = true\n");
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert!(l.config.preview.audio_autoplay);
+    assert!(!l.config.preview.video_autoplay);
+    let l = load("[preview]\nvideo_autoplay = true\n");
+    assert!(!l.config.preview.audio_autoplay);
+    assert!(l.config.preview.video_autoplay);
+}
+
+#[test]
+fn preview_autoplay_round_trips_through_user_config() {
+    use td_config::{set_user_value, ConfigValue};
+    let dir = tempfile::tempdir().unwrap();
+    set_user_value(
+        dir.path(),
+        "preview.audio_autoplay",
+        ConfigValue::Bool(true),
+    )
+    .unwrap();
+    let l = load_dir(dir.path(), Platform::Linux);
+    assert!(l.config.preview.audio_autoplay && !l.config.preview.video_autoplay);
+    set_user_value(
+        dir.path(),
+        "preview.video_autoplay",
+        ConfigValue::Bool(true),
+    )
+    .unwrap();
+    set_user_value(
+        dir.path(),
+        "preview.audio_autoplay",
+        ConfigValue::Bool(false),
+    )
+    .unwrap();
+    let l = load_dir(dir.path(), Platform::Linux);
+    assert!(!l.config.preview.audio_autoplay && l.config.preview.video_autoplay);
+}

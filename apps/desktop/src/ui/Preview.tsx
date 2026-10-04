@@ -5,6 +5,7 @@ import { usePreviewFont } from "./fonts";
 import { JsonView } from "./JsonView";
 import { MarkdownView } from "./MarkdownView";
 import { AudioView } from "./AudioView";
+import { VideoView } from "./VideoView";
 import { PdfView } from "./PdfView";
 
 const isMarkdown = (name: string) => /\.(md|markdown)$/i.test(name);
@@ -20,6 +21,7 @@ function size(n: number): string {
 /** 미리보기 (VIEW-01): 텍스트는 앞부분, 이미지는 그림, 그 밖은 종류와 크기. 키 조작은 `preview` 스코프가 처리한다. */
 export function Preview() {
   const p = useApp((s) => s.preview);
+  const previewConfig = useApp((s) => s.loaded.config.preview);
   const previewFont = usePreviewFont();
   if (!p) return null;
   const d = p.data;
@@ -64,10 +66,11 @@ export function Preview() {
             ))}
           {d?.kind === "audio" &&
             (d.dataUrl ? (
-              <AudioView dataUrl={d.dataUrl} name={p.name} />
+              <AudioView dataUrl={d.dataUrl} name={p.name} autoplay={previewConfig.audio_autoplay} />
             ) : (
               <p className="text-ink-faint">사운드 파일이 너무 커서 미리 들을 수 없습니다 ({size(d.size)})</p>
             ))}
+          {d?.kind === "video" && <VideoView path={p.path} name={p.name} autoplay={previewConfig.video_autoplay} />}
           {d?.kind === "pdf" &&
             (d.dataUrl ? (
               <PdfView dataUrl={d.dataUrl} name={p.name} />
