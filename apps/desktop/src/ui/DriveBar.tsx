@@ -43,7 +43,7 @@ export function DriveBar({ pane }: { pane: PaneId }) {
         <span className="truncate">{current?.name ?? ""}</span>
         <span className="flex shrink-0 items-center gap-2">
           {current && space && <span title={`전체 ${formatSpace(space.total, sizeFormat)}`}>{formatSpace(space.free, sizeFormat)} 남음</span>}
-          {current && current.mountPoint !== "/" && (
+          {current && current.mountPoint !== "/" && current.mountPoint !== volumes[0].mountPoint && (
             <button type="button" aria-label="언마운트" className="rounded border border-app-line px-2 py-0.5 hover:bg-app-selected" onClick={() => void api.unmountVolume(pane)}>
               ⏏ 언마운트
             </button>
