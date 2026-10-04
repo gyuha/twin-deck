@@ -1,4 +1,4 @@
-# Windows용 설치/삭제. NSIS 설치 파일(task bundle로 만든다)을 조용히 실행한다.
+﻿# Windows용 설치/삭제. NSIS 설치 파일(task bundle로 만든다)을 조용히 실행한다.
 # 사용: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install.ps1 [install|uninstall]
 param([string]$Action = "install")
 $ErrorActionPreference = "Stop"

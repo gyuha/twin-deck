@@ -1,4 +1,4 @@
-# Windows 설치 파일(NSIS)을 GitHub 릴리스(v<버전>)에 올린다. 버전은 tauri.conf.json에서 읽는다. (gh 로그인 필요)
+﻿# Windows 설치 파일(NSIS)을 GitHub 릴리스(v<버전>)에 올린다. 버전은 tauri.conf.json에서 읽는다. (gh 로그인 필요)
 #
 # 사용: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 -Mode draft|publish
 #   draft   드래프트 배포: 비공개 초안(draft) 릴리스에 이 OS의 파일만 올린다. 공개하지 않고 태그도 만들지 않는다.
