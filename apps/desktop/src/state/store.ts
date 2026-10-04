@@ -537,6 +537,26 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     }
   }
 
+  /**
+   * 이 볼륨 안에 있는 모든 탭(양쪽 패널, 배경 탭 포함)을 첫 번째 볼륨으로 옮기고 그 안의 폴더 감시를 푼다.
+   * Windows는 앱이 열어 둔 드라이브를 "사용 중"이라며 꺼내 주지 않으므로 언마운트 전에 해야 한다.
+   */
+  async function leaveVolume(mountPoint: string) {
+    const dest = get().volumes.find((v) => v.mountPoint !== mountPoint)?.mountPoint ?? get().userDirs.home ?? "/";
+    for (const p of ["left", "right"] as const) {
+      const pn = get().panes[p];
+      for (const [i, t] of pn.tabs.entries()) {
+        if (t.virtual || !isInside(t.path, mountPoint)) continue;
+        if (i === pn.active) await api.navigate(dest, undefined, "push", p);
+        else {
+          patchTab(p, t.id, { path: dest, history: [...t.history, dest], back: [], forward: [], cursor: 0, selection: new Set(), quick: null, entries: [] });
+          await reload(p, t.id);
+        }
+      }
+    }
+    await syncWatches();
+  }
+
   const reloadAll = () => {
     // 복사·이동·삭제로 남은 용량이 달라졌을 수 있다.
     void refreshDiskSpace("left");
@@ -2075,34 +2095,22 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       await api.navigate(mountPoint, undefined, "push", pane);
     },
     /**
-     * 패널의 현재 볼륨을 언마운트한다. 먼저 언마운트를 시도하고, 성공했을 때만 그 볼륨 안에 있는 모든 탭(양쪽 패널, 배경 탭 포함)을 홈으로 옮긴다.
-     * 실패하면 오류를 알리고 아무 탭도 옮기지 않는다. 루트 볼륨은 시도하지 않는다.
+     * 패널의 현재 볼륨을 언마운트한다. 먼저 그 볼륨 안에 있는 모든 탭(양쪽 패널, 배경 탭 포함)을 첫 번째 볼륨으로 옮기고
+     * 감시를 푼 뒤 언마운트한다. 언마운트가 실패하면 오류를 알리지만 탭은 되돌리지 않는다. 루트 볼륨은 시도하지 않는다.
      */
     async unmountVolume(pane: PaneId) {
       const tab = activeTab(get(), pane);
       const vol = tab.virtual ? null : volumeOf(tab.path, get().volumes);
       if (!vol || vol.mountPoint === "/") return;
       set({ notice: null });
+      await leaveVolume(vol.mountPoint);
       try {
         await backend.unmountVolume(vol.mountPoint);
       } catch (e) {
         fail(e);
         return;
       }
-      const home = get().userDirs.home ?? "/";
-      for (const p of ["left", "right"] as const) {
-        const pn = get().panes[p];
-        for (const [i, t] of pn.tabs.entries()) {
-          if (t.virtual || !isInside(t.path, vol.mountPoint)) continue;
-          if (i === pn.active) await api.navigate(home, undefined, "push", p);
-          else {
-            patchTab(p, t.id, { path: home, history: [...t.history, home], back: [], forward: [], cursor: 0, selection: new Set(), quick: null, entries: [] });
-            await reload(p, t.id);
-          }
-        }
-      }
       await api.refreshVolumes();
-      await syncWatches();
     },
     /** Volumes 메뉴에서 커서 볼륨을 언마운트/추출한다. */
     async menuVolumeAction(kind: "unmount" | "eject") {
@@ -2110,6 +2118,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const item = m?.kind === "volumes" ? m.items[m.cursor] : undefined;
       if (!m || !item?.path) return;
       set({ notice: null });
+      if (item.path !== "/") await leaveVolume(item.path); // 루트 볼륨은 모든 탭이 그 안이라 옮기지 않는다(언마운트도 거부된다)
       try {
         if (kind === "unmount") await backend.unmountVolume(item.path);
         else await backend.ejectVolume(item.path);

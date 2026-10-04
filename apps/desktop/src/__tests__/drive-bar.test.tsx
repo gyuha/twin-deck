@@ -59,14 +59,14 @@ describe("드라이브 바", () => {
     expect(info("오른쪽")).toHaveTextContent("73.8 GB 남음"); // 오른쪽은 그대로
   });
 
-  it("현재 볼륨을 언마운트하면 그 볼륨 안의 패널은 홈으로 옮겨지고 목록에서 빠진다", async () => {
+  it("현재 볼륨을 언마운트하면 그 볼륨 안의 패널은 첫 번째 볼륨으로 옮겨지고 목록에서 빠진다", async () => {
     const backend = setup();
     const { user } = await renderApp(backend);
     await user.click(volButton("왼쪽", "USB"));
     await waitFor(() => expect(info("왼쪽")).toHaveTextContent("1.5 GB 남음"));
     await user.click(within(info("왼쪽")).getByRole("button", { name: "언마운트" }));
     await waitFor(() => expect(backend.unmounted).toEqual(["/Volumes/USB"]));
-    await waitFor(() => expect(leftCrumbs()).toEqual(["/", "home", "a"])); // userDirs.home
+    await waitFor(() => expect(leftCrumbs()).toEqual(["/"])); // 첫 번째 볼륨의 루트
     await waitFor(() => expect(within(bar("왼쪽")).queryByRole("button", { name: "USB" })).toBeNull());
     expect(within(bar("오른쪽")).queryByRole("button", { name: "USB" })).toBeNull();
     expect(volButton("왼쪽", "/")).toHaveAttribute("aria-pressed", "true");
@@ -80,7 +80,7 @@ describe("드라이브 바", () => {
     await waitFor(() => expect(within(info("왼쪽")).getByRole("button", { name: "언마운트" })).toBeInTheDocument());
   });
 
-  it("언마운트에 실패하면 알리고 패널을 옮기지 않는다", async () => {
+  it("언마운트에 실패하면 알리지만 패널은 이미 첫 번째 볼륨으로 옮겨져 있다", async () => {
     const backend = setup();
     backend.unmountVolume = async () => {
       throw new BackendError("사용 중이라 언마운트할 수 없습니다");
@@ -90,8 +90,66 @@ describe("드라이브 바", () => {
     await waitFor(() => expect(info("왼쪽")).toHaveTextContent("1.5 GB 남음"));
     await user.click(within(info("왼쪽")).getByRole("button", { name: "언마운트" }));
     expect(await screen.findByText(/사용 중이라 언마운트할 수 없습니다/)).toBeInTheDocument();
-    expect(leftCrumbs()).toEqual(["/", "Volumes", "USB"]);
-    expect(volButton("왼쪽", "USB")).toHaveAttribute("aria-pressed", "true");
+    expect(leftCrumbs()).toEqual(["/"]);
+    expect(volButton("왼쪽", "/")).toHaveAttribute("aria-pressed", "true");
+  });
+
+  // Windows는 앱이 폴더 감시로 잡고 있는 드라이브를 "사용 중"이라며 꺼내 주지 않는다.
+  const trackWatches = (backend: ReturnType<typeof setup>) => {
+    const log: string[] = [];
+    const { watch, unwatch, unmountVolume } = backend;
+    backend.watch = async (p) => {
+      log.push(`watch ${p}`);
+      return watch.call(backend, p);
+    };
+    backend.unwatch = async (p) => {
+      log.push(`unwatch ${p}`);
+      return unwatch.call(backend, p);
+    };
+    backend.unmountVolume = async (mp) => {
+      log.push(`unmount ${mp}`);
+      return unmountVolume.call(backend, mp);
+    };
+    return log;
+  };
+
+  it("언마운트를 시도하기 전에 그 볼륨 안의 폴더 감시를 푼다", async () => {
+    const backend = setup();
+    const log = trackWatches(backend);
+    const { user } = await renderApp(backend);
+    await user.click(volButton("왼쪽", "USB"));
+    await waitFor(() => expect(info("왼쪽")).toHaveTextContent("1.5 GB 남음"));
+    await waitFor(() => expect(log).toContain("watch /Volumes/USB"));
+    await user.click(within(info("왼쪽")).getByRole("button", { name: "언마운트" }));
+    await waitFor(() => expect(log).toContain("unmount /Volumes/USB"));
+    expect(log.indexOf("unwatch /Volumes/USB")).toBeGreaterThanOrEqual(0);
+    expect(log.indexOf("unwatch /Volumes/USB")).toBeLessThan(log.indexOf("unmount /Volumes/USB"));
+  });
+
+  it("반대쪽 패널도 같은 볼륨이면 둘 다 첫 번째 볼륨으로 옮긴다", async () => {
+    const backend = setup();
+    const { user } = await renderApp(backend);
+    await user.click(volButton("왼쪽", "USB"));
+    await user.click(volButton("오른쪽", "USB"));
+    await waitFor(() => expect(info("오른쪽")).toHaveTextContent("1.5 GB 남음"));
+    await user.click(within(info("왼쪽")).getByRole("button", { name: "언마운트" }));
+    await waitFor(() => expect(backend.unmounted).toEqual(["/Volumes/USB"]));
+    const rightCrumbs = () =>
+      within(screen.getAllByRole("navigation", { name: "경로" })[1])
+        .getAllByRole("button")
+        .map((b) => b.textContent);
+    await waitFor(() => expect(leftCrumbs()).toEqual(["/"]));
+    await waitFor(() => expect(rightCrumbs()).toEqual(["/"]));
+  });
+
+  it("다른 볼륨에 있는 반대쪽 패널은 옮기지 않는다", async () => {
+    const { user } = await renderApp(setup());
+    await user.click(volButton("왼쪽", "USB"));
+    await waitFor(() => expect(info("왼쪽")).toHaveTextContent("1.5 GB 남음"));
+    await user.click(within(info("왼쪽")).getByRole("button", { name: "언마운트" }));
+    await waitFor(() => expect(leftCrumbs()).toEqual(["/"]));
+    const right = within(screen.getAllByRole("navigation", { name: "경로" })[1]).getAllByRole("button");
+    expect(right.map((b) => b.textContent)).toEqual(["/", "home", "b"]);
   });
 
   it("용량을 알 수 없으면 남은 용량을 표시하지 않고 오류도 내지 않는다", async () => {
