@@ -27,7 +27,34 @@ pub fn disk_space(path: &str) -> Result<DiskSpace, String> {
     })
 }
 
-#[cfg(not(unix))]
+#[cfg(windows)]
+pub fn disk_space(path: &str) -> Result<DiskSpace, String> {
+    use std::os::windows::ffi::OsStrExt;
+
+    if path.contains('\0') {
+        return Err(format!("{path}: 경로에 NUL 문자가 있습니다"));
+    }
+    let wide: Vec<u16> = std::ffi::OsStr::new(path)
+        .encode_wide()
+        .chain(Some(0))
+        .collect();
+    let (mut free, mut total) = (0u64, 0u64);
+    // SAFETY: `wide`는 NUL로 끝나는 유효한 UTF-16 문자열이고 출력 포인터는 쓸 수 있는 u64를 가리킨다.
+    let ok = unsafe {
+        windows_sys::Win32::Storage::FileSystem::GetDiskFreeSpaceExW(
+            wide.as_ptr(),
+            &mut free,
+            &mut total,
+            std::ptr::null_mut(),
+        )
+    };
+    if ok == 0 {
+        return Err(format!("{path}: {}", std::io::Error::last_os_error()));
+    }
+    Ok(DiskSpace { free, total })
+}
+
+#[cfg(not(any(unix, windows)))]
 pub fn disk_space(_path: &str) -> Result<DiskSpace, String> {
     Err("이 OS에서는 용량 조회를 지원하지 않습니다".into())
 }
@@ -39,6 +66,29 @@ mod tests {
     #[test]
     fn disk_space_reports_total_and_free() {
         // 흉내가 아니라 실제 statvfs 호출이다: 임시 폴더가 놓인 파일시스템의 값을 본다.
+        let tmp = tempfile::tempdir().unwrap();
+        let s = disk_space(tmp.path().to_str().unwrap()).unwrap();
+        assert!(s.total > 0, "전체 용량이 0이다: {s:?}");
+        assert!(s.free > 0, "남은 용량이 0이다: {s:?}");
+        assert!(s.free <= s.total, "남은 양이 전체보다 크다: {s:?}");
+    }
+
+    #[test]
+    fn disk_space_missing_path_is_error() {
+        let tmp = tempfile::tempdir().unwrap();
+        let missing = tmp.path().join("nope");
+        let err = disk_space(missing.to_str().unwrap()).unwrap_err();
+        assert!(err.contains("nope"), "{err}");
+        assert!(disk_space("a\0b").is_err());
+    }
+}
+
+#[cfg(all(test, windows))]
+mod windows_tests {
+    use super::*;
+
+    #[test]
+    fn disk_space_reports_total_and_free() {
         let tmp = tempfile::tempdir().unwrap();
         let s = disk_space(tmp.path().to_str().unwrap()).unwrap();
         assert!(s.total > 0, "전체 용량이 0이다: {s:?}");
