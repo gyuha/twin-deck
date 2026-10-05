@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { renderApp } from "./helpers";
+import { names, renderApp } from "./helpers";
 
 const actionBar = () => screen.queryByRole("toolbar", { name: "액션 바" });
 const driveBars = () => screen.queryAllByRole("toolbar", { name: /^드라이브/ });
@@ -28,5 +28,16 @@ describe("보기 토글 버튼 (오른쪽 아래)", () => {
     expect(toggle("드라이브 바 표시")).toHaveAttribute("aria-pressed", "false");
     await user.click(toggle("드라이브 바 표시"));
     await waitFor(() => expect(driveBars().length).toBe(2));
+  });
+
+  it("숨김 파일 표시 토글: 클릭하면 숨김 파일이 나타났다 사라진다", async () => {
+    const { user } = await renderApp();
+    expect(names("left").some((n) => n.includes(".hidden"))).toBe(false);
+    expect(toggle("숨김 파일 표시")).toHaveAttribute("aria-pressed", "false");
+    await user.click(toggle("숨김 파일 표시"));
+    await waitFor(() => expect(names("left").some((n) => n.includes(".hidden"))).toBe(true));
+    expect(toggle("숨김 파일 표시")).toHaveAttribute("aria-pressed", "true");
+    await user.click(toggle("숨김 파일 표시"));
+    await waitFor(() => expect(names("left").some((n) => n.includes(".hidden"))).toBe(false));
   });
 });

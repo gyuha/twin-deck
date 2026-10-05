@@ -80,18 +80,19 @@ function StatusBar() {
   const keymapWarnings = useApp((s) => s.keymapWarnings.length);
   const showActionBar = useApp((s) => s.loaded.config.behavior.layout.show_action_bar);
   const showDriveBar = useApp((s) => s.loaded.config.behavior.layout.show_drive_bar);
+  const showHidden = useApp((s) => s.showHidden);
   const { api } = useAppStore();
   const warnings = fileWarnings + keymapWarnings;
-  // 메뉴 막대가 없는 Windows에서도 바를 켜고 끌 수 있게 오른쪽 끝에 항상 보이는 토글을 둔다.
-  const viewToggle = (label: string, text: string, on: boolean, flag: "show_action_bar" | "show_drive_bar") => (
+  // 메뉴 막대가 없는 Windows에서도 바와 숨김 파일 표시를 켜고 끌 수 있게 오른쪽 끝에 항상 보이는 토글을 둔다.
+  const viewToggle = (label: string, text: string, on: boolean, toggle: () => void | Promise<void>) => (
     <button
       type="button"
       tabIndex={-1}
       aria-label={label}
       aria-pressed={on}
       title={label}
-      onClick={() => void api.toggleLayoutFlag(flag)}
-      className={["rounded border border-app-line px-1.5 hover:bg-app-selected", on ? "" : "text-ink-faint line-through"].join(" ")}
+      onClick={() => void toggle()}
+      className={["rounded border border-app-line px-1.5 hover:bg-app-selected", on ? "" : "text-ink-faint"].join(" ")}
     >
       {text}
     </button>
@@ -111,8 +112,9 @@ function StatusBar() {
         </span>
       )}
       <span className="ml-auto flex gap-1">
-        {viewToggle("드라이브 바 표시", "Drive Bar", showDriveBar, "show_drive_bar")}
-        {viewToggle("Action Bar 표시", "Action Bar", showActionBar, "show_action_bar")}
+        {viewToggle("숨김 파일 표시", "숨김 파일", showHidden, () => api.toggleHidden())}
+        {viewToggle("드라이브 바 표시", "Drive Bar", showDriveBar, () => api.toggleLayoutFlag("show_drive_bar"))}
+        {viewToggle("Action Bar 표시", "Action Bar", showActionBar, () => api.toggleLayoutFlag("show_action_bar"))}
       </span>
     </footer>
   );
