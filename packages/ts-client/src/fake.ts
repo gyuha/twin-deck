@@ -744,6 +744,12 @@ export class FakeBackend implements Backend {
     this.notify(destDir);
   }
 
+  /** 아카이브(`<경로>!` 아래) 안의 파일 수. 아카이브가 아니면 0. */
+  private archiveFileCount(src: string): number {
+    const root = `${src}!/`;
+    return [...this.nodes].filter(([k, n]) => k.startsWith(root) && n.kind === "file").length;
+  }
+
   private extract(src: string, destDir: string) {
     if (this.need(src).kind !== "file" || !this.nodes.has(`${src}!`)) throw new BackendError(`아카이브가 아닙니다: ${src}`);
     this.need(destDir);
@@ -803,7 +809,7 @@ export class FakeBackend implements Backend {
       job.dto.errors.push({ path: item.src, message: e instanceof Error ? e.message : String(e) });
     }
     job.dto.completed += 1;
-    job.dto.filesDone += 1;
+    job.dto.filesDone = job.dto.kind === "extract" ? Math.min(job.dto.filesTotal ?? 0, job.dto.filesDone + this.archiveFileCount(item.src)) : job.dto.filesDone + 1;
     if (job.dto.completed >= job.dto.total) this.finish(job);
     this.notifyQueue();
     return true;
@@ -813,7 +819,7 @@ export class FakeBackend implements Backend {
     const id = this.nextJobId++;
     const job: FakeJob = {
       items,
-      dto: { id, kind, status: "queued", total: items.length, completed: 0, filesTotal: ["copy", "move", "delete", "trash"].includes(kind) ? items.length : null, filesDone: 0, bytesTotal: null, bytesDone: 0, current: null, errors: [] },
+      dto: { id, kind, status: "queued", total: items.length, completed: 0, filesTotal: kind === "extract" ? items.reduce((n, i) => n + this.archiveFileCount(i.src), 0) : ["copy", "move", "delete", "trash"].includes(kind) ? items.length : null, filesDone: 0, bytesTotal: null, bytesDone: 0, current: null, errors: [] },
     };
     this.jobs.set(id, job);
     this.notifyQueue();
@@ -827,7 +833,7 @@ export class FakeBackend implements Backend {
           job.dto.errors.push({ path: item.src, message: e instanceof Error ? e.message : String(e) });
         }
         job.dto.completed += 1;
-        job.dto.filesDone += 1;
+        job.dto.filesDone = kind === "extract" ? Math.min(job.dto.filesTotal ?? 0, job.dto.filesDone + this.archiveFileCount(item.src)) : job.dto.filesDone + 1;
       }
       this.finish(job);
       this.notifyQueue();

@@ -54,6 +54,20 @@ impl Control for NoControl {
     }
 }
 
+/// 추출용으로 압축 파일을 연다. 확장자로 형식을 알 수 없으면(설정의 추가 확장자, Open As 등) 내용으로 판별한다.
+fn open_archive_for_extract(src: &VfsPath) -> Result<td_archive::Archive> {
+    Ok(
+        td_archive::Archive::open(src.as_path(), &[]).or_else(|e| match e {
+            td_archive::ArchiveError::Unsupported(_) => td_archive::sniff_kind(src.as_path())
+                .ok()
+                .flatten()
+                .map(|k| td_archive::Archive::open_as(src.as_path(), k))
+                .unwrap_or(Err(e)),
+            other => Err(other),
+        })?,
+    )
+}
+
 pub struct Ops<V: Vfs, T: Trasher> {
     vfs: V,
     trasher: T,
@@ -432,29 +446,44 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
             }
             None => archive_stem(&src_name),
         };
-        let archive = td_archive::Archive::open(src.as_path(), &[]).or_else(|e| match e {
-            // 확장자로 형식을 알 수 없으면(설정의 추가 확장자, Open As 등) 내용으로 판별한다.
-            td_archive::ArchiveError::Unsupported(_) => td_archive::sniff_kind(src.as_path())
-                .ok()
-                .flatten()
-                .map(|k| td_archive::Archive::open_as(src.as_path(), k))
-                .unwrap_or(Err(e)),
-            other => Err(other),
-        })?;
+        let archive = open_archive_for_extract(src)?;
         let Some(dest) = self.resolve_name(dest_dir, &folder_name, policy)? else {
             return Ok(Outcome::Skipped);
         };
+        // 항목을 처리하기 직전에 불리므로, 앞서 처리한 파일은 다음 호출(또는 끝)에서 "끝났다"고 알린다.
+        let dirs: std::collections::HashSet<&str> = archive
+            .entries()
+            .iter()
+            .filter(|e| e.is_dir)
+            .map(|e| e.name.as_str())
+            .collect();
+        let mut pending_file = false;
         let result = archive.extract_all_with(dest.as_path(), &mut |name| {
+            if std::mem::take(&mut pending_file) {
+                ctl.on_file_done();
+            }
             ctl.on_item(&dest.join(name));
+            pending_file = !dirs.contains(name);
             !ctl.should_stop()
         });
         match result {
-            Ok(_) => Ok(Outcome::Done(dest)),
+            Ok(_) => {
+                if pending_file {
+                    ctl.on_file_done();
+                }
+                Ok(Outcome::Done(dest))
+            }
             Err(e) => {
                 let _ = std::fs::remove_dir_all(dest.as_path());
                 Err(e.into())
             }
         }
+    }
+
+    /// 압축 파일 안의 파일 수(폴더는 세지 않는다). 진행률의 분모로 쓴다.
+    pub fn count_archive_files(&self, src: &VfsPath) -> Result<usize> {
+        let archive = open_archive_for_extract(src)?;
+        Ok(archive.entries().iter().filter(|e| !e.is_dir).count())
     }
 
     /// 복제 (OP-08): 같은 폴더에 접미사를 붙여 복사한다. 만들어진 경로를 돌려준다.

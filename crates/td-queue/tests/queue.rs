@@ -479,3 +479,41 @@ fn byte_progress_of_single_file_copy_ends_at_file_size() {
     assert_eq!(info.bytes_total, Some(2 * 1024 * 1024));
     assert_eq!(info.bytes_done, 2 * 1024 * 1024);
 }
+
+#[test]
+fn extract_reports_file_progress() {
+    let a = dirs(&["one.txt", "two.txt", "three.txt"]);
+    let (q, rx) = Queue::new(ops());
+    let mut compress = Item::new(
+        a.src.join("one.txt"),
+        Some(a.dst.clone()),
+        ConflictPolicy::Rename,
+    );
+    compress.extra = vec![a.src.join("two.txt"), a.src.join("three.txt")];
+    compress.name = Some("bundle.zip".into());
+    let id = q.enqueue(JobSpec {
+        kind: JobKind::Compress,
+        items: vec![compress],
+    });
+    wait_for(
+        &rx,
+        |e| matches!(e, QueueEvent::Finished { job, .. } if *job == id),
+    );
+
+    let extract = Item::new(
+        a.dst.join("bundle.zip"),
+        Some(a.dst.clone()),
+        ConflictPolicy::Rename,
+    );
+    let id = q.enqueue(JobSpec {
+        kind: JobKind::Extract,
+        items: vec![extract],
+    });
+    wait_for(
+        &rx,
+        |e| matches!(e, QueueEvent::Finished { job, .. } if *job == id),
+    );
+    let info = q.job(id).unwrap();
+    assert_eq!(info.status, JobStatus::Done);
+    assert_eq!((info.files_total, info.files_done), (Some(3), 3));
+}

@@ -1788,7 +1788,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       patchActive({ selection: new Set() });
       for (const t of targets) {
         try {
-          await backend.enqueueExtract(t.path, fixed ?? parentPath(t.path) ?? "/");
+          const jobId = await backend.enqueueExtract(t.path, fixed ?? parentPath(t.path) ?? "/");
+          void trackTransfer(jobId, "압축 풀기");
         } catch (e) {
           fail(e);
           break;

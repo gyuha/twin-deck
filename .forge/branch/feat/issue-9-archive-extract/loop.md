@@ -15,7 +15,7 @@ wall: none
 ## Check progress (updated after EVERY stop-condition run)
 - C1: not-run
 - C2: not-run
-- C3: not-run
+- C3: pass ×0 · regressed: ×0 · last-evidence: "cargo test extract_reports_file_progress → 1 passed (구현 전 실패), vitest -t '압축 풀기 진행 창' → 1 passed (구현 전 실패)"
 - C4: not-run
 
 ## Authorized replan scope
@@ -27,6 +27,6 @@ wall: none
 - 실제 화면 확인(메뉴·진행 창 모양)은 기계로 검증하지 않는다. 사용자가 확인 전 이슈가 닫히는 점은 사전 승인했다.
 
 ## Tasks
-- extract-progress
+- extract-progress (sealed)
 - context-menu-extract
 - preview-enter-extract
