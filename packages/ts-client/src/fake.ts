@@ -813,7 +813,7 @@ export class FakeBackend implements Backend {
     const id = this.nextJobId++;
     const job: FakeJob = {
       items,
-      dto: { id, kind, status: "queued", total: items.length, completed: 0, filesTotal: ["copy", "move", "delete", "trash"].includes(kind) ? items.length : null, filesDone: 0, current: null, errors: [] },
+      dto: { id, kind, status: "queued", total: items.length, completed: 0, filesTotal: ["copy", "move", "delete", "trash"].includes(kind) ? items.length : null, filesDone: 0, bytesTotal: null, bytesDone: 0, current: null, errors: [] },
     };
     this.jobs.set(id, job);
     this.notifyQueue();
@@ -837,6 +837,15 @@ export class FakeBackend implements Backend {
 
   async queueJobs() {
     return this.snapshot();
+  }
+
+  /** 테스트용: 작업이 지금 복사 중인 파일의 바이트 진행을 알린 것처럼 만든다(실제 백엔드는 복사 중에 채운다). */
+  reportBytes(id: number, done: number, total: number) {
+    const j = this.jobs.get(id);
+    if (!j) return;
+    j.dto.bytesDone = done;
+    j.dto.bytesTotal = total;
+    this.notifyQueue();
   }
 
   async queuePause(id: number) {

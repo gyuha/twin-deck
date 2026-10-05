@@ -244,7 +244,7 @@ pub struct JobErrorDto {
     pub message: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct JobDto {
     pub id: u32,
@@ -255,6 +255,10 @@ pub struct JobDto {
     /// 복사/이동의 전체 파일 수. 집계 전이거나 해당 없는 작업이면 `None`.
     pub files_total: Option<u32>,
     pub files_done: u32,
+    /// 지금 복사 중인 파일의 전체 바이트. 아직 모르거나 복사/이동이 아니면 `None`.
+    pub bytes_total: Option<f64>,
+    /// 지금 복사 중인 파일에서 처리한 바이트.
+    pub bytes_done: f64,
     pub current: Option<String>,
     pub errors: Vec<JobErrorDto>,
 }
@@ -298,6 +302,8 @@ impl From<&JobInfo> for JobDto {
             completed: j.completed as u32,
             files_total: j.files_total.map(|n| n as u32),
             files_done: j.files_done as u32,
+            bytes_total: j.bytes_total.map(|n| n as f64),
+            bytes_done: j.bytes_done as f64,
             current: j.current.clone(),
             errors: j
                 .errors
@@ -1004,6 +1010,27 @@ mod tests {
         assert_eq!(job.status, JobStatusDto::Done);
         assert_eq!((job.files_total, job.files_done), (Some(3), 3));
         assert!(Path::new(&format!("{dest}/[이력서]/하위/b.pdf")).exists());
+    }
+
+    #[test]
+    fn job_bytes_of_single_file_copy_reach_file_size() {
+        let (_t, svc, _ch, root) = setup();
+        let dest = format!("{root}/dest");
+        svc.mkdir(&dest).unwrap();
+        std::fs::write(format!("{root}/big.bin"), vec![1u8; 2 * 1024 * 1024]).unwrap();
+        let id = svc.enqueue(
+            JobKindDto::Copy,
+            vec![item(
+                &format!("{root}/big.bin"),
+                Some(&dest),
+                ConflictDto::Skip,
+            )],
+        );
+        let job = wait_finished(&svc, id);
+        assert_eq!(
+            (job.bytes_total, job.bytes_done),
+            (Some(2097152.0), 2097152.0)
+        );
     }
 
     #[test]

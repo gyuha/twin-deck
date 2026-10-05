@@ -1,3 +1,5 @@
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use td_vfs::{Entry, EntryKind, ListOptions, Vfs, VfsError, VfsPath};
 
 use crate::{OpsError, Result, Trasher};
@@ -16,6 +18,10 @@ pub enum Outcome {
     Skipped,
 }
 
+/// 이 크기 이상인 파일만 복사 중 진행을 읽는다(작은 파일은 순식간에 끝나 스레드 비용이 더 크다).
+const BYTES_POLL_MIN: u64 = 1024 * 1024;
+const BYTES_POLL_INTERVAL: std::time::Duration = std::time::Duration::from_millis(100);
+
 /// 긴 작업이 파일 단위로 진행을 알리고 중단 요청을 확인하는 지점.
 pub trait Control {
     /// 파일/폴더 하나를 처리하기 직전에 호출된다.
@@ -31,6 +37,11 @@ pub trait Control {
     }
     /// `collects_errors`가 true일 때 실패한 항목의 경로와 오류를 알린다.
     fn on_error(&self, _path: &VfsPath, _message: &str) {}
+    /// 파일 하나를 복사하는 동안 (처리한 바이트, 전체 바이트)를 받을 함수. 복사하는 동안 다른 스레드에서 호출된다.
+    /// 필요 없으면 `None`(기본)이고, 그러면 진행을 읽는 스레드도 만들지 않는다.
+    fn bytes_sink(&self) -> Option<Box<dyn Fn(u64, u64) + Send + '_>> {
+        None
+    }
 }
 
 /// 진행 알림도 중단도 없는 기본 제어.
@@ -228,6 +239,40 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
         Ok(())
     }
 
+    /// 파일 하나를 복사한다. `ctl`이 바이트 진행을 받으면, 큰 파일은 복사하는 동안 대상 파일 크기를 주기적으로 읽어 알리고
+    /// 끝나면 (전체, 전체)를 알린다. `fs::copy` 자체는 그대로 둬서 OS의 빠른 복사 경로를 잃지 않는다.
+    fn copy_file_reporting(&self, entry: &Entry, dest: &VfsPath, ctl: &dyn Control) -> Result<()> {
+        let Some(sink) = ctl.bytes_sink() else {
+            self.vfs.copy_file(&entry.path, dest)?;
+            return Ok(());
+        };
+        let total = entry.size;
+        let sink = if total >= BYTES_POLL_MIN {
+            let done = AtomicBool::new(false);
+            std::thread::scope(|scope| {
+                let poller = scope.spawn(|| {
+                    while !done.load(Ordering::Acquire) {
+                        if let Ok(m) = std::fs::metadata(dest.as_path()) {
+                            sink(m.len().min(total), total);
+                        }
+                        std::thread::park_timeout(BYTES_POLL_INTERVAL);
+                    }
+                    sink
+                });
+                let copied = self.vfs.copy_file(&entry.path, dest);
+                done.store(true, Ordering::Release);
+                poller.thread().unpark();
+                let sink = poller.join().expect("진행 읽기 스레드");
+                copied.map(|_| sink)
+            })?
+        } else {
+            self.vfs.copy_file(&entry.path, dest)?;
+            sink
+        };
+        sink(total, total);
+        Ok(())
+    }
+
     /// 항목 하나(폴더면 그 안 전부)를 복사한다. 돌려주는 값은 `ctl.collects_errors()`일 때 건너뛰고 알린 실패 개수다.
     fn copy_entry(&self, entry: &Entry, dest: &VfsPath, ctl: &dyn Control) -> Result<usize> {
         if ctl.should_stop() {
@@ -236,7 +281,7 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
         ctl.on_item(&entry.path);
         match entry.kind {
             EntryKind::File => {
-                self.vfs.copy_file(&entry.path, dest)?;
+                self.copy_file_reporting(entry, dest, ctl)?;
                 ctl.on_file_done();
             }
             EntryKind::Symlink => {

@@ -80,6 +80,10 @@ pub struct JobInfo {
     pub files_total: Option<usize>,
     /// 처리가 끝난 파일 수.
     pub files_done: usize,
+    /// 지금 복사 중인 파일의 전체 바이트. 아직 모르거나 복사/이동이 아니면 `None`.
+    pub bytes_total: Option<u64>,
+    /// 지금 복사 중인 파일에서 처리한 바이트.
+    pub bytes_done: u64,
     /// 지금 처리 중인 경로.
     pub current: Option<String>,
     /// 실패한 항목: (경로, 오류 문자열)

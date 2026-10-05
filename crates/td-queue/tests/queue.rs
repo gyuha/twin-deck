@@ -467,3 +467,15 @@ fn queue_folder_copy_continues_past_failed_child() {
     assert!(a.dst.join("d/a.txt").as_path().exists());
     assert!(a.dst.join("d/c.txt").as_path().exists());
 }
+
+#[test]
+fn byte_progress_of_single_file_copy_ends_at_file_size() {
+    let d = dirs(&[]);
+    std::fs::write(d.src.as_path().join("big.bin"), vec![1u8; 2 * 1024 * 1024]).unwrap();
+    let (q, rx) = Queue::new(ops());
+    let id = q.enqueue(copy_spec(&d, &["big.bin"]));
+    wait_for(&rx, |e| matches!(e, QueueEvent::Finished { .. }));
+    let info = q.job(id).unwrap();
+    assert_eq!(info.bytes_total, Some(2 * 1024 * 1024));
+    assert_eq!(info.bytes_done, 2 * 1024 * 1024);
+}

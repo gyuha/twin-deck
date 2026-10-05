@@ -4,6 +4,7 @@ import { CONFLICT_CHOICES, isActiveJob } from "../state/store";
 import type { DialogState } from "../state/store";
 import { buildNewNames, validateNames } from "../lib/multiRename";
 import { MultiRename } from "./MultiRename";
+import { formatSpace } from "../lib/format";
 
 const CHOICE_LABEL = { overwrite: "덮어쓰기 (O)", skip: "건너뛰기 (S)", rename: "이름 바꿔 복사 (R)" } as const;
 
@@ -21,6 +22,7 @@ export function Dialog() {
   const kind = dialog?.kind;
   const jobId = dialog?.kind === "progress" ? dialog.jobId : null;
   const job = useApp((s) => (jobId === null ? undefined : s.queue.find((j) => j.id === jobId)));
+  const sizeFormat = useApp((s) => s.loaded.config.display.size_format);
   const selectStem = dialog?.kind === "name" && dialog.selectStem;
 
   // 열릴 때 첫 입력에 포커스, 이름 변경이면 확장자를 뺀 부분을 선택한다.
@@ -74,24 +76,35 @@ export function Dialog() {
           </>
         )}
         {dialog.kind === "multirename" && <MultiRename items={dialog.items} existing={dialog.existing} options={dialog.options} />}
-        {dialog.kind === "progress" && job && (
+        {dialog.kind === "progress" && job && (() => {
+          // 파일이 1개이고 바이트를 알면 그 파일의 바이트 진행률을, 아니면 파일 개수 진행을 보여 준다.
+          const byBytes = job.filesTotal === 1 && job.bytesTotal !== null && job.bytesTotal > 0;
+          const ratio = byBytes ? job.bytesDone / job.bytesTotal! : job.filesTotal ? job.filesDone / job.filesTotal : 0;
+          const started = byBytes ? job.bytesDone > 0 : job.filesDone > 0;
+          return (
           <>
             <div
               role="progressbar"
               aria-label="전송 진행"
               aria-valuemin={0}
               aria-valuemax={100}
-              aria-valuenow={job.filesTotal ? Math.round((job.filesDone / job.filesTotal) * 100) : undefined}
+              aria-valuenow={byBytes || job.filesTotal ? Math.round(ratio * 100) : undefined}
               className="h-2 w-full overflow-hidden rounded bg-app-slider"
             >
-              {/* 아직 한 개도 끝나지 않았으면 막대가 죽어 보이지 않게 깜빡이는 진행 중 표시를 한다. */}
-              {isActiveJob(job) && job.filesDone === 0 ? (
+              {/* 아직 시작한 진행이 없으면 막대가 죽어 보이지 않게 깜빡이는 진행 중 표시를 한다. */}
+              {isActiveJob(job) && !started ? (
                 <div className="h-full w-full animate-pulse bg-accent opacity-40" />
               ) : (
-                <div className="h-full bg-accent" style={{ width: `${job.filesTotal ? (job.filesDone / job.filesTotal) * 100 : 0}%` }} />
+                <div className="h-full bg-accent" style={{ width: `${ratio * 100}%` }} />
               )}
             </div>
-            <p className="mt-1">{job.filesTotal === null ? "집계 중…" : `${job.filesDone}/${job.filesTotal}개`}</p>
+            <p className="mt-1">
+              {byBytes
+                ? `${formatSpace(job.bytesDone, sizeFormat)} / ${formatSpace(job.bytesTotal!, sizeFormat)}`
+                : job.filesTotal === null
+                  ? "집계 중…"
+                  : `${job.filesDone}/${job.filesTotal}개`}
+            </p>
             {job.current && isActiveJob(job) && <p className="truncate text-xs text-ink-dull">{job.current}</p>}
             {job.errors.length > 0 && (
               <div className="mt-1 max-h-40 overflow-auto">
@@ -121,7 +134,8 @@ export function Dialog() {
               )}
             </div>
           </>
-        )}
+          );
+        })()}
         {(dialog.kind === "confirm" || dialog.kind === "info") && (
           <ul className="mb-1 list-inside list-disc">
             {dialog.lines.map((l) => (

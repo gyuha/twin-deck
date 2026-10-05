@@ -91,6 +91,14 @@ impl Control for JobControl<'_> {
             j.info.files_done += 1;
         }
     }
+    fn bytes_sink(&self) -> Option<Box<dyn Fn(u64, u64) + Send + '_>> {
+        Some(Box::new(|done, total| {
+            if let Some(j) = self.shared.state.lock().unwrap().jobs.get_mut(&self.job) {
+                j.info.bytes_done = done;
+                j.info.bytes_total = Some(total);
+            }
+        }))
+    }
     fn collects_errors(&self) -> bool {
         true
     }
@@ -159,6 +167,8 @@ impl Queue {
             completed: 0,
             files_total: None,
             files_done: 0,
+            bytes_total: None,
+            bytes_done: 0,
             current: None,
             errors: Vec::new(),
         };
