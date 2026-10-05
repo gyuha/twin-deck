@@ -13,7 +13,7 @@ wall: none
 - [ ] C4. 회귀 방지: `bunx tsc --noEmit` 통과, 전체 `bunx vitest run`의 실패는 기준선 `pdf-preview` 1건뿐, `cargo test -p td-queue -p td-ops -p twin-deck-desktop` 통과(`up_to_date` 포함), `cargo clippy -p td-queue -p td-ops -p twin-deck-desktop -- -D warnings` 통과.
 
 ## Check progress (updated after EVERY stop-condition run)
-- C1: not-run
+- C1: pass ×0 · regressed: ×0 · last-evidence: "vitest -t '컨텍스트 메뉴 압축 풀기' → 2 passed (구현 전 2 failed)"
 - C2: not-run
 - C3: pass ×0 · regressed: ×0 · last-evidence: "cargo test extract_reports_file_progress → 1 passed (구현 전 실패), vitest -t '압축 풀기 진행 창' → 1 passed (구현 전 실패)"
 - C4: not-run
@@ -28,5 +28,5 @@ wall: none
 
 ## Tasks
 - extract-progress (sealed)
-- context-menu-extract
+- context-menu-extract (sealed)
 - preview-enter-extract

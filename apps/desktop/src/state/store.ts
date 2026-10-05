@@ -184,6 +184,8 @@ export interface CtxItem {
   label?: string;
   actionId?: string;
   sub?: CtxItem[];
+  /** true이면 커서가 압축 파일(또는 선택 항목이 있을 때)만 켜진다. 일반 파일 위에서는 흐리게 보인다. */
+  archiveOnly?: boolean;
 }
 
 /** 파일 행 컨텍스트 메뉴의 구성 (Finder 스타일). 단축키 힌트와 실행 가능 여부는 액션 ID로 구한다. */
@@ -199,6 +201,7 @@ export const CONTEXT_MENU: readonly CtxItem[] = [
   },
   {},
   { label: "여기에 압축…", actionId: "core.compress" },
+  { label: "압축 풀기", actionId: "core.extract", archiveOnly: true },
   {},
   { label: "이동", actionId: "core.move" },
   { label: "복사", actionId: "core.copy" },
@@ -342,6 +345,11 @@ export function targetsOf(tab: TabState): EntryDto[] {
   return c ? [c] : [];
 }
 
+/** 파일이면서 이름이 압축 파일(아카이브)인 항목인지. */
+function isArchiveEntry(e: EntryDto | undefined, extraExts: string[]): boolean {
+  return e?.kind === "file" && isArchiveName(e.name, extraExts);
+}
+
 export function actionContext(s: AppState): ActionContext {
   const tab = activeTab(s);
   return {
@@ -352,6 +360,7 @@ export function actionContext(s: AppState): ActionContext {
     canGoBack: !tab.virtual && tab.back.length > 0,
     canGoForward: !tab.virtual && tab.forward.length > 0,
     cursorIsDir: cursorEntry(tab)?.kind === "dir",
+    cursorIsArchive: isArchiveEntry(cursorEntry(tab), s.loaded.config.file_systems.zip.additional_extensions),
     multiColumn: tab.view.mode === "columns",
     virtualTab: !!tab.virtual,
     searching: !!tab.virtual?.running,

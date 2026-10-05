@@ -18,7 +18,7 @@ describe("파일 행 컨텍스트 메뉴", () => {
     expect(menu()).toBeNull();
     rightClick(1);
     expect(menu()).toBeTruthy();
-    expect(labels()).toEqual(["열기", "다음으로 열기", "여기에 압축…", "이동", "복사", "삭제", "이름 바꾸기", "파일 속성 표시"]);
+    expect(labels()).toEqual(["열기", "다음으로 열기", "여기에 압축…", "압축 풀기", "이동", "복사", "삭제", "이름 바꾸기", "파일 속성 표시"]);
     expect(within(menu()!).getAllByRole("separator")).toHaveLength(3);
   });
 
@@ -150,5 +150,37 @@ describe("파일 행 컨텍스트 메뉴", () => {
     document.body.append(input);
     expect(fireEvent.contextMenu(input)).toBe(true);
     input.remove();
+  });
+});
+
+describe("컨텍스트 메뉴 압축 풀기", () => {
+  // 이름순: docs, a.txt, pack.zip
+  const withZip = () =>
+    new FakeBackend().seed({
+      "/home/a/docs/in.txt": "x",
+      "/home/a/a.txt": "a",
+      "/home/a/pack.zip": "PK",
+      "/home/a/pack.zip!/inner/f.txt": "F",
+      "/home/b": null,
+    });
+
+  it("압축 파일 위에서는 켜져 있고 누르면 옆의 새 폴더로 푼다", async () => {
+    const b = withZip();
+    await renderApp(b);
+    rightClick(2); // pack.zip
+    expect(item("압축 풀기")).toHaveAttribute("aria-disabled", "false");
+    fireEvent.click(item("압축 풀기"));
+    await waitFor(() => expect(b.exists("/home/a/pack/inner/f.txt")).toBe(true));
+    expect((await b.queueJobs())[0]).toMatchObject({ kind: "extract" });
+    expect(menu()).toBeNull();
+  });
+
+  it("압축이 아닌 파일과 폴더에서는 꺼져 있다", async () => {
+    await renderApp(withZip());
+    rightClick(1); // a.txt
+    expect(item("압축 풀기")).toHaveAttribute("aria-disabled", "true");
+    fireEvent.keyDown(window, { key: "Escape" });
+    rightClick(0); // docs 폴더
+    expect(item("압축 풀기")).toHaveAttribute("aria-disabled", "true");
   });
 });

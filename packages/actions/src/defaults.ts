@@ -16,6 +16,8 @@ export interface ActionContext {
   canGoForward: boolean;
   /** 커서 항목이 폴더인지. */
   cursorIsDir: boolean;
+  /** 커서 항목이 압축 파일(아카이브)인지. */
+  cursorIsArchive: boolean;
   /** 활성 탭이 다중 컬럼 표시 모드인지. */
   multiColumn: boolean;
   /** 활성 탭이 위치 없는 가상 탭(Look Up/Flatten/Disk Usage 결과)인지. */

@@ -20,7 +20,11 @@ export function ContextMenu() {
     <div role="menu" aria-label={label} className="rounded-lg border border-app-line bg-app-box py-1 text-sm shadow-lg" style={{ width: MENU_WIDTH }}>
       {items.map((it, i) => {
         if (!it.label) return <hr key={i} role="separator" className="my-1 border-app-line" />;
-        const enabled = it.sub ? true : it.actionId ? registry.isApplicable(it.actionId, ctx) : false;
+        const enabled = it.sub
+          ? true
+          : it.actionId
+            ? registry.isApplicable(it.actionId, ctx) && (!it.archiveOnly || ctx.cursorIsArchive || ctx.selectedCount > 0)
+            : false;
         const keys = it.actionId ? keymap.keysFor(it.actionId).map((k) => formatKey(k, platform))[0] : undefined;
         return (
           <div
