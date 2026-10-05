@@ -14,8 +14,14 @@ export function appItemLabel(text: string): string | null {
   return `${m[1]} ${APP_NAME}`;
 }
 
+/** 액션 ID의 현재 키를 화면에 보일 글자(예: `Cmd+Shift+D`)로 돌려주는 함수. 키가 없으면 undefined. */
+export type KeyOf = (actionId: string) => string | undefined;
+
+/** 메뉴 항목 글자 뒤에 키를 괄호로 붙인다. 네이티브 accelerator는 쓰지 않는다(아래 `installFileMenu` 설명). */
+const withKey = (text: string, key: string | undefined) => (key ? `${text} (${key})` : text);
+
 /** View 메뉴 끝에 화면 요소를 켜고 끄는 체크 항목을 붙인다. View 메뉴가 없으면 File 다음 자리에 만든다. */
-async function addViewToggles(menu: Menu, run: (actionId: string) => void, flags: LayoutFlags): Promise<void> {
+async function addViewToggles(menu: Menu, run: (actionId: string) => void, flags: LayoutFlags, keyOf?: KeyOf): Promise<void> {
   let view: Submenu | null = null;
   for (const item of await menu.items()) {
     if (item instanceof Submenu && (await item.text()) === "View") view = item;
@@ -26,7 +32,7 @@ async function addViewToggles(menu: Menu, run: (actionId: string) => void, flags
   }
   await view.append(await PredefinedMenuItem.new({ item: "Separator" }));
   for (const t of VIEW_TOGGLES) {
-    await view.append(await CheckMenuItem.new({ id: t.actionId, text: t.text, checked: flags[t.flag], action: () => run(t.actionId) }));
+    await view.append(await CheckMenuItem.new({ id: t.actionId, text: withKey(t.text, keyOf?.(t.actionId)), checked: flags[t.flag], action: () => run(t.actionId) }));
   }
 }
 
@@ -81,7 +87,11 @@ export interface LayoutFlags {
  * 기본 메뉴를 쓰는 이유는 Edit의 복사/붙여넣기 같은 기본 동작(입력창 단축키)을 잃지 않기 위해서다.
  * 항목에 단축키(accelerator)는 달지 않는다: 앱이 이미 키를 직접 처리하고, 메뉴가 먼저 가로채면 열려 있는 창 위에서도 실행된다.
  */
-export async function installFileMenu(run: (actionId: string) => void, flags: LayoutFlags = { driveBar: true, actionBar: true }): Promise<void> {
+export async function installFileMenu(
+  run: (actionId: string) => void,
+  flags: LayoutFlags = { driveBar: true, actionBar: true },
+  keyOf?: KeyOf,
+): Promise<void> {
   const menu = await Menu.default();
   let file: Submenu | null = null;
   for (const item of await menu.items()) {
@@ -97,7 +107,7 @@ export async function installFileMenu(run: (actionId: string) => void, flags: La
     ),
   );
   await file.prepend(entries);
-  await addViewToggles(menu, run, flags);
+  await addViewToggles(menu, run, flags, keyOf);
   await renameAppMenu(menu);
   await menu.setAsAppMenu();
 }
@@ -107,9 +117,9 @@ export async function installFileMenu(run: (actionId: string) => void, flags: La
  * macOS 메뉴바는 앱 전체에서 하나라서, 창을 여럿 열면(win-N) 마지막에 설치한 창의 실행기가 남는다.
  * 포커스를 얻을 때 다시 설치해야 메뉴가 항상 지금 보이는 창에 작용한다. 반환값은 포커스 감시 해제 함수다.
  */
-export async function installFileMenuForWindow(run: (actionId: string) => void, flags?: LayoutFlags): Promise<() => void> {
-  await installFileMenu(run, flags);
+export async function installFileMenuForWindow(run: (actionId: string) => void, flags?: LayoutFlags, keyOf?: KeyOf): Promise<() => void> {
+  await installFileMenu(run, flags, keyOf);
   return getCurrentWindow().onFocusChanged(({ payload: focused }) => {
-    if (focused) void installFileMenu(run, flags);
+    if (focused) void installFileMenu(run, flags, keyOf);
   });
 }

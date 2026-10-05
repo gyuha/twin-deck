@@ -166,6 +166,13 @@ describe("상단 메뉴바 File 메뉴", () => {
     expect(viewAdds[0]).toEqual({ separator: true });
   });
 
+  it("보기 단축키: keyOf를 주면 View 항목 글자에 키가 붙고 accelerator는 달지 않는다", async () => {
+    const keys: Record<string, string> = { "core.view.drive_bar": "Cmd+Shift+D", "core.view.action_bar": "Cmd+Shift+A" };
+    await installFileMenu(() => {}, { driveBar: true, actionBar: true }, (id) => keys[id]);
+    expect(checks.map((c) => c.text)).toEqual(["드라이브 바 표시 (Cmd+Shift+D)", "Action Bar 표시 (Cmd+Shift+A)"]);
+    for (const c of checks) expect(c).not.toHaveProperty("accelerator");
+  });
+
   it("체크 항목을 누르면 대응하는 액션 ID로 실행기를 부른다", async () => {
     const run = vi.fn();
     await installFileMenu(run);

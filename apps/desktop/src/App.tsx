@@ -24,7 +24,7 @@ import { ContextMenu } from "./ui/ContextMenu";
 import { PopupMenu } from "./ui/PopupMenu";
 import { QueueIndicator, QueuePopup } from "./ui/Queue";
 import { Settings } from "./ui/Settings";
-import { UiContext } from "./ui/uiContext";
+import { UiContext, useUi } from "./ui/uiContext";
 import { useKeyboard } from "./ui/useKeyboard";
 
 export interface AppProps {
@@ -82,21 +82,25 @@ function StatusBar() {
   const showDriveBar = useApp((s) => s.loaded.config.behavior.layout.show_drive_bar);
   const showHidden = useApp((s) => s.showHidden);
   const { api } = useAppStore();
+  const { keymap, platform } = useUi();
   const warnings = fileWarnings + keymapWarnings;
   // 메뉴 막대가 없는 Windows에서도 바와 숨김 파일 표시를 켜고 끌 수 있게 오른쪽 끝에 항상 보이는 토글을 둔다.
-  const viewToggle = (label: string, text: string, on: boolean, toggle: () => void | Promise<void>) => (
+  const viewToggle = (label: string, text: string, on: boolean, toggle: () => void | Promise<void>, actionId: string) => {
+    const key = keymap.keysFor(actionId)[0];
+    return (
     <button
       type="button"
       tabIndex={-1}
       aria-label={label}
       aria-pressed={on}
-      title={label}
+      title={key ? `${label} (${formatKey(key, platform)})` : label}
       onClick={() => void toggle()}
       className={["rounded border border-app-line px-1.5 hover:bg-app-selected", on ? "" : "text-ink-faint"].join(" ")}
     >
       {text}
     </button>
-  );
+    );
+  };
   return (
     <footer role="status" aria-label="상태 표시줄" className="flex items-center border-t border-app-line px-2 py-0.5 text-xs">
       선택 {selected}개
@@ -112,9 +116,9 @@ function StatusBar() {
         </span>
       )}
       <span className="ml-auto flex gap-1">
-        {viewToggle("숨김 파일 표시", "숨김 파일", showHidden, () => api.toggleHidden())}
-        {viewToggle("드라이브 바 표시", "Drive Bar", showDriveBar, () => api.toggleLayoutFlag("show_drive_bar"))}
-        {viewToggle("Action Bar 표시", "Action Bar", showActionBar, () => api.toggleLayoutFlag("show_action_bar"))}
+        {viewToggle("숨김 파일 표시", "숨김 파일", showHidden, () => api.toggleHidden(), "core.view.hidden")}
+        {viewToggle("드라이브 바 표시", "Drive Bar", showDriveBar, () => api.toggleLayoutFlag("show_drive_bar"), "core.view.drive_bar")}
+        {viewToggle("Action Bar 표시", "Action Bar", showActionBar, () => api.toggleLayoutFlag("show_action_bar"), "core.view.action_bar")}
       </span>
     </footer>
   );
@@ -197,14 +201,17 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
       const s = app.store.getState();
       if (scopeStack(s)[0] !== "pane") return;
       void registry.dispatch(id, actionContext(s));
-    }, { driveBar, actionBar })
+    }, { driveBar, actionBar }, (id) => {
+      const key = keymap.keysFor(id)[0];
+      return key ? formatKey(key, platform) : undefined;
+    })
       .then((unlisten) => (gone ? unlisten() : (off = unlisten)))
       .catch((e) => console.warn("[twin-deck] 메뉴바를 설정하지 못했습니다", e));
     return () => {
       gone = true;
       off?.();
     };
-  }, [app, registry, platform, driveBar, actionBar]);
+  }, [app, registry, keymap, platform, driveBar, actionBar]);
 
   useEffect(() => {
     void app.api.init().then(() => {

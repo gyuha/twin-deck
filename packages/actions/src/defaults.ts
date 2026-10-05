@@ -252,6 +252,8 @@ export const DEFAULT_BINDINGS: Binding[] = [
   b("pane", "core.tab.next", "Ctrl+Tab"),
   b("pane", "core.tab.prev", "Ctrl+Shift+Tab"),
   b("pane", "core.view.hidden", "Mod+Shift+."),
+  b("pane", "core.view.drive_bar", "Mod+Shift+D"),
+  b("pane", "core.view.action_bar", "Mod+Shift+A"),
   b("pane", "core.quickselect.start", "Mod+Shift+F"),
   b("pane", "core.find.open", "Mod+F"),
   b("find", "core.find.close", "Escape"),

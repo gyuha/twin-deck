@@ -159,6 +159,8 @@ Shift+이동 키(범위의 선택 반전)는 액션이 아니라 `pane` 스코�
 | 액션 ID | 이름 | macOS 키 | Windows/Linux 키 | 출처 |
 |---|---|---|---|---|
 | `core.view.hidden` | 숨김 파일 표시 토글 | `Mod+Shift+.` | `Ctrl+H` | 자체 ID. macOS 키 확인, 나머지는 관례 |
+| `core.view.drive_bar` | 드라이브 바 표시 토글 | `Mod+Shift+D` | `Ctrl+Shift+D` | 자체 ID. 이슈 #6. 상태 줄 토글 버튼·macOS View 메뉴에도 키를 표시한다 |
+| `core.view.action_bar` | Action Bar 표시 토글 | `Mod+Shift+A` | `Ctrl+Shift+A` | 자체 ID. 이슈 #6 |
 | `core.view.mode` | 표시 모드 (인수) | 없음 | 없음 | 자체 (인수 이름 미확인) |
 | `core.view.order` | 정렬 (인수) | 없음 | 없음 | 자체 (인수 이름 미확인) |
 | `core.preview` | 미리보기 (파일에서는 `Right`도 연다) | `Mod+Y` | `Ctrl+Y` | 자체 ID, 키 확인 |
