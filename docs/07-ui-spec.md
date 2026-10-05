@@ -71,7 +71,7 @@ Marta의 화면을 픽셀 단위로 재현하지 않고, 확인된 기능 구조
 
 ### 4.4 Quick Select
 
-수정자 없는 문자를 입력하면 입력 상자가 목록 위에 나타나고 일치 항목으로 커서가 이동한다. 기본은 부분 일치이며 `quick_select.match_only_prefix`로 접두 일치로 바꾼다. 정규식 입력은 홈페이지에 "substring or regex"로 언급되나 입력 문법은 확인하지 못했다 `[알 수 없음]`. `Escape`가 선택 해제와 Quick Select 종료를 겸한다. 키 충돌 규칙은 [05](05-actions-keybindings.md#32-단일-문자-키와-quick-select의-충돌).
+수정자 없는 문자를 입력하면 입력 상자가 목록 위에 나타나고 일치 항목으로 커서가 이동한다. 기본은 부분 일치이며 `quick_select.match_only_prefix`로 접두 일치로 바꾼다. 정규식 입력은 홈페이지에 "substring or regex"로 언급되나 입력 문법은 확인하지 못했다 `[알 수 없음]`. 입력 중 `↑`/`↓`는 입력과 일치한 행들 사이에서만 커서를 옮기고(일치하지 않는 행은 건너뛰며 끝에서 멈춘다), `Return`은 Quick Select를 끝내고 커서 행을 연다(폴더면 들어가고 파일이면 기본 열기). `Escape`가 선택 해제와 Quick Select 종료를 겸한다. 키 충돌 규칙은 [05](05-actions-keybindings.md#32-단일-문자-키와-quick-select의-충돌).
 
 ## 5. 팝업 메뉴
 

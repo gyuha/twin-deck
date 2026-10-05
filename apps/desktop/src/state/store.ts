@@ -1353,8 +1353,21 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         return { quick: text, ...quickCursor(t, text, prefix) };
       });
     },
-    quickAccept() {
+    /** 빠른 선택 중 ↑↓: 입력과 일치한 행들 사이에서만 커서를 옮긴다. 끝에서는 멈추고 순환하지 않는다. */
+    quickMove(step: -1 | 1) {
+      const prefix = cfg().behavior.quick_select.match_only_prefix;
+      patchActive((t) => {
+        if (!t.quick) return {};
+        const hits: number[] = [];
+        t.entries.forEach((e, i) => quickMatch(e.name, t.quick!, prefix) && hits.push(i));
+        const next = step > 0 ? hits.find((i) => i > t.cursor) : [...hits].reverse().find((i) => i < t.cursor);
+        return next === undefined ? {} : { cursor: next };
+      });
+    },
+    /** Return: 빠른 선택을 끝내고 커서 행을 연다(폴더면 들어가고 파일이면 기본 열기). */
+    async quickAccept() {
       patchActive({ quick: null });
+      await api.open();
     },
     quickCancel() {
       patchActive({ quick: null });

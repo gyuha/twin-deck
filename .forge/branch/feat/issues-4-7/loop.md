@@ -14,7 +14,7 @@ wall: none
 - [ ] C5. 회귀 방지: `bunx tsc --noEmit` 통과, 전체 `bunx vitest run`의 실패는 기준선 `pdf-preview` 1건뿐, `cargo test -p twin-deck-desktop` 통과(`up_to_date` 포함), `cargo clippy -p twin-deck-desktop -- -D warnings` 통과.
 
 ## Check progress (updated after EVERY stop-condition run)
-- C1: not-run
+- C1: pass ×0 · regressed: ×0 · last-evidence: "vitest -t '빠른 선택 이동' 1 passed, -t '빠른 선택 실행' 3 passed (구현 전 3 failed)"
 - C2: not-run
 - C3: not-run
 - C4: not-run
@@ -29,7 +29,7 @@ wall: none
 - 실제 화면 확인(메뉴 막대 표시, 트리 모양 등)은 기계로 검증하지 않는다. 사용자가 확인 전 이슈가 닫히는 점은 사전 승인했다.
 
 ## Tasks
-- quick-select-nav
+- quick-select-nav (sealed)
 - archive-preview-tree
 - layout-toggle-shortcuts
 - multi-rename-key-display
