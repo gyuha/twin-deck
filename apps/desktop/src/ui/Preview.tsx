@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { languageFor } from "../lib/highlight";
+import { isArchiveName } from "@twin-deck/ts-client";
 import { useApp } from "../state/context";
 import { CodeView } from "./CodeView";
 import { usePreviewFont } from "./fonts";
@@ -23,6 +24,7 @@ function size(n: number): string {
 export function Preview() {
   const p = useApp((s) => s.preview);
   const previewConfig = useApp((s) => s.loaded.config.preview);
+  const zipExts = useApp((s) => s.loaded.config.file_systems.zip.additional_extensions);
   const previewFont = usePreviewFont();
   const bodyRef = useRef<HTMLDivElement | null>(null);
   // 다른 파일로 넘어가면 스크롤을 맨 위로 되돌린다(이전 파일의 위치를 이어받지 않게).
@@ -89,7 +91,7 @@ export function Preview() {
             </p>
           )}
         </div>
-        <p className="mt-2 pr-3 text-xs text-ink-faint">↑↓ 이전/다음 항목 · PageUp/PageDown 스크롤 · Enter 열기 · Delete 삭제 · Space/Esc 닫기</p>
+        <p className="mt-2 pr-3 text-xs text-ink-faint">↑↓ 이전/다음 항목 · PageUp/PageDown 스크롤 · Enter {isArchiveName(p.name, zipExts) ? "압축 풀기" : "열기"} · Delete 삭제 · Space/Esc 닫기</p>
       </div>
     </div>
   );

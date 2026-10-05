@@ -14,7 +14,7 @@ wall: none
 
 ## Check progress (updated after EVERY stop-condition run)
 - C1: pass ×0 · regressed: ×0 · last-evidence: "vitest -t '컨텍스트 메뉴 압축 풀기' → 2 passed (구현 전 2 failed)"
-- C2: not-run
+- C2: pass ×0 · regressed: ×0 · last-evidence: "vitest -t '압축 파일 미리보기 Enter' → 2 passed (압축 Enter 테스트는 구현 전 실패)"
 - C3: pass ×0 · regressed: ×0 · last-evidence: "cargo test extract_reports_file_progress → 1 passed (구현 전 실패), vitest -t '압축 풀기 진행 창' → 1 passed (구현 전 실패)"
 - C4: not-run
 
@@ -29,4 +29,4 @@ wall: none
 ## Tasks
 - extract-progress (sealed)
 - context-menu-extract (sealed)
-- preview-enter-extract
+- preview-enter-extract (sealed)

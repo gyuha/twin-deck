@@ -164,6 +164,7 @@ Shift+이동 키(범위의 선택 반전)는 액션이 아니라 `pane` 스코�
 | `core.view.mode` | 표시 모드 (인수) | 없음 | 없음 | 자체 (인수 이름 미확인) |
 | `core.view.order` | 정렬 (인수) | 없음 | 없음 | 자체 (인수 이름 미확인) |
 | `core.preview` | 미리보기 (파일에서는 `Right`도 연다) | `Mod+Y` | `Ctrl+Y` | 자체 ID, 키 확인 |
+| `core.preview.open` | 미리보기 닫고 열기. 압축 파일(아카이브) 미리보기에서는 열지 않고 압축을 푼다(`core.extract`와 같이 압축 파일 옆의 새 폴더로) | `Return` | `Return` | preview | 자체 ID. 이슈 #9 |
 | `core.preview.page_up` / `core.preview.page_down` | 미리보기: 본문을 한 화면 위/아래로 스크롤 (텍스트·코드·JSON·Markdown). PDF는 한 쪽씩 넘긴다. 다른 파일로 넘어가면 맨 위로 돌아간다 | `PageUp` / `PageDown` | `PageUp` / `PageDown` | preview | 자체 ID |
 | `core.preview.delete` | 미리보기: 파일 삭제 (영구 삭제 확인을 거친다. 다음 파일로 넘어가고 남은 파일이 없으면 닫는다) | `Delete`, `Shift+F8` | `Delete`, `Shift+F8` | preview | 자체 ID |
 | `core.find.open` | 파일 찾기(Double Commander "파일 찾기" 기본 탭, 하위 폴더 검색) | `Mod+F` | `Ctrl+F` | 자체 ID. 결과는 새 가상 탭. Quick Select는 이 키를 내주고 `Mod+Shift+F`로 옮겼다 |

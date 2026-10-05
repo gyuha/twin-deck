@@ -135,10 +135,7 @@ export function paletteHandlers({ api }: AppStore): Partial<ActionHandlers> {
     "core.state.reset": () => api.resetState(),
     "core.preview": () => api.previewToggle(),
     "core.preview.close": () => api.previewClose(),
-    "core.preview.open": async () => {
-      api.previewClose();
-      await api.open();
-    },
+    "core.preview.open": () => api.previewOpen(),
     "core.preview.prev": () => api.previewMove(-1),
     "core.preview.next": () => api.previewMove(1),
     "core.preview.delete": () => api.previewDelete(),

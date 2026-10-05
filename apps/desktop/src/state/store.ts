@@ -2239,6 +2239,12 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       previewSeq++;
       set({ preview: null });
     },
+    /** 미리보기에서 Return: 닫고, 압축 파일이면 압축을 풀고 아니면 연다. */
+    async previewOpen() {
+      api.previewClose();
+      if (isArchiveEntry(cursorEntry(activeTab(get())), cfg().file_systems.zip.additional_extensions)) await api.extract();
+      else await api.open();
+    },
     /** 미리보기를 연 채 커서를 옮기고 새 항목을 보여 준다. */
     async previewMove(delta: 1 | -1) {
       api.moveCursor(delta);
