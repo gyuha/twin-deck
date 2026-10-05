@@ -24,14 +24,14 @@ describe("키보드 전용 종단 시나리오", () => {
     // 2) 파일 선택: Insert로 두 파일을 고른다
     await user.keyboard("{Insert}");
     await user.keyboard("{Insert}");
-    expect(screen.getByRole("status", { name: "상태 표시줄" })).toHaveTextContent("선택 2개");
+    expect(screen.getByRole("status", { name: "상태 표시줄" })).toHaveTextContent("선택: 11 B / 11 B, 파일: 2/2, 폴더: 0/0");
 
     // 3) F5: 비활성 패널(/home/b)로 복사
     await user.keyboard("{F5}{Enter}");
     await waitFor(() => expect(backend.exists("/home/b/readme.md")).toBe(true));
     expect(backend.exists("/home/b/notes.md")).toBe(true);
     expect(backend.exists("/home/a/docs/readme.md")).toBe(true); // 원본 유지
-    expect(screen.getByRole("status", { name: "상태 표시줄" })).toHaveTextContent("선택 0개");
+    expect(screen.getByRole("status", { name: "상태 표시줄" })).toHaveTextContent("선택: 0 / 11 B, 파일: 0/2, 폴더: 0/0");
 
     // 4) F6: readme.md를 이동 → 같은 이름이 있어 충돌 다이얼로그 → R(이름 바꿈)
     expect(cursorName("left")).toBe("readme.md");

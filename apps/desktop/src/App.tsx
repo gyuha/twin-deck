@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useStore } from "zustand";
 import { createDefaultRegistry, defaultBindingsFor, mergeUserBindings } from "@twin-deck/actions";
 import { formatKey } from "@twin-deck/keybinds";
+import { formatSpace } from "./lib/format";
+import { selectionSummary } from "./lib/selectionSummary";
 import { Keymap } from "@twin-deck/keybinds";
 import type { Platform } from "@twin-deck/keybinds";
 import type { Backend, Snapshot } from "@twin-deck/ts-client";
@@ -73,7 +75,10 @@ function useTheme(theme: string) {
 }
 
 function StatusBar() {
-  const selected = useApp((s) => activeTab(s).selection.size);
+  const entries = useApp((s) => activeTab(s).entries);
+  const selection = useApp((s) => activeTab(s).selection);
+  const sizeFormat = useApp((s) => s.loaded.config.display.size_format);
+  const summary = useMemo(() => selectionSummary(entries, selection), [entries, selection]);
   const notice = useApp((s) => s.notice);
   const flash = useApp((s) => s.flash);
   const fileWarnings = useApp((s) => s.loaded.warnings.length);
@@ -103,7 +108,7 @@ function StatusBar() {
   };
   return (
     <footer role="status" aria-label="상태 표시줄" className="flex items-center border-t border-app-line px-2 py-0.5 text-xs">
-      선택 {selected}개
+      선택: {summary.bytes.selected === 0 ? "0" : formatSpace(summary.bytes.selected, sizeFormat)} / {formatSpace(summary.bytes.total, sizeFormat)}, 파일: {summary.files.selected}/{summary.files.total}, 폴더: {summary.dirs.selected}/{summary.dirs.total}
       {flash && <span className="ml-4 text-status-success">{flash}</span>}
       {warnings > 0 && (
         <button type="button" tabIndex={-1} onClick={() => void api.showConfigWarnings()} className="ml-4 text-status-warning">

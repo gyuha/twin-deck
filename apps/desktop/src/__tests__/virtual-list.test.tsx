@@ -42,7 +42,7 @@ describe("가상 스크롤 (10만 항목)", () => {
     await waitFor(() => expect(list("left").getAttribute("aria-rowcount")).toBe(String(N)), { timeout: 20_000 });
 
     await user.keyboard("{Control>}a{/Control}");
-    await waitFor(() => expect(status()).toHaveTextContent(`선택 ${N}개`));
+    await waitFor(() => expect(status()).toHaveTextContent(`파일: ${N}/${N}, 폴더: 0/0`));
 
     await user.keyboard("{Control>}{Alt>}3{/Alt}{/Control}");
     await waitFor(() => expect(list("left").getAttribute("data-view")).toBe("columns-3"));
