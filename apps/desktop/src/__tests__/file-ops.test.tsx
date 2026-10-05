@@ -26,6 +26,25 @@ describe("OP-01 새 폴더 / OP-02 새 파일", () => {
     await waitFor(() => expect(names("left").some((n) => n.includes("sub"))).toBe(true));
   });
 
+  it("F7: 새로 만든 폴더로 커서가 이동한다(정렬상 맨 아래여도)", async () => {
+    const backend = seedBackend();
+    for (let i = 0; i < 30; i++) backend.seed({ [`/home/a/dir${String(i).padStart(2, "0")}/x.txt`]: "x" });
+    const { user } = await renderApp(backend);
+    await user.keyboard("{F7}");
+    await dialog();
+    await user.keyboard("zzz{Enter}");
+    await waitFor(() => expect(backend.exists("/home/a/zzz")).toBe(true));
+    await waitFor(() => expect(cursorName("left")).toBe("zzz"));
+  });
+
+  it("F7: 새로 만든 폴더가 중첩 경로면 맨 위 폴더로 커서가 이동한다", async () => {
+    const { user } = await renderApp();
+    await user.keyboard("{F7}");
+    await dialog();
+    await user.keyboard("zsub/deep{Enter}");
+    await waitFor(() => expect(cursorName("left")).toBe("zsub"));
+  });
+
   it("Shift+F7: 0바이트 파일을 만든다", async () => {
     const { user, backend } = await renderApp();
     await user.keyboard("{Shift>}{F7}{/Shift}");

@@ -1434,8 +1434,13 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (name === null) return;
       set({ notice: null });
       try {
-        await backend.mkdir(joinPath(tab.path, name.trim()));
+        const typed = name.trim();
+        await backend.mkdir(joinPath(tab.path, typed));
         await reloadAll();
+        // 중첩 경로(`a/b/c`)면 이 폴더 바로 아래에 생긴 맨 위 폴더(`a`)로 간다. 길어서 화면 밖이어도 표가 따라 스크롤한다.
+        const top = typed.split(/[\\/]/).find((part) => part !== "");
+        const idx = activeTab(get()).entries.findIndex((e) => e.name.normalize("NFC") === top?.normalize("NFC"));
+        if (idx >= 0) api.setCursor(idx);
       } catch (e) {
         fail(e);
       }
