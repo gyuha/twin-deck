@@ -184,6 +184,8 @@ export interface CtxItem {
   label?: string;
   actionId?: string;
   sub?: CtxItem[];
+  /** true이면 커서가 압축 파일(또는 선택 항목이 있을 때)만 켜진다. 일반 파일 위에서는 흐리게 보인다. */
+  archiveOnly?: boolean;
 }
 
 /** 파일 행 컨텍스트 메뉴의 구성 (Finder 스타일). 단축키 힌트와 실행 가능 여부는 액션 ID로 구한다. */
@@ -199,6 +201,7 @@ export const CONTEXT_MENU: readonly CtxItem[] = [
   },
   {},
   { label: "여기에 압축…", actionId: "core.compress" },
+  { label: "압축 풀기", actionId: "core.extract", archiveOnly: true },
   {},
   { label: "이동", actionId: "core.move" },
   { label: "복사", actionId: "core.copy" },
@@ -342,6 +345,11 @@ export function targetsOf(tab: TabState): EntryDto[] {
   return c ? [c] : [];
 }
 
+/** 파일이면서 이름이 압축 파일(아카이브)인 항목인지. */
+function isArchiveEntry(e: EntryDto | undefined, extraExts: string[]): boolean {
+  return e?.kind === "file" && isArchiveName(e.name, extraExts);
+}
+
 export function actionContext(s: AppState): ActionContext {
   const tab = activeTab(s);
   return {
@@ -352,6 +360,7 @@ export function actionContext(s: AppState): ActionContext {
     canGoBack: !tab.virtual && tab.back.length > 0,
     canGoForward: !tab.virtual && tab.forward.length > 0,
     cursorIsDir: cursorEntry(tab)?.kind === "dir",
+    cursorIsArchive: isArchiveEntry(cursorEntry(tab), s.loaded.config.file_systems.zip.additional_extensions),
     multiColumn: tab.view.mode === "columns",
     virtualTab: !!tab.virtual,
     searching: !!tab.virtual?.running,
@@ -1353,8 +1362,21 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         return { quick: text, ...quickCursor(t, text, prefix) };
       });
     },
-    quickAccept() {
+    /** 빠른 선택 중 ↑↓: 입력과 일치한 행들 사이에서만 커서를 옮긴다. 끝에서는 멈추고 순환하지 않는다. */
+    quickMove(step: -1 | 1) {
+      const prefix = cfg().behavior.quick_select.match_only_prefix;
+      patchActive((t) => {
+        if (!t.quick) return {};
+        const hits: number[] = [];
+        t.entries.forEach((e, i) => quickMatch(e.name, t.quick!, prefix) && hits.push(i));
+        const next = step > 0 ? hits.find((i) => i > t.cursor) : [...hits].reverse().find((i) => i < t.cursor);
+        return next === undefined ? {} : { cursor: next };
+      });
+    },
+    /** Return: 빠른 선택을 끝내고 커서 행을 연다(폴더면 들어가고 파일이면 기본 열기). */
+    async quickAccept() {
       patchActive({ quick: null });
+      await api.open();
     },
     quickCancel() {
       patchActive({ quick: null });
@@ -1434,8 +1456,13 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (name === null) return;
       set({ notice: null });
       try {
-        await backend.mkdir(joinPath(tab.path, name.trim()));
+        const typed = name.trim();
+        await backend.mkdir(joinPath(tab.path, typed));
         await reloadAll();
+        // 중첩 경로(`a/b/c`)면 이 폴더 바로 아래에 생긴 맨 위 폴더(`a`)로 간다. 길어서 화면 밖이어도 표가 따라 스크롤한다.
+        const top = typed.split(/[\\/]/).find((part) => part !== "");
+        const idx = activeTab(get()).entries.findIndex((e) => e.name.normalize("NFC") === top?.normalize("NFC"));
+        if (idx >= 0) api.setCursor(idx);
       } catch (e) {
         fail(e);
       }
@@ -1770,7 +1797,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       patchActive({ selection: new Set() });
       for (const t of targets) {
         try {
-          await backend.enqueueExtract(t.path, fixed ?? parentPath(t.path) ?? "/");
+          const jobId = await backend.enqueueExtract(t.path, fixed ?? parentPath(t.path) ?? "/");
+          void trackTransfer(jobId, "압축 풀기");
         } catch (e) {
           fail(e);
           break;
@@ -2210,6 +2238,12 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     previewClose() {
       previewSeq++;
       set({ preview: null });
+    },
+    /** 미리보기에서 Return: 닫고, 압축 파일이면 압축을 풀고 아니면 연다. */
+    async previewOpen() {
+      api.previewClose();
+      if (isArchiveEntry(cursorEntry(activeTab(get())), cfg().file_systems.zip.additional_extensions)) await api.extract();
+      else await api.open();
     },
     /** 미리보기를 연 채 커서를 옮기고 새 항목을 보여 준다. */
     async previewMove(delta: 1 | -1) {

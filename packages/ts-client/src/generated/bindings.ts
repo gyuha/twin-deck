@@ -508,7 +508,15 @@ export type JobDto = { id: number; kind: JobKindDto; status: JobStatusDto; total
 /**
  * 복사/이동의 전체 파일 수. 집계 전이거나 해당 없는 작업이면 `None`.
  */
-filesTotal: number | null; filesDone: number; current: string | null; errors: JobErrorDto[] }
+filesTotal: number | null; filesDone: number; 
+/**
+ * 지금 복사 중인 파일의 전체 바이트. 아직 모르거나 복사/이동이 아니면 `None`.
+ */
+bytesTotal: number | null; 
+/**
+ * 지금 복사 중인 파일에서 처리한 바이트.
+ */
+bytesDone: number; current: string | null; errors: JobErrorDto[] }
 export type JobErrorDto = { path: string; message: string }
 export type JobKindDto = "copy" | "move" | "trash" | "delete" | "duplicate" | "compress" | "extract"
 export type JobStatusDto = "queued" | "running" | "paused" | "done" | "failed" | "aborted"

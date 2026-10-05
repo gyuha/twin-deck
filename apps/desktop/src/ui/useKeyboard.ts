@@ -32,6 +32,11 @@ export function useKeyboard({ app, keymap, registry }: Options) {
         api.shiftMove(e.key === "ArrowUp" ? -1 : 1);
         return;
       }
+      if (top === "quickSelect" && plain && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+        e.preventDefault();
+        api.quickMove(e.key === "ArrowUp" ? -1 : 1);
+        return;
+      }
       if (top === "quickSelect" && e.key === " " && plain) {
         e.preventDefault();
         api.quickInput(" ");

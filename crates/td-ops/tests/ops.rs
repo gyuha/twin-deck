@@ -367,3 +367,51 @@ fn move_dir_keeps_source_when_some_files_fail_to_copy() {
         assert!(d.join(f).as_path().exists(), "{f}가 원본에서 사라졌다");
     }
 }
+
+/// 복사 중 처리한 바이트(처리한 값, 전체 크기)를 모으는 제어.
+#[derive(Default)]
+struct BytesLog(Mutex<Vec<(u64, u64)>>);
+
+impl Control for BytesLog {
+    fn on_item(&self, _path: &VfsPath) {}
+    fn should_stop(&self) -> bool {
+        false
+    }
+    fn bytes_sink(&self) -> Option<Box<dyn Fn(u64, u64) + Send + '_>> {
+        Some(Box::new(|done, total| {
+            self.0.lock().unwrap().push((done, total))
+        }))
+    }
+}
+
+#[test]
+fn copy_reports_bytes_monotonic_and_ends_at_file_size() {
+    let f = fixture();
+    let size = 3 * 1024 * 1024;
+    std::fs::write(f.a.join("big.bin").as_path(), vec![7u8; size]).unwrap();
+    let log = BytesLog::default();
+    f.ops
+        .copy_with(&f.a.join("big.bin"), &f.b, ConflictPolicy::Rename, &log)
+        .unwrap();
+    let log = log.0.into_inner().unwrap();
+    assert!(!log.is_empty());
+    assert!(log
+        .iter()
+        .all(|&(done, total)| total == size as u64 && done <= total));
+    assert!(
+        log.windows(2).all(|w| w[0].0 <= w[1].0),
+        "단조 증가: {log:?}"
+    );
+    assert_eq!(log.last().unwrap().0, size as u64);
+}
+
+#[test]
+fn copy_reports_bytes_for_small_file_too() {
+    let f = fixture();
+    std::fs::write(f.a.join("s.txt").as_path(), b"hello").unwrap();
+    let log = BytesLog::default();
+    f.ops
+        .copy_with(&f.a.join("s.txt"), &f.b, ConflictPolicy::Rename, &log)
+        .unwrap();
+    assert_eq!(log.0.into_inner().unwrap().last(), Some(&(5, 5)));
+}

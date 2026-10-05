@@ -3,7 +3,7 @@ import { formatKey } from "@twin-deck/keybinds";
 import type { ActionContext } from "@twin-deck/actions";
 import { parentPath } from "@twin-deck/ts-client";
 import { useApp } from "../state/context";
-import { activeTab, cursorEntry } from "../state/store";
+import { actionContext, activeTab, cursorEntry } from "../state/store";
 import { useUi } from "./uiContext";
 
 /** 현재 화면 상태를 요약한 액션 컨텍스트. 원시 값만 선택해서 불필요한 재렌더를 피한다. */
@@ -15,12 +15,13 @@ export function useActionContext(): ActionContext {
   const canGoBack = useApp((s) => !activeTab(s).virtual && activeTab(s).back.length > 0);
   const canGoForward = useApp((s) => !activeTab(s).virtual && activeTab(s).forward.length > 0);
   const cursorIsDir = useApp((s) => cursorEntry(activeTab(s))?.kind === "dir");
+  const cursorIsArchive = useApp((s) => actionContext(s).cursorIsArchive);
   const multiColumn = useApp((s) => activeTab(s).view.mode === "columns");
   const virtualTab = useApp((s) => !!activeTab(s).virtual);
   const searching = useApp((s) => !!activeTab(s).virtual?.running);
   return useMemo(
-    () => ({ hasCursorItem, selectedCount, tabCount, canGoUp, canGoBack, canGoForward, cursorIsDir, multiColumn, virtualTab, searching }),
-    [hasCursorItem, selectedCount, tabCount, canGoUp, canGoBack, canGoForward, cursorIsDir, multiColumn, virtualTab, searching],
+    () => ({ hasCursorItem, selectedCount, tabCount, canGoUp, canGoBack, canGoForward, cursorIsDir, cursorIsArchive, multiColumn, virtualTab, searching }),
+    [hasCursorItem, selectedCount, tabCount, canGoUp, canGoBack, canGoForward, cursorIsDir, cursorIsArchive, multiColumn, virtualTab, searching],
   );
 }
 

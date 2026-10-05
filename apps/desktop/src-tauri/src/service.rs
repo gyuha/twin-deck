@@ -120,6 +120,77 @@ pub struct PreviewDto {
     pub data_url: Option<String>,
 }
 
+/// 이 크기를 넘는 압축 파일은 목록을 읽지 않는다(tar 계열은 목록을 만들려면 전체를 훑어야 한다).
+const ARCHIVE_PREVIEW_MAX_BYTES: u64 = 512 * 1024 * 1024;
+/// 미리보기 트리의 최대 줄 수. 넘으면 앞쪽만 보이고 `truncated`가 켜진다.
+const ARCHIVE_PREVIEW_MAX_LINES: usize = 2000;
+
+/// 압축 파일(이름으로 형식을 알 수 있는 것)의 미리보기: 안의 항목을 들여쓴 텍스트 트리로 보여 준다.
+/// 압축 파일이 아니면 None(일반 미리보기로 간다). 이름은 압축인데 열 수 없거나 너무 크면 "기타"(종류와 크기)다.
+fn archive_preview(path: &str, extra_zip_exts: &[String]) -> Option<td_vfs::Preview> {
+    let name = std::path::Path::new(path).file_name()?.to_string_lossy();
+    td_archive::kind_for_name(&name, extra_zip_exts)?;
+    let size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
+    let other = td_vfs::Preview {
+        kind: td_vfs::PreviewKind::Other,
+        text: None,
+        truncated: false,
+        size,
+        data_url: None,
+    };
+    if size > ARCHIVE_PREVIEW_MAX_BYTES {
+        return Some(other);
+    }
+    let Ok(archive) = td_archive::Archive::open(std::path::Path::new(path), extra_zip_exts) else {
+        return Some(other);
+    };
+    // 경로를 이름순으로 모아 폴더마다 한 번씩만 줄을 만든다(압축에 폴더 항목이 따로 없어도 경로에서 만든다).
+    let mut paths: Vec<(&str, bool)> = archive
+        .entries()
+        .iter()
+        .map(|e| (e.name.trim_matches('/'), e.is_dir))
+        .filter(|(n, _)| !n.is_empty())
+        .collect();
+    paths.sort();
+    let mut lines: Vec<String> = Vec::new();
+    let mut shown: Vec<&str> = Vec::new(); // 이미 줄을 만든 폴더 경로
+    let mut truncated = false;
+    'outer: for (full, is_dir) in paths {
+        let parts: Vec<&str> = full.split('/').collect();
+        for depth in 0..parts.len() {
+            let last = depth + 1 == parts.len();
+            let is_folder = !last || is_dir;
+            if is_folder {
+                let prefix =
+                    &full[..parts[..=depth].iter().map(|p| p.len()).sum::<usize>() + depth];
+                if shown.contains(&prefix) {
+                    continue;
+                }
+                shown.push(prefix);
+            }
+            if lines.len() >= ARCHIVE_PREVIEW_MAX_LINES {
+                truncated = true;
+                break 'outer;
+            }
+            lines.push(format!(
+                "{}{}{}",
+                "  ".repeat(depth),
+                parts[depth],
+                if is_folder { "/" } else { "" }
+            ));
+        }
+    }
+    let mut text = lines.join("\n");
+    text.push('\n');
+    Some(td_vfs::Preview {
+        kind: td_vfs::PreviewKind::Text,
+        text: Some(text),
+        truncated,
+        size,
+        data_url: None,
+    })
+}
+
 /// cbz(이미지를 ZIP으로 묶은 만화 파일)의 미리보기: 안의 첫 이미지. 이미지가 없거나 ZIP이 아니면 "기타"(종류와 크기)다.
 fn cbz_preview(path: &str) -> td_vfs::Preview {
     let limit = td_vfs::PreviewLimits::default().image_bytes;
@@ -244,7 +315,7 @@ pub struct JobErrorDto {
     pub message: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct JobDto {
     pub id: u32,
@@ -255,6 +326,10 @@ pub struct JobDto {
     /// 복사/이동의 전체 파일 수. 집계 전이거나 해당 없는 작업이면 `None`.
     pub files_total: Option<u32>,
     pub files_done: u32,
+    /// 지금 복사 중인 파일의 전체 바이트. 아직 모르거나 복사/이동이 아니면 `None`.
+    pub bytes_total: Option<f64>,
+    /// 지금 복사 중인 파일에서 처리한 바이트.
+    pub bytes_done: f64,
     pub current: Option<String>,
     pub errors: Vec<JobErrorDto>,
 }
@@ -298,6 +373,8 @@ impl From<&JobInfo> for JobDto {
             completed: j.completed as u32,
             files_total: j.files_total.map(|n| n as u32),
             files_done: j.files_done as u32,
+            bytes_total: j.bytes_total.map(|n| n as f64),
+            bytes_done: j.bytes_done as f64,
             current: j.current.clone(),
             errors: j
                 .errors
@@ -818,6 +895,11 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
         if path.to_ascii_lowercase().ends_with(".cbz") && std::path::Path::new(path).is_file() {
             return Ok(cbz_preview(path).into());
         }
+        if std::path::Path::new(path).is_file() {
+            if let Some(p) = archive_preview(path, &self.fs.extra_zip_exts()) {
+                return Ok(p.into());
+            }
+        }
         td_vfs::read_preview(&vp(path), td_vfs::PreviewLimits::default())
             .map(PreviewDto::from)
             .map_err(|e| e.to_string())
@@ -1004,6 +1086,27 @@ mod tests {
         assert_eq!(job.status, JobStatusDto::Done);
         assert_eq!((job.files_total, job.files_done), (Some(3), 3));
         assert!(Path::new(&format!("{dest}/[이력서]/하위/b.pdf")).exists());
+    }
+
+    #[test]
+    fn job_bytes_of_single_file_copy_reach_file_size() {
+        let (_t, svc, _ch, root) = setup();
+        let dest = format!("{root}/dest");
+        svc.mkdir(&dest).unwrap();
+        std::fs::write(format!("{root}/big.bin"), vec![1u8; 2 * 1024 * 1024]).unwrap();
+        let id = svc.enqueue(
+            JobKindDto::Copy,
+            vec![item(
+                &format!("{root}/big.bin"),
+                Some(&dest),
+                ConflictDto::Skip,
+            )],
+        );
+        let job = wait_finished(&svc, id);
+        assert_eq!(
+            (job.bytes_total, job.bytes_done),
+            (Some(2097152.0), 2097152.0)
+        );
     }
 
     #[test]
@@ -1726,6 +1829,61 @@ mod tests {
         let upper = format!("{root}/BOOK.CBZ");
         std::fs::rename(&dest, &upper).unwrap();
         assert_eq!(svc.preview(&upper).unwrap().kind, PreviewKindDto::Image);
+    }
+
+    fn make_zip_tree(dir: &std::path::Path, dest: &str, files: &[&str]) {
+        let src = dir.join("zip-src");
+        for f in files {
+            let p = src.join(f);
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            std::fs::write(&p, b"x").unwrap();
+        }
+        let status = std::process::Command::new("zip")
+            .args(["-q", "-r", dest, "."])
+            .current_dir(&src)
+            .status()
+            .expect("zip 실행 불가");
+        assert!(status.success());
+        std::fs::remove_dir_all(&src).unwrap();
+    }
+
+    #[test]
+    fn preview_archive_lists_entries_as_indented_tree() {
+        let (t, svc, _ch, root) = setup();
+        let dest = format!("{root}/pack.zip");
+        make_zip_tree(
+            t.path(),
+            &dest,
+            &["a.txt", "docs/readme.md", "src/lib/mod.rs", "src/main.rs"],
+        );
+        let p = svc.preview(&dest).unwrap();
+        assert_eq!(p.kind, PreviewKindDto::Text);
+        assert!(!p.truncated);
+        assert_eq!(
+            p.text.unwrap(),
+            "a.txt\ndocs/\n  readme.md\nsrc/\n  lib/\n    mod.rs\n  main.rs\n"
+        );
+    }
+
+    #[test]
+    fn preview_archive_truncates_long_listings() {
+        let (t, svc, _ch, root) = setup();
+        let dest = format!("{root}/many.zip");
+        let names: Vec<String> = (0..2100).map(|i| format!("f{i:04}.txt")).collect();
+        let refs: Vec<&str> = names.iter().map(String::as_str).collect();
+        make_zip_tree(t.path(), &dest, &refs);
+        let p = svc.preview(&dest).unwrap();
+        assert_eq!(p.kind, PreviewKindDto::Text);
+        assert!(p.truncated);
+        assert_eq!(p.text.unwrap().lines().count(), 2000);
+    }
+
+    #[test]
+    fn preview_archive_corrupt_or_unreadable_is_other() {
+        let (_t, svc, _ch, root) = setup();
+        let dest = format!("{root}/broken.zip");
+        std::fs::write(&dest, b"this is not a zip").unwrap();
+        assert_eq!(svc.preview(&dest).unwrap().kind, PreviewKindDto::Other);
     }
 
     #[test]

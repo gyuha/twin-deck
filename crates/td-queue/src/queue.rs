@@ -91,6 +91,14 @@ impl Control for JobControl<'_> {
             j.info.files_done += 1;
         }
     }
+    fn bytes_sink(&self) -> Option<Box<dyn Fn(u64, u64) + Send + '_>> {
+        Some(Box::new(|done, total| {
+            if let Some(j) = self.shared.state.lock().unwrap().jobs.get_mut(&self.job) {
+                j.info.bytes_done = done;
+                j.info.bytes_total = Some(total);
+            }
+        }))
+    }
     fn collects_errors(&self) -> bool {
         true
     }
@@ -159,6 +167,8 @@ impl Queue {
             completed: 0,
             files_total: None,
             files_done: 0,
+            bytes_total: None,
+            bytes_done: 0,
             current: None,
             errors: Vec::new(),
         };
@@ -304,7 +314,7 @@ where
     };
     shared.emit(QueueEvent::Started(id));
 
-    // 복사/이동/삭제는 먼저 항목별 진행 단위(파일) 수를 세어 분모를 정한다. 세지 못한 항목은 0으로 친다.
+    // 복사/이동/삭제/추출은 먼저 항목별 진행 단위(파일) 수를 세어 분모를 정한다. 세지 못한 항목은 0으로 친다.
     // 휴지통은 OS 호출 한 번이 한 항목이라 항목 수가 곧 단위 수다.
     let counts: Option<Vec<usize>> = match kind {
         JobKind::Copy | JobKind::Move => Some(
@@ -317,6 +327,12 @@ where
             items
                 .iter()
                 .map(|i| ops.delete_units(&i.src).unwrap_or(0))
+                .collect(),
+        ),
+        JobKind::Extract => Some(
+            items
+                .iter()
+                .map(|i| ops.count_archive_files(&i.src).unwrap_or(0))
                 .collect(),
         ),
         JobKind::Trash => Some(vec![1; items.len()]),

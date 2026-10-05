@@ -179,6 +179,31 @@ describe("전송 진행 창", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
+  it("바이트: 파일이 1개면 막대와 글자를 바이트 기준으로 보여 준다", async () => {
+    const backend = seedBackend();
+    backend.queueMode = "manual";
+    const { user } = await renderApp(backend);
+    await user.keyboard("{ArrowDown}{ArrowDown}{F5}"); // a.txt 하나
+    await confirmDialog(/복사/);
+    await user.keyboard("{Enter}");
+    const d = await screen.findByRole("dialog", { name: "복사 중" });
+    expect(d).toHaveTextContent("0/1개"); // 바이트를 아직 모를 때는 지금까지처럼 개수
+    const [job] = await backend.queueJobs();
+    act(() => backend.reportBytes(job.id, 12_300_000, 80_000_000));
+    await waitFor(() => expect(screen.getByRole("dialog", { name: "복사 중" })).toHaveTextContent("12.3 MB / 80.0 MB"));
+    expect(screen.getByRole("dialog", { name: "복사 중" })).not.toHaveTextContent("0/1개");
+    expect(within(screen.getByRole("dialog", { name: "복사 중" })).getByRole("progressbar")).toHaveAttribute("aria-valuenow", "15");
+  });
+
+  it("바이트: 파일이 2개 이상이면 바이트 정보가 있어도 N/M개를 유지한다", async () => {
+    const { backend } = await startManual();
+    await screen.findByRole("dialog", { name: "복사 중" });
+    const [job] = await backend.queueJobs();
+    act(() => backend.reportBytes(job.id, 1_000_000, 8_000_000));
+    await waitFor(() => expect(screen.getByRole("dialog", { name: "복사 중" })).toHaveTextContent("0/5개"));
+    expect(screen.getByRole("dialog", { name: "복사 중" })).not.toHaveTextContent("MB");
+  });
+
   it("Esc/중단 버튼: 작업을 중단하고 닫는다", async () => {
     const { user, backend } = await startManual();
     await screen.findByRole("dialog", { name: "복사 중" });

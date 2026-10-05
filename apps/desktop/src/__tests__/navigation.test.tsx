@@ -148,7 +148,7 @@ describe("SEL-05 Quick Select", () => {
     expect(screen.queryByRole("status", { name: "빠른 선택" })).toBeNull();
   });
 
-  it("Backspace는 입력을 지우고 Enter는 커서를 둔 채 확정한다", async () => {
+  it("Backspace는 입력을 지우고 Enter는 일치한 행을 연다", async () => {
     const { user } = await renderApp();
     await user.keyboard("sr");
     expect(cursorName("left")).toBe("src");
@@ -158,7 +158,7 @@ describe("SEL-05 Quick Select", () => {
     expect(breadcrumb("left")).toEqual(["/", "home", "a"]); // Backspace가 상위 이동을 일으키지 않았다
     await user.keyboard("{Enter}");
     expect(screen.queryByRole("status", { name: "빠른 선택" })).toBeNull();
-    expect(cursorName("left")).toBe("docs");
+    await waitFor(() => expect(breadcrumb("left")).toEqual(["/", "home", "a", "docs"])); // 이슈 #4: 일치한 행(폴더)을 연다
   });
 
   it("NFD로 저장된 한글 이름이 NFC 입력에 일치한다", async () => {

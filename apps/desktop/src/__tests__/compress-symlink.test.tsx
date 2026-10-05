@@ -300,3 +300,18 @@ describe("OP-12 심볼릭 링크", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("아카이브 안에서는 심볼릭 링크를 만들 수 없습니다");
   });
 });
+
+describe("압축 풀기 진행 창", () => {
+  it("압축을 푸는 동안 진행 창이 N/M개를 보여 주고 끝나면 닫힌다", async () => {
+    const b = backend();
+    b.queueMode = "manual";
+    const { user } = await renderApp(b);
+    await user.keyboard(TO_BUNDLE);
+    await runAction(user, "core.extract");
+    const d = await screen.findByRole("dialog", { name: "압축 풀기 중" });
+    expect(d).toHaveTextContent("0/2개"); // bundle.zip 안의 파일 2개(content/a.txt, b.txt)
+    await advance(b);
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(b.exists("/home/a/bundle/b.txt")).toBe(true);
+  });
+});
