@@ -78,10 +78,26 @@ function StatusBar() {
   const flash = useApp((s) => s.flash);
   const fileWarnings = useApp((s) => s.loaded.warnings.length);
   const keymapWarnings = useApp((s) => s.keymapWarnings.length);
+  const showActionBar = useApp((s) => s.loaded.config.behavior.layout.show_action_bar);
+  const showDriveBar = useApp((s) => s.loaded.config.behavior.layout.show_drive_bar);
   const { api } = useAppStore();
   const warnings = fileWarnings + keymapWarnings;
+  // 메뉴 막대가 없는 Windows에서도 바를 켜고 끌 수 있게 오른쪽 끝에 항상 보이는 토글을 둔다.
+  const viewToggle = (label: string, text: string, on: boolean, flag: "show_action_bar" | "show_drive_bar") => (
+    <button
+      type="button"
+      tabIndex={-1}
+      aria-label={label}
+      aria-pressed={on}
+      title={label}
+      onClick={() => void api.toggleLayoutFlag(flag)}
+      className={["rounded border border-app-line px-1.5 hover:bg-app-selected", on ? "" : "text-ink-faint line-through"].join(" ")}
+    >
+      {text}
+    </button>
+  );
   return (
-    <footer role="status" aria-label="상태 표시줄" className="border-t border-app-line px-2 py-0.5 text-xs">
+    <footer role="status" aria-label="상태 표시줄" className="flex items-center border-t border-app-line px-2 py-0.5 text-xs">
       선택 {selected}개
       {flash && <span className="ml-4 text-status-success">{flash}</span>}
       {warnings > 0 && (
@@ -94,6 +110,10 @@ function StatusBar() {
           {notice}
         </span>
       )}
+      <span className="ml-auto flex gap-1">
+        {viewToggle("드라이브 바 표시", "Drive Bar", showDriveBar, "show_drive_bar")}
+        {viewToggle("Action Bar 표시", "Action Bar", showActionBar, "show_action_bar")}
+      </span>
     </footer>
   );
 }
