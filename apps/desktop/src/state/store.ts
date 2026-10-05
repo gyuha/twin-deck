@@ -2245,6 +2245,16 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (isArchiveEntry(cursorEntry(activeTab(get())), cfg().file_systems.zip.additional_extensions)) await api.extract();
       else await api.open();
     },
+    /** 미리보기에서 →: 폴더면 그 안으로 들어가 첫 항목을 미리보고(항목이 없으면 미리보기를 닫는다), 아니면 다음 항목이다. */
+    async previewForward() {
+      const entry = cursorEntry(activeTab(get()));
+      if (entry?.kind !== "dir") return api.previewMove(1);
+      await api.navigate(entry.path);
+      const first = activeTab(get()).entries[0];
+      if (!first) return api.previewClose();
+      api.setCursor(0);
+      await loadPreview(first);
+    },
     /** 미리보기를 연 채 커서를 옮기고 새 항목을 보여 준다. */
     async previewMove(delta: 1 | -1) {
       api.moveCursor(delta);
