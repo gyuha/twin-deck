@@ -15,7 +15,7 @@ wall: none
 
 ## Check progress (updated after EVERY stop-condition run)
 - C1: pass ×0 · regressed: ×0 · last-evidence: "vitest -t '빠른 선택 이동' 1 passed, -t '빠른 선택 실행' 3 passed (구현 전 3 failed)"
-- C2: not-run
+- C2: pass ×0 · regressed: ×0 · last-evidence: "cargo test preview_archive → 3 passed (구현 전 3 failed), vitest -t '압축 파일 미리보기' → 2 passed"
 - C3: not-run
 - C4: not-run
 - C5: not-run
@@ -30,6 +30,6 @@ wall: none
 
 ## Tasks
 - quick-select-nav (sealed)
-- archive-preview-tree
+- archive-preview-tree (sealed)
 - layout-toggle-shortcuts
 - multi-rename-key-display
