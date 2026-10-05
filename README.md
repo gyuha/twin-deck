@@ -32,7 +32,7 @@
 
 Twin Deck은 Apple 개발자 인증서로 서명하거나 공증하지 않은 앱입니다. 그래서 내려받은 앱을 처음 열면 macOS(Gatekeeper)가 "확인되지 않은 개발자" 경고로 막습니다. 아래 순서대로 한 번만 허용하면 이후에는 일반 앱처럼 열립니다.
 
-릴리스에는 현재 **Apple Silicon(arm64)용 macOS 빌드**만 있습니다. Intel Mac, Windows, Linux는 아래 "소스에서 빌드"를 따라 직접 빌드하세요.
+릴리스에는 **Apple Silicon(arm64)용 macOS 빌드**와 **Windows(x64) 설치 파일**이 올라갑니다. Intel Mac, Linux는 아래 "소스에서 빌드"를 따라 직접 빌드하세요. Windows 설치는 바로 아래 "설치 (Windows)"를 보세요.
 
 1. [Releases](https://github.com/gyuha/twin-deck/releases)에서 `twin-deck-<버전>-macos-arm64.zip`을 내려받습니다.
 2. 압축을 풀면 `Twin Deck.app`이 나옵니다. 이것을 `/Applications` 폴더로 옮깁니다.
@@ -57,6 +57,29 @@ zip 내려받기 → 압축 풀기 → /Applications로 이동 → xattr 로 격
 ```
 
 Gatekeeper가 막는 이유는 앱에 문제가 있어서가 아니라 서명과 공증이 없어서입니다. 출처를 신뢰할 수 있을 때만 허용하세요.
+
+## 설치 (Windows)
+
+Windows 빌드도 코드 서명을 하지 않았습니다. 그래서 설치 파일을 실행하면 Microsoft Defender SmartScreen이 "Windows의 PC 보호" 경고를 띄울 수 있습니다. 한 번만 허용하면 됩니다. 웹뷰로 WebView2를 쓰며, Windows 10·11에는 대부분 이미 들어 있습니다.
+
+1. [Releases](https://github.com/gyuha/twin-deck/releases)에서 `*-setup.exe` 설치 파일을 내려받습니다.
+2. 실행하면 SmartScreen 경고가 뜹니다. **추가 정보**를 누른 뒤 **실행**을 누릅니다.
+3. 설치 마법사를 따릅니다. 앱은 사용자 폴더(`%LOCALAPPDATA%\Twin Deck`)에 설치되므로 관리자 권한이 필요 없습니다.
+
+```
+setup.exe 내려받기 → 실행 → SmartScreen: 추가 정보 → 실행 → 설치 → Twin Deck 시작
+```
+
+삭제는 설정 앱의 **설치된 앱**에서 하거나 `%LOCALAPPDATA%\Twin Deck\uninstall.exe`를 실행합니다. 설정 파일은 남습니다.
+
+Windows에서 달라지는 점:
+
+- 단축키의 `Mod`는 `Ctrl`입니다. 탭 전환은 `Ctrl+PageDown`/`Ctrl+PageUp`, 상위 폴더는 `Alt+↑`, 숨김 파일 표시는 `Ctrl+H`입니다.
+- 경로는 `C:\Users\...`처럼 `\`와 드라이브 문자를 그대로 씁니다. 드라이브 바에서 드라이브를 고르고 남은 용량을 보며, 이동식·네트워크 드라이브는 언마운트할 수 있습니다.
+- 파일 클립보드와 창 밖 드래그가 탐색기와 연동됩니다.
+- F키에 외부 프로그램을 지정할 때 확장자 없는 실행 파일(예: VS Code의 `code`)은 `.cmd` 등으로 찾아 실행하고, `wt -d` 같은 옵션도 붙일 수 있습니다.
+- 설정 파일은 `%APPDATA%\dev.twindeck.app\`에 있습니다.
+- Windows 코드는 macOS 중심으로 개발하다 보니 검증이 덜 됐습니다. 문제가 있으면 이슈로 알려 주세요.
 
 ## 자주 쓰는 단축키
 
@@ -90,7 +113,7 @@ Gatekeeper가 막는 이유는 앱에 문제가 있어서가 아니라 서명과
 
 - [Rust](https://rustup.rs/) (저장소의 `rust-toolchain.toml`이 stable을 지정합니다)
 - [Bun](https://bun.sh/) 1.3 이상, Node 20 이상(`.nvmrc`)
-- [Tauri 2 사전 요구 사항](https://v2.tauri.app/start/prerequisites/) (macOS는 Xcode Command Line Tools, Windows는 WebView2와 C++ 빌드 도구)
+- [Tauri 2 사전 요구 사항](https://v2.tauri.app/start/prerequisites/) (macOS는 Xcode Command Line Tools, Windows는 WebView2와 Visual Studio C++ 빌드 도구. Windows에서 `task`는 PowerShell에서 실행합니다)
 - [go-task](https://taskfile.dev/) (선택. 없으면 `Taskfile.yml`의 명령을 직접 실행)
 
 ```sh
@@ -99,7 +122,8 @@ task dev        # 개발 모드 실행
 task test       # Rust와 TS 테스트
 task check      # fmt, clippy, 타입 검사
 task bundle     # 설치용 번들 만들기 (macOS는 .app, Windows는 NSIS 설치 파일)
-task install    # 번들을 만들어 이 PC에 설치 (macOS는 /Applications)
+task install    # 번들을 만들어 이 PC에 설치 (macOS는 /Applications, Windows는 NSIS 조용히 설치)
+task uninstall  # 설치한 앱 삭제 (설정은 남김)
 task release:draft  # 드래프트 배포: 이 OS의 파일을 비공개 초안에 올린다(공개·태그 없음. gh 로그인 필요)
 task release        # 배포: 이 OS의 파일을 올리고 공개한다(macOS·Windows 파일이 모두 있을 때만, 태그가 만들어진다)
 ```
@@ -109,6 +133,7 @@ task release        # 배포: 이 OS의 파일을 올리고 공개한다(macOS·
 설정과 키맵은 TOML입니다. 설정 화면(`Mod+,`)에서 대부분을 바꿀 수 있고, 직접 편집해도 됩니다.
 
 - macOS: `~/Library/Application Support/dev.twindeck.app/config.toml`
+- Windows: `%APPDATA%\dev.twindeck.app\config.toml`
 - 키맵: 같은 폴더의 `keybindings.toml`
 
 ## 문서
