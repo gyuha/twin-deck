@@ -17,7 +17,7 @@ wall: none
 - C1: pass ×0 · regressed: ×0 · last-evidence: "vitest -t '빠른 선택 이동' 1 passed, -t '빠른 선택 실행' 3 passed (구현 전 3 failed)"
 - C2: pass ×0 · regressed: ×0 · last-evidence: "cargo test preview_archive → 3 passed (구현 전 3 failed), vitest -t '압축 파일 미리보기' → 2 passed"
 - C3: pass ×0 · regressed: ×0 · last-evidence: "vitest -t '보기 단축키' → 5 passed (구현 전 5 failed), docs/05 Shift+A 1건·Shift+D 1건"
-- C4: not-run
+- C4: pass ×0 · regressed: ×0 · last-evidence: "vitest -t '다중 이름 바꾸기 단축키' → 10 passed (메뉴 글자 테스트는 구현 전 실패), Mod+Shift+F 여전히 빠른 선택"
 - C5: not-run
 
 ## Authorized replan scope
@@ -32,4 +32,4 @@ wall: none
 - quick-select-nav (sealed)
 - archive-preview-tree (sealed)
 - layout-toggle-shortcuts (sealed)
-- multi-rename-key-display
+- multi-rename-key-display (sealed)

@@ -173,6 +173,14 @@ describe("상단 메뉴바 File 메뉴", () => {
     for (const c of checks) expect(c).not.toHaveProperty("accelerator");
   });
 
+  it("다중 이름 바꾸기 단축키: keyOf를 주면 File 메뉴 항목 글자에 키가 붙고 accelerator는 달지 않는다", async () => {
+    const keys: Record<string, string> = { "core.rename.multi": "Cmd+Shift+R" };
+    await installFileMenu(() => {}, undefined, (id) => keys[id]);
+    expect(created.find((c) => c.id === "core.rename.multi")!.text).toBe("다중 이름 바꾸기 (Cmd+Shift+R)");
+    expect(created.find((c) => c.id === "core.copy")!.text).toBe("복사"); // 키가 없으면 글자 그대로
+    for (const c of created) expect(c).not.toHaveProperty("accelerator");
+  });
+
   it("체크 항목을 누르면 대응하는 액션 ID로 실행기를 부른다", async () => {
     const run = vi.fn();
     await installFileMenu(run);

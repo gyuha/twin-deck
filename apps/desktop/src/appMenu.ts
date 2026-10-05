@@ -103,7 +103,7 @@ export async function installFileMenu(
   }
   const entries = await Promise.all(
     FILE_MENU.map((e) =>
-      e ? MenuItem.new({ id: e.actionId, text: e.text, action: () => run(e.actionId) }) : PredefinedMenuItem.new({ item: "Separator" }),
+      e ? MenuItem.new({ id: e.actionId, text: withKey(e.text, keyOf?.(e.actionId)), action: () => run(e.actionId) }) : PredefinedMenuItem.new({ item: "Separator" }),
     ),
   );
   await file.prepend(entries);
