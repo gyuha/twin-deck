@@ -182,6 +182,7 @@ Shift+이동 키(범위의 선택 반전)는 액션이 아니라 `pane` 스코�
 | `core.terminal.toggle` | 터미널 표시 토글 | `Alt+Mod+O` | `Ctrl+Alt+O` | 자체 ID, 키 확인 |
 | `core.terminal.external` | 외부 터미널 | `F11` | `F11` | 자체 ID, 키 확인 |
 | `core.config.open` | 설정 폴더 열기 | 없음 | 없음 | 자체 |
+| `core.app.check_update` | 업데이트 확인 (GitHub 최신 릴리스를 보고, 새 버전이면 확인 창을 거쳐 설치 후 다시 시작) | 없음 | 없음 | 자체 |
 | `core.state.reset` | 상태 초기화 후 종료 | 없음 | 없음 | 자체 |
 | `core.theme.switch` | 테마 전환 | 없음 | 없음 | 자체 |
 

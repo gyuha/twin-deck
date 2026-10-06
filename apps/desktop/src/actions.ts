@@ -151,6 +151,7 @@ export function paletteHandlers({ api }: AppStore): Partial<ActionHandlers> {
     "core.app.launch": (_ctx, args) => api.launchApp(args),
     "core.app.open_folder": (_ctx, args) => api.launchApp(args, "folder"),
     "core.help": () => api.openHelp(),
+    "core.app.check_update": () => api.checkForUpdate(),
     "core.help.close": () => api.closeHelp(),
   };
 }

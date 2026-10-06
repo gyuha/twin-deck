@@ -796,6 +796,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     flashTimer = setTimeout(() => set({ flash: null }), 3000);
   };
   const fail = (e: unknown) => set({ notice: String(e instanceof Error ? e.message : e) });
+  /** 업데이트 확인·설치가 진행 중이면 다시 시작하지 않는다. */
+  let updateBusy = false;
 
   // 작업 상태가 바뀌면(진행/완료) 목록을 다시 읽는다.
   let lastSignature = "";
@@ -2525,6 +2527,33 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
      * `items`(`core.app.launch`): 선택한 항목 전체, 없으면 커서 항목, 항목이 하나도 없으면(빈 폴더) 현재 폴더를 넘긴다.
      * `folder`(`core.app.open_folder`): 선택·커서와 무관하게 항상 현재 패널의 폴더를 넘긴다.
      */
+    /** 업데이트 확인: 새 버전이 있으면 확인 창을 거쳐 설치하고 다시 시작한다. 확인은 수동으로만 한다. */
+    async checkForUpdate() {
+      if (updateBusy) return;
+      updateBusy = true;
+      set({ notice: null });
+      try {
+        flash("업데이트를 확인하는 중…");
+        const info = await backend.checkUpdate();
+        if (!info) {
+          flash("최신 버전입니다");
+          return;
+        }
+        const ok = await ask<boolean>({
+          kind: "confirm",
+          title: `새 버전 ${info.version}이 있습니다. 설치하고 다시 시작할까요?`,
+          lines: (info.notes ?? "").split("\n").filter((l) => l.trim()).slice(0, 8),
+        });
+        if (ok !== true) return;
+        flash("업데이트를 설치하는 중… 끝나면 앱이 다시 시작됩니다");
+        await backend.installUpdate();
+      } catch (e) {
+        set({ flash: null });
+        fail(e);
+      } finally {
+        updateBusy = false;
+      }
+    },
     async launchApp(args?: Record<string, unknown>, target: "items" | "folder" = "items") {
       const app = typeof args?.app === "string" ? args.app.trim() : "";
       const key = typeof args?.key === "string" ? args.key : "이 키";
