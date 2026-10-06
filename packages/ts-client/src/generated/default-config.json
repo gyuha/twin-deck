@@ -3,7 +3,7 @@
     "behavior": {
       "theme": "system",
       "ui_font": "",
-      "preview_font": "",
+      "preview_font": "Menlo, Consolas, monospace",
       "table": {
         "icon_size": 16,
         "circular_selection": false,

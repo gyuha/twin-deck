@@ -6,7 +6,7 @@ favorites = []
 [behavior]
 theme = "system"
 ui_font = ""
-preview_font = ""
+preview_font = "Menlo, Consolas, monospace" # macOS 기본 Menlo, Windows 기본 Consolas, 그 밖은 시스템 고정폭
 
 [behavior.table]
 icon_size = 16

@@ -27,6 +27,8 @@ const KINDS = [
   { file: "notes.txt", at: 4, label: "텍스트 미리보기" },
 ] as const;
 
+const DEFAULT_PREVIEW = "Menlo, Consolas, monospace";
+
 describe("글꼴 설정", () => {
   it("ui_font는 앱 화면에만 적용되고 미리보기 본문에는 닿지 않는다", async () => {
     const backend = seed();
@@ -36,7 +38,7 @@ describe("글꼴 설정", () => {
     expect(screen.getByRole("listbox", { name: "왼쪽 파일 목록" }).style.fontFamily).toBe(""); // 목록은 body에서 상속한다
     await open(user, 4);
     const body = within(await dlg("미리보기: notes.txt")).getByLabelText("텍스트 미리보기");
-    expect(body.style.fontFamily).toBe(""); // 미리보기 글꼴을 따로 지정하지 않았으니 기본 글꼴 그대로
+    expect(body.style.fontFamily).toBe(DEFAULT_PREVIEW); // 미리보기 글꼴을 따로 지정하지 않았으니 기본값(Menlo/Consolas)
   });
 
   it.each(KINDS)("preview_font는 $file 미리보기 본문에만 적용되고 앱 화면에는 닿지 않는다", async ({ file, at, label }) => {
@@ -92,7 +94,8 @@ describe("글꼴 설정", () => {
     await user.tab();
     await waitFor(async () => expect((await backend.getConfig()).config.behavior.ui_font).toBe(UI));
     await waitFor(() => expect(document.body.style.fontFamily).toBe(UI));
-    expect((await backend.getConfig()).config.behavior.preview_font).toBe(""); // 다른 쪽은 그대로
+    expect((await backend.getConfig()).config.behavior.preview_font).toBe(DEFAULT_PREVIEW); // 다른 쪽은 그대로
+    await user.clear(preview); // 기본값이 채워져 있다
     await user.type(preview, PREVIEW);
     await user.tab();
     await waitFor(async () => expect((await backend.getConfig()).config.behavior.preview_font).toBe(PREVIEW));
