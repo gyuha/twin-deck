@@ -10,7 +10,7 @@ export function PopupMenu() {
     <div className="fixed inset-0 flex items-start justify-center bg-black/20 pt-16">
       <div role="dialog" aria-label={menu.title} className="w-[28rem] max-w-full rounded border border-app-line bg-app-box p-3 text-sm shadow-lg">
         <h2 className="mb-2 font-semibold">{menu.title}</h2>
-        {menu.kind === "recent" && (
+        {(menu.kind === "recent" || menu.kind === "favorites") && (
           <input
             autoFocus
             aria-label="필터"
@@ -50,7 +50,7 @@ export function PopupMenu() {
           </div>
         )}
         <p className="mt-2 text-xs text-ink-faint">
-          {menu.kind === "recent" ? "↑↓ 이동 · 입력 필터 · Alt+숫자/Return 선택 · Ctrl+Backspace 비우기 · Esc 닫기" : `↑↓ 이동 · 숫자/Return 선택 · Esc 닫기${menu.kind === "volumes" ? " · U 언마운트 · E 추출" : ""}`}
+          {menu.kind === "recent" || menu.kind === "favorites" ? `↑↓ 이동 · 입력 필터 · Alt+숫자/Return 선택${menu.kind === "recent" ? " · Ctrl+Backspace 비우기" : ""} · Esc 닫기` : `↑↓ 이동 · 숫자/Return 선택 · Esc 닫기${menu.kind === "volumes" ? " · U 언마운트 · E 추출" : ""}`}
         </p>
       </div>
     </div>

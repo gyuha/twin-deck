@@ -109,8 +109,8 @@ describe("최근 위치 메뉴 입력 필터", () => {
   });
 });
 
-describe("다른 팝업 메뉴는 필터가 없다", () => {
-  it("즐겨찾기 팝업은 필터 입력창이 없고 숫자키로 바로 고른다", async () => {
+describe("즐겨찾기 팝업도 필터 입력창을 쓴다", () => {
+  it("즐겨찾기 팝업은 필터 입력창이 있고 Alt+숫자로 고른다", async () => {
     const b = seedBackend();
     b.setConfig((l) => {
       l.config.favorites = [{ kind: "item", name: "소스", path: "/home/a/src" } as never];
@@ -118,8 +118,8 @@ describe("다른 팝업 메뉴는 필터가 없다", () => {
     const { user } = await renderApp(b);
     await user.keyboard("{Alt>}2{/Alt}");
     const d = await menu("즐겨찾기");
-    expect(within(d).queryByRole("textbox", { name: "필터" })).toBeNull();
-    await user.keyboard("1");
+    expect(within(d).getByRole("textbox", { name: "필터" })).toBeInTheDocument();
+    await user.keyboard("{Alt>}1{/Alt}");
     await waitFor(() => expect(crumbs()).toEqual(["/", "home", "a", "src"]));
   });
 });

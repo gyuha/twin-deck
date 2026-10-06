@@ -96,8 +96,22 @@ describe("NAV-08 Favorites", () => {
     expect(options(d)).toEqual(["Downloads", "Src"]);
     expect(within(d).getByRole("separator")).toBeInTheDocument();
     expect(within(d).getByText("Work")).toBeInTheDocument();
-    await user.keyboard("2");
+    await user.keyboard("{Alt>}2{/Alt}"); // 숫자는 필터 입력창이 받으므로 Alt+숫자로 고른다
     await waitFor(() => expect(crumbs()).toEqual(["/", "home", "a", "src"]));
+  });
+
+  it("글자를 입력하면 이름·경로로 거르고 Esc는 필터부터 비운다", async () => {
+    const { user } = await renderApp(withFavs(favs));
+    await user.keyboard("{Alt>}2{/Alt}");
+    const d = await menu("즐겨찾기");
+    await user.keyboard("src");
+    expect(options(d)).toEqual(["Src"]);
+    expect(within(d).queryByRole("separator")).toBeNull();
+    await user.keyboard("{Escape}");
+    expect(options(d)).toEqual(["Downloads", "Src"]);
+    expect(within(d).getByRole("separator")).toBeInTheDocument();
+    await user.keyboard("zzz");
+    expect(within(d).getByText("일치하는 항목 없음")).toBeInTheDocument();
   });
 
   it("Return으로 커서 항목(Downloads → ${user.downloads})으로 이동한다", async () => {

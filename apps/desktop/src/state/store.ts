@@ -181,7 +181,7 @@ export interface MenuState {
   title: string;
   items: MenuItem[];
   cursor: number;
-  /** 최근 위치 메뉴: 필터 전 전체 목록과 입력한 필터. `items`는 필터를 거친 보이는 목록이다. */
+  /** 최근 위치·즐겨찾기 메뉴: 필터 전 전체 목록과 입력한 필터. `items`는 필터를 거친 보이는 목록이다. */
   all?: MenuItem[];
   filter?: string;
 }
@@ -2143,7 +2143,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         return;
       }
       const first = items.findIndex((i) => i.path !== undefined);
-      set({ menu: { kind, title, items, cursor: Math.max(first, 0), ...(kind === "recent" ? { all: items, filter: "" } : {}) } });
+      set({ menu: { kind, title, items, cursor: Math.max(first, 0), ...(kind === "recent" || kind === "favorites" ? { all: items, filter: "" } : {}) } });
     },
     /** 파일 행 우클릭: 선택 밖의 행이면 그 행만 대상으로 삼고, 선택 안의 행이면 선택을 유지한 채 메뉴를 연다. */
     openContextMenu(pane: PaneId, index: number, x: number, y: number) {
@@ -2211,19 +2211,21 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         return {};
       });
     },
-    /** Esc: 최근 위치 메뉴에 필터가 있으면 필터부터 비우고, 아니면 메뉴를 닫는다. */
+    /** Esc: 최근 위치·즐겨찾기 메뉴에 필터가 있으면 필터부터 비우고, 아니면 메뉴를 닫는다. */
     menuClose() {
       const m = get().menu;
-      if (m?.kind === "recent" && m.filter) return api.menuSetFilter("");
+      if ((m?.kind === "recent" || m?.kind === "favorites") && m.filter) return api.menuSetFilter("");
       set({ menu: null, ctxMenu: null });
     },
-    /** 최근 위치 메뉴의 필터를 바꾼다(경로 부분 문자열, 대소문자 무시, NFC). 커서는 첫 일치 항목으로 간다. */
+    /** 최근 위치·즐겨찾기 메뉴의 필터를 바꾼다(이름·경로 부분 문자열, 대소문자 무시, NFC). 커서는 첫 일치 항목으로 간다. */
     menuSetFilter(filter: string) {
       const m = get().menu;
-      if (m?.kind !== "recent") return;
+      if (m?.kind !== "recent" && m?.kind !== "favorites") return;
       const q = filter.normalize("NFC").toLowerCase();
-      const items = (m.all ?? []).filter((it) => it.path !== undefined && it.label.normalize("NFC").toLowerCase().includes(q));
-      set({ menu: { ...m, filter, items, cursor: 0 } });
+      // 필터가 비면 전체(즐겨찾기의 그룹 제목·구분선 포함), 있으면 이름이나 경로가 맞는 항목만.
+      const has = (t?: string) => !!t && t.normalize("NFC").toLowerCase().includes(q);
+      const items = q ? (m.all ?? []).filter((it) => it.path !== undefined && (has(it.label) || has(it.path))) : (m.all ?? []);
+      set({ menu: { ...m, filter, items, cursor: Math.max(items.findIndex((i) => i.path !== undefined), 0) } });
     },
     /** 커서 항목으로 이동하고 메뉴를 닫는다. */
     async menuSelect(index?: number) {

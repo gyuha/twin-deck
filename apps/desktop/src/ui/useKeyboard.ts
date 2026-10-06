@@ -50,7 +50,7 @@ export function useKeyboard({ app, keymap, registry }: Options) {
         return;
       }
       // 최근 위치 메뉴: 글자·숫자·Backspace는 필터 입력창이 받는다. 숫자 바로 선택은 Alt+숫자(Option+숫자는 e.key가 특수문자라 e.code로 본다).
-      if (top === "panel" && s.menu?.kind === "recent") {
+      if (top === "panel" && (s.menu?.kind === "recent" || s.menu?.kind === "favorites")) {
         const digit = /^Digit([0-9])$/.exec(e.code);
         if (e.altKey && !e.ctrlKey && !e.metaKey && digit) {
           e.preventDefault();
