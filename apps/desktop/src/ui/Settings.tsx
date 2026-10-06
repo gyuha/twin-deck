@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Button, Input, Select, SelectOption, Switch } from "@spacedrive/primitives";
+import { Button, Input, Select, SelectOption } from "@spacedrive/primitives";
 import { defaultBindingsFor } from "@twin-deck/actions";
 import { defaultLoaded } from "@twin-deck/ts-client";
 import { APP_ACTIONS, APP_LAUNCH_ACTION, APP_OPEN_FOLDER_ACTION } from "../lib/fkeys";
 import { useApp, useAppStore } from "../state/context";
 import { Combobox } from "./Combobox";
+import { Switch } from "./Switch";
 import { useUi } from "./uiContext";
 
 type Control =
