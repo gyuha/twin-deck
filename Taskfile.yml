@@ -13,6 +13,12 @@ tasks:
     cmds:
       - bun run --cwd apps/desktop tauri dev
 
+  icons:
+    desc: 선택 원본에서 데스크톱 앱 아이콘 재생성 (macOS)
+    platforms: [darwin]
+    cmds:
+      - swift scripts/generate-icons.swift
+
   gen-types:
     desc: Rust 타입에서 TS 바인딩(bindings.ts)과 기본 설정 fixture 재생성
     cmds:
