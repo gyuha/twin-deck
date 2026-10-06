@@ -717,3 +717,65 @@ fn remove_favorite_drops_matching_entry_and_keeps_the_rest() {
     let text = std::fs::read_to_string(dir.path().join("config.toml")).unwrap();
     assert!(!text.contains("/x") && text.contains("/y"), "{text}");
 }
+
+#[test]
+fn list_appearance_defaults_round_trip_and_validate_folder_style() {
+    use td_config::{set_user_value, ConfigValue};
+    // 기본값은 지금 모양과 같다
+    let none = load("");
+    assert!(none.warnings.is_empty(), "{:?}", none.warnings);
+    let t = &none.config.behavior.table;
+    assert!(!t.zebra_rows);
+    assert!(t.show_marks);
+    assert_eq!(t.folder_style, "none");
+    assert!(!t.cursor_fill);
+
+    // 사용자 설정이 그 키만 바꾼다
+    let dir = tempfile::tempdir().unwrap();
+    set_user_value(
+        dir.path(),
+        "behavior.table.zebra_rows",
+        ConfigValue::Bool(true),
+    )
+    .unwrap();
+    set_user_value(
+        dir.path(),
+        "behavior.table.show_marks",
+        ConfigValue::Bool(false),
+    )
+    .unwrap();
+    set_user_value(
+        dir.path(),
+        "behavior.table.folder_style",
+        ConfigValue::Str("brackets".into()),
+    )
+    .unwrap();
+    set_user_value(
+        dir.path(),
+        "behavior.table.cursor_fill",
+        ConfigValue::Bool(true),
+    )
+    .unwrap();
+    let l = load_dir(dir.path(), Platform::Linux);
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    let t = &l.config.behavior.table;
+    assert!(t.zebra_rows && !t.show_marks && t.cursor_fill);
+    assert_eq!(t.folder_style, "brackets");
+    assert_eq!(t.icon_size, 16, "건드리지 않은 키는 기본값");
+
+    // 허용값 밖은 경고하고 none으로 되돌린다
+    for ok in ["none", "brackets", "parens", "slash"] {
+        let l = load(&format!("[behavior.table]\nfolder_style = \"{ok}\"\n"));
+        assert!(l.warnings.is_empty(), "{ok}: {:?}", l.warnings);
+        assert_eq!(l.config.behavior.table.folder_style, ok);
+    }
+    let l = load("[behavior.table]\nfolder_style = \"x\"\n");
+    assert!(
+        l.warnings
+            .iter()
+            .any(|w| w.message.contains("folder_style")),
+        "{:?}",
+        l.warnings
+    );
+    assert_eq!(l.config.behavior.table.folder_style, "none");
+}

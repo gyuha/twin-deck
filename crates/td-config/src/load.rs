@@ -90,7 +90,7 @@ fn syntax_warning(file: &str, src: &str, e: &toml::de::Error) -> Warning {
     }
 }
 
-const ENUMS: [(&str, &str, &[&str]); 3] = [
+const ENUMS: [(&str, &str, &[&str]); 4] = [
     (
         "behavior",
         "theme",
@@ -99,6 +99,11 @@ const ENUMS: [(&str, &str, &[&str]); 3] = [
         ],
     ),
     ("behavior.selection", "shift_mode", &["invert", "extend"]),
+    (
+        "behavior.table",
+        "folder_style",
+        &["none", "brackets", "parens", "slash"],
+    ),
     (
         "display",
         "size_format",

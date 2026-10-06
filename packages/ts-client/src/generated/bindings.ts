@@ -467,7 +467,23 @@ export type BehaviorTable = { icon_size: number;
 /**
  * 끝에서 처음으로 순환 (NAV-06).
  */
-circular_selection: boolean; right_click_select: boolean }
+circular_selection: boolean; right_click_select: boolean; 
+/**
+ * 행 배경을 번갈아 옅게 칠한다.
+ */
+zebra_rows: boolean; 
+/**
+ * 행 맨 앞 표시 칸(`●` 선택, `▸` 폴더)을 보인다. 끄면 칸 자체가 사라진다.
+ */
+show_marks: boolean; 
+/**
+ * 폴더 이름 장식: "none" | "brackets" | "parens" | "slash". 화면 표시만 바꾼다.
+ */
+folder_style: string; 
+/**
+ * 활성 패널의 커서 행을 강조색으로 꽉 채운다.
+ */
+cursor_fill: boolean }
 /**
  * 사용자 키바인딩 한 줄. `action`이 None이면 기본 바인딩 해제(`"F5" = "none"`).
  */

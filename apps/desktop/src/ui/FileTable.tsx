@@ -11,7 +11,7 @@ import { SORT_KEYS } from "../lib/sort";
 import { FileIcon } from "./FileIcon";
 import type { SortKey } from "../lib/sort";
 import { useApp, useAppStore } from "../state/context";
-import { activeTab, effectiveSort } from "../state/store";
+import { activeTab, effectiveSort, isFolderEntry } from "../state/store";
 import type { PaneId } from "../state/store";
 
 const ROW_HEIGHT = 24;
@@ -30,8 +30,14 @@ const DEFAULT_WIDTH: Record<ColumnSpec["name"], string> = {
 /** 아이콘 칸은 아이콘 크기에 이름과의 간격(6px)을 더한 폭이다. */
 const iconColumn = (iconSize: number) => `${iconSize + 6}px`;
 
-const gridTemplate = (cols: ColumnSpec[], iconSize: number) =>
-  `1.25rem ${iconColumn(iconSize)} ${cols.map((c) => (c.width ? `${c.width}px` : DEFAULT_WIDTH[c.name])).join(" ")}`;
+/** 표시 칸(`●`/`▸`)의 폭. 표시 칸을 끄면 이 칸이 열 정의에서 빠진다. */
+const MARK_COLUMN = "1.25rem";
+
+const gridTemplate = (cols: ColumnSpec[], iconSize: number, showMarks: boolean) =>
+  `${showMarks ? `${MARK_COLUMN} ` : ""}${iconColumn(iconSize)} ${cols.map((c) => (c.width ? `${c.width}px` : DEFAULT_WIDTH[c.name])).join(" ")}`;
+
+/** 폴더 이름 장식(`behavior.table.folder_style`)의 앞뒤 글자. 화면 표시만 바꾼다. */
+const FOLDER_DECOR: Record<string, [string, string]> = { brackets: ["[", "]"], parens: ["(", ")"], slash: ["", "/"] };
 
 /** 보이는 행만 그리는 가상 스크롤러. jsdom처럼 크기 관찰이 없는 환경에서도 동작하도록 측정을 직접 제공한다. */
 function useRows(count: number, ref: React.RefObject<HTMLDivElement | null>): Virtualizer<HTMLDivElement, Element> {
@@ -92,6 +98,8 @@ export function FileTable({ pane }: { pane: PaneId }) {
   const dirSizes = useApp((s) => s.dirSizes);
   const rightClickSelect = config.behavior.table.right_click_select;
   const iconSize = config.behavior.table.icon_size;
+  const { zebra_rows: zebra, show_marks: showMarks, folder_style: folderStyle, cursor_fill: cursorFill } = config.behavior.table;
+  const [decoPre, decoPost] = FOLDER_DECOR[folderStyle] ?? ["", ""];
   const columns = useMemo(() => parseColumns(config.view.table.columns), [config.view.table.columns]);
   const sort = effectiveSort(tab, config.view.table.columns);
 
@@ -114,6 +122,9 @@ export function FileTable({ pane }: { pane: PaneId }) {
     const selected = tab.selection.has(e.path);
     const cursor = i === tab.cursor;
     const mark = selected ? "●" : e.kind === "dir" ? "▸" : "";
+    const fill = cursor && isActive && cursorFill;
+    const stripe = zebra ? (i % 2 === 1 ? "odd" : "even") : undefined;
+    const [pre, post] = isFolderEntry(e) ? [decoPre, decoPost] : ["", ""];
     return (
       <div
         key={e.path}
@@ -122,6 +133,8 @@ export function FileTable({ pane }: { pane: PaneId }) {
         aria-selected={selected}
         aria-rowindex={i + 1}
         data-cursor={cursor}
+        data-cursor-fill={fill ? "true" : undefined}
+        data-stripe={stripe}
         data-path={e.path}
         data-pane={pane}
         data-row-kind={e.kind}
@@ -152,23 +165,42 @@ export function FileTable({ pane }: { pane: PaneId }) {
         }}
         style={{
           gridTemplateColumns: multi
-            ? `1.25rem ${iconColumn(iconSize)} minmax(0,1fr)`
-            : gridTemplate(columns, iconSize),
+            ? `${showMarks ? `${MARK_COLUMN} ` : ""}${iconColumn(iconSize)} minmax(0,1fr)`
+            : gridTemplate(columns, iconSize, showMarks),
         }}
         className={[
           "grid",
           "h-6 cursor-default items-center border-l-[3px] px-2",
-          // 커서: 은은한 배경 + 왼쪽 막대(활성 패널은 accent). 선택: accent 굵은 글자.
-          cursor ? (isActive ? "border-accent bg-app-selected" : "border-ink-faint bg-app-selected") : "border-transparent",
-          selected ? "font-semibold text-accent" : "",
+          // 커서: 은은한 배경 + 왼쪽 막대(활성 패널은 accent). 커서 행 꽉 채움을 켜면 활성 패널의 커서 행은 accent 배경이다.
+          // 선택: accent 굵은 글자(꽉 채운 행 위에서는 배경과 같은 색이 되지 않게 굵게만). 줄무늬: 커서 행이 아닌 홀수 번째 행.
+          cursor
+            ? isActive
+              ? fill
+                ? "border-accent bg-accent text-white"
+                : "border-accent bg-app-selected"
+              : "border-ink-faint bg-app-selected"
+            : stripe === "odd"
+              ? "border-transparent bg-app-line/20"
+              : "border-transparent",
+          selected ? (fill ? "font-semibold" : "font-semibold text-accent") : "",
         ].join(" ")}
       >
-        <span aria-hidden>{mark}</span>
+        {showMarks && (
+          <span aria-hidden data-mark>
+            {mark}
+          </span>
+        )}
         <FileIcon name={e.name} kind={e.kind} size={iconSize} />
         {(multi ? [{ name: "name" } as ColumnSpec] : columns).map((c, k) => (
           <span key={`${c.name}-${k}`} className={c.name === "name" ? "truncate" : "truncate text-right tabular-nums"}>
             {c.name === "name" && tab.quick ? (
-              <QuickHighlight name={e.name} input={tab.quick} prefixOnly={config.behavior.quick_select.match_only_prefix} />
+              <>
+                {pre}
+                <QuickHighlight name={e.name} input={tab.quick} prefixOnly={config.behavior.quick_select.match_only_prefix} />
+                {post}
+              </>
+            ) : c.name === "name" ? (
+              `${pre}${cellText(e, c.name, config.display, undefined, tab.virtual?.kind === "usage", dirSizes[e.path])}${post}`
             ) : (
               cellText(e, c.name, config.display, undefined, tab.virtual?.kind === "usage", dirSizes[e.path])
             )}
@@ -198,10 +230,10 @@ export function FileTable({ pane }: { pane: PaneId }) {
         <div
           role="row"
           aria-label="컬럼 머리글"
-          style={{ gridTemplateColumns: gridTemplate(columns, iconSize) }}
+          style={{ gridTemplateColumns: gridTemplate(columns, iconSize, showMarks) }}
           className="grid border-b border-l-[3px] border-app-line border-l-transparent px-2 text-xs text-ink-dull"
         >
-          <span aria-hidden />
+          {showMarks && <span aria-hidden />}
           <span aria-hidden />
           {columns.map((c, k) => {
             const sortable = (SORT_KEYS as readonly string[]).includes(c.name);

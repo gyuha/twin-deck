@@ -46,6 +46,14 @@ pub struct BehaviorTable {
     /// 끝에서 처음으로 순환 (NAV-06).
     pub circular_selection: bool,
     pub right_click_select: bool,
+    /// 행 배경을 번갈아 옅게 칠한다.
+    pub zebra_rows: bool,
+    /// 행 맨 앞 표시 칸(`●` 선택, `▸` 폴더)을 보인다. 끄면 칸 자체가 사라진다.
+    pub show_marks: bool,
+    /// 폴더 이름 장식: "none" | "brackets" | "parens" | "slash". 화면 표시만 바꾼다.
+    pub folder_style: String,
+    /// 활성 패널의 커서 행을 강조색으로 꽉 채운다.
+    pub cursor_fill: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

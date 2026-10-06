@@ -25,6 +25,8 @@ interface Item {
 const THEMES = ["system", "dark", "light", "midnight", "noir", "slate", "nord", "mocha"] as const;
 // size_format의 허용 값은 td-config의 검증 목록과 같아야 한다(crates/td-config/src/load.rs).
 const SIZE_FORMATS = ["adaptive", "adaptive_kibi", "bytes", "KB", "MB"] as const;
+// folder_style의 허용 값도 td-config의 검증 목록(ENUMS)과 같아야 한다.
+const FOLDER_STYLES = ["none", "brackets", "parens", "slash"] as const;
 
 const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
   {
@@ -34,6 +36,10 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
       { key: "behavior.ui_font", title: "UI 글꼴", desc: "앱 화면 전체의 글꼴. CSS font-family 값(예: Pretendard, sans-serif). 기본은 macOS Menlo·Windows Consolas. 비우면 앱 기본 고정폭", control: { type: "text" } },
       { key: "behavior.preview_font", title: "미리보기 글꼴", desc: "텍스트·코드·JSON·Markdown 미리보기 본문의 글꼴. 비우면 기본 글꼴", control: { type: "text" } },
       { key: "behavior.table.icon_size", title: "아이콘 크기", desc: "파일 목록 행의 아이콘(px)", control: { type: "int" } },
+      { key: "behavior.table.zebra_rows", title: "줄무늬 행", desc: "파일 목록의 행 배경을 번갈아 옅게 칠합니다", control: { type: "switch" } },
+      { key: "behavior.table.show_marks", title: "표시 칸", desc: "행 맨 앞의 선택(●)·폴더(▸) 표시 칸. 끄면 칸이 사라지고 선택은 굵은 강조색 글씨로만 보입니다", control: { type: "switch" } },
+      { key: "behavior.table.folder_style", title: "폴더 모양", desc: "폴더 이름을 꾸밉니다: none, brackets [이름], parens (이름), slash 이름/. 화면 표시만 바뀝니다", control: { type: "select", options: FOLDER_STYLES } },
+      { key: "behavior.table.cursor_fill", title: "커서 행 꽉 채움", desc: "활성 패널의 커서 행을 강조색으로 꽉 채웁니다", control: { type: "switch" } },
       { key: "behavior.layout.show_action_bar", title: "Action Bar 표시", desc: "아래쪽 단축키 버튼 줄", control: { type: "switch" } },
       { key: "behavior.layout.action_bar_by_modifier", title: "Action Bar 조합키는 누를 때만", desc: "Shift 등을 누르는 동안에만 그 조합 키의 버튼을 보인다. 끄면 전부 보인다", control: { type: "switch" } },
       { key: "behavior.layout.recent_limit", title: "최근 위치 개수", desc: "최근 위치 메뉴에 기억하는 폴더 수(양쪽 패널 공용, 창을 닫아도 유지)", control: { type: "int" } },

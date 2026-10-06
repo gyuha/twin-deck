@@ -12,6 +12,10 @@ preview_font = "Menlo, Consolas, monospace" # macOS 기본 Menlo, Windows 기본
 icon_size = 16
 circular_selection = false
 right_click_select = false
+zebra_rows = false
+show_marks = true
+folder_style = "none"
+cursor_fill = false
 
 [behavior.quick_select]
 match_only_prefix = false

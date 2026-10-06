@@ -53,6 +53,10 @@ theme = "dark"                    # 내장 테마 이름 또는 themes/ 의 파�
 icon_size = 16
 circular_selection = false        # 끝에서 처음으로 순환
 right_click_select = false
+zebra_rows = false                # 행 배경을 번갈아 옅게 칠한다
+show_marks = true                 # 행 맨 앞 표시 칸(● 선택, ▸ 폴더). false면 칸이 사라진다
+folder_style = "none"             # 폴더 이름 장식: "none" | "brackets" [이름] | "parens" (이름) | "slash" 이름/ (화면 표시만)
+cursor_fill = false               # 활성 패널의 커서 행을 강조색으로 꽉 채운다
 
 [behavior.quick_select]
 match_only_prefix = false

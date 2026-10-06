@@ -161,3 +161,17 @@ describe("키 설정", () => {
     expect(await screen.findByRole("option", { name: /설정/ })).toBeInTheDocument();
   });
 });
+
+describe("파일 목록 모양 설정 항목", () => {
+  it("모양 탭에 줄무늬·표시 칸·폴더 모양·커서 행 꽉 채움이 있고 바꾸면 저장된다", async () => {
+    const { user, backend } = await renderApp();
+    await open(user);
+    await dialog();
+    expect(screen.getByRole("group", { name: "폴더 모양" })).toBeInTheDocument();
+    expect(sw("줄무늬 행")).toHaveAttribute("aria-checked", "false");
+    expect(sw("표시 칸")).toHaveAttribute("aria-checked", "true");
+    expect(sw("커서 행 꽉 채움")).toHaveAttribute("aria-checked", "false");
+    await user.click(sw("줄무늬 행"));
+    await waitFor(() => expect((backend as unknown as { loaded: { config: { behavior: { table: { zebra_rows: boolean } } } } }).loaded.config.behavior.table.zebra_rows).toBe(true));
+  });
+});
