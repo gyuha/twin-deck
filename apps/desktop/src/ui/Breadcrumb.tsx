@@ -5,7 +5,8 @@ import type { PaneId } from "../state/store";
 
 /**
  * 경로를 조각으로 나눈 이동 링크 (NAV-12).
- * 오른쪽 클릭하면 입력 상자로 바뀌어 현재 폴더 경로를 글자로 보여 주고, 경로를 고쳐 Enter를 누르면 그 폴더로 이동한다(Esc·포커스를 잃으면 취소).
+ * 오른쪽 클릭하거나 빈 공간(경로 조각 버튼이 아닌 곳)을 더블클릭하면 입력 상자로 바뀌어 현재 폴더 경로를 글자로 보여 주고,
+ * 경로를 고쳐 Enter를 누르면 그 폴더로 이동한다(Esc·포커스를 잃으면 취소). 경로 조각을 왼쪽 클릭하면 그 폴더로 이동한다.
  */
 export function Breadcrumb({ pane, path }: { pane: PaneId; path: string }) {
   const { api } = useAppStore();
@@ -67,6 +68,11 @@ export function Breadcrumb({ pane, path }: { pane: PaneId; path: string }) {
       aria-label="경로"
       onContextMenu={(e) => {
         e.preventDefault();
+        startEdit();
+      }}
+      onDoubleClick={(e) => {
+        // 조각 버튼의 더블클릭은 이동용 클릭이라 편집으로 바꾸지 않는다. 빈 공간과 구분자만 편집을 시작한다.
+        if ((e.target as Element).closest("button")) return;
         startEdit();
       }}
       className="flex flex-wrap items-center px-2 py-1 text-sm"

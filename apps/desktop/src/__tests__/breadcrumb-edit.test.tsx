@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { FakeBackend } from "@twin-deck/ts-client";
 import { cursorName, entryNames, renderApp } from "./helpers";
@@ -96,5 +96,47 @@ describe("경로 표시줄: 오른쪽 클릭으로 직접 입력", () => {
     await user.type(box(), "/home/b/b1{Enter}");
     await waitFor(() => expect(entryNames("right")).toEqual(["x.txt"]));
     expect(entryNames("left")).toEqual(["docs", "other", "a.txt"]);
+  });
+});
+
+describe("경로 표시줄: 빈 공간 더블클릭으로도 직접 입력", () => {
+  const emptySpace = (pane: "left" | "right") => nav(pane); // 조각 버튼이 아닌 표시줄 바탕
+  const segment = (pane: "left" | "right", name: string) => within(nav(pane)).getByRole("button", { name });
+
+  it("빈 공간을 더블클릭하면 입력 상자로 바뀌고 현재 경로가 전부 선택돼 있다", async () => {
+    await renderApp(seed());
+    expect(screen.queryByRole("textbox", { name: "경로 입력" })).toBeNull();
+    fireEvent.doubleClick(emptySpace("left"));
+    expect(box().value).toBe("/home/a");
+    await waitFor(() => expect(box()).toHaveFocus());
+    expect([box().selectionStart, box().selectionEnd]).toEqual([0, "/home/a".length]);
+  });
+
+  it("경로 조각 버튼을 더블클릭해도 입력 상자로 바뀌지 않는다", async () => {
+    await renderApp(seed());
+    fireEvent.doubleClick(segment("left", "a"));
+    expect(screen.queryByRole("textbox", { name: "경로 입력" })).toBeNull();
+  });
+
+  it("왼쪽 클릭 동작은 그대로다: 조각을 누르면 그 폴더로 이동하고, 빈 공간 한 번 클릭은 아무 일도 없다", async () => {
+    const { user } = await renderApp(seed());
+    await user.click(emptySpace("left"));
+    expect(screen.queryByRole("textbox", { name: "경로 입력" })).toBeNull();
+    await user.click(segment("left", "home"));
+    await waitFor(() => expect(crumbs("left")).toEqual(["/", "home"]));
+  });
+
+  it("오른쪽 한 번 클릭으로 입력 상자가 열리는 기존 동작도 그대로다", async () => {
+    await renderApp(seed());
+    rightClick("left");
+    expect(box().value).toBe("/home/a");
+  });
+
+  it("입력 중 더블클릭해도 입력은 계속되고, 가상(검색 결과) 탭에는 경로 표시줄이 없어 해당 없다", async () => {
+    await renderApp(seed());
+    fireEvent.doubleClick(emptySpace("left"));
+    const first = box();
+    fireEvent.doubleClick(first);
+    expect(box()).toBe(first);
   });
 });
