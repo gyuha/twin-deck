@@ -7,16 +7,16 @@ budget-spent: 0 · since: 2026-10-06T00:00:00Z
 wall: none
 
 ## Stop-condition checks (ALL must pass)
-- [ ] C1. (#13 Rust) `cargo test -p twin-deck-desktop link_is_dir` 통과 ≥ 1, 실패 0. 폴더 링크는 `linkIsDir` true, 파일 링크·끊어진 링크·일반 폴더·일반 파일은 false.
-- [ ] C2. (#13 타입) `task gen-types` 후 `cargo test -p twin-deck-desktop up_to_date` 통과, `grep -c linkIsDir packages/ts-client/src/generated/bindings.ts` ≥ 1.
-- [ ] C3. (#13 UI) `cd apps/desktop && bunx vitest run src/__tests__ -t "폴더 심볼릭 링크"` 통과 ≥ 1, 실패 0. 폴더 링크는 `Enter`·더블클릭·오른쪽 클릭 "열기"·`→`로 링크 경로로 들어가고, 파일 링크와 끊어진 링크는 들어가지 않으며, 일반 폴더는 그대로다.
-- [ ] C4. 회귀 방지: `bunx tsc --noEmit` 통과, 전체 `bunx vitest run`의 실패는 기준선 `pdf-preview` 1건뿐, `cargo test -p twin-deck-desktop` 통과, `cargo clippy -p twin-deck-desktop -- -D warnings` 통과, `cargo fmt --check` 통과.
+- [x] C1. (#13 Rust) `cargo test -p twin-deck-desktop link_is_dir` 통과 ≥ 1, 실패 0. 폴더 링크는 `linkIsDir` true, 파일 링크·끊어진 링크·일반 폴더·일반 파일은 false.
+- [x] C2. (#13 타입) `task gen-types` 후 `cargo test -p twin-deck-desktop up_to_date` 통과, `grep -c linkIsDir packages/ts-client/src/generated/bindings.ts` ≥ 1.
+- [x] C3. (#13 UI) `cd apps/desktop && bunx vitest run src/__tests__ -t "폴더 심볼릭 링크"` 통과 ≥ 1, 실패 0. 폴더 링크는 `Enter`·더블클릭·오른쪽 클릭 "열기"·`→`로 링크 경로로 들어가고, 파일 링크와 끊어진 링크는 들어가지 않으며, 일반 폴더는 그대로다.
+- [x] C4. 회귀 방지: `bunx tsc --noEmit` 통과, 전체 `bunx vitest run`의 실패는 기준선 `pdf-preview` 1건뿐, `cargo test -p twin-deck-desktop` 통과, `cargo clippy -p twin-deck-desktop -- -D warnings` 통과, `cargo fmt --check` 통과.
 
 ## Check progress (updated after EVERY stop-condition run)
-- C1: not-run
-- C2: not-run
-- C3: not-run
-- C4: not-run
+- C1: pass ×0 · regressed: ×0 · last-evidence: "cargo test link_is_dir → 1 passed (구현 전 컴파일 실패)"
+- C2: pass ×0 · regressed: ×0 · last-evidence: "up_to_date 통과, grep -c linkIsDir bindings.ts → 1"
+- C3: pass ×0 · regressed: ×0 · last-evidence: "vitest -t '폴더 심볼릭 링크' → 6 passed (구현 전 4개 실패)"
+- C4: pass ×0 · regressed: ×0 · last-evidence: "tsc 통과, 전체 vitest 667 통과 / 1 실패(pdf-preview 기준선), cargo test 41 passed, clippy·fmt 통과"
 
 ## Authorized replan scope
 - 실패한 조건에 직접 연결된 수정 작업만 자동 생성한다.
@@ -27,4 +27,4 @@ wall: none
 - 실제 앱(macOS iCloud CloudDocs 같은 링크)에서의 동작은 기계로 검증하지 않는다. 사용자가 확인 전 이슈가 닫히는 점은 사전 승인했다.
 
 ## Tasks
-- folder-symlink-enter
+- folder-symlink-enter (sealed)

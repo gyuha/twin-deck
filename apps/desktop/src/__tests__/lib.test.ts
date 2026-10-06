@@ -16,6 +16,7 @@ const entry = (name: string, o: Partial<EntryDto> = {}): EntryDto => ({
   createdMs: null,
   mode: null,
   hidden: false,
+  linkIsDir: false,
   ...o,
 });
 
