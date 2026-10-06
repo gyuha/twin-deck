@@ -1,4 +1,4 @@
-import type { ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, LoadedState, PreviewDto, QueueItemDto, SearchStartDto, SearchSummaryDto, Snapshot, UserDirsDto, VolumeDto } from "./generated/bindings";
+import type { ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, LoadedState, PreviewDto, QueueItemDto, SearchStartDto, SearchSummaryDto, Snapshot, UpdateInfoDto, UserDirsDto, VolumeDto } from "./generated/bindings";
 
 /** Look Up / Flatten / Disk Usage가 스트리밍으로 보내는 이벤트. 작업마다 마지막은 `done`이다. */
 export type SearchEvent =
@@ -105,6 +105,10 @@ export interface Backend {
   resetConfigValue(key: string): Promise<Loaded>;
   /** 설정 폴더를 파일 관리자로 연다. */
   revealConfigDir(): Promise<void>;
+  /** GitHub 릴리스의 최신 버전을 확인한다. 새 버전이 없으면 null. 확인에 실패하면 BackendError. */
+  checkUpdate(): Promise<UpdateInfoDto | null>;
+  /** 새 버전을 내려받아 설치하고 앱을 다시 시작한다. 실패하면 BackendError(서명 불일치 포함). */
+  installUpdate(): Promise<void>;
   /** 설정 파일이 바뀔 때마다 호출된다. 문법 오류면 이전 유효 설정과 경고가 온다. */
   onConfigChanged(callback: (loaded: Loaded) => void): () => void;
   /** 큐 상태가 바뀔 때마다 전체 스냅샷과 함께 호출된다. */

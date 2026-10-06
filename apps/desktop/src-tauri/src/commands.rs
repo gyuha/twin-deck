@@ -594,6 +594,47 @@ pub fn unwatch_dir(svc: State<'_, AppService>, path: String) -> ServiceResult<()
     svc.unwatch(&path)
 }
 
+/// 새 버전 정보. 업데이트 확인 창에 보인다.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct UpdateInfoDto {
+    pub version: String,
+    /// 릴리스 노트(없으면 null).
+    pub notes: Option<String>,
+    /// 릴리스 날짜(RFC 3339, 없으면 null).
+    pub date: Option<String>,
+}
+
+/// GitHub 릴리스의 `latest.json`을 읽어 새 버전이 있으면 알려 준다. 없으면 null.
+/// 이 OS용 항목이 없는 버전은 새 버전으로 치지 않는다(updater가 "항목 없음"으로 돌려준다).
+#[tauri::command]
+#[specta::specta]
+pub async fn check_update(app: tauri::AppHandle) -> ServiceResult<Option<UpdateInfoDto>> {
+    use tauri_plugin_updater::UpdaterExt;
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    let found = updater.check().await.map_err(|e| e.to_string())?;
+    Ok(found.map(|u| UpdateInfoDto {
+        version: u.version,
+        notes: u.body,
+        date: u.date.map(|d| d.to_string()),
+    }))
+}
+
+/// 새 버전을 내려받아 설치하고 앱을 다시 시작한다(성공하면 돌아오지 않는다). 서명이 맞지 않으면 설치하지 않고 오류를 돌려준다.
+#[tauri::command]
+#[specta::specta]
+pub async fn install_update(app: tauri::AppHandle) -> ServiceResult<()> {
+    use tauri_plugin_updater::UpdaterExt;
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    let Some(update) = updater.check().await.map_err(|e| e.to_string())? else {
+        return Err("설치할 새 버전이 없습니다".into());
+    };
+    update
+        .download_and_install(|_, _| {}, || {})
+        .await
+        .map_err(|e| e.to_string())?;
+    app.restart()
+}
+
 pub fn specta_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new()
         .commands(collect_commands![
@@ -620,6 +661,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             set_config_value,
             reset_config_value,
             reveal_config_dir,
+            check_update,
+            install_update,
             list_dir,
             mkdir,
             touch,

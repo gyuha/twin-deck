@@ -17,6 +17,7 @@ import type {
   UserDirsDto,
   VolumeDto,
   DiskSpaceDto,
+  UpdateInfoDto,
   FindSpecDto,
 } from "./generated/bindings";
 import { globMatch } from "./glob";
@@ -717,6 +718,20 @@ export class FakeBackend implements Backend {
   configDirRevealed = 0;
   async revealConfigDir() {
     this.configDirRevealed += 1;
+  }
+
+  /** 테스트용: 다음 업데이트 확인 결과. 기본은 새 버전 없음. */
+  updateScenario: { info: UpdateInfoDto | null; checkError?: string; installError?: string } = { info: null };
+  /** 테스트용: `checkUpdate`/`installUpdate` 호출 횟수. */
+  updateCalls = { check: 0, install: 0 };
+  async checkUpdate() {
+    this.updateCalls.check += 1;
+    if (this.updateScenario.checkError) throw new BackendError(this.updateScenario.checkError);
+    return this.updateScenario.info;
+  }
+  async installUpdate() {
+    this.updateCalls.install += 1;
+    if (this.updateScenario.installError) throw new BackendError(this.updateScenario.installError);
   }
 
   /** 테스트용: 파일의 수정·생성 시각을 지정한다. */

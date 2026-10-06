@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "메인 창과 새로 여는 창(win-N)의 기본 권한 (경로 조회, 이벤트 수신, 창 위치·크기 복원)",
+  "description": "메인 창과 새로 여는 창(win-N)의 기본 권한 (경로 조회, 이벤트 수신, 창 위치·크기 복원, 업데이트 확인)",
   "windows": ["main", "win-*"],
-  "permissions": ["core:default", "clipboard-manager:allow-write-text", "window-state:default"]
+  "permissions": ["core:default", "clipboard-manager:allow-write-text", "window-state:default", "updater:default"]
 }

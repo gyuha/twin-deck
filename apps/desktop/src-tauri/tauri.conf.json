@@ -13,6 +13,12 @@
     "windows": [{ "title": "Twin Deck", "width": 1200, "height": 760, "acceptFirstMouse": true, "visible": false }],
     "security": { "csp": null, "assetProtocol": { "enable": true, "scope": ["**"] } }
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "REPLACE_WITH_UPDATER_PUBKEY",
+      "endpoints": ["https://github.com/gyuha/twin-deck/releases/latest/download/latest.json"]
+    }
+  },
   "bundle": {
     "active": true,
     "targets": ["app"],

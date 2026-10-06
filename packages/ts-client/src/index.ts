@@ -32,6 +32,7 @@ export type {
   FindSpecDto,
   TextSpecDto,
   DiskSpaceDto,
+  UpdateInfoDto,
 } from "./generated/bindings";
 export * from "./backend";
 export { archiveFileName, archiveRoot, isArchiveName, isArchivePath } from "./archive";

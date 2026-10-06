@@ -175,6 +175,12 @@ export class TauriBackend implements Backend {
   async revealConfigDir() {
     unwrap(await commands.revealConfigDir());
   }
+  async checkUpdate() {
+    return unwrap(await commands.checkUpdate());
+  }
+  async installUpdate() {
+    unwrap(await commands.installUpdate());
+  }
   onConfigChanged(callback: (loaded: Loaded) => void) {
     const unlisten = events.configChanged.listen((e) => callback(e.payload.loaded));
     return () => {

@@ -206,6 +206,29 @@ async revealConfigDir() : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * GitHub 릴리스의 `latest.json`을 읽어 새 버전이 있으면 알려 준다. 없으면 null.
+ * 이 OS용 항목이 없는 버전은 새 버전으로 치지 않는다(updater가 "항목 없음"으로 돌려준다).
+ */
+async checkUpdate() : Promise<Result<UpdateInfoDto | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("check_update") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 새 버전을 내려받아 설치하고 앱을 다시 시작한다(성공하면 돌아오지 않는다). 서명이 맞지 않으면 설치하지 않고 오류를 돌려준다.
+ */
+async installUpdate() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("install_update") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async listDir(path: string, showHidden: boolean) : Promise<Result<EntryDto[], string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("list_dir", { path, showHidden }) };
@@ -674,6 +697,18 @@ export type TextSpecDto = { pattern: string; caseSensitive: boolean; regex: bool
  * 텍스트를 포함하지 않는 파일을 찾는다.
  */
 invert: boolean }
+/**
+ * 새 버전 정보. 업데이트 확인 창에 보인다.
+ */
+export type UpdateInfoDto = { version: string; 
+/**
+ * 릴리스 노트(없으면 null).
+ */
+notes: string | null; 
+/**
+ * 릴리스 날짜(RFC 3339, 없으면 null).
+ */
+date: string | null }
 /**
  * Disk Usage의 부분(또는 최종) 결과. 크기 내림차순 전체 스냅샷이다.
  */

@@ -49,6 +49,7 @@ fn main() {
                 )
                 .build(),
         )
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(service)
         .manage(AppLaunch::new(
             td_launch::SystemLauncher,
