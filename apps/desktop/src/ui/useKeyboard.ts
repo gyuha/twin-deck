@@ -57,10 +57,10 @@ export function useKeyboard({ app, keymap, registry }: Options) {
           void api.menuSelectNth(Number(digit[1]));
           return;
         }
-        // 필터를 입력하는 중(`my-project` 등)에는 +/-도 글자로 받는다.
-        if (s.menu?.kind === "favorites" && !s.menu.filter && (e.key === "+" || e.key === "-")) {
+        // Ctrl+=는 현재 폴더 추가, Ctrl+-는 커서 항목 삭제. 글자 키가 아니라 필터 입력과 겹치지 않는다.
+        if (s.menu?.kind === "favorites" && e.ctrlKey && !e.metaKey && !e.altKey && (e.key === "=" || e.key === "-")) {
           e.preventDefault();
-          void (e.key === "+" ? api.menuAddFavoriteHere() : api.menuRemoveFavorite());
+          void (e.key === "=" ? api.menuAddFavoriteHere() : api.menuRemoveFavorite());
           return;
         }
         if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key.length === 1 || e.key === "Backspace")) return;

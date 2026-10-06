@@ -50,7 +50,7 @@ export function PopupMenu() {
           </div>
         )}
         <p className="mt-2 text-xs text-ink-faint">
-          {menu.kind === "recent" || menu.kind === "favorites" ? `↑↓ 이동 · 입력 필터 · Alt+숫자/Return 선택${menu.kind === "recent" ? " · Ctrl+Backspace 비우기" : " · + 현재 폴더 추가 · - 선택 항목 삭제"} · Esc 닫기` : `↑↓ 이동 · 숫자/Return 선택 · Esc 닫기${menu.kind === "volumes" ? " · U 언마운트 · E 추출" : ""}`}
+          {menu.kind === "recent" || menu.kind === "favorites" ? `↑↓ 이동 · 입력 필터 · Alt+숫자/Return 선택${menu.kind === "recent" ? " · Ctrl+Backspace 비우기" : " · Ctrl+= 현재 폴더 추가 · Ctrl+- 선택 항목 삭제"} · Esc 닫기` : `↑↓ 이동 · 숫자/Return 선택 · Esc 닫기${menu.kind === "volumes" ? " · U 언마운트 · E 추출" : ""}`}
         </p>
       </div>
     </div>

@@ -114,38 +114,39 @@ describe("NAV-08 Favorites", () => {
     expect(within(d).getByText("일치하는 항목 없음")).toBeInTheDocument();
   });
 
-  it("+를 누르면 현재 폴더를 추가하고, 이미 있는 폴더는 무시한다", async () => {
+  it("Ctrl+=를 누르면 현재 폴더를 추가하고, 이미 있는 폴더는 무시한다", async () => {
     const { user } = await renderApp(withFavs(favs));
     await user.keyboard("{Alt>}2{/Alt}");
     let d = await menu("즐겨찾기");
-    await user.keyboard("+");
+    await user.keyboard("{Control>}={/Control}");
     await waitFor(() => expect(options(d)).toEqual(["Downloads", "Src", "a"]));
-    expect(within(d).getByRole("textbox", { name: "필터" })).toHaveValue(""); // +는 필터에 들어가지 않는다
-    expect(within(d).getByText(/\+ 현재 폴더 추가/)).toBeInTheDocument();
-    await user.keyboard("+"); // 같은 폴더를 또 추가해도 늘지 않는다
+    expect(within(d).getByRole("textbox", { name: "필터" })).toHaveValue(""); // 필터에 글자가 들어가지 않는다
+    expect(within(d).getByText(/Ctrl\+= 현재 폴더 추가/)).toBeInTheDocument();
+    await user.keyboard("{Control>}={/Control}"); // 같은 폴더를 또 추가해도 늘지 않는다
     await new Promise((r) => setTimeout(r, 50));
     expect(options(d)).toEqual(["Downloads", "Src", "a"]);
     await user.keyboard("{Escape}{Enter}"); // 메뉴를 닫고 docs로 이동
     await waitFor(() => expect(crumbs()).toEqual(["/", "home", "a", "docs"]));
     await user.keyboard("{Alt>}2{/Alt}");
     d = await menu("즐겨찾기");
-    await user.keyboard("+"); // docs는 이미 Downloads로 들어 있다
+    await user.keyboard("{Control>}={/Control}"); // docs는 이미 Downloads로 들어 있다
     await new Promise((r) => setTimeout(r, 50));
     expect(options(d)).toEqual(["Downloads", "Src", "a"]);
   });
 
-  it("-를 누르면 커서의 즐겨찾기만 목록에서 빼고(폴더는 그대로), 필터 입력 중에는 글자로 받는다", async () => {
+  it("Ctrl+-를 누르면 커서의 즐겨찾기만 목록에서 빼고(폴더는 그대로), +와 -는 필터에 글자로 들어간다", async () => {
     const b = withFavs(favs);
     const { user } = await renderApp(b);
     await user.keyboard("{Alt>}2{/Alt}");
     const d = await menu("즐겨찾기");
-    expect(within(d).getByText(/- 선택 항목 삭제/)).toBeInTheDocument();
-    await user.keyboard("{ArrowDown}-"); // Src
+    expect(within(d).getByText(/Ctrl\+- 선택 항목 삭제/)).toBeInTheDocument();
+    await user.keyboard("{ArrowDown}{Control>}-{/Control}"); // Src
     await waitFor(() => expect(options(d)).toEqual(["Downloads"]));
     expect((await b.getConfig()).config.favorites?.some((f) => f.path === "/home/a/src")).toBe(false);
     expect(await b.listDir("/home/a", true)).toEqual(expect.arrayContaining([expect.objectContaining({ name: "src" })]));
-    await user.keyboard("a-"); // 필터가 비어 있지 않으면 -는 글자
-    expect(within(d).getByRole("textbox", { name: "필터" })).toHaveValue("a-");
+    await user.keyboard("a-+"); // 수식키 없는 +/-는 그냥 글자
+    expect(within(d).getByRole("textbox", { name: "필터" })).toHaveValue("a-+");
+    expect(options(d)).toEqual([]);
   });
 
   it("Return으로 커서 항목(Downloads → ${user.downloads})으로 이동한다", async () => {

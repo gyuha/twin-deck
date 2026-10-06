@@ -2302,7 +2302,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (m?.kind !== "recent") return;
       set({ recent: [], menu: { ...m, items: [], all: [], filter: "", cursor: 0 } });
     },
-    /** 즐겨찾기 메뉴에서 `+`: 활성 탭의 현재 폴더를 추가하고 메뉴를 다시 만든다. 이미 있는 폴더는 무시한다. */
+    /** 즐겨찾기 메뉴에서 `Ctrl+=`: 활성 탭의 현재 폴더를 추가하고 메뉴를 다시 만든다. 이미 있는 폴더는 무시한다. */
     async menuAddFavoriteHere() {
       const m = get().menu;
       if (m?.kind !== "favorites") return;
@@ -2319,7 +2319,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       }
       await api.openMenu("favorites");
     },
-    /** 즐겨찾기 메뉴에서 `-`: 커서가 있는 항목을 즐겨찾기에서 뺀다(폴더 자체는 그대로). 메뉴를 다시 만들고 커서는 근처에 둔다. */
+    /** 즐겨찾기 메뉴에서 `Ctrl+-`: 커서가 있는 항목을 즐겨찾기에서 뺀다(폴더 자체는 그대로). 메뉴를 다시 만들고 커서는 근처에 둔다. */
     async menuRemoveFavorite() {
       const m = get().menu;
       if (m?.kind !== "favorites") return;
