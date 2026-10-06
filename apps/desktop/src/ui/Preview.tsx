@@ -96,21 +96,26 @@ export function Preview() {
         role="dialog"
         aria-label={`미리보기: ${p.name}`}
         style={rect ? { position: "absolute", left: rect.x, top: rect.y, width: rect.w, height: rect.h } : undefined}
-        className={["relative flex flex-col rounded border border-app-line bg-app-box py-3 pl-3 pr-0 text-sm shadow-lg", rect ? "" : "h-[80vh] w-[44rem] max-w-full"].join(" ")}
+        className={["relative flex flex-col overflow-hidden rounded border border-app-line bg-app-box text-sm shadow-lg", rect ? "" : "h-[80vh] w-[44rem] max-w-full"].join(" ")}
       >
         {HANDLES.map((h) => (
           <div key={h.edge} data-resize={h.edge} aria-hidden="true" onMouseDown={(e) => startDrag(e, h.edge)} className={`absolute z-10 ${h.className}`} />
         ))}
-        <h2
+        <div className="flex shrink-0 items-center border-b border-app-line bg-app-dark-box">
+          <h2
           data-preview-title
           title="끌어서 옮기고, 더블클릭하면 기본 크기로 돌아갑니다"
           onMouseDown={(e) => startDrag(e, null)}
           onDoubleClick={() => api.setPreviewRect(null)}
-          className="mb-2 shrink-0 cursor-move select-none break-all pr-3 font-semibold"
+          className="min-w-0 flex-1 shrink-0 cursor-move select-none break-all py-2 pl-3 font-semibold"
         >
           {p.name}
         </h2>
-        <div ref={bodyRef} data-preview-body className={`td-thin-scroll min-h-0 flex-1 overflow-auto pr-3 ${p.status === "loading" && d ? "opacity-60" : ""}`}>
+          <button type="button" aria-label="닫기" title="닫기 (Esc)" onClick={() => api.previewClose()} className="mx-2 flex size-6 shrink-0 items-center justify-center rounded text-ink-dull hover:bg-app-selected hover:text-ink">
+            ✕
+          </button>
+        </div>
+        <div ref={bodyRef} data-preview-body className={`td-thin-scroll min-h-0 flex-1 overflow-auto py-2 pl-3 pr-3 ${p.status === "loading" && d ? "opacity-60" : ""}`}>
           {p.status === "loading" && !d && <p className="text-ink-faint">불러오는 중…</p>}
           {p.status === "error" && (
             <p role="alert" className="text-status-error">
@@ -160,7 +165,7 @@ export function Preview() {
             </p>
           )}
         </div>
-        <p className="mt-2 pr-3 text-xs text-ink-faint">↑↓ 이전/다음 항목 · PageUp/PageDown 스크롤 · Enter {isArchiveName(p.name, zipExts) ? "압축 풀기" : "열기"} · Delete 삭제 · Space/Esc 닫기</p>
+        <p className="shrink-0 border-t border-app-line bg-app-dark-box px-3 py-2 text-xs text-ink-faint">↑↓ 이전/다음 항목 · PageUp/PageDown 스크롤 · Enter {isArchiveName(p.name, zipExts) ? "압축 풀기" : "열기"} · Delete 삭제 · Space/Esc 닫기</p>
       </div>
     </div>
   );
