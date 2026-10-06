@@ -5,6 +5,7 @@ mod snapshot;
 mod windows;
 
 pub use snapshot::{
-    load, reset, save, LoadedState, PaneSnap, Snapshot, SortSnap, TabSnap, ViewSnap, VERSION,
+    load, reset, save, LoadedState, PaneSnap, PreviewRect, Snapshot, SortSnap, TabSnap, ViewSnap,
+    VERSION,
 };
 pub use windows::{next_window_label, open_new_window, pattern_matches, Spawner};

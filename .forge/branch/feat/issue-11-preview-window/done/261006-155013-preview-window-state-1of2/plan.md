@@ -19,5 +19,5 @@
   4. `cargo clippy -p td-state -p twin-deck-desktop -- -D warnings`, `cargo fmt --check`, `bunx tsc --noEmit`, `cargo test -p td-state -p twin-deck-desktop`, 전체 `bunx vitest run`(실패는 기준선 `pdf-preview` 1건뿐)이 통과한다. 회귀 방지 검사로 작업 전에도 같다.
 
 ## Work slices
-- [ ] S1. `td-state`에 `PreviewRect`와 `Snapshot.preview_rect`(serde default)를 더하고 저장·읽기·옛 파일 호환 테스트를 쓴다 — completion criterion: DoD 1
-- [ ] S2. `task gen-types`, 스토어 `previewRect` 상태와 `toSnapshot`·복원 연결(값이 없으면 null) — completion criterion: DoD 2, 3 (depends: S1)
+- [x] S1. `td-state`에 `PreviewRect`와 `Snapshot.preview_rect`(serde default)를 더하고 저장·읽기·옛 파일 호환 테스트를 쓴다 — completion criterion: DoD 1
+- [x] S2. `task gen-types`, 스토어 `previewRect` 상태와 `toSnapshot`·복원 연결(값이 없으면 null) — completion criterion: DoD 2, 3 (depends: S1)

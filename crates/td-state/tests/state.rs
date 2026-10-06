@@ -26,6 +26,7 @@ fn sample() -> Snapshot {
         show_hidden: true,
         palette_query: "복제".into(),
         split: 500,
+        preview_rect: None,
         left: PaneSnap {
             tabs: vec![tab("/home/a"), tab("/home/a/docs")],
             active: 1,
@@ -225,5 +226,53 @@ fn split_defaults_for_old_files_and_rejects_out_of_range() {
         let got = load(tmp.path(), "main");
         assert_eq!(got.snapshot, None, "split={bad}");
         assert!(got.warning.is_some());
+    }
+}
+
+#[test]
+fn preview_rect_round_trips_and_old_files_without_it_load_as_none() {
+    let tmp = tempfile::tempdir().unwrap();
+
+    // 값이 없으면(기본 크기·가운데) None 그대로 저장하고 읽는다.
+    save(tmp.path(), "main", &sample()).unwrap();
+    assert_eq!(
+        load(tmp.path(), "main").snapshot.unwrap().preview_rect,
+        None
+    );
+
+    // 값이 있으면 그대로 돌아온다.
+    let mut s = sample();
+    s.preview_rect = Some(PreviewRect {
+        x: 120,
+        y: 40,
+        w: 900,
+        h: 600,
+    });
+    save(tmp.path(), "main", &s).unwrap();
+    let got = load(tmp.path(), "main");
+    assert!(got.warning.is_none(), "{:?}", got.warning);
+    assert_eq!(got.snapshot.unwrap().preview_rect, s.preview_rect);
+
+    // 이 필드가 생기기 전에 저장된 옛 파일도 그대로 읽힌다(저장 형식 버전은 그대로).
+    let mut json: serde_json::Value = serde_json::to_value(sample()).unwrap();
+    json.as_object_mut().unwrap().remove("previewRect");
+    fs::write(tmp.path().join("state.json"), json.to_string()).unwrap();
+    let got = load(tmp.path(), "main");
+    assert!(got.warning.is_none(), "{:?}", got.warning);
+    assert_eq!(got.snapshot.unwrap().preview_rect, None);
+}
+
+#[test]
+fn preview_rect_with_zero_size_is_dropped_without_discarding_the_rest() {
+    let tmp = tempfile::tempdir().unwrap();
+    for (w, h) in [(0u32, 600u32), (900, 0)] {
+        let mut s = sample();
+        s.preview_rect = Some(PreviewRect { x: 10, y: 10, w, h });
+        save(tmp.path(), "main", &s).unwrap();
+        let got = load(tmp.path(), "main");
+        let snap = got.snapshot.expect("탭 복원 정보는 버리지 않는다");
+        assert_eq!(snap.preview_rect, None, "{w}x{h}");
+        assert_eq!(snap.left, s.left);
+        assert!(got.warning.is_none());
     }
 }

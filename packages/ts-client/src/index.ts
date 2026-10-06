@@ -12,6 +12,7 @@ export type {
   Loaded,
   LoadedState,
   PaneSnap,
+  PreviewRect,
   Snapshot,
   SortSnap,
   TabSnap,

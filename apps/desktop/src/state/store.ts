@@ -22,6 +22,7 @@ import type {
   JobDto,
   Loaded,
   PreviewDto,
+  PreviewRect,
   QueueItemDto,
   SearchEvent,
   SearchSummaryDto,
@@ -259,6 +260,8 @@ export interface AppState {
   activePane: PaneId;
   /** 왼쪽 패널이 차지하는 너비 비율(0~1). 화면 크기가 바뀌어도 비율이 유지된다. */
   split: number;
+  /** 미리보기 창의 위치·크기(px). null이면 기본 크기로 가운데에 띄운다. */
+  previewRect: PreviewRect | null;
   showHidden: boolean;
   /** 선택해서 계산한 폴더의 하위 용량(바이트). null은 계산 중·대기 중이고, 없으면 계산하지 않은 폴더다. */
   dirSizes: Record<string, number | null>;
@@ -436,6 +439,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         },
     activePane: snapshot?.activePane === "right" ? "right" : "left",
     split: clampSplit((snapshot?.split ?? 500) / 1000),
+    previewRect: snapshot?.previewRect ?? null,
     showHidden: snapshot?.showHidden ?? false,
     dirSizes: {},
     dialog: null,
@@ -849,6 +853,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       showHidden: s.showHidden,
       paletteQuery: s.lastPaletteQuery,
       split: Math.round(s.split * 1000),
+      previewRect: s.previewRect,
       left: pane(s.panes.left),
       right: pane(s.panes.right),
     };
@@ -1152,6 +1157,10 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     /** 두 패널 사이 구분선을 옮긴다. `ratio`는 왼쪽 패널이 차지할 너비 비율(0~1)이다. */
     setSplit(ratio: number) {
       set({ split: clampSplit(ratio) });
+    },
+    /** 미리보기 창의 위치·크기를 기억한다. null이면 기본값으로 되돌린다. */
+    setPreviewRect(rect: PreviewRect | null) {
+      set({ previewRect: rect });
     },
     async paneSend(args?: Record<string, unknown>) {
       const to = args?.to;

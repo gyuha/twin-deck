@@ -570,6 +570,10 @@ video_autoplay: boolean }
 export type PreviewDto = { kind: PreviewKindDto; text: string | null; truncated: boolean; size: number; dataUrl: string | null }
 export type PreviewKindDto = "text" | "image" | "audio" | "video" | "pdf" | "directory" | "other"
 /**
+ * 미리보기 창의 위치와 크기(화면 안 픽셀). 왼쪽 위 모서리 `x`, `y`와 너비·높이 `w`, `h`다.
+ */
+export type PreviewRect = { x: number; y: number; w: number; h: number }
+/**
  * 작업 큐의 상태가 바뀔 때마다 전체 스냅샷을 보낸다.
  */
 export type QueueChanged = { jobs: JobDto[] }
@@ -611,7 +615,11 @@ activePane: string; showHidden: boolean; paletteQuery: string;
 /**
  * 왼쪽 패널이 차지하는 너비 비율(천분율, 1~999). 옛 파일에는 없어서 500(반반)으로 읽는다.
  */
-split?: number; left: PaneSnap; right: PaneSnap }
+split?: number; 
+/**
+ * 사용자가 옮기거나 크기를 바꾼 미리보기 창의 위치·크기. 없으면 기본 크기·가운데다. 옛 파일에는 없어서 None으로 읽는다.
+ */
+previewRect?: PreviewRect | null; left: PaneSnap; right: PaneSnap }
 export type SortSnap = { key: string; dir: string }
 export type TabSnap = { path: string; 
 /**

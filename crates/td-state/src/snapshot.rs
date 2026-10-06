@@ -42,6 +42,16 @@ pub struct PaneSnap {
     pub active: u32,
 }
 
+/// 미리보기 창의 위치와 크기(화면 안 픽셀). 왼쪽 위 모서리 `x`, `y`와 너비·높이 `w`, `h`다.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewRect {
+    pub x: u32,
+    pub y: u32,
+    pub w: u32,
+    pub h: u32,
+}
+
 /// 창 하나의 복원 상태: 두 패널의 탭들, 활성 패널, 숨김 표시, Actions Panel 검색어.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -54,6 +64,9 @@ pub struct Snapshot {
     /// 왼쪽 패널이 차지하는 너비 비율(천분율, 1~999). 옛 파일에는 없어서 500(반반)으로 읽는다.
     #[serde(default = "default_split")]
     pub split: u32,
+    /// 사용자가 옮기거나 크기를 바꾼 미리보기 창의 위치·크기. 없으면 기본 크기·가운데다. 옛 파일에는 없어서 None으로 읽는다.
+    #[serde(default)]
+    pub preview_rect: Option<PreviewRect>,
     pub left: PaneSnap,
     pub right: PaneSnap,
 }
@@ -139,10 +152,14 @@ pub fn load(dir: &Path, label: &str) -> LoadedState {
         snapshot: None,
         warning: Some(format!("{}을 무시합니다: {why}", file.display())),
     };
-    let snapshot: Snapshot = match serde_json::from_str(&text) {
+    let mut snapshot: Snapshot = match serde_json::from_str(&text) {
         Ok(s) => s,
         Err(e) => return fail(e.to_string()),
     };
+    // 크기가 0인 미리보기 창 값은 쓸 수 없어 버린다(탭 복원 정보까지 버리지는 않는다).
+    if snapshot.preview_rect.is_some_and(|r| r.w == 0 || r.h == 0) {
+        snapshot.preview_rect = None;
+    }
     if snapshot.version != VERSION {
         return fail(format!(
             "저장 형식 버전이 다릅니다({} != {VERSION})",
