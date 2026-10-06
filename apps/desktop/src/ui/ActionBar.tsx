@@ -94,7 +94,10 @@ export function ActionBar() {
   const ctx = useActionContext();
   const { registry, keymap, platform } = useUi();
   const byModifier = useApp((s) => s.loaded.config.behavior.layout.action_bar_by_modifier);
-  const held = useHeldModifiers(show && byModifier, platform);
+  // 팝업 메뉴·다이얼로그·미리보기·설정이 열려 있으면 수식키를 눌러도 바를 바꾸지 않는다(Ctrl+= 같은 창 안 단축키 때문).
+  const overlayOpen = useApp((s) => !!s.menu || !!s.dialog || !!s.preview || s.settingsOpen);
+  const heldRaw = useHeldModifiers(show && byModifier, platform);
+  const held = overlayOpen ? "" : heldRaw;
   if (!show) return null;
   // 옵션이 켜져 있으면 누르고 있는 수식키와 같은 조합의 버튼만 보인다(안 누르면 수식키 없는 버튼).
   const visible = (key: string | undefined) => !byModifier || modsOf(key) === held;

@@ -678,6 +678,7 @@ export class FakeBackend implements Backend {
     this.setConfig((l) => {
       (l.config.favorites ??= []).push({ kind: "item", name, path, items: [] });
     });
+    return structuredClone(this.loaded);
   }
 
   async removeFavorite(path: string) {
@@ -692,6 +693,7 @@ export class FakeBackend implements Backend {
       };
       drop((l.config.favorites ??= []) as never);
     });
+    return structuredClone(this.loaded);
   }
 
   async getConfig() {

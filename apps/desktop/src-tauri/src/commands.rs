@@ -166,30 +166,32 @@ pub fn user_dirs(app: tauri::AppHandle) -> UserDirsDto {
     }
 }
 
-/// 즐겨찾기에서 경로(변수 확장 전 원문)가 같은 항목을 `config.toml`에서 지운다. 폴더 자체는 지우지 않는다.
+/// 즐겨찾기에서 경로(변수 확장 전 원문)가 같은 항목을 `config.toml`에서 지우고 새 설정을 바로 돌려준다. 폴더 자체는 지우지 않는다.
 #[tauri::command]
 #[specta::specta]
-pub fn remove_favorite(config: State<'_, ConfigState>, path: String) -> ServiceResult<()> {
+pub fn remove_favorite(config: State<'_, ConfigState>, path: String) -> ServiceResult<Loaded> {
     let store = config
         .store
         .as_ref()
         .ok_or("설정 디렉터리를 사용할 수 없습니다")?;
-    td_config::remove_favorite(store.dir(), &path)
+    td_config::remove_favorite(store.dir(), &path)?;
+    Ok(store.refresh())
 }
 
-/// 현재 폴더 등을 즐겨찾기로 `config.toml`에 덧붙인다. 파일 감시가 재로딩한다.
+/// 현재 폴더 등을 즐겨찾기로 `config.toml`에 덧붙이고, 새로 병합된 설정을 바로 돌려준다(변경 이벤트를 기다리지 않는다).
 #[tauri::command]
 #[specta::specta]
 pub fn add_favorite(
     config: State<'_, ConfigState>,
     name: String,
     path: String,
-) -> ServiceResult<()> {
+) -> ServiceResult<Loaded> {
     let store = config
         .store
         .as_ref()
         .ok_or("설정 디렉터리를 사용할 수 없습니다")?;
-    td_config::append_favorite(store.dir(), &name, &path)
+    td_config::append_favorite(store.dir(), &name, &path)?;
+    Ok(store.refresh())
 }
 
 /// 설정 화면: 사용자 `config.toml`의 키 하나를 쓰고, 새로 병합된 설정을 바로 돌려준다(변경 이벤트를 기다리지 않는다).

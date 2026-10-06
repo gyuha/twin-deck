@@ -831,6 +831,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     set({ loaded });
     void reloadAll(true);
   }));
+  let addingFavorite = false; // 즐겨찾기 추가 요청이 진행 중인 동안 연타를 무시한다
   const cfg = () => get().loaded.config;
   /** 최근 위치에 `paths`를 뒤에 붙인다(이미 있으면 맨 뒤로). 설정한 개수만 남긴다. */
   const addRecent = (paths: string[]) =>
@@ -2308,14 +2309,20 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (m?.kind !== "favorites") return;
       const norm = (p: string) => (p.length > 1 ? p.replace(/[\\/]+$/, "") : p).normalize("NFC");
       const here = hereOf(activeTab(get()));
-      if ((m.all ?? []).some((it) => it.path !== undefined && norm(it.path) === norm(here))) return;
+      // 메뉴 목록이 아니라 설정에서 직접 비교한다(연타해도 갱신 전 목록 때문에 중복되지 않게).
+      const dirs = get().userDirs;
+      const leaves = (get().loaded.config.favorites ?? []).flatMap((f) => (f.kind === "group" ? (f.items ?? []).map((l) => l.path) : [f.path ?? ""]));
+      if (leaves.some((p) => { const r = expandPath(p, dirs); return r !== null && norm(r) === norm(here); })) return;
+      if (addingFavorite) return;
+      addingFavorite = true;
       set({ notice: null });
       try {
-        await backend.addFavorite(baseName(here) || here, here);
-        set({ loaded: await backend.getConfig() });
+        set({ loaded: await backend.addFavorite(baseName(here) || here, here) });
       } catch (e) {
         fail(e);
         return;
+      } finally {
+        addingFavorite = false;
       }
       await api.openMenu("favorites");
     },
@@ -2327,8 +2334,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (raw === undefined) return;
       set({ notice: null });
       try {
-        await backend.removeFavorite(raw);
-        set({ loaded: await backend.getConfig() });
+        set({ loaded: await backend.removeFavorite(raw) });
       } catch (e) {
         fail(e);
         return;

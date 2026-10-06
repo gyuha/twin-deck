@@ -35,6 +35,18 @@ describe("F키 설정의 Action Bar 노출", () => {
     await waitFor(() => expect(buttons()).toContain("F5복사"));
   });
 
+  it("팝업 메뉴가 열려 있으면 수식키를 눌러도 바가 바뀌지 않는다", async () => {
+    const b = new FakeBackend().seed({ "/home/a/a.txt": "a", "/home/b/x.txt": "x" });
+    b.setConfig((l) => (l.config.behavior.layout.action_bar_by_modifier = true));
+    const { user } = await renderApp(b);
+    await user.keyboard("{Alt>}2{/Alt}");
+    await screen.findByRole("dialog", { name: "즐겨찾기" });
+    await user.keyboard("{Shift>}");
+    await new Promise((r) => setTimeout(r, 50));
+    expect(buttons()).toContain("F5복사");
+    expect(buttons()).not.toContain("Shift+F8삭제");
+  });
+
   it("기본값에서는 바가 기존 구성 그대로다", async () => {
     await renderApp(seed({ F2: "core.rename" }, {}));
     expect(buttons()).toEqual(BASE);

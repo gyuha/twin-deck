@@ -152,9 +152,9 @@ async userDirs() : Promise<UserDirsDto> {
     return await TAURI_INVOKE("user_dirs");
 },
 /**
- * 현재 폴더 등을 즐겨찾기로 `config.toml`에 덧붙인다. 파일 감시가 재로딩한다.
+ * 현재 폴더 등을 즐겨찾기로 `config.toml`에 덧붙이고, 새로 병합된 설정을 바로 돌려준다(변경 이벤트를 기다리지 않는다).
  */
-async addFavorite(name: string, path: string) : Promise<Result<null, string>> {
+async addFavorite(name: string, path: string) : Promise<Result<Loaded, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("add_favorite", { name, path }) };
 } catch (e) {
@@ -163,9 +163,9 @@ async addFavorite(name: string, path: string) : Promise<Result<null, string>> {
 }
 },
 /**
- * 즐겨찾기에서 경로(변수 확장 전 원문)가 같은 항목을 `config.toml`에서 지운다. 폴더 자체는 지우지 않는다.
+ * 즐겨찾기에서 경로(변수 확장 전 원문)가 같은 항목을 `config.toml`에서 지우고 새 설정을 바로 돌려준다. 폴더 자체는 지우지 않는다.
  */
-async removeFavorite(path: string) : Promise<Result<null, string>> {
+async removeFavorite(path: string) : Promise<Result<Loaded, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("remove_favorite", { path }) };
 } catch (e) {

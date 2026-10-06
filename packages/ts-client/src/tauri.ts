@@ -158,10 +158,10 @@ export class TauriBackend implements Backend {
     return commands.userDirs();
   }
   async addFavorite(name: string, path: string) {
-    unwrap(await commands.addFavorite(name, path));
+    return unwrap(await commands.addFavorite(name, path));
   }
   async removeFavorite(path: string) {
-    unwrap(await commands.removeFavorite(path));
+    return unwrap(await commands.removeFavorite(path));
   }
   getConfig() {
     return commands.getConfig();
