@@ -103,3 +103,14 @@ else {
   if ($LASTEXITCODE -ne 0) { throw "공개 실패" }
 }
 Write-Host "배포 완료: $Tag"
+
+# 공개했으니 자체 Homebrew tap(gyuha/homebrew-tap)의 Cask도 새 버전으로 갱신한다(macOS ZIP이 있을 때만; 스크립트가 판단한다).
+# 릴리스는 이미 공개됐으므로 tap 갱신이 실패해도 되돌리지 않는다. 안내를 보여 주고 종료 코드 4로 끝낸다.
+if ($Dry) { Write-Host "[DRY_RUN] node scripts/update-tap.mjs $Version   (tap에 push)" }
+else {
+  node scripts/update-tap.mjs $Version
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "릴리스는 공개됐지만 Homebrew tap 갱신에 실패했습니다. 확인 후 다시: node scripts/update-tap.mjs $Version"
+    exit 4
+  }
+}

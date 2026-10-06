@@ -30,7 +30,19 @@
 
 ## 설치 (macOS)
 
-Twin Deck은 Apple 개발자 인증서로 서명하거나 공증하지 않은 앱입니다. 그래서 내려받은 앱을 처음 열면 macOS(Gatekeeper)가 "확인되지 않은 개발자" 경고로 막습니다. 아래 순서대로 한 번만 허용하면 이후에는 일반 앱처럼 열립니다.
+Apple Silicon Mac에서 [자체 Homebrew tap](https://github.com/gyuha/homebrew-tap)으로 설치할 수 있습니다.
+
+```sh
+brew install --cask gyuha/tap/twin-deck
+```
+
+- **업데이트**: 설치한 앱에서 "업데이트 확인"(설정 화면 위쪽 버튼, 또는 `Mod+Shift+P`로 연 액션 패널에서 "업데이트")을 누르면 새 버전을 설치하고 다시 시작합니다. 앱이 자동으로 확인하지는 않습니다. Cask에 `auto_updates true`가 있어서 `brew upgrade`는 이 앱을 건너뜁니다.
+- **Gatekeeper**: Twin Deck은 Apple 개발자 인증서로 서명하거나 공증하지 않은 앱입니다. Cask는 설치 직후 이 앱의 `com.apple.quarantine` 속성을 지워 Gatekeeper 경고 없이 열리게 합니다. 이 검사를 우회하는 것이므로 출처를 신뢰하는 경우에만 설치하세요.
+- **지원 범위**: Apple Silicon(arm64)만 지원합니다. Intel Mac은 설치가 거부됩니다.
+
+### 수동 설치 (Homebrew 없이)
+
+Homebrew를 쓰지 않으면 직접 내려받아 설치합니다. 내려받은 앱을 처음 열면 macOS(Gatekeeper)가 서명되지 않은 앱이라 "확인되지 않은 개발자" 경고로 막습니다. 아래 순서대로 한 번만 허용하면 이후에는 일반 앱처럼 열립니다.
 
 릴리스에는 현재 **Apple Silicon(arm64)용 macOS 빌드**만 있습니다. Intel Mac, Windows, Linux는 아래 "소스에서 빌드"를 따라 직접 빌드하세요.
 
@@ -109,6 +121,7 @@ task release        # 배포: 이 OS의 파일을 올리고 공개한다(macOS·
 앱의 "업데이트 확인"(설정 화면 위쪽 버튼, 또는 `Mod+Shift+P`로 연 액션 패널에서 "업데이트")은 GitHub 최신 릴리스의 `latest.json`을 읽어 새 버전이면 설치합니다. 자동으로 확인하지는 않습니다.
 
 - 업데이트 파일은 서명 키로 서명합니다. 키는 한 번 만들어 두세요: `bunx tauri signer generate -w ~/.tauri/twin-deck.key`. 출력되는 **공개 키**는 `apps/desktop/src-tauri/tauri.conf.json`의 `plugins.updater.pubkey`에 들어 있습니다(키를 새로 만들면 이 값도 바꿔야 합니다). **비밀 키와 비밀번호는 저장소에 넣지 마세요.** 비밀 키를 잃으면 이미 설치된 앱은 새 업데이트를 받지 못합니다.
+- `task release`로 공개하면 자체 Homebrew tap([gyuha/homebrew-tap](https://github.com/gyuha/homebrew-tap))의 Cask도 새 버전으로 갱신됩니다(`scripts/update-tap.mjs`가 공개 ZIP의 sha256을 GitHub 값과 대조한 뒤 push). 공개는 됐는데 tap 갱신만 실패했다면 `node scripts/update-tap.mjs <버전>`으로 다시 실행하세요(이미 반영돼 있으면 아무것도 바꾸지 않습니다). 흐름은 AGENTS.md의 "릴리스 공개 흐름"에 있습니다.
 - `task release:draft` / `task release`는 `TAURI_SIGNING_PRIVATE_KEY` 환경변수(키 파일 경로 또는 내용. 비밀번호가 있으면 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`)의 키로 업데이트용 파일과 `.sig`를 만들어 함께 올리고, 올라온 `latest.json`에 이 OS의 항목을 합칩니다. 평소의 `task bundle`·`task install`은 키 없이 됩니다.
 - 한쪽 OS 파일만 올라간 버전은 `latest.json`에 그 OS 항목이 없어서, 그 OS의 앱은 그 버전을 업데이트로 받지 않습니다.
 

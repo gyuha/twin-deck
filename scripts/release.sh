@@ -126,3 +126,12 @@ else
   gh api -X PATCH "repos/{owner}/{repo}/releases/$ID" -F draft=false --jq '.html_url'
 fi
 echo "배포 완료: $TAG"
+
+# 공개했으니 자체 Homebrew tap(gyuha/homebrew-tap)의 Cask도 새 버전으로 갱신한다.
+# 릴리스는 이미 공개됐으므로 tap 갱신이 실패해도 되돌리지 않는다. 안내를 보여 주고 따로 종료 코드 4로 끝낸다.
+if [[ "${DRY_RUN:-}" == "1" ]]; then
+  echo "[DRY_RUN] node scripts/update-tap.mjs $VERSION   (tap에 push)"
+elif ! node scripts/update-tap.mjs "$VERSION"; then
+  echo "릴리스는 공개됐지만 Homebrew tap 갱신에 실패했습니다. 확인 후 다시: node scripts/update-tap.mjs $VERSION" >&2
+  exit 4
+fi
