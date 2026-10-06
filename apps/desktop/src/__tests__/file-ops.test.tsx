@@ -54,6 +54,38 @@ describe("OP-01 새 폴더 / OP-02 새 파일", () => {
     expect(backend.read("/home/a/new.txt")).toBe("");
   });
 
+  it("Shift+F7: 새로 만든 파일로 커서가 이동한다(정렬상 맨 아래여도)", async () => {
+    const backend = seedBackend();
+    for (let i = 0; i < 30; i++) backend.seed({ [`/home/a/dir${String(i).padStart(2, "0")}/x.txt`]: "x" });
+    const { user } = await renderApp(backend);
+    await user.keyboard("{Shift>}{F7}{/Shift}");
+    await dialog();
+    await user.keyboard("zzz.txt{Enter}");
+    await waitFor(() => expect(backend.exists("/home/a/zzz.txt")).toBe(true));
+    await waitFor(() => expect(cursorName("left")).toBe("zzz.txt"));
+  });
+
+  it("Shift+F7: 새로 만든 파일이 기존 하위 폴더 안이면 그 폴더로 커서가 이동한다", async () => {
+    const { user, backend } = await renderApp();
+    await user.keyboard("{ArrowDown}"); // docs → src로 커서를 옮겨 둔다(결과가 우연히 같지 않게)
+    expect(cursorName("left")).toBe("src");
+    await user.keyboard("{Shift>}{F7}{/Shift}");
+    await dialog();
+    await user.keyboard("docs/n.txt{Enter}");
+    await waitFor(() => expect(backend.exists("/home/a/docs/n.txt")).toBe(true));
+    await waitFor(() => expect(cursorName("left")).toBe("docs"));
+  });
+
+  it("Shift+F7: 새로 만든 파일이 이미 있는 이름이면 오류를 알리고 커서는 그대로다", async () => {
+    const { user } = await renderApp();
+    const before = cursorName("left");
+    await user.keyboard("{Shift>}{F7}{/Shift}");
+    await dialog();
+    await user.keyboard("docs{Enter}");
+    expect(await screen.findByRole("alert")).toHaveTextContent("이미 존재함");
+    expect(cursorName("left")).toBe(before);
+  });
+
   it("빈 이름은 확인되지 않고 Esc로 닫힌다", async () => {
     const { user } = await renderApp();
     await user.keyboard("{F7}");

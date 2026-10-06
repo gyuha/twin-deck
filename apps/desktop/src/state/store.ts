@@ -796,6 +796,12 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     flashTimer = setTimeout(() => set({ flash: null }), 3000);
   };
   const fail = (e: unknown) => set({ notice: String(e instanceof Error ? e.message : e) });
+  /** 새로 만든 항목으로 커서를 옮긴다. 중첩 경로(`a/b/c`)면 이 폴더 바로 아래에 생긴 맨 위 폴더(`a`)로 간다. 길어서 화면 밖이어도 표가 따라 스크롤한다. */
+  const cursorToCreated = (typed: string) => {
+    const top = typed.split(/[\\/]/).find((part) => part !== "");
+    const idx = activeTab(get()).entries.findIndex((e) => e.name.normalize("NFC") === top?.normalize("NFC"));
+    if (idx >= 0) api.setCursor(idx);
+  };
   /** 업데이트 확인·설치가 진행 중이면 다시 시작하지 않는다. */
   let updateBusy = false;
 
@@ -1588,10 +1594,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         const typed = name.trim();
         await backend.mkdir(joinPath(tab.path, typed));
         await reloadAll();
-        // 중첩 경로(`a/b/c`)면 이 폴더 바로 아래에 생긴 맨 위 폴더(`a`)로 간다. 길어서 화면 밖이어도 표가 따라 스크롤한다.
-        const top = typed.split(/[\\/]/).find((part) => part !== "");
-        const idx = activeTab(get()).entries.findIndex((e) => e.name.normalize("NFC") === top?.normalize("NFC"));
-        if (idx >= 0) api.setCursor(idx);
+        cursorToCreated(typed);
       } catch (e) {
         fail(e);
       }
@@ -1604,8 +1607,10 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (name === null) return;
       set({ notice: null });
       try {
-        await backend.touch(joinPath(tab.path, name.trim()));
+        const typed = name.trim();
+        await backend.touch(joinPath(tab.path, typed));
         await reloadAll();
+        cursorToCreated(typed);
       } catch (e) {
         fail(e);
       }
