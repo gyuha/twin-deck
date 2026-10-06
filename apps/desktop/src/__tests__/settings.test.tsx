@@ -175,3 +175,15 @@ describe("파일 목록 모양 설정 항목", () => {
     await waitFor(() => expect((backend as unknown as { loaded: { config: { behavior: { table: { zebra_rows: boolean } } } } }).loaded.config.behavior.table.zebra_rows).toBe(true));
   });
 });
+
+describe("패널·탭 모양 설정 항목", () => {
+  it("모양 탭에 패널 테두리 강조와 탭 모양이 있고 바꾸면 저장된다", async () => {
+    const { user, backend } = await renderApp();
+    await open(user);
+    await dialog();
+    expect(screen.getByRole("group", { name: "탭 모양" })).toBeInTheDocument();
+    expect(sw("패널 테두리 강조")).toHaveAttribute("aria-checked", "true");
+    await user.click(sw("패널 테두리 강조"));
+    await waitFor(() => expect((backend as unknown as { loaded: { config: { behavior: { layout: { pane_highlight: boolean } } } } }).loaded.config.behavior.layout.pane_highlight).toBe(false));
+  });
+});

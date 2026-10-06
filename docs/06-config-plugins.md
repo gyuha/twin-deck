@@ -67,6 +67,8 @@ shift_mode = "invert"             # "invert"(Marta 방식) | "extend"
 
 [behavior.layout]
 show_action_bar = true
+pane_highlight = true             # 활성 패널의 accent 테두리. false면 두 패널 모두 투명(폭은 그대로)
+tab_style = "underline"           # "underline"(활성 탭 밑줄) | "segments"(폭 균등 분할 + 활성 탭 배경, Marta식)
 
 [display]
 relative_date = true

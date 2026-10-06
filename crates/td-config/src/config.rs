@@ -77,6 +77,10 @@ pub struct BehaviorLayout {
     pub recent_limit: u32,
     /// 패널 위의 드라이브 바(볼륨 버튼, 남은 용량, 언마운트).
     pub show_drive_bar: bool,
+    /// 활성 패널을 감싸는 accent 테두리를 보인다. 끄면 두 패널 모두 테두리가 투명이다(폭은 그대로).
+    pub pane_highlight: bool,
+    /// 탭 모양: "underline"(글자 + 활성 탭 밑줄) | "segments"(폭을 균등 분할, 활성 탭은 배경).
+    pub tab_style: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

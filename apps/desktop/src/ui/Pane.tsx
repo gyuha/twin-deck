@@ -12,6 +12,7 @@ export function Pane({ pane }: { pane: PaneId }) {
   const isActive = useApp((s) => s.activePane === pane);
   const path = useApp((s) => activeTab(s, pane).path);
   const isVirtual = useApp((s) => !!activeTab(s, pane).virtual);
+  const paneHighlight = useApp((s) => s.loaded.config.behavior.layout.pane_highlight);
   return (
     <section
       aria-label={pane === "left" ? "왼쪽 패널" : "오른쪽 패널"}
@@ -30,7 +31,7 @@ export function Pane({ pane }: { pane: PaneId }) {
       }}
       className={[
         "flex min-h-0 min-w-0 flex-1 flex-col border-2",
-        isActive ? "border-accent" : "border-transparent",
+        isActive && paneHighlight ? "border-accent" : "border-transparent",
       ].join(" ")}
     >
       <DriveBar pane={pane} />

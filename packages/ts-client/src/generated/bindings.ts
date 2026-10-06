@@ -462,7 +462,15 @@ recent_limit: number;
 /**
  * 패널 위의 드라이브 바(볼륨 버튼, 남은 용량, 언마운트).
  */
-show_drive_bar: boolean }
+show_drive_bar: boolean; 
+/**
+ * 활성 패널을 감싸는 accent 테두리를 보인다. 끄면 두 패널 모두 테두리가 투명이다(폭은 그대로).
+ */
+pane_highlight: boolean; 
+/**
+ * 탭 모양: "underline"(글자 + 활성 탭 밑줄) | "segments"(폭을 균등 분할, 활성 탭은 배경).
+ */
+tab_style: string }
 export type BehaviorTable = { icon_size: number; 
 /**
  * 끝에서 처음으로 순환 (NAV-06).

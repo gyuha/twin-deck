@@ -26,6 +26,8 @@ const THEMES = ["system", "dark", "light", "midnight", "noir", "slate", "nord", 
 // size_format의 허용 값은 td-config의 검증 목록과 같아야 한다(crates/td-config/src/load.rs).
 const SIZE_FORMATS = ["adaptive", "adaptive_kibi", "bytes", "KB", "MB"] as const;
 // folder_style의 허용 값도 td-config의 검증 목록(ENUMS)과 같아야 한다.
+// tab_style의 허용 값도 td-config의 검증 목록(ENUMS)과 같아야 한다.
+const TAB_STYLES = ["underline", "segments"] as const;
 const FOLDER_STYLES = ["none", "brackets", "parens", "slash"] as const;
 
 const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
@@ -40,6 +42,8 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
       { key: "behavior.table.show_marks", title: "표시 칸", desc: "행 맨 앞의 선택(●)·폴더(▸) 표시 칸. 끄면 칸이 사라지고 선택은 굵은 강조색 글씨로만 보입니다", control: { type: "switch" } },
       { key: "behavior.table.folder_style", title: "폴더 모양", desc: "폴더 이름을 꾸밉니다: none, brackets [이름], parens (이름), slash 이름/. 화면 표시만 바뀝니다", control: { type: "select", options: FOLDER_STYLES } },
       { key: "behavior.table.cursor_fill", title: "커서 행 꽉 채움", desc: "활성 패널의 커서 행을 강조색으로 꽉 채웁니다", control: { type: "switch" } },
+      { key: "behavior.layout.pane_highlight", title: "패널 테두리 강조", desc: "활성 패널을 강조색 테두리로 둘러쌉니다. 끄면 커서 행으로만 구분됩니다", control: { type: "switch" } },
+      { key: "behavior.layout.tab_style", title: "탭 모양", desc: "underline은 글자 + 활성 탭 밑줄, segments는 탭이 폭을 똑같이 나누고 활성 탭은 배경으로 구분합니다", control: { type: "select", options: TAB_STYLES } },
       { key: "behavior.layout.show_action_bar", title: "Action Bar 표시", desc: "아래쪽 단축키 버튼 줄", control: { type: "switch" } },
       { key: "behavior.layout.action_bar_by_modifier", title: "Action Bar 조합키는 누를 때만", desc: "Shift 등을 누르는 동안에만 그 조합 키의 버튼을 보인다. 끄면 전부 보인다", control: { type: "switch" } },
       { key: "behavior.layout.recent_limit", title: "최근 위치 개수", desc: "최근 위치 메뉴에 기억하는 폴더 수(양쪽 패널 공용, 창을 닫아도 유지)", control: { type: "int" } },

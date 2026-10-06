@@ -779,3 +779,48 @@ fn list_appearance_defaults_round_trip_and_validate_folder_style() {
     );
     assert_eq!(l.config.behavior.table.folder_style, "none");
 }
+
+#[test]
+fn pane_tab_appearance_defaults_round_trip_and_validate_tab_style() {
+    use td_config::{set_user_value, ConfigValue};
+    // 기본값은 지금 모양과 같다
+    let none = load("");
+    assert!(none.warnings.is_empty(), "{:?}", none.warnings);
+    assert!(none.config.behavior.layout.pane_highlight);
+    assert_eq!(none.config.behavior.layout.tab_style, "underline");
+
+    let dir = tempfile::tempdir().unwrap();
+    set_user_value(
+        dir.path(),
+        "behavior.layout.pane_highlight",
+        ConfigValue::Bool(false),
+    )
+    .unwrap();
+    set_user_value(
+        dir.path(),
+        "behavior.layout.tab_style",
+        ConfigValue::Str("segments".into()),
+    )
+    .unwrap();
+    let l = load_dir(dir.path(), Platform::Linux);
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert!(!l.config.behavior.layout.pane_highlight);
+    assert_eq!(l.config.behavior.layout.tab_style, "segments");
+    assert!(
+        l.config.behavior.layout.show_action_bar,
+        "건드리지 않은 키는 기본값"
+    );
+
+    for ok in ["underline", "segments"] {
+        let l = load(&format!("[behavior.layout]\ntab_style = \"{ok}\"\n"));
+        assert!(l.warnings.is_empty(), "{ok}: {:?}", l.warnings);
+        assert_eq!(l.config.behavior.layout.tab_style, ok);
+    }
+    let l = load("[behavior.layout]\ntab_style = \"round\"\n");
+    assert!(
+        l.warnings.iter().any(|w| w.message.contains("tab_style")),
+        "{:?}",
+        l.warnings
+    );
+    assert_eq!(l.config.behavior.layout.tab_style, "underline");
+}
