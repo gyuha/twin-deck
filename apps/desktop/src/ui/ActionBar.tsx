@@ -1,7 +1,9 @@
 import { useMemo } from "react";
+import { defaultBindingsFor } from "@twin-deck/actions";
 import { formatKey } from "@twin-deck/keybinds";
 import type { ActionContext } from "@twin-deck/actions";
 import { parentPath } from "@twin-deck/ts-client";
+import { fkeyBarItems } from "../lib/fkeys";
 import { useApp } from "../state/context";
 import { actionContext, activeTab, cursorEntry } from "../state/store";
 import { useUi } from "./uiContext";
@@ -35,10 +37,25 @@ export function useBarIds(): { known: string[]; unknown: string[] } {
   );
 }
 
+/** 설정 `fkey_bar`로 켠 F키 줄 중 쓸 수 있는 것. 같은 인수 없는 액션이 기본 구성에 이미 있으면 중복이라 뺀다. */
+function useFKeyBarItems(known: string[]) {
+  const fkeys = useApp((s) => s.loaded.config.fkeys);
+  const fkeyApps = useApp((s) => s.loaded.config.fkey_apps);
+  const fkeyBar = useApp((s) => s.loaded.config.fkey_bar);
+  const { registry, platform } = useUi();
+  return useMemo(() => {
+    const builtin = (key: string) => defaultBindingsFor(platform).find((b) => b.scope === "pane" && b.keys.includes(key))?.actionId;
+    return fkeyBarItems({ fkeys, fkey_apps: fkeyApps, fkey_bar: fkeyBar }, builtin).filter(
+      (it) => registry.has(it.action) && !(known.includes(it.action) && Object.keys(it.args).length === 0),
+    );
+  }, [fkeys, fkeyApps, fkeyBar, platform, registry, known]);
+}
+
 /** Action Bar (PANE-07): 액션과 현재 키를 한 줄로 보여 주는 하단 버튼. `behavior.layout.show_action_bar`로 끈다. */
 export function ActionBar() {
   const show = useApp((s) => s.loaded.config.behavior.layout.show_action_bar);
   const { known } = useBarIds();
+  const extra = useFKeyBarItems(known);
   const ctx = useActionContext();
   const { registry, keymap, platform } = useUi();
   if (!show) return null;
@@ -61,6 +78,26 @@ export function ActionBar() {
             className={"flex items-center gap-1 rounded border border-app-line px-2 py-0.5 " + (enabled ? "" : "opacity-40")}
           >
             {key && <kbd className="font-mono text-ink-dull">{formatKey(key, platform)}</kbd>}
+            <span>{action.shortTitle ?? action.title}</span>
+          </button>
+        );
+      })}
+      {extra.map((it) => {
+        const action = registry.get(it.action)!;
+        const enabled = registry.isApplicable(it.action, ctx);
+        return (
+          <button
+            key={`fkey:${it.key}`}
+            type="button"
+            tabIndex={-1}
+            aria-disabled={!enabled}
+            title={it.action}
+            onClick={() => {
+              if (enabled) void registry.dispatch(it.action, ctx, it.args);
+            }}
+            className={"flex items-center gap-1 rounded border border-app-line px-2 py-0.5 " + (enabled ? "" : "opacity-40")}
+          >
+            <kbd className="font-mono text-ink-dull">{formatKey(it.key, platform)}</kbd>
             <span>{action.shortTitle ?? action.title}</span>
           </button>
         );

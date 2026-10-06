@@ -651,3 +651,33 @@ fn fkey_combo_round_trips_through_user_config() {
     let l = load_dir(dir.path(), Platform::Linux);
     assert!(!l.config.fkeys.contains_key("Ctrl+F5"));
 }
+
+#[test]
+fn fkey_bar_defaults_off_and_round_trips_including_combos() {
+    use td_config::{reset_user_value, set_user_value, ConfigValue};
+    let none = load("");
+    assert!(none.warnings.is_empty(), "{:?}", none.warnings);
+    assert_eq!(none.config.fkey_bar.len(), 12);
+    assert!(
+        none.config.fkey_bar.values().all(|v| !v),
+        "기본은 모두 꺼짐"
+    );
+
+    let dir = tempfile::tempdir().unwrap();
+    set_user_value(dir.path(), "fkey_bar.F2", ConfigValue::Bool(true)).unwrap();
+    set_user_value(dir.path(), "fkey_bar.Ctrl+F5", ConfigValue::Bool(true)).unwrap();
+    let l = load_dir(dir.path(), Platform::Linux);
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert!(l.config.fkey_bar["F2"] && l.config.fkey_bar["Ctrl+F5"]);
+    assert!(!l.config.fkey_bar["F3"]);
+    reset_user_value(dir.path(), "fkey_bar.Ctrl+F5").unwrap();
+    assert!(!load_dir(dir.path(), Platform::Linux)
+        .config
+        .fkey_bar
+        .contains_key("Ctrl+F5"));
+
+    // 잘못된 키와 불리언이 아닌 값은 경고하고 무시한다
+    let l = load("[fkey_bar]\nF13 = true\n\"Ctrl+A\" = true\n\"Ctrl+F5\" = \"yes\"\n");
+    assert_eq!(l.warnings.len(), 3, "{:?}", l.warnings);
+    assert!(!l.config.fkey_bar.contains_key("Ctrl+F5"));
+}

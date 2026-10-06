@@ -456,6 +456,10 @@ fkeys: Partial<{ [key in string]: string }>;
  */
 fkey_apps: Partial<{ [key in string]: string }>; 
 /**
+ * F키 줄(`F5`, `Ctrl+F5` …)마다 그 동작을 Action Bar에 보일지. 켠 줄은 `layout.action_bar` 뒤에 이어 붙는다.
+ */
+fkey_bar: Partial<{ [key in string]: boolean }>; 
+/**
  * 병합 후 항목별로 검증해서 채운다(잘못된 항목은 경고와 함께 빠진다).
  */
 favorites?: FavoriteDto[] }

@@ -6,6 +6,33 @@ export interface FKeyConfig {
   fkey_apps: Partial<Record<string, string>>;
 }
 
+/** Action Bar에 이어 붙는 F키 버튼 하나. */
+export interface FKeyBarItem {
+  key: string;
+  action: string;
+  args: Record<string, unknown>;
+}
+
+const fkeyNum = (k: string) => Number(k.slice(k.lastIndexOf("F") + 1));
+
+/**
+ * "Action Bar에 표시"를 켠 F키 줄을 바 순서(단독 F1→F12, 그 뒤 조합키)로 돌려준다.
+ * 동작이 "기본값"(빈 문자열)이면 `builtin`이 알려 주는 내장 바인딩의 액션을 쓰고, 해제("none")·내장 바인딩 없음은 뺀다.
+ */
+export function fkeyBarItems(config: FKeyConfig & { fkey_bar: Partial<Record<string, boolean>> }, builtin: (key: string) => string | undefined): FKeyBarItem[] {
+  const keys = Object.keys(config.fkey_bar).filter((k) => config.fkey_bar[k]);
+  keys.sort((a, b) => Number(a.includes("+")) - Number(b.includes("+")) || fkeyNum(a) - fkeyNum(b) || a.localeCompare(b));
+  const out: FKeyBarItem[] = [];
+  for (const key of keys) {
+    const value = (config.fkeys[key] ?? "").trim();
+    if (value === "none") continue;
+    const action = value || builtin(key);
+    if (!action) continue;
+    out.push({ key, action, args: APP_ACTIONS.includes(action) ? { app: (config.fkey_apps[key] ?? "").trim(), key } : {} });
+  }
+  return out;
+}
+
 /** 선택·커서 항목을 앱에 넘기는 액션. */
 export const APP_LAUNCH_ACTION = "core.app.launch";
 /** 현재 패널의 폴더를 앱에 넘기는 액션(에디터, 버전 관리 프로그램, 터미널 등). */

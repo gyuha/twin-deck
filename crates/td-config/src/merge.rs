@@ -54,7 +54,12 @@ pub fn merge_user(
             format!("{path}.{key}")
         };
         let Some(dv) = defaults.get(key) else {
-            if (path == "fkeys" || path == "fkey_apps") && is_fkey_combo(key) && uv.is_str() {
+            let fits = match path {
+                "fkeys" | "fkey_apps" => uv.is_str(),
+                "fkey_bar" => uv.is_bool(),
+                _ => false,
+            };
+            if fits && is_fkey_combo(key) {
                 out.insert(key.clone(), uv.clone());
                 continue;
             }

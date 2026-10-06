@@ -107,6 +107,20 @@
       "F8": "",
       "F9": ""
     },
+    "fkey_bar": {
+      "F1": false,
+      "F10": false,
+      "F11": false,
+      "F12": false,
+      "F2": false,
+      "F3": false,
+      "F4": false,
+      "F5": false,
+      "F6": false,
+      "F7": false,
+      "F8": false,
+      "F9": false
+    },
     "favorites": []
   },
   "bindings": [],

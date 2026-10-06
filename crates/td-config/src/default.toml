@@ -95,3 +95,18 @@ F9 = ""
 F10 = ""
 F11 = ""
 F12 = ""
+
+# F키 줄마다 그 동작을 Action Bar에 보일지. true인 줄은 layout.action_bar 뒤에 이어 붙는다.
+[fkey_bar]
+F1 = false
+F2 = false
+F3 = false
+F4 = false
+F5 = false
+F6 = false
+F7 = false
+F8 = false
+F9 = false
+F10 = false
+F11 = false
+F12 = false

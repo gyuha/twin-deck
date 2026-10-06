@@ -276,7 +276,10 @@ export function Settings() {
                           void (async () => {
                             await api.resetConfigValue(item.key);
                             // F키는 지정한 앱 경로도 함께 비운다.
-                            if (item.control.type === "fkey") await api.resetConfigValue(item.key.replace("fkeys.", "fkey_apps."));
+                            if (item.control.type === "fkey") {
+                              await api.resetConfigValue(item.key.replace("fkeys.", "fkey_apps."));
+                              await api.resetConfigValue(item.key.replace("fkeys.", "fkey_bar."));
+                            }
                           })()
                         }
                       >
@@ -292,6 +295,17 @@ export function Settings() {
                       />
                     )}
                     {item.control.type === "fkey" && <FKeyControl name={item.title} value={String(value)} disabled={!!broken} />}
+                    {item.control.type === "fkey" && (
+                      <label className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-xs text-ink-dull">
+                        <Switch
+                          aria-label={`${item.title} Action Bar에 표시`}
+                          checked={config.fkey_bar[item.title] ?? false}
+                          disabled={!!broken}
+                          onCheckedChange={(v) => void api.setConfigValue(`fkey_bar.${item.title}`, { kind: "bool", value: v })}
+                        />
+                        Action Bar
+                      </label>
+                    )}
                     {item.control.type === "select" && (
                       <Select value={String(value)} disabled={!!broken} onChange={(v) => void api.setConfigValue(item.key, { kind: "str", value: v })}>
                         {item.control.options.map((o) => (

@@ -20,6 +20,8 @@ pub struct Config {
     pub fkeys: BTreeMap<String, String>,
     /// `fkeys`가 "core.app.launch"인 키가 실행할 애플리케이션. 빈 문자열이면 미지정.
     pub fkey_apps: BTreeMap<String, String>,
+    /// F키 줄(`F5`, `Ctrl+F5` …)마다 그 동작을 Action Bar에 보일지. 켠 줄은 `layout.action_bar` 뒤에 이어 붙는다.
+    pub fkey_bar: BTreeMap<String, bool>,
     /// 병합 후 항목별로 검증해서 채운다(잘못된 항목은 경고와 함께 빠진다).
     #[serde(default)]
     pub favorites: Vec<FavoriteDto>,
