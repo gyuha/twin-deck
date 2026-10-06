@@ -164,6 +164,9 @@ export type DialogState =
   /** 실행 중인 전송(복사/이동) 작업의 진행 창. */
   | { kind: "progress"; title: string; jobId: number };
 
+/** 최근 위치 개수 설정(1 이상). */
+export const recentLimit = (c: { behavior: { layout: { recent_limit: number } } }) => Math.max(1, Math.floor(c.behavior.layout.recent_limit) || 20);
+
 export type MenuKind = "volumes" | "favorites" | "recent" | "hierarchy";
 
 export interface MenuItem {
@@ -265,6 +268,8 @@ export interface AppState {
   split: number;
   /** 미리보기 창의 위치·크기(px). null이면 기본 크기로 가운데에 띄운다. */
   previewRect: PreviewRect | null;
+  /** 최근 위치(두 패널 공용, 오래된 것부터). 저장하고 다시 열 때 복원한다. */
+  recent: string[];
   showHidden: boolean;
   /** 선택해서 계산한 폴더의 하위 용량(바이트). null은 계산 중·대기 중이고, 없으면 계산하지 않은 폴더다. */
   dirSizes: Record<string, number | null>;
@@ -443,6 +448,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     activePane: snapshot?.activePane === "right" ? "right" : "left",
     split: clampSplit((snapshot?.split ?? 500) / 1000),
     previewRect: snapshot?.previewRect ?? null,
+    recent: snapshot?.recent ?? [],
     showHidden: snapshot?.showHidden ?? false,
     dirSizes: {},
     dialog: null,
@@ -824,6 +830,12 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     void reloadAll(true);
   }));
   const cfg = () => get().loaded.config;
+  /** 최근 위치에 `paths`를 뒤에 붙인다(이미 있으면 맨 뒤로). 설정한 개수만 남긴다. */
+  const addRecent = (paths: string[]) =>
+    set((s) => {
+      const limit = recentLimit(s.loaded.config);
+      return { recent: [...s.recent.filter((r) => !paths.includes(r)), ...paths].slice(-limit) };
+    });
 
   /** 지금 화면 상태를 저장 형식으로 만든다. */
   const toSnapshot = (): Snapshot => {
@@ -857,6 +869,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       paletteQuery: s.lastPaletteQuery,
       split: Math.round(s.split * 1000),
       previewRect: s.previewRect,
+      recent: s.recent,
       left: pane(s.panes.left),
       right: pane(s.panes.right),
     };
@@ -1133,6 +1146,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const s = get();
       const tab = activeTab(s, pane);
       stopSearch(tab); // 가상 탭에서 실제 위치로 나가면 결과를 버린다
+      addRecent([...(tab.virtual || tab.path === path ? [] : [tab.path]), path]);
       patchTab(pane, tab.id, (t) => {
         // 가상 탭(검색 결과)에서 나올 때는 돌아갈 실제 위치가 없으므로 쌓지 않는다.
         const here = t.virtual ? [] : [t.path];
@@ -2112,11 +2126,11 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         } else if (kind === "recent") {
           title = "최근 위치";
           const seen = new Set<string>([tab.path]);
-          for (const p of [...(tab.virtual ? [] : tab.history)].reverse()) {
+          for (const p of [...s.recent].reverse()) {
             if (seen.has(p)) continue;
             seen.add(p);
             items.push({ label: p, path: p });
-            if (items.length >= 20) break;
+            if (items.length >= recentLimit(s.loaded.config)) break;
           }
         } else {
           title = "상위 폴더";
@@ -2282,8 +2296,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     menuClearRecent() {
       const m = get().menu;
       if (m?.kind !== "recent") return;
-      patchActive((t) => ({ history: [t.path] }));
-      set({ menu: { ...m, items: [], all: [], filter: "", cursor: 0 } });
+      set({ recent: [], menu: { ...m, items: [], all: [], filter: "", cursor: 0 } });
     },
     /** 현재 폴더를 즐겨찾기에 추가한다. */
     async addFavoriteHere() {

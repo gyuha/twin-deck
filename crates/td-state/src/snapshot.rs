@@ -67,6 +67,9 @@ pub struct Snapshot {
     /// 사용자가 옮기거나 크기를 바꾼 미리보기 창의 위치·크기. 없으면 기본 크기·가운데다. 옛 파일에는 없어서 None으로 읽는다.
     #[serde(default)]
     pub preview_rect: Option<PreviewRect>,
+    /// 최근 위치(두 패널 공용, 오래된 것부터). 옛 파일에는 없어서 빈 목록으로 읽는다.
+    #[serde(default)]
+    pub recent: Vec<String>,
     pub left: PaneSnap,
     pub right: PaneSnap,
 }

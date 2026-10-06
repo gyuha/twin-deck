@@ -422,6 +422,10 @@ export type BehaviorLayout = { show_action_bar: boolean;
  */
 action_bar_by_modifier: boolean; 
 /**
+ * 최근 위치 메뉴에 기억하는 폴더 수(두 패널 공용). 1 이상.
+ */
+recent_limit: number; 
+/**
  * 패널 위의 드라이브 바(볼륨 버튼, 남은 용량, 언마운트).
  */
 show_drive_bar: boolean }
@@ -631,7 +635,11 @@ split?: number;
 /**
  * 사용자가 옮기거나 크기를 바꾼 미리보기 창의 위치·크기. 없으면 기본 크기·가운데다. 옛 파일에는 없어서 None으로 읽는다.
  */
-previewRect?: PreviewRect | null; left: PaneSnap; right: PaneSnap }
+previewRect?: PreviewRect | null; 
+/**
+ * 최근 위치(두 패널 공용, 오래된 것부터). 옛 파일에는 없어서 빈 목록으로 읽는다.
+ */
+recent?: string[]; left: PaneSnap; right: PaneSnap }
 export type SortSnap = { key: string; dir: string }
 export type TabSnap = { path: string; 
 /**

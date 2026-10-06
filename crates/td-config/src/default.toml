@@ -23,6 +23,7 @@ shift_mode = "invert"
 [behavior.layout]
 show_action_bar = true
 action_bar_by_modifier = false
+recent_limit = 20
 show_drive_bar = true
 
 [display]

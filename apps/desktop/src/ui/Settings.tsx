@@ -36,6 +36,7 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
       { key: "behavior.table.icon_size", title: "아이콘 크기", desc: "파일 목록 행의 아이콘(px)", control: { type: "int" } },
       { key: "behavior.layout.show_action_bar", title: "Action Bar 표시", desc: "아래쪽 단축키 버튼 줄", control: { type: "switch" } },
       { key: "behavior.layout.action_bar_by_modifier", title: "Action Bar 조합키는 누를 때만", desc: "Shift 등을 누르는 동안에만 그 조합 키의 버튼을 보인다. 끄면 전부 보인다", control: { type: "switch" } },
+      { key: "behavior.layout.recent_limit", title: "최근 위치 개수", desc: "최근 위치 메뉴에 기억하는 폴더 수(양쪽 패널 공용, 창을 닫아도 유지)", control: { type: "int" } },
       { key: "behavior.layout.show_drive_bar", title: "드라이브 바 표시", desc: "패널 위의 볼륨 버튼, 남은 용량, 언마운트 줄", control: { type: "switch" } },
     ],
   },

@@ -27,6 +27,7 @@ fn sample() -> Snapshot {
         palette_query: "복제".into(),
         split: 500,
         preview_rect: None,
+        recent: vec![],
         left: PaneSnap {
             tabs: vec![tab("/home/a"), tab("/home/a/docs")],
             active: 1,

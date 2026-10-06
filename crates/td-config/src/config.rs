@@ -65,6 +65,8 @@ pub struct BehaviorLayout {
     pub show_action_bar: bool,
     /// true면 Action Bar가 평소엔 수식키 없는 키만 보이고, Shift/Ctrl/Alt/Cmd를 누르는 동안 그 조합 키의 항목만 보인다.
     pub action_bar_by_modifier: bool,
+    /// 최근 위치 메뉴에 기억하는 폴더 수(두 패널 공용). 1 이상.
+    pub recent_limit: u32,
     /// 패널 위의 드라이브 바(볼륨 버튼, 남은 용량, 언마운트).
     pub show_drive_bar: bool,
 }

@@ -146,19 +146,19 @@ describe("NAV-09 Recent Locations", () => {
     await waitFor(() => expect(crumbs()).toEqual(["/", "home", "a", "docs"]));
   });
 
-  it("탭마다 따로이며 탭을 닫으면 사라지고 Ctrl+Backspace로 비운다", async () => {
+  it("탭을 바꾸거나 닫아도 유지되고 Ctrl+Backspace로 비운다", async () => {
     const { user } = await renderApp(withFavs(() => {}));
     await visit(user);
-    await user.keyboard("{Control>}t{/Control}"); // 새 탭: 이력이 비어 있다
+    await user.keyboard("{Control>}t{/Control}"); // 새 탭: 최근 위치는 공용이라 그대로 보인다
     await waitFor(() => expect(screen.getAllByRole("tab")).toHaveLength(3));
     await user.keyboard("{Alt>}3{/Alt}");
     let d = await menu("최근 위치");
-    expect(within(d).getByText("항목 없음")).toBeInTheDocument();
-    await user.keyboard("{Escape}{Control>}w{/Control}"); // 새 탭 닫기 → 첫 탭
+    expect(options(d)).toEqual(["/home/a", "/home/a/docs"]); // 새 탭의 현재 폴더(src)는 빠진다
+    await user.keyboard("{Escape}{Control>}w{/Control}");
     await waitFor(() => expect(screen.getAllByRole("tab")).toHaveLength(2));
     await user.keyboard("{Alt>}3{/Alt}");
     d = await menu("최근 위치");
-    expect(options(d)).toEqual(["/home/a", "/home/a/docs"]); // 첫 탭의 이력은 그대로
+    expect(options(d)).toEqual(["/home/a", "/home/a/docs"]);
     await user.keyboard("{Control>}{Backspace}{/Control}");
     expect(within(d).getByText("항목 없음")).toBeInTheDocument();
     await user.keyboard("{Escape}{Alt>}3{/Alt}");

@@ -37,9 +37,9 @@ Marta의 화면을 픽셀 단위로 재현하지 않고, 확인된 기능 구조
 
 ## 3. 탭
 
-- 탭은 각 패널의 상단에 있다. 탭마다 위치, 표시 모드, 컬럼, 정렬, 커서, 선택, 이력, Recent Locations를 따로 갖는다.
+- 탭은 각 패널의 상단에 있다. 탭마다 위치, 표시 모드, 컬럼, 정렬, 커서, 선택, 이력을 따로 갖는다.
 - 탭 제목은 현재 폴더 이름이다. 아카이브 안이면 아카이브 이름을 앞에 붙이고, 가상 탭이면 종류(예: "Disk Usage")를 표시한다.
-- Recent Locations는 탭별이며 탭을 닫으면 사라진다(NAV-09).
+- Recent Locations는 두 패널이 함께 쓰고(탭·패널과 무관) 창을 닫아도 `state.json`에 남는다. 개수는 `behavior.layout.recent_limit`(기본 20)로 정한다(NAV-09).
 - 마지막 탭은 닫을 수 없다(닫기 액션은 홈 폴더로 이동). 이는 twin-deck의 결정이며 Marta 동작은 확인하지 못했다 `[알 수 없음]`.
 - 탭을 다른 패널로 옮기는 기능은 P2 이후로 미룬다.
 
@@ -83,7 +83,7 @@ Volumes, Favorites, Recent Locations, Hierarchy는 모두 같은 형태의 팝�
 |---|---|---|
 | Volumes | `Alt+1` | 마운트된 볼륨. 항목에서 언마운트/추출 |
 | Favorites | `Alt+2` | 즐겨찾기 (숫자키로 상위 항목 선택). 추가/편집 액션 |
-| Recent Locations | `Alt+3` | 이 탭의 최근 위치 |
+| Recent Locations | `Alt+3` | 최근 위치(양쪽 패널 공용) |
 | Hierarchy | `Alt+0` | 루트까지의 상위 폴더 목록 (브레드크럼과 같은 정보) |
 
 ## 6. 다이얼로그
