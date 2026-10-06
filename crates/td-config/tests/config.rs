@@ -684,3 +684,33 @@ fn fkey_bar_defaults_and_round_trips_including_combos() {
     assert_eq!(l.warnings.len(), 3, "{:?}", l.warnings);
     assert!(!l.config.fkey_bar.contains_key("Ctrl+F5"));
 }
+
+#[test]
+fn remove_favorite_drops_matching_entry_and_keeps_the_rest() {
+    use td_config::remove_favorite;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("config.toml"),
+        "# 내 설정\n[[favorites]]\nname = \"A\"\npath = \"/a\"\n\n[[favorites]]\nname = \"B\"\npath = \"${user.downloads}\"\n",
+    )
+    .unwrap();
+    remove_favorite(dir.path(), "${user.downloads}").unwrap();
+    let text = std::fs::read_to_string(dir.path().join("config.toml")).unwrap();
+    assert!(
+        text.contains("# 내 설정") && text.contains("path = \"/a\""),
+        "{text}"
+    );
+    assert!(!text.contains("downloads"), "{text}");
+    // 없는 경로나 파일이 없는 경우는 오류가 아니다.
+    remove_favorite(dir.path(), "/nope").unwrap();
+    remove_favorite(tempfile::tempdir().unwrap().path(), "/a").unwrap();
+    // 인라인 배열과 그룹 안 항목도 지운다.
+    std::fs::write(
+        dir.path().join("config.toml"),
+        "favorites = [{ kind = \"group\", name = \"G\", items = [{ name = \"X\", path = \"/x\" }, { name = \"Y\", path = \"/y\" }] }]\n",
+    )
+    .unwrap();
+    remove_favorite(dir.path(), "/x").unwrap();
+    let text = std::fs::read_to_string(dir.path().join("config.toml")).unwrap();
+    assert!(!text.contains("/x") && text.contains("/y"), "{text}");
+}

@@ -173,6 +173,8 @@ export interface MenuItem {
   label: string;
   /** 이동할 경로. 없으면 머리글/구분선이라 고를 수 없다. */
   path?: string;
+  /** 즐겨찾기 항목의 변수 확장 전 경로(삭제할 때 설정 파일과 맞춘다). */
+  raw?: string;
   separator?: boolean;
 }
 
@@ -2114,7 +2116,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
           const dirs = s.userDirs;
           const resolve = (name: string, path: string, indent = ""): MenuItem[] => {
             const real = expandPath(path, dirs);
-            return real ? [{ label: `${indent}${name}`, path: real }] : [];
+            return real ? [{ label: `${indent}${name}`, path: real, raw: path }] : [];
           };
           for (const f of s.loaded.config.favorites ?? []) {
             if (f.kind === "separator") items.push({ label: "", separator: true });
@@ -2316,6 +2318,29 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         return;
       }
       await api.openMenu("favorites");
+    },
+    /** 즐겨찾기 메뉴에서 `-`: 커서가 있는 항목을 즐겨찾기에서 뺀다(폴더 자체는 그대로). 메뉴를 다시 만들고 커서는 근처에 둔다. */
+    async menuRemoveFavorite() {
+      const m = get().menu;
+      if (m?.kind !== "favorites") return;
+      const raw = m.items[m.cursor]?.raw;
+      if (raw === undefined) return;
+      set({ notice: null });
+      try {
+        await backend.removeFavorite(raw);
+        set({ loaded: await backend.getConfig() });
+      } catch (e) {
+        fail(e);
+        return;
+      }
+      await api.openMenu("favorites");
+      const next = get().menu;
+      if (next?.kind === "favorites") {
+        const last = next.items.length - 1;
+        let at = Math.min(m.cursor, last);
+        while (at > 0 && next.items[at]?.path === undefined) at--;
+        set({ menu: { ...next, cursor: Math.max(at, 0) } });
+      }
     },
     /** 현재 폴더를 즐겨찾기에 추가한다. */
     async addFavoriteHere() {

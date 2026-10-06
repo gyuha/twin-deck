@@ -134,6 +134,20 @@ describe("NAV-08 Favorites", () => {
     expect(options(d)).toEqual(["Downloads", "Src", "a"]);
   });
 
+  it("-를 누르면 커서의 즐겨찾기만 목록에서 빼고(폴더는 그대로), 필터 입력 중에는 글자로 받는다", async () => {
+    const b = withFavs(favs);
+    const { user } = await renderApp(b);
+    await user.keyboard("{Alt>}2{/Alt}");
+    const d = await menu("즐겨찾기");
+    expect(within(d).getByText(/- 선택 항목 삭제/)).toBeInTheDocument();
+    await user.keyboard("{ArrowDown}-"); // Src
+    await waitFor(() => expect(options(d)).toEqual(["Downloads"]));
+    expect((await b.getConfig()).config.favorites?.some((f) => f.path === "/home/a/src")).toBe(false);
+    expect(await b.listDir("/home/a", true)).toEqual(expect.arrayContaining([expect.objectContaining({ name: "src" })]));
+    await user.keyboard("a-"); // 필터가 비어 있지 않으면 -는 글자
+    expect(within(d).getByRole("textbox", { name: "필터" })).toHaveValue("a-");
+  });
+
   it("Return으로 커서 항목(Downloads → ${user.downloads})으로 이동한다", async () => {
     const { user } = await renderApp(withFavs(favs));
     await user.keyboard("{Alt>}2{/Alt}");

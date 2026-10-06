@@ -209,6 +209,56 @@ fn remove_key(table: &mut toml_edit::Table, path: &[&str]) -> bool {
     }
 }
 
+/// `config.toml`의 즐겨찾기에서 경로가 `path`(변수 확장 전의 원문)인 항목 하나를 지운다. 그룹 안의 항목도 찾는다.
+/// 폴더 자체는 건드리지 않는다. 없는 경로는 오류가 아니다. 문법 오류가 있는 파일은 건드리지 않는다.
+pub fn remove_favorite(dir: &Path, path: &str) -> Result<(), String> {
+    use toml_edit::{Item, Value};
+    fn has(t: &dyn toml_edit::TableLike, path: &str) -> bool {
+        t.get("path").and_then(Item::as_str) == Some(path)
+    }
+    fn remove_in(item: &mut Item, path: &str) -> bool {
+        match item {
+            Item::ArrayOfTables(a) => {
+                if let Some(i) = (0..a.len()).find(|&i| a.get(i).is_some_and(|t| has(t, path))) {
+                    a.remove(i);
+                    return true;
+                }
+                a.iter_mut()
+                    .any(|t| t.get_mut("items").is_some_and(|it| remove_in(it, path)))
+            }
+            Item::Value(Value::Array(a)) => {
+                let found = a
+                    .iter()
+                    .position(|v| v.as_inline_table().is_some_and(|t| has(t, path)));
+                if let Some(i) = found {
+                    a.remove(i);
+                    return true;
+                }
+                a.iter_mut().any(|v| {
+                    v.as_inline_table_mut()
+                        .and_then(|t| t.get_mut("items"))
+                        .is_some_and(|val| match val {
+                            Value::Array(inner) => {
+                                let f = inner.iter().position(|x| {
+                                    x.as_inline_table().is_some_and(|t| has(t, path))
+                                });
+                                f.map(|i| inner.remove(i)).is_some()
+                            }
+                            _ => false,
+                        })
+                })
+            }
+            _ => false,
+        }
+    }
+    let mut doc = read_user_doc(dir)?;
+    let removed = doc.get_mut("favorites").is_some_and(|f| remove_in(f, path));
+    if !removed {
+        return Ok(());
+    }
+    write_user_doc(dir, &doc)
+}
+
 /// `config.toml` 끝에 `[[favorites]]` 항목을 덧붙인다. 기존 내용과 주석은 그대로 두고,
 /// 결과가 올바른 TOML이 아니면(예: 이미 `favorites = [...]`로 정의됨) 파일을 건드리지 않고 오류를 돌려준다.
 pub fn append_favorite(dir: &Path, name: &str, path: &str) -> Result<(), String> {

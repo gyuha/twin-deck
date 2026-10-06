@@ -163,6 +163,17 @@ async addFavorite(name: string, path: string) : Promise<Result<null, string>> {
 }
 },
 /**
+ * 즐겨찾기에서 경로(변수 확장 전 원문)가 같은 항목을 `config.toml`에서 지운다. 폴더 자체는 지우지 않는다.
+ */
+async removeFavorite(path: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("remove_favorite", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * 설정 화면: 사용자 `config.toml`의 키 하나를 쓰고, 새로 병합된 설정을 바로 돌려준다(변경 이벤트를 기다리지 않는다).
  */
 async setConfigValue(key: string, value: ConfigValue) : Promise<Result<Loaded, string>> {

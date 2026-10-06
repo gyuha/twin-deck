@@ -680,6 +680,20 @@ export class FakeBackend implements Backend {
     });
   }
 
+  async removeFavorite(path: string) {
+    this.setConfig((l) => {
+      const drop = (list: { path?: string | null; items?: { path: string }[] }[]): boolean => {
+        const i = list.findIndex((f) => f.path === path);
+        if (i >= 0) {
+          list.splice(i, 1);
+          return true;
+        }
+        return list.some((f) => f.items && drop(f.items));
+      };
+      drop((l.config.favorites ??= []) as never);
+    });
+  }
+
   async getConfig() {
     return structuredClone(this.loaded);
   }

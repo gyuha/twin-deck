@@ -57,9 +57,10 @@ export function useKeyboard({ app, keymap, registry }: Options) {
           void api.menuSelectNth(Number(digit[1]));
           return;
         }
-        if (s.menu?.kind === "favorites" && e.key === "+") {
+        // 필터를 입력하는 중(`my-project` 등)에는 +/-도 글자로 받는다.
+        if (s.menu?.kind === "favorites" && !s.menu.filter && (e.key === "+" || e.key === "-")) {
           e.preventDefault();
-          void api.menuAddFavoriteHere();
+          void (e.key === "+" ? api.menuAddFavoriteHere() : api.menuRemoveFavorite());
           return;
         }
         if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key.length === 1 || e.key === "Backspace")) return;

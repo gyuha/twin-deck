@@ -166,6 +166,17 @@ pub fn user_dirs(app: tauri::AppHandle) -> UserDirsDto {
     }
 }
 
+/// 즐겨찾기에서 경로(변수 확장 전 원문)가 같은 항목을 `config.toml`에서 지운다. 폴더 자체는 지우지 않는다.
+#[tauri::command]
+#[specta::specta]
+pub fn remove_favorite(config: State<'_, ConfigState>, path: String) -> ServiceResult<()> {
+    let store = config
+        .store
+        .as_ref()
+        .ok_or("설정 디렉터리를 사용할 수 없습니다")?;
+    td_config::remove_favorite(store.dir(), &path)
+}
+
 /// 현재 폴더 등을 즐겨찾기로 `config.toml`에 덧붙인다. 파일 감시가 재로딩한다.
 #[tauri::command]
 #[specta::specta]
@@ -603,6 +614,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             eject_volume,
             user_dirs,
             add_favorite,
+            remove_favorite,
             set_config_value,
             reset_config_value,
             reveal_config_dir,

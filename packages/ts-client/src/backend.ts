@@ -95,6 +95,8 @@ export interface Backend {
   userDirs(): Promise<UserDirsDto>;
   /** 즐겨찾기를 config.toml에 덧붙인다(설정 감시가 재로딩한다). */
   addFavorite(name: string, path: string): Promise<void>;
+  /** 즐겨찾기에서 경로(변수 확장 전 원문)가 같은 항목을 지운다. 폴더 자체는 그대로다. */
+  removeFavorite(path: string): Promise<void>;
   /** 현재 설정(기본값 병합 결과)과 키바인딩, 경고. */
   getConfig(): Promise<Loaded>;
   /** 설정 화면: 사용자 config.toml의 키 하나(`behavior.theme` 같은 점 표기)를 쓰고, 새로 병합된 설정을 돌려준다. */
