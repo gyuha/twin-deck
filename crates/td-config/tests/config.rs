@@ -596,3 +596,35 @@ fn folder_size_on_select_defaults_to_true_and_can_be_turned_off() {
         .any(|w| w.message.contains("folder_size_on_select")));
     assert!(l.config.display.folder_size_on_select);
 }
+
+#[test]
+fn fkey_combo_keys_are_accepted_and_invalid_ones_warn() {
+    let l = load(
+        "[fkeys]\n\"Ctrl+F5\" = \"core.copy\"\n\"Mod+Shift+F2\" = \"core.app.launch\"\nF5 = \"core.move\"\n[fkey_apps]\n\"Mod+Shift+F2\" = \"/Applications/Foo.app\"\n",
+    );
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert_eq!(l.config.fkeys["Ctrl+F5"], "core.copy");
+    assert_eq!(l.config.fkeys["Mod+Shift+F2"], "core.app.launch");
+    assert_eq!(l.config.fkeys["F5"], "core.move");
+    assert_eq!(l.config.fkey_apps["Mod+Shift+F2"], "/Applications/Foo.app");
+    assert_eq!(l.config.fkeys.len(), 14, "기본 12개 + 조합 2개");
+
+    for bad in [
+        "Ctrl+A",
+        "F13",
+        "Foo+F1",
+        "Shift+Ctrl+F1",
+        "Ctrl+Ctrl+F1",
+        "Ctrl+F0",
+    ] {
+        let l = load(&format!("[fkeys]\n\"{bad}\" = \"core.copy\"\n"));
+        assert!(
+            l.warnings
+                .iter()
+                .any(|w| w.message.contains(&format!("fkeys.{bad}"))),
+            "{bad}: {:?}",
+            l.warnings
+        );
+        assert!(!l.config.fkeys.contains_key(bad), "{bad}");
+    }
+}

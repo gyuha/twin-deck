@@ -193,6 +193,10 @@ Marta의 Action Bar는 액션과 단축키를 한 줄로 보여 주는 하단 �
 
 `F4 편집` `F5 복사` `F6 이동` `F7 새 폴더` `F8 휴지통` `Shift+F8 삭제`
 
+### 5.7 F키 설정과 조합키
+
+설정의 `[fkeys]`(와 앱 실행용 `[fkey_apps]`)는 `F1`~`F12` 외에 조합키를 키로 받는다. 수식키는 `Mod`, `Ctrl`, `Alt`, `Shift`를 이 순서로 쓰고 마지막에 `F1`~`F12`가 온다(예: `"Ctrl+F5"`, `"Mod+Shift+F2"`). 같은 F키에 서로 다른 조합을 여럿 걸 수 있고, 형식에 맞지 않는 키(`Ctrl+A`, `F13`, 순서가 틀린 `Shift+Ctrl+F1`)는 경고와 함께 무시한다. `Mod`는 macOS에서 Cmd, 그 밖에서 Ctrl이다.
+
 ## 6. Actions Panel
 
 - `Mod+Shift+P`로 열고, 입력한 문자열로 액션 이름을 퍼지 검색한다. `Return`으로 실행한다.

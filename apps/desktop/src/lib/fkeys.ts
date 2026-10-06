@@ -14,14 +14,13 @@ export const APP_OPEN_FOLDER_ACTION = "core.app.open_folder";
 export const APP_ACTIONS: readonly string[] = [APP_LAUNCH_ACTION, APP_OPEN_FOLDER_ACTION];
 
 /**
- * F1~F12 설정을 사용자 바인딩으로 바꾼다. 빈 값은 기본 바인딩 유지라 건너뛰고,
+ * F1~F12와 조합키(`Ctrl+F5`, `Mod+Shift+F2` 등) 설정을 사용자 바인딩으로 바꾼다. 빈 값은 기본 바인딩 유지라 건너뛰고,
  * `none`은 그 키 해제, 앱 실행은 `app`(경로)과 `key`(안내 메시지용)를 인수로 싣는다.
  * `keybindings.toml`보다 먼저 병합되도록 호출하는 쪽에서 앞에 붙인다(파일이 이긴다).
  */
 export function fkeyBindings(config: FKeyConfig): UserBinding[] {
   const out: UserBinding[] = [];
-  for (let n = 1; n <= 12; n++) {
-    const key = `F${n}`;
+  for (const key of Object.keys(config.fkeys)) {
     const value = (config.fkeys[key] ?? "").trim();
     if (!value) continue;
     if (value === "none") out.push({ key, action: null, args: {}, scope: null });

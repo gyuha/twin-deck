@@ -13,6 +13,30 @@ fn kind(v: &Value) -> &'static str {
     }
 }
 
+/// `Mod+Ctrl+Alt+Shift+` 순서의 수식키 뒤에 F1~F12가 오는 조합키 이름인가 (예: `Ctrl+F5`, `Mod+Shift+F2`).
+/// 수식키가 없는 `F1`~`F12`는 기본값에 이미 있어서 여기서 다루지 않는다.
+fn is_fkey_combo(key: &str) -> bool {
+    let mut parts: Vec<&str> = key.split('+').collect();
+    let Some(f) = parts.pop() else { return false };
+    let is_f = f
+        .strip_prefix('F')
+        .and_then(|n| n.parse::<u8>().ok())
+        .is_some_and(|n| (1..=12).contains(&n) && f == format!("F{n}"));
+    if !is_f || parts.is_empty() {
+        return false;
+    }
+    let order = ["Mod", "Ctrl", "Alt", "Shift"];
+    let mut last = None;
+    parts.iter().all(|m| {
+        let Some(i) = order.iter().position(|o| o == m) else {
+            return false;
+        };
+        let ok = last.is_none_or(|l| i > l);
+        last = Some(i);
+        ok
+    })
+}
+
 /// 기본값 위에 사용자 값을 깊게 병합한다. 테이블은 재귀, 배열은 통째로 교체.
 /// 알 수 없는 키와 타입이 다른 값은 경고하고 무시한다.
 pub fn merge_user(
@@ -30,6 +54,10 @@ pub fn merge_user(
             format!("{path}.{key}")
         };
         let Some(dv) = defaults.get(key) else {
+            if (path == "fkeys" || path == "fkey_apps") && is_fkey_combo(key) && uv.is_str() {
+                out.insert(key.clone(), uv.clone());
+                continue;
+            }
             warnings.push(Warning::new(
                 file,
                 format!("알 수 없는 키를 무시합니다: {here}"),

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { FakeBackend } from "@twin-deck/ts-client";
 import { defaultBindingsFor } from "@twin-deck/actions";
 import { cursorName, renderApp, seedBackend } from "./helpers";
+import { fkeyBindings } from "../lib/fkeys";
 
 const openSettings = (user: Awaited<ReturnType<typeof renderApp>>["user"]) => user.keyboard("{Control>},{/Control}");
 
@@ -202,5 +203,29 @@ describe("설정 화면의 F키 섹션", () => {
       expect(c.fkeys.F3).toBe("");
       expect(c.fkey_apps.F3).toBe("");
     });
+  });
+});
+
+describe("F키 조합키 설정", () => {
+  it("같은 F키의 단독·조합 설정이 각각 바인딩이 된다", () => {
+    const b = fkeyBindings({ fkeys: { "Ctrl+F5": "core.copy", F5: "core.move" }, fkey_apps: {} });
+    expect(b.map((x) => [x.key, x.action])).toEqual([
+      ["Ctrl+F5", "core.copy"],
+      ["F5", "core.move"],
+    ]);
+  });
+
+  it("앱 실행 조합키는 그 키의 앱 경로를 인수로 싣는다", () => {
+    const b = fkeyBindings({ fkeys: { "Mod+Shift+F2": "core.app.launch" }, fkey_apps: { "Mod+Shift+F2": "/Applications/Foo.app" } });
+    expect(b).toEqual([{ key: "Mod+Shift+F2", action: "core.app.launch", args: { app: "/Applications/Foo.app", key: "Mod+Shift+F2" }, scope: null }]);
+  });
+
+  it("Ctrl+F2에 지정한 동작은 Ctrl+F2에서만 실행되고 F2는 기본 그대로다", async () => {
+    const backend = seedBackend();
+    setFKeys(backend, { "Ctrl+F2": "core.rename" });
+    const { user } = await renderApp(backend);
+    await toATxt(user);
+    await user.keyboard("{Control>}{F2}{/Control}");
+    expect(await nameBox()).toHaveValue("a.txt");
   });
 });
