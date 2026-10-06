@@ -130,7 +130,7 @@ const ARCHIVE_PREVIEW_MAX_BYTES: u64 = 512 * 1024 * 1024;
 /// 미리보기 트리의 최대 줄 수. 넘으면 앞쪽만 보이고 `truncated`가 켜진다.
 const ARCHIVE_PREVIEW_MAX_LINES: usize = 2000;
 
-/// 압축 파일(이름으로 형식을 알 수 있는 것)의 미리보기: 안의 항목을 들여쓴 텍스트 트리로 보여 준다.
+/// 압축 파일(이름으로 형식을 알 수 있는 것)의 미리보기: 안의 항목을 폴더 미리보기와 같은 가지 트리 텍스트로 보여 준다.
 /// 압축 파일이 아니면 None(일반 미리보기로 간다). 이름은 압축인데 열 수 없거나 너무 크면 "기타"(종류와 크기)다.
 const DIR_PREVIEW_MAX_DEPTH: usize = 3;
 const DIR_PREVIEW_MAX_LINES: usize = 200;
@@ -222,43 +222,17 @@ fn archive_preview(path: &str, extra_zip_exts: &[String]) -> Option<td_vfs::Prev
     let Ok(archive) = td_archive::Archive::open(std::path::Path::new(path), extra_zip_exts) else {
         return Some(other);
     };
-    // 경로를 이름순으로 모아 폴더마다 한 번씩만 줄을 만든다(압축에 폴더 항목이 따로 없어도 경로에서 만든다).
-    let mut paths: Vec<(&str, bool)> = archive
+    let paths: Vec<(&str, bool)> = archive
         .entries()
         .iter()
-        .map(|e| (e.name.trim_matches('/'), e.is_dir))
-        .filter(|(n, _)| !n.is_empty())
+        .map(|e| (e.name.as_str(), e.is_dir))
         .collect();
-    paths.sort();
-    let mut lines: Vec<String> = Vec::new();
-    let mut shown: Vec<&str> = Vec::new(); // 이미 줄을 만든 폴더 경로
-    let mut truncated = false;
-    'outer: for (full, is_dir) in paths {
-        let parts: Vec<&str> = full.split('/').collect();
-        for depth in 0..parts.len() {
-            let last = depth + 1 == parts.len();
-            let is_folder = !last || is_dir;
-            if is_folder {
-                let prefix =
-                    &full[..parts[..=depth].iter().map(|p| p.len()).sum::<usize>() + depth];
-                if shown.contains(&prefix) {
-                    continue;
-                }
-                shown.push(prefix);
-            }
-            if lines.len() >= ARCHIVE_PREVIEW_MAX_LINES {
-                truncated = true;
-                break 'outer;
-            }
-            lines.push(format!(
-                "{}{}{}",
-                "  ".repeat(depth),
-                parts[depth],
-                if is_folder { "/" } else { "" }
-            ));
-        }
-    }
-    let mut text = lines.join("\n");
+    let (lines, truncated) = archive_tree_lines(&paths, ARCHIVE_PREVIEW_MAX_LINES);
+    let mut text = if lines.is_empty() {
+        "(빈 압축 파일)".to_string()
+    } else {
+        lines.join("\n")
+    };
     text.push('\n');
     Some(td_vfs::Preview {
         kind: td_vfs::PreviewKind::Text,
@@ -267,6 +241,65 @@ fn archive_preview(path: &str, extra_zip_exts: &[String]) -> Option<td_vfs::Prev
         size,
         data_url: None,
     })
+}
+
+/// 압축 안의 경로 목록을 폴더 미리보기와 같은 `├── └── │` 가지 트리 줄로 만든다(폴더 먼저, 이름순).
+/// 압축에 폴더 항목이 따로 없어도 경로에서 폴더를 만든다. 줄 수가 `max_lines`를 넘으면 거기서 멈추고 `true`를 돌려준다.
+fn archive_tree_lines(paths: &[(&str, bool)], max_lines: usize) -> (Vec<String>, bool) {
+    use std::collections::{BTreeMap, BTreeSet};
+    #[derive(Default)]
+    struct Node {
+        dirs: BTreeMap<String, Node>,
+        files: BTreeSet<String>,
+    }
+    fn walk(node: &Node, prefix: &str, max: usize, lines: &mut Vec<String>, truncated: &mut bool) {
+        let n = node.dirs.len() + node.files.len();
+        let folders = node.dirs.iter().map(|(name, child)| (name, Some(child)));
+        let files = node.files.iter().map(|name| (name, None));
+        for (i, (name, child)) in folders.chain(files).enumerate() {
+            if lines.len() >= max {
+                *truncated = true;
+                return;
+            }
+            let last = i + 1 == n;
+            lines.push(format!(
+                "{prefix}{}{name}{}",
+                if last { "└── " } else { "├── " },
+                if child.is_some() { "/" } else { "" }
+            ));
+            if let Some(child) = child {
+                let next = format!("{prefix}{}", if last { "    " } else { "│   " });
+                walk(child, &next, max, lines, truncated);
+                if *truncated {
+                    return;
+                }
+            }
+        }
+    }
+    let mut root = Node::default();
+    for (full, is_dir) in paths {
+        let parts: Vec<&str> = full
+            .trim_matches('/')
+            .split('/')
+            .filter(|p| !p.is_empty())
+            .collect();
+        let Some((last, dirs)) = parts.split_last() else {
+            continue;
+        };
+        let mut node = &mut root;
+        for part in dirs {
+            node = node.dirs.entry((*part).to_string()).or_default();
+        }
+        if *is_dir {
+            node.dirs.entry((*last).to_string()).or_default();
+        } else {
+            node.files.insert((*last).to_string());
+        }
+    }
+    let mut lines = Vec::new();
+    let mut truncated = false;
+    walk(&root, "", max_lines, &mut lines, &mut truncated);
+    (lines, truncated)
 }
 
 /// cbz(이미지를 ZIP으로 묶은 만화 파일)의 미리보기: 안의 첫 이미지. 이미지가 없거나 ZIP이 아니면 "기타"(종류와 크기)다.
@@ -2126,7 +2159,7 @@ mod tests {
     }
 
     #[test]
-    fn preview_archive_lists_entries_as_indented_tree() {
+    fn preview_archive_lists_entries_as_branch_tree_like_folder_preview() {
         let (t, svc, _ch, root) = setup();
         let dest = format!("{root}/pack.zip");
         make_zip_tree(
@@ -2139,8 +2172,48 @@ mod tests {
         assert!(!p.truncated);
         assert_eq!(
             p.text.unwrap(),
-            "a.txt\ndocs/\n  readme.md\nsrc/\n  lib/\n    mod.rs\n  main.rs\n"
+            "├── docs/\n│   └── readme.md\n├── src/\n│   ├── lib/\n│   │   └── mod.rs\n│   └── main.rs\n└── a.txt\n"
         );
+    }
+
+    #[test]
+    fn archive_tree_lines_puts_folders_first_and_sorts_by_name() {
+        let paths = [
+            ("z.txt", false),
+            ("b/x", false),
+            ("a.txt", false),
+            ("a/y", false),
+        ];
+        let (lines, truncated) = archive_tree_lines(&paths, 100);
+        assert!(!truncated);
+        assert_eq!(
+            lines,
+            [
+                "├── a/",
+                "│   └── y",
+                "├── b/",
+                "│   └── x",
+                "├── a.txt",
+                "└── z.txt"
+            ]
+        );
+    }
+
+    #[test]
+    fn archive_tree_lines_shows_folder_entries_without_children_and_empty_archive() {
+        let (lines, _) = archive_tree_lines(&[("empty", true), ("only/", true)], 100);
+        assert_eq!(lines, ["├── empty/", "└── only/"]);
+        let (lines, truncated) = archive_tree_lines(&[], 100);
+        assert!(lines.is_empty() && !truncated);
+    }
+
+    #[test]
+    fn archive_tree_lines_stops_at_the_line_limit() {
+        let paths: Vec<(String, bool)> = (0..10).map(|i| (format!("f{i}.txt"), false)).collect();
+        let refs: Vec<(&str, bool)> = paths.iter().map(|(n, d)| (n.as_str(), *d)).collect();
+        let (lines, truncated) = archive_tree_lines(&refs, 4);
+        assert_eq!(lines.len(), 4);
+        assert!(truncated);
     }
 
     #[test]
