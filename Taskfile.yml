@@ -106,7 +106,7 @@ tasks:
       - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install.ps1 uninstall
 
   # 릴리스용 번들: 업데이트 산출물(.app.tar.gz/.sig 등)까지 만든다. 서명 키가 필요하다 —
-  # TAURI_SIGNING_PRIVATE_KEY 또는 TAURI_SIGNING_PRIVATE_KEY_PATH 환경변수. 평소 task bundle은 키 없이 된다.
+  # TAURI_SIGNING_PRIVATE_KEY 환경변수(키 파일 경로 또는 내용). 평소 task bundle은 키 없이 된다.
   bundle:release:
     internal: true
     cmds:

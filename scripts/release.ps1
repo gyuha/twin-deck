@@ -7,8 +7,8 @@
 #           macOS용과 Windows용 파일이 모두 올라와 있어야 공개한다. 한쪽만 공개하려면 $env:ALLOW_PARTIAL = "1".
 #
 # 앱 안 업데이트: 설치 파일의 서명(.sig)도 올리고, latest.json에 이 OS의 항목을 병합해 올린다.
-# 업데이트 산출물은 서명 키로 빌드해야 만들어진다(task release:draft / release가 TAURI_SIGNING_PRIVATE_KEY 또는
-# TAURI_SIGNING_PRIVATE_KEY_PATH 환경변수로 키를 읽는다). 이 OS 파일이 없는 버전은 latest.json에 그 OS 항목이 없어서 그 OS는 건너뛴다.
+# 업데이트 산출물은 서명 키로 빌드해야 만들어진다(task release:draft / release가 TAURI_SIGNING_PRIVATE_KEY
+# 환경변수(키 파일 경로 또는 내용)로 키를 읽는다). 이 OS 파일이 없는 버전은 latest.json에 그 OS 항목이 없어서 그 OS는 건너뛴다.
 #
 # 환경 변수(시험용): $env:DRY_RUN = "1" 이면 GitHub를 바꾸는 명령은 출력만 한다. $env:VERSION_OVERRIDE = "<버전>" 이면 그 버전으로 올린다.
 param([Parameter(Mandatory = $true)][ValidateSet("draft", "publish")][string]$Mode)
@@ -52,7 +52,7 @@ $UpdName = "twin-deck-$Version-windows-x64-setup.exe"
 $sigSrc = "$($setup.FullName).sig"
 if (-not (Test-Path $sigSrc)) {
   if ($Dry) { Write-Host "[DRY_RUN] 업데이트 서명이 없어 가짜 파일로 대신합니다 (키 없이 시험 중)"; $sigSrc = Join-Path $Work "fake.sig"; Set-Content $sigSrc "FAKE-SIGNATURE" }
-  else { throw "업데이트 서명이 없습니다: $sigSrc`n서명 키 환경변수(TAURI_SIGNING_PRIVATE_KEY 또는 TAURI_SIGNING_PRIVATE_KEY_PATH)를 설정하고 task release:draft 로 다시 빌드하세요" }
+  else { throw "업데이트 서명이 없습니다: $sigSrc`n서명 키 환경변수(TAURI_SIGNING_PRIVATE_KEY = 키 파일 경로 또는 내용)를 설정하고 task release:draft 로 다시 빌드하세요" }
 }
 Copy-Item $setup.FullName (Join-Path $Work $UpdName)
 Copy-Item $sigSrc (Join-Path $Work "$UpdName.sig")
