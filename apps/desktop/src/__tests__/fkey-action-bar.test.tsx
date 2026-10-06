@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { FakeBackend } from "@twin-deck/ts-client";
+import { FakeBackend } from "@twin-deck/ts-client";
 import { cursorName, renderApp, seedBackend } from "./helpers";
 
 const buttons = () => within(screen.getByRole("toolbar", { name: "액션 바" })).getAllByRole("button").map((b) => b.textContent);
@@ -16,6 +16,25 @@ const seed = (fkeys: Record<string, string>, bar: Record<string, boolean>, apps:
 };
 
 describe("F키 설정의 Action Bar 노출", () => {
+  it("앱 기본값은 F1·F2·F4~F8을 노출하고 내장 조합키는 설정 화면에 나온다", async () => {
+    const { user } = await renderApp(new FakeBackend().seed({ "/home/a/a.txt": "a", "/home/b/x.txt": "x" }));
+    expect(buttons()).toEqual(["F1도움말 (단축키 목록)", "F2이름 변경", "F4편집", "F5복사", "F6이동", "F7새 폴더", "F8휴지통", "Shift+F8삭제"]);
+    await user.keyboard("{Control>},{/Control}");
+    await user.click(await screen.findByRole("tab", { name: "F키" }));
+    for (const k of ["Mod+F12", "Shift+F4", "Shift+F6", "Shift+F7", "Shift+F8"]) expect(await screen.findByRole("group", { name: k })).toBeTruthy();
+  });
+
+  it("action_bar_by_modifier를 켜면 평소엔 단독 키만, Shift를 누르는 동안엔 Shift 조합만 보인다", async () => {
+    const b = new FakeBackend().seed({ "/home/a/a.txt": "a", "/home/b/x.txt": "x" });
+    b.setConfig((l) => (l.config.behavior.layout.action_bar_by_modifier = true));
+    const { user } = await renderApp(b);
+    expect(buttons()).toEqual(["F1도움말 (단축키 목록)", "F2이름 변경", "F4편집", "F5복사", "F6이동", "F7새 폴더", "F8휴지통"]);
+    await user.keyboard("{Shift>}");
+    await waitFor(() => expect(buttons()).toEqual(["Shift+F8삭제"]));
+    await user.keyboard("{/Shift}");
+    await waitFor(() => expect(buttons()).toContain("F5복사"));
+  });
+
   it("기본값에서는 바가 기존 구성 그대로다", async () => {
     await renderApp(seed({ F2: "core.rename" }, {}));
     expect(buttons()).toEqual(BASE);

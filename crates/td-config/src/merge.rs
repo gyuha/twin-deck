@@ -78,7 +78,8 @@ pub fn merge_user(
             }
             (Value::Array(d), Value::Array(u)) => {
                 // 기본 배열이 문자열 배열이면 문자열만 허용한다. 빈 기본 배열(즐겨찾기)은 나중에 항목별로 검증.
-                let want_strings = d.first().is_some_and(Value::is_str);
+                let want_strings =
+                    d.first().is_some_and(Value::is_str) || here == "layout.action_bar";
                 if want_strings && !u.iter().all(Value::is_str) {
                     warnings.push(Warning::new(
                         file,

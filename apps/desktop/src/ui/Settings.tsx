@@ -35,6 +35,7 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
       { key: "behavior.preview_font", title: "미리보기 글꼴", desc: "텍스트·코드·JSON·Markdown 미리보기 본문의 글꼴. 비우면 기본 글꼴", control: { type: "text" } },
       { key: "behavior.table.icon_size", title: "아이콘 크기", desc: "파일 목록 행의 아이콘(px)", control: { type: "int" } },
       { key: "behavior.layout.show_action_bar", title: "Action Bar 표시", desc: "아래쪽 단축키 버튼 줄", control: { type: "switch" } },
+      { key: "behavior.layout.action_bar_by_modifier", title: "Action Bar 조합키는 누를 때만", desc: "Shift 등을 누르는 동안에만 그 조합 키의 버튼을 보인다. 끄면 전부 보인다", control: { type: "switch" } },
       { key: "behavior.layout.show_drive_bar", title: "드라이브 바 표시", desc: "패널 위의 볼륨 버튼, 남은 용량, 언마운트 줄", control: { type: "switch" } },
     ],
   },
@@ -207,9 +208,17 @@ export function Settings() {
   const section = useApp((s) => s.settingsSection);
   const config = useApp((s) => s.loaded.config);
   // F키 탭은 고정 F1~F12 뒤에 설정 파일의 조합키 항목이 이어진다.
-  const comboKeys = Object.keys(config.fkeys)
-    .filter((k) => k.includes("+"))
-    .sort();
+  // 내장 기본 바인딩의 조합키(Shift+F8, Mod+F12 등)도 설정 파일에 없어도 같이 보인다.
+  const { platform } = useUi();
+  const comboKeys = [
+    ...new Set([
+      ...Object.keys(config.fkeys).filter((k) => k.includes("+")),
+      ...defaultBindingsFor(platform)
+        .filter((b) => b.scope === "pane")
+        .flatMap((b) => b.keys)
+        .filter((k) => /^((Mod|Ctrl|Alt|Shift)\+)+F\d+$/.test(k)),
+    ]),
+  ].sort();
   const broken = useApp((s) => s.loaded.warnings.find((w) => w.message.startsWith("TOML 문법 오류")));
   const error = useApp((s) => s.settingsError);
   const { api } = useAppStore();
@@ -260,9 +269,10 @@ export function Settings() {
             <h3 className="text-sm font-semibold">{current.title}</h3>
             {current.desc ? <p className="mb-2 text-xs text-ink-faint">{current.desc}</p> : <div className="mb-2" />}
             {items.map((item) => {
-              const combo = item.key.startsWith("fkeys.") && item.title.includes("+");
-              const value = valueAt(config, item.key) as string | number | boolean;
-              const isDefault = value === valueAt(defaults, item.key);
+              const combo = item.key.startsWith("fkeys.") && item.title.includes("+") && item.title in config.fkeys;
+              // 설정 파일에 없는 내장 조합키는 값이 없다 → 기본값("")으로 본다.
+              const value = (valueAt(config, item.key) ?? (item.control.type === "fkey" ? "" : undefined)) as string | number | boolean;
+              const isDefault = value === (valueAt(defaults, item.key) ?? (item.control.type === "fkey" ? "" : undefined));
               const wide = item.control.type === "text" || item.control.type === "fkey";
               return (
                 <div key={item.key} role="group" aria-label={item.title} className="flex items-center justify-between gap-4 border-b border-app-line py-2.5">

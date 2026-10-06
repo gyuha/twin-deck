@@ -8,7 +8,7 @@ import { App } from "../App";
 export const NFD = (s: string) => s.normalize("NFD");
 
 export function seedBackend() {
-  return new FakeBackend().seed({
+  const b = new FakeBackend().seed({
     "/home/a/docs/readme.md": "r",
     "/home/a/src/main.rs": "m",
     "/home/a/a.txt": "aaa",
@@ -17,6 +17,12 @@ export function seedBackend() {
     [`/home/a/${NFD("한글.txt")}`]: "hangul",
     "/home/b/x.txt": "xxx",
   });
+  // 기존 테스트는 고정 구성(layout.action_bar)만 보이는 Action Bar를 전제한다(앱 기본값 검증은 fkey-action-bar.test).
+  b.setConfig((l) => {
+    l.config.layout.action_bar = ["core.edit", "core.copy", "core.move", "core.file.new_folder", "core.trash", "core.delete"];
+    for (const k of Object.keys(l.config.fkey_bar)) l.config.fkey_bar[k] = false;
+  });
+  return b;
 }
 
 export async function renderApp(

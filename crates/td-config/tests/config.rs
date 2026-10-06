@@ -653,15 +653,18 @@ fn fkey_combo_round_trips_through_user_config() {
 }
 
 #[test]
-fn fkey_bar_defaults_off_and_round_trips_including_combos() {
+fn fkey_bar_defaults_and_round_trips_including_combos() {
     use td_config::{reset_user_value, set_user_value, ConfigValue};
     let none = load("");
     assert!(none.warnings.is_empty(), "{:?}", none.warnings);
-    assert_eq!(none.config.fkey_bar.len(), 12);
-    assert!(
-        none.config.fkey_bar.values().all(|v| !v),
-        "기본은 모두 꺼짐"
-    );
+    assert_eq!(none.config.fkey_bar.len(), 13);
+    for (k, on) in &none.config.fkey_bar {
+        let want = matches!(
+            k.as_str(),
+            "F1" | "F2" | "F4" | "F5" | "F6" | "F7" | "F8" | "Shift+F8"
+        );
+        assert_eq!(*on, want, "{k} 기본 노출");
+    }
 
     let dir = tempfile::tempdir().unwrap();
     set_user_value(dir.path(), "fkey_bar.F2", ConfigValue::Bool(true)).unwrap();

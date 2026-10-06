@@ -22,6 +22,7 @@ shift_mode = "invert"
 
 [behavior.layout]
 show_action_bar = true
+action_bar_by_modifier = false
 show_drive_bar = true
 
 [display]
@@ -45,7 +46,7 @@ video_autoplay = false
 close_on_outside_click = false
 
 [layout]
-action_bar = ["core.edit", "core.copy", "core.move", "core.file.new_folder", "core.trash", "core.delete"]
+action_bar = []
 
 [file_systems.zip]
 additional_extensions = []
@@ -98,15 +99,16 @@ F12 = ""
 
 # F키 줄마다 그 동작을 Action Bar에 보일지. true인 줄은 layout.action_bar 뒤에 이어 붙는다.
 [fkey_bar]
-F1 = false
-F2 = false
+F1 = true
+F2 = true
 F3 = false
-F4 = false
-F5 = false
-F6 = false
-F7 = false
-F8 = false
+F4 = true
+F5 = true
+F6 = true
+F7 = true
+F8 = true
 F9 = false
 F10 = false
 F11 = false
 F12 = false
+"Shift+F8" = true

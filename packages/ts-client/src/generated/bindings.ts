@@ -418,6 +418,10 @@ ui_font: string;
 preview_font: string; table: BehaviorTable; quick_select: QuickSelect; selection: SelectionConfig; layout: BehaviorLayout }
 export type BehaviorLayout = { show_action_bar: boolean; 
 /**
+ * true면 Action Bar가 평소엔 수식키 없는 키만 보이고, Shift/Ctrl/Alt/Cmd를 누르는 동안 그 조합 키의 항목만 보인다.
+ */
+action_bar_by_modifier: boolean; 
+/**
  * 패널 위의 드라이브 바(볼륨 버튼, 남은 용량, 언마운트).
  */
 show_drive_bar: boolean }
