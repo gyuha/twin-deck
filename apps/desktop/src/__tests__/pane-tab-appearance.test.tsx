@@ -64,6 +64,7 @@ describe("탭 모양 (behavior.layout.tab_style)", () => {
       expect(tab.className).toContain("flex-1");
       expect(tab.className).toContain("min-w-0");
       expect(tab.className).toContain("truncate");
+      expect(tab.className).toContain("py-1"); // 글자 높이만큼만 나오지 않게 세로 여백을 준다
     }
     expect(t[0].getAttribute("aria-selected")).toBe("true");
     expect(t[0].className).not.toContain("border-b-2");
@@ -76,7 +77,10 @@ describe("탭 모양 (behavior.layout.tab_style)", () => {
     const t = tabs("left");
     expect(t[0].className).toContain("border-b-2");
     expect(t[1].className).not.toContain("border-b-2");
-    for (const tab of t) expect(tab.className).not.toContain("flex-1");
+    for (const tab of t) {
+      expect(tab.className).not.toContain("flex-1");
+      expect(tab.className).not.toContain("py-1"); // 밑줄형의 높이는 그대로
+    }
   });
 
   it("탭이 하나여도 두 모양 모두 그 탭이 활성으로 보인다", async () => {
