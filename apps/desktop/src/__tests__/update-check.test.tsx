@@ -85,4 +85,14 @@ describe("업데이트 확인", () => {
     await renderApp(b);
     expect(b.updateCalls).toEqual({ check: 0, install: 0 });
   });
+
+  it("설정 화면의 '업데이트 확인' 버튼으로도 확인한다(설정은 닫히고 확인 창이 보인다)", async () => {
+    const b = setup({ info: NEW });
+    const { user } = await renderApp(b);
+    await user.keyboard("{Control>},{/Control}");
+    await user.click(await screen.findByRole("button", { name: "업데이트 확인" }));
+    await confirmDialog();
+    expect(screen.queryByRole("dialog", { name: "설정" })).toBeNull();
+    expect(b.updateCalls).toEqual({ check: 1, install: 0 });
+  });
 });

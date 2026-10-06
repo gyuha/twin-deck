@@ -106,7 +106,7 @@ task release        # 배포: 이 OS의 파일을 올리고 공개한다(macOS·
 
 ### 앱 안 업데이트와 서명 키
 
-앱의 "업데이트 확인" 액션(`Mod+Shift+P`로 연 액션 패널에서 "업데이트")은 GitHub 최신 릴리스의 `latest.json`을 읽어 새 버전이면 설치합니다. 자동으로 확인하지는 않습니다.
+앱의 "업데이트 확인"(설정 화면 위쪽 버튼, 또는 `Mod+Shift+P`로 연 액션 패널에서 "업데이트")은 GitHub 최신 릴리스의 `latest.json`을 읽어 새 버전이면 설치합니다. 자동으로 확인하지는 않습니다.
 
 - 업데이트 파일은 서명 키로 서명합니다. 키는 한 번 만들어 두세요: `bunx tauri signer generate -w ~/.tauri/twin-deck.key`. 출력되는 **공개 키**를 `apps/desktop/src-tauri/tauri.conf.json`의 `plugins.updater.pubkey`에 넣습니다(`REPLACE_WITH_UPDATER_PUBKEY` 자리). **비밀 키와 비밀번호는 저장소에 넣지 마세요.** 비밀 키를 잃으면 이미 설치된 앱은 새 업데이트를 받지 못합니다.
 - `task release:draft` / `task release`는 `TAURI_SIGNING_PRIVATE_KEY`(또는 `TAURI_SIGNING_PRIVATE_KEY_PATH`) 환경변수의 키로 업데이트용 파일과 `.sig`를 만들어 함께 올리고, 올라온 `latest.json`에 이 OS의 항목을 합칩니다. 평소의 `task bundle`·`task install`은 키 없이 됩니다.

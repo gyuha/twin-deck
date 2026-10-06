@@ -233,6 +233,17 @@ export function Settings() {
         <header className="flex items-center justify-between border-b border-app-line px-4 py-2">
           <h2 className="text-base font-semibold">설정</h2>
           <div className="flex items-center gap-3">
+            {/* 확인 창이 설정 화면에 가려지지 않게 설정을 닫고 확인한다. */}
+            <Button
+              size="sm"
+              variant="gray"
+              onClick={() => {
+                api.closeSettings();
+                void api.checkForUpdate();
+              }}
+            >
+              업데이트 확인
+            </Button>
             <Button size="sm" variant="gray" onClick={() => void api.revealConfigDir()}>
               설정 폴더 열기
             </Button>
