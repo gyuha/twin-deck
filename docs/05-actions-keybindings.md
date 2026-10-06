@@ -125,10 +125,10 @@ Marta에서는 수정자 없는 단일 키 바인딩이 Quick Select에 가로�
 | `core.pane.switch` | 활성 패널 전환 | `Tab` | `Tab` | 자체 ID, 키 확인 |
 | `core.menu.volumes` | Volumes 메뉴 | `Alt+1` | `Alt+1` | 자체 ID, 키 확인 |
 | `core.menu.favorites` | Favorites 메뉴 | `Alt+2` | `Alt+2` | 자체 ID, 키 확인 |
-| `core.menu.recent` | Recent Locations | `Alt+3` | `Alt+3` | 자체 ID, 키 확인 |
+| `core.menu.recent` | Recent Locations (열린 뒤 글자·숫자 입력으로 경로 필터, `Alt+숫자`로 n번째 선택) | `Alt+3` | `Alt+3` | 자체 ID, 키 확인 |
 | `core.menu.hierarchy` | Hierarchy | `Alt+0` | `Alt+0` | 자체 ID, 키 확인 |
 | `core.favorites.add` / `core.favorites.edit` | Favorites 추가/편집 | 없음 | 없음 | 자체 |
-| `core.recent.clear` | Recent 비우기 | 없음 | 없음 | 자체 |
+| `core.recent.clear` | Recent 비우기 (최근 위치 메뉴 안) | `Ctrl+Backspace` | `Ctrl+Backspace` | 자체 |
 | `core.volume.unmount` / `core.volume.eject` | 언마운트 / 추출 | 없음 | 없음 | 자체 |
 
 Windows/Linux에서 `Alt+숫자`는 일부 데스크톱 환경이나 앱과 충돌할 수 있다 `[낮음]`. 충돌이 확인되면 `Ctrl+Alt+숫자` 대안을 검토한다.

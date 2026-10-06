@@ -49,6 +49,16 @@ export function useKeyboard({ app, keymap, registry }: Options) {
         void api.gotoComplete();
         return;
       }
+      // 최근 위치 메뉴: 글자·숫자·Backspace는 필터 입력창이 받는다. 숫자 바로 선택은 Alt+숫자(Option+숫자는 e.key가 특수문자라 e.code로 본다).
+      if (top === "panel" && s.menu?.kind === "recent") {
+        const digit = /^Digit([0-9])$/.exec(e.code);
+        if (e.altKey && !e.ctrlKey && !e.metaKey && digit) {
+          e.preventDefault();
+          void api.menuSelectNth(Number(digit[1]));
+          return;
+        }
+        if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key.length === 1 || e.key === "Backspace")) return;
+      }
       // 팝업 메뉴: 숫자키로 항목을 고른다.
       if (top === "panel" && plain && /^[0-9]$/.test(e.key)) {
         e.preventDefault();

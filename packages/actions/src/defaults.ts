@@ -277,7 +277,7 @@ export const DEFAULT_BINDINGS: Binding[] = [
   b("panel", "core.menu.left", "Left"),
   b("panel", "core.volume.unmount", "U"),
   b("panel", "core.volume.eject", "E"),
-  b("panel", "core.recent.clear", "C"),
+  b("panel", "core.recent.clear", "Ctrl+Backspace"),
   b("pane", "core.window.new", "Mod+N"),
   b("pane", "core.help", "F1"),
   b("help", "core.help.close", "Escape", "F1"),
