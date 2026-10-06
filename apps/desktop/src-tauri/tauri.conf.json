@@ -15,7 +15,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQ4NUY1QUI0MEY2QzkxMkUKUldRdWtXd1B0RnBmU0N0LzRHRlFtSytIT3UzcXlBcXg1K2orS2F5Vm00Z0N1R2czK0tmSG5LQTgK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEMzQUNDREJCRUM4OTM2MzIKUldReU5vbnN1ODJzd3hwSnpTcWUvdFFNVDVneUlQd1R3SkRaYy9Ndm9CRXlKdHN4WGdIQjJ2WjkK",
       "endpoints": ["https://github.com/gyuha/twin-deck/releases/latest/download/latest.json"]
     }
   },
