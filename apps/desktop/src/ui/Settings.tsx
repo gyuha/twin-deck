@@ -162,17 +162,61 @@ function FKeyControl({ name, value, disabled }: { name: string; value: string; d
   );
 }
 
+const MODIFIERS = ["Mod", "Ctrl", "Alt", "Shift"] as const;
+
+/** 조합키 F키 항목 추가: F키 + 수식키(Mod/Ctrl/Alt/Shift)를 골라 `fkeys`에 빈 항목으로 만든다. 같은 조합은 한 번만. */
+function FKeyAdder({ disabled }: { disabled: boolean }) {
+  const { api } = useAppStore();
+  const existing = useApp((s) => s.loaded.config.fkeys);
+  const [f, setF] = useState("F1");
+  const [mods, setMods] = useState<string[]>([]);
+  const key = [...MODIFIERS.filter((m) => mods.includes(m)), f].join("+");
+  const duplicate = key in existing;
+  return (
+    <div role="group" aria-label="조합키 추가" className="flex flex-wrap items-center gap-3 py-2.5">
+      <select aria-label="F키" value={f} disabled={disabled} onChange={(e) => setF(e.target.value)} className="rounded border border-app-line bg-app-box px-2 py-1 text-sm">
+        {Array.from({ length: 12 }, (_, i) => `F${i + 1}`).map((n) => (
+          <option key={n} value={n}>
+            {n}
+          </option>
+        ))}
+      </select>
+      {MODIFIERS.map((m) => (
+        <label key={m} className="flex items-center gap-1 text-sm">
+          <input
+            type="checkbox"
+            aria-label={m}
+            checked={mods.includes(m)}
+            disabled={disabled}
+            onChange={(e) => setMods(e.target.checked ? [...mods, m] : mods.filter((x) => x !== m))}
+          />
+          {m}
+        </label>
+      ))}
+      <Button type="button" variant="gray" size="sm" disabled={disabled || mods.length === 0 || duplicate} onClick={() => void api.setConfigValue(`fkeys.${key}`, { kind: "str", value: "" })}>
+        추가
+      </Button>
+      {duplicate && mods.length > 0 && <span className="text-xs text-status-error">이미 있는 조합입니다</span>}
+    </div>
+  );
+}
+
 /** 사용자 설정을 항목별 컨트롤로 바꾸는 화면(`Mod+,`). 바꾸는 즉시 저장한다. */
 export function Settings() {
   const open = useApp((s) => s.settingsOpen);
   const section = useApp((s) => s.settingsSection);
   const config = useApp((s) => s.loaded.config);
+  // F키 탭은 고정 F1~F12 뒤에 설정 파일의 조합키 항목이 이어진다.
+  const comboKeys = Object.keys(config.fkeys)
+    .filter((k) => k.includes("+"))
+    .sort();
   const broken = useApp((s) => s.loaded.warnings.find((w) => w.message.startsWith("TOML 문법 오류")));
   const error = useApp((s) => s.settingsError);
   const { api } = useAppStore();
   if (!open) return null;
   const defaults = defaultLoaded().config;
   const current = SECTIONS[section];
+  const items: Item[] = current.title === "F키" ? [...current.items, ...comboKeys.map((k): Item => ({ key: `fkeys.${k}`, title: k, control: { type: "fkey" } }))] : current.items;
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-app text-ink">
       <div role="dialog" aria-modal="true" aria-label="설정" className="flex min-h-0 flex-1 flex-col">
@@ -215,7 +259,8 @@ export function Settings() {
           <section role="tabpanel" aria-label={current.title} className="min-w-0 flex-1 overflow-auto px-6 py-3">
             <h3 className="text-sm font-semibold">{current.title}</h3>
             {current.desc ? <p className="mb-2 text-xs text-ink-faint">{current.desc}</p> : <div className="mb-2" />}
-            {current.items.map((item) => {
+            {items.map((item) => {
+              const combo = item.key.startsWith("fkeys.") && item.title.includes("+");
               const value = valueAt(config, item.key) as string | number | boolean;
               const isDefault = value === valueAt(defaults, item.key);
               const wide = item.control.type === "text" || item.control.type === "fkey";
@@ -226,7 +271,7 @@ export function Settings() {
                     {item.desc && <div className="text-xs text-ink-faint">{item.desc}</div>}
                   </div>
                   <div className={"flex items-center gap-3 " + (wide ? "min-w-0 flex-1 justify-end" : "shrink-0")}>
-                    {!isDefault && !broken && (
+                    {(combo || !isDefault) && !broken && (
                       <button type="button" className="whitespace-nowrap text-xs text-accent hover:underline" onClick={() =>
                           void (async () => {
                             await api.resetConfigValue(item.key);
@@ -235,7 +280,7 @@ export function Settings() {
                           })()
                         }
                       >
-                        기본값으로
+                        {combo ? "삭제" : "기본값으로"}
                       </button>
                     )}
                     {item.control.type === "switch" && (
@@ -270,6 +315,7 @@ export function Settings() {
                 </div>
               );
             })}
+            {current.title === "F키" && <FKeyAdder disabled={!!broken} />}
           </section>
         </div>
       </div>

@@ -30,7 +30,8 @@ const setPath = (obj: Record<string, unknown>, key: string, value: unknown) => {
   const parts = key.split(".");
   const leaf = parts.pop()!;
   const parent = parts.reduce<Record<string, unknown>>((o, k) => (o[k] ??= {}) as Record<string, unknown>, obj);
-  parent[leaf] = value;
+  if (value === undefined) delete parent[leaf];
+  else parent[leaf] = value;
 };
 
 export const defaultLoaded = (): Loaded => structuredClone(defaultConfigJson) as Loaded;

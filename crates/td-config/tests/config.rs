@@ -628,3 +628,26 @@ fn fkey_combo_keys_are_accepted_and_invalid_ones_warn() {
         assert!(!l.config.fkeys.contains_key(bad), "{bad}");
     }
 }
+
+#[test]
+fn fkey_combo_round_trips_through_user_config() {
+    use td_config::{reset_user_value, set_user_value, ConfigValue};
+    let dir = tempfile::tempdir().unwrap();
+    set_user_value(dir.path(), "fkeys.Ctrl+F5", ConfigValue::Str(String::new())).unwrap();
+    let l = load_dir(dir.path(), Platform::Linux);
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert_eq!(l.config.fkeys["Ctrl+F5"], "");
+    set_user_value(
+        dir.path(),
+        "fkeys.Ctrl+F5",
+        ConfigValue::Str("core.copy".into()),
+    )
+    .unwrap();
+    assert_eq!(
+        load_dir(dir.path(), Platform::Linux).config.fkeys["Ctrl+F5"],
+        "core.copy"
+    );
+    reset_user_value(dir.path(), "fkeys.Ctrl+F5").unwrap();
+    let l = load_dir(dir.path(), Platform::Linux);
+    assert!(!l.config.fkeys.contains_key("Ctrl+F5"));
+}
