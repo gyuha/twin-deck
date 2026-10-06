@@ -21,6 +21,6 @@
   5. `grep -c "미리보기 창" docs/07-ui-spec.md` ≥ 1 이면서 이동·크기 조절·더블클릭 초기화가 적혀 있다. 작성 시점 pre-state는 확인 후 기록. 전진 검사.
 
 ## Work slices
-- [ ] S1. `Preview.tsx`: 창을 `previewRect`(없으면 기본 배치)로 배치하고, 제목 줄 끌기(이동)와 가장자리·모서리 끌기(크기), 화면 안 제한·최소 크기 제한을 구현한다 — completion criterion: DoD 1, 2
-- [ ] S2. 닫고 다시 열기·파일 넘기기에서의 유지, 화면 밖 값 보정, 제목 줄 더블클릭 초기화 — completion criterion: DoD 3 (depends: S1)
-- [ ] S3. `docs/07-ui-spec.md`에 미리보기 창 이동·크기 조절을 적는다 — completion criterion: DoD 5 (depends: S1)
+- [x] S1. `Preview.tsx`: 창을 `previewRect`(없으면 기본 배치)로 배치하고, 제목 줄 끌기(이동)와 가장자리·모서리 끌기(크기), 화면 안 제한·최소 크기 제한을 구현한다 — completion criterion: DoD 1, 2
+- [x] S2. 닫고 다시 열기·파일 넘기기에서의 유지, 화면 밖 값 보정, 제목 줄 더블클릭 초기화 — completion criterion: DoD 3 (depends: S1)
+- [x] S3. `docs/07-ui-spec.md`에 미리보기 창 이동·크기 조절을 적는다 — completion criterion: DoD 5 (depends: S1)
