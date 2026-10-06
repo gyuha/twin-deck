@@ -347,6 +347,11 @@ export function targetsOf(tab: TabState): EntryDto[] {
   return c ? [c] : [];
 }
 
+/** 폴더처럼 들어갈 수 있는 항목인지: 폴더이거나, 폴더를 가리키는 심볼릭 링크다(`kind`는 링크 그대로 남는다). */
+export function isFolderEntry(e: EntryDto | undefined): boolean {
+  return e?.kind === "dir" || (e?.kind === "symlink" && e.linkIsDir);
+}
+
 /** 파일이면서 이름이 압축 파일(아카이브)인 항목인지. */
 function isArchiveEntry(e: EntryDto | undefined, extraExts: string[]): boolean {
   return e?.kind === "file" && isArchiveName(e.name, extraExts);
@@ -1178,7 +1183,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     async open() {
       const tab = activeTab(get());
       const c = cursorEntry(tab);
-      if (c?.kind === "dir") await api.navigate(c.path);
+      if (c && isFolderEntry(c)) await api.navigate(c.path);
       else if (c?.kind === "file" && isArchiveName(c.name, cfg().file_systems.zip.additional_extensions)) {
         await api.navigate(archiveRoot(c.path));
       } else if (c && tab.virtual) {
@@ -1250,7 +1255,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     async goRight() {
       const tab = activeTab(get());
       if (tab.view.mode === "columns") api.moveColumn(1);
-      else if (cursorEntry(tab)?.kind === "dir") await api.open();
+      else if (isFolderEntry(cursorEntry(tab))) await api.open();
       else await api.previewToggle();
     },
     /** 정렬 변경 (`core.view.order`). 같은 키를 다시 고르면 방향을 뒤집는다. `dir`로 방향을 지정할 수 있다. */

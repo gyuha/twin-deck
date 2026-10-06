@@ -502,7 +502,12 @@ createdMs: number | null;
 /**
  * 유닉스 권한 비트. Windows에서는 null.
  */
-mode: number | null; hidden: boolean }
+mode: number | null; hidden: boolean; 
+/**
+ * 심볼릭 링크이고 그 대상(링크를 끝까지 따라간 곳)이 폴더이면 true. 링크가 아니거나 대상이 파일·없음이면 false.
+ * 종류(`kind`)는 그대로 링크라서, 이 값은 "폴더처럼 들어갈 수 있는가"만 알려 준다.
+ */
+linkIsDir: boolean }
 export type Environment = { text_editor: string; terminal: string }
 /**
  * 즐겨찾기 항목. `kind`는 "item" | "separator" | "group". 그룹은 한 단계까지 지원한다.

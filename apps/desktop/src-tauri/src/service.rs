@@ -40,6 +40,9 @@ pub struct EntryDto {
     /// 유닉스 권한 비트. Windows에서는 null.
     pub mode: Option<u32>,
     pub hidden: bool,
+    /// 심볼릭 링크이고 그 대상(링크를 끝까지 따라간 곳)이 폴더이면 true. 링크가 아니거나 대상이 파일·없음이면 false.
+    /// 종류(`kind`)는 그대로 링크라서, 이 값은 "폴더처럼 들어갈 수 있는가"만 알려 준다.
+    pub link_is_dir: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -81,6 +84,8 @@ impl From<&Entry> for EntryDto {
                 .map(|d| d.as_millis() as f64),
             mode: e.mode,
             hidden: e.hidden,
+            link_is_dir: e.kind == EntryKind::Symlink
+                && std::fs::metadata(e.path.as_path()).is_ok_and(|m| m.is_dir()),
         }
     }
 }
@@ -467,6 +472,7 @@ impl From<&UsageItem> for EntryDto {
             created_ms: None,
             mode: None,
             hidden: i.name.starts_with('.'),
+            link_is_dir: false,
         }
     }
 }
@@ -1884,6 +1890,32 @@ mod tests {
         assert_eq!(svc.preview(&upper).unwrap().kind, PreviewKindDto::Image);
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn link_is_dir_marks_only_symlinks_that_point_to_folders() {
+        let (_t, svc, _ch, root) = setup();
+        let dir = format!("{root}/links");
+        std::fs::create_dir_all(format!("{dir}/realdir")).unwrap();
+        std::fs::write(format!("{dir}/realfile"), "x").unwrap();
+        std::os::unix::fs::symlink(format!("{dir}/realdir"), format!("{dir}/to_dir")).unwrap();
+        std::os::unix::fs::symlink(format!("{dir}/realfile"), format!("{dir}/to_file")).unwrap();
+        std::os::unix::fs::symlink(format!("{dir}/nowhere"), format!("{dir}/broken")).unwrap();
+        // 링크의 링크도 끝까지 따라가 폴더면 폴더다.
+        std::os::unix::fs::symlink(format!("{dir}/to_dir"), format!("{dir}/to_link_to_dir"))
+            .unwrap();
+        let entries = svc.list_dir(&dir, true).unwrap();
+        let flag = |name: &str| entries.iter().find(|e| e.name == name).unwrap().link_is_dir;
+        assert!(flag("to_dir"), "폴더 링크");
+        assert!(flag("to_link_to_dir"), "링크의 링크");
+        assert!(!flag("to_file"), "파일 링크");
+        assert!(!flag("broken"), "끊어진 링크");
+        assert!(!flag("realdir"), "일반 폴더는 링크가 아니다");
+        assert!(!flag("realfile"), "일반 파일");
+        // 종류는 그대로 링크다(아이콘·정렬·파일 작업이 링크로 다루는 방식을 바꾸지 않는다).
+        let kind = |name: &str| entries.iter().find(|e| e.name == name).unwrap().kind;
+        assert_eq!(kind("to_dir"), KindDto::Symlink);
+    }
+
     #[test]
     fn dir_size_sums_nested_files_including_hidden() {
         let (_t, svc, _ch, root) = setup();
@@ -2082,6 +2114,7 @@ mod tests {
                 created_ms: Some(1_780_000_000_000.0),
                 mode: Some(0o644),
                 hidden: false,
+                link_is_dir: false,
             })
             .collect();
         let t = std::time::Instant::now();

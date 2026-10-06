@@ -22,6 +22,7 @@ function entries(): EntryDto[] {
     modifiedMs: 1_780_000_000_000 + ((i * 131) % 86_400_000),
     createdMs: 1_780_000_000_000,
     mode: 0o644,
+    linkIsDir: false,
     hidden: false,
   }));
 }

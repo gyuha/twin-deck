@@ -173,15 +173,26 @@ export class FakeBackend implements Backend {
       createdMs: n.createdMs ?? 0,
       mode: n.kind === "dir" ? 0o755 : 0o644,
       hidden: name.startsWith("."),
+      linkIsDir: !!n.link && this.nodes.get(n.link)?.kind === "dir",
     };
   }
 
+  /** 테스트용: `path`에 `target`을 가리키는 심볼릭 링크를 만든다. 대상이 없어도(끊어진 링크) 만들 수 있다. */
+  seedLink(path: string, target: string) {
+    this.nodes.set(path, { kind: "file", content: "", link: target });
+    return this;
+  }
+
   async listDir(path: string, showHidden: boolean): Promise<EntryDto[]> {
-    if (this.need(path).kind !== "dir") throw new BackendError(`폴더가 아님: ${path}`);
-    const prefix = path === "/" ? "/" : `${path}/`;
+    // 폴더를 가리키는 링크는 대상 폴더의 내용을 링크 경로 아래 항목으로 보여 준다(실제 파일시스템처럼).
+    const node = this.need(path);
+    const real = node.link && this.nodes.get(node.link)?.kind === "dir" ? node.link : path;
+    if (this.need(real).kind !== "dir") throw new BackendError(`폴더가 아님: ${path}`);
+    const prefix = real === "/" ? "/" : `${real}/`;
     const out: EntryDto[] = [];
-    for (const [p, n] of this.nodes) {
-      if (p === path || !p.startsWith(prefix) || p.slice(prefix.length).includes("/")) continue;
+    for (const [rp, n] of this.nodes) {
+      if (rp === real || !rp.startsWith(prefix) || rp.slice(prefix.length).includes("/")) continue;
+      const p = real === path ? rp : `${path}/${rp.slice(prefix.length)}`;
       const name = baseName(p);
       // `x.zip!`는 아카이브 안쪽을 여는 가상 위치라서 부모 목록에는 나오지 않는다.
       if (name.endsWith("!") && this.nodes.get(p.slice(0, -1))?.kind === "file") continue;
