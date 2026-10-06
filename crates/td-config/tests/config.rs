@@ -577,3 +577,22 @@ fn preview_autoplay_round_trips_through_user_config() {
     let l = load_dir(dir.path(), Platform::Linux);
     assert!(!l.config.preview.audio_autoplay && l.config.preview.video_autoplay);
 }
+
+#[test]
+fn folder_size_on_select_defaults_to_true_and_can_be_turned_off() {
+    let l = load("");
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert!(l.config.display.folder_size_on_select, "기본은 켜짐");
+
+    let l = load("[display]\nfolder_size_on_select = false\n");
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert!(!l.config.display.folder_size_on_select);
+
+    // 타입이 틀리면 경고하고 기본값을 쓴다
+    let l = load("[display]\nfolder_size_on_select = \"no\"\n");
+    assert!(l
+        .warnings
+        .iter()
+        .any(|w| w.message.contains("folder_size_on_select")));
+    assert!(l.config.display.folder_size_on_select);
+}

@@ -31,8 +31,9 @@ describe("선택 요약 계산", () => {
 
 describe("선택 요약 상태 줄", () => {
   // /home/a 이름순: docs, sub(폴더 둘), a.txt(1000 B), b.txt(2500 B). 숨김 파일 .h(700 B)는 표시를 켜기 전에는 목록에 없다.
-  const seed = () =>
-    new FakeBackend().seed({
+  // 폴더 용량 계산(`display.folder_size_on_select`)은 끄고 파일 규칙만 시험한다. 켠 상태는 `folder-size-select.test.tsx`가 다룬다.
+  const seed = () => {
+    const b = new FakeBackend().seed({
       "/home/a/docs/in.txt": "x".repeat(50),
       "/home/a/sub/in.txt": "y",
       "/home/a/a.txt": "a".repeat(1000),
@@ -40,6 +41,9 @@ describe("선택 요약 상태 줄", () => {
       "/home/a/.h": "h".repeat(700),
       "/home/b/z.txt": "z".repeat(40),
     });
+    b.setConfig((l) => (l.config.display.folder_size_on_select = false));
+    return b;
+  };
   const status = () => screen.getByRole("status", { name: "상태 표시줄" });
 
   it("선택이 없을 때는 전체 규모를 `선택: 0 / 전체` 형식으로 보여 준다", async () => {
@@ -47,7 +51,7 @@ describe("선택 요약 상태 줄", () => {
     expect(status()).toHaveTextContent("선택: 0 / 3.5 KB, 파일: 0/2, 폴더: 0/2");
   });
 
-  it("선택하면 선택한 용량·파일·폴더 수가 올라가고 폴더 용량은 더하지 않는다", async () => {
+  it("선택하면 선택한 용량·파일·폴더 수가 올라가고 폴더 용량 계산을 끄면 폴더 용량은 더하지 않는다", async () => {
     const { user } = await renderApp(seed());
     await user.keyboard("{Insert}"); // docs(폴더) 선택, 커서는 sub로
     expect(status()).toHaveTextContent("선택: 0 / 3.5 KB, 파일: 0/2, 폴더: 1/2");

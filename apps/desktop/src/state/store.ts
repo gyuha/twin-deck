@@ -260,6 +260,8 @@ export interface AppState {
   /** 왼쪽 패널이 차지하는 너비 비율(0~1). 화면 크기가 바뀌어도 비율이 유지된다. */
   split: number;
   showHidden: boolean;
+  /** 선택해서 계산한 폴더의 하위 용량(바이트). null은 계산 중·대기 중이고, 없으면 계산하지 않은 폴더다. */
+  dirSizes: Record<string, number | null>;
   dialog: DialogState | null;
   /** 열려 있는 미리보기 (VIEW-01). */
   preview: PreviewState | null;
@@ -430,6 +432,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     activePane: snapshot?.activePane === "right" ? "right" : "left",
     split: clampSplit((snapshot?.split ?? 500) / 1000),
     showHidden: snapshot?.showHidden ?? false,
+    dirSizes: {},
     dialog: null,
     preview: null,
     drag: null,
@@ -469,7 +472,22 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
 
   /** 목록을 다시 읽는다. 커서는 이름으로, 선택은 남아 있는 경로로 유지한다. `focusName`이 있으면 커서를 그 이름에 둔다. */
   const reloadSeq = new Map<string, number>();
-  async function reload(pane: PaneId, tabId: number, focusName?: string) {
+  /** 폴더 `dir`를 다시 읽었을 때: 그 안의 직계 폴더들에 계산해 둔 하위 용량을 지운다(내용이 달라졌을 수 있다). */
+  function forgetDirSizesIn(dir: string) {
+    const stale = Object.keys(get().dirSizes).filter((p) => parentPath(p) === dir && get().dirSizes[p] !== null);
+    if (stale.length === 0) return;
+    set((s) => {
+      const next = { ...s.dirSizes };
+      for (const p of stale) delete next[p];
+      return { dirSizes: next };
+    });
+  }
+
+  /**
+   * 패널의 탭 목록을 다시 읽는다. `keepDirSizes`이면 선택해서 계산해 둔 폴더 용량을 지우지 않는다 — 폴더 내용이 바뀐 것이 아니라
+   * 화면 설정이 바뀌어 다시 읽을 때(`onConfigChanged`)가 그렇다.
+   */
+  async function reload(pane: PaneId, tabId: number, focusName?: string, keepDirSizes = false) {
     const tab = get().panes[pane].tabs.find((t) => t.id === tabId);
     if (!tab) return;
     if (tab.virtual) return revalidateVirtual(pane, tab);
@@ -493,6 +511,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
           selection: new Set([...t.selection].filter((p) => paths.has(p))),
         };
       });
+      if (!keepDirSizes) forgetDirSizesIn(tab.path);
     } catch (e) {
       if (reloadSeq.get(key) !== seq) return;
       patchTab(pane, tabId, { entries: [], cursor: 0, selection: new Set(), error: String(e instanceof Error ? e.message : e) });
@@ -566,11 +585,11 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     await syncWatches();
   }
 
-  const reloadAll = () => {
+  const reloadAll = (keepDirSizes = false) => {
     // 복사·이동·삭제로 남은 용량이 달라졌을 수 있다.
     void refreshDiskSpace("left");
     void refreshDiskSpace("right");
-    return Promise.all((["left", "right"] as const).flatMap((pane) => get().panes[pane].tabs.map((t) => reload(pane, t.id))));
+    return Promise.all((["left", "right"] as const).flatMap((pane) => get().panes[pane].tabs.map((t) => reload(pane, t.id, undefined, keepDirSizes))));
   };
 
   /**
@@ -612,6 +631,78 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       }
     }
   }));
+
+  // 선택한 폴더의 하위 용량 계산(옵션 `display.folder_size_on_select`). 폴더를 선택하면 백그라운드에서 한 번에 하나씩 순서대로 계산하고,
+  // 선택을 풀거나 폴더를 벗어나면 진행 중·대기 중 계산을 멈춘다. 끝난 크기는 그 폴더 목록을 다시 읽기 전까지 남는다.
+  const dirSizeQueue: string[] = [];
+  let dirSizeRunning: string | null = null;
+  let dirSizeInputs: unknown[] = [];
+  function wantedDirSizes(s: AppState): string[] {
+    if (!s.loaded.config.display.folder_size_on_select) return [];
+    const out: string[] = [];
+    for (const pane of ["left", "right"] as const) {
+      const t = activeTab(s, pane);
+      if (t.virtual || isArchivePath(t.path) || t.selection.size === 0) continue;
+      for (const e of t.entries) if (e.kind === "dir" && t.selection.has(e.path)) out.push(e.path);
+    }
+    return out;
+  }
+  function syncDirSizes(s: AppState) {
+    // 목록·선택·옵션이 그대로면(커서만 움직인 경우 등) 다시 세지 않는다.
+    const inputs = [s.loaded.config.display.folder_size_on_select, ...(["left", "right"] as const).flatMap((pane) => {
+      const t = activeTab(s, pane);
+      return [t.entries, t.selection, t.virtual, t.path];
+    })];
+    if (inputs.length === dirSizeInputs.length && inputs.every((v, i) => v === dirSizeInputs[i])) return;
+    dirSizeInputs = inputs;
+    const wanted = wantedDirSizes(s);
+    const wantedSet = new Set(wanted);
+    const drop: string[] = [];
+    // 더는 필요 없는 대기 중 계산은 뺀다.
+    for (let i = dirSizeQueue.length - 1; i >= 0; i--) {
+      if (!wantedSet.has(dirSizeQueue[i])) drop.push(...dirSizeQueue.splice(i, 1));
+    }
+    // 진행 중인 계산이 필요 없어졌으면 멈춘다(결과는 `pumpDirSizes`가 버린다).
+    if (dirSizeRunning !== null && !wantedSet.has(dirSizeRunning)) void backend.cancelDirSize(dirSizeRunning).catch(() => {});
+    const queued = new Set(dirSizeQueue);
+    const add = wanted.filter((p) => typeof s.dirSizes[p] !== "number" && p !== dirSizeRunning && !queued.has(p) && s.dirSizes[p] !== null);
+    dirSizeQueue.push(...add);
+    // 옵션이 꺼지면 계산해 둔 크기도 모두 지운다.
+    const clearAll = !s.loaded.config.display.folder_size_on_select && Object.keys(s.dirSizes).length > 0;
+    if (clearAll || drop.length > 0 || add.length > 0) {
+      set((cur) => {
+        if (clearAll) return { dirSizes: {} };
+        const next = { ...cur.dirSizes };
+        for (const p of drop) if (next[p] === null) delete next[p];
+        for (const p of add) next[p] = null;
+        return { dirSizes: next };
+      });
+    }
+    void pumpDirSizes();
+  }
+  async function pumpDirSizes() {
+    if (dirSizeRunning !== null) return;
+    const path = dirSizeQueue.shift();
+    if (path === undefined) return;
+    dirSizeRunning = path;
+    let size: number | null = null;
+    try {
+      size = await backend.dirSize(path);
+    } catch {
+      size = null; // 읽지 못한 폴더는 크기 없이 둔다
+    }
+    dirSizeRunning = null;
+    // 계산하는 사이에 같은 폴더를 다시 선택했을 수 있다. 입력 기록을 비워 이번 `set`이 필요한 계산을 다시 세게 한다.
+    dirSizeInputs = [];
+    set((s) => {
+      const next = { ...s.dirSizes };
+      if (size !== null && s.loaded.config.display.folder_size_on_select) next[path] = size;
+      else delete next[path];
+      return { dirSizes: next };
+    });
+    void pumpDirSizes();
+  }
+  subscribe(() => store.subscribe((s) => syncDirSizes(s)));
 
   subscribe(() => backend.onDirChanged((path) => {
     for (const pane of ["left", "right"] as const) {
@@ -714,9 +805,11 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     applyQueue(jobs);
   }));
   // 설정이 바뀌면 컬럼 명세(정렬 표시)나 표시 옵션이 달라질 수 있으니 목록을 다시 정렬한다.
+  // 설정 폴더 감시는 그 폴더의 어떤 파일이 바뀌어도(커서·선택이 바뀔 때마다 저장하는 state.json 포함) 알리므로, 이때의 다시 읽기는
+  // 폴더 내용이 바뀐 것이 아니다 — 계산해 둔 폴더 용량을 지우지 않는다.
   subscribe(() => backend.onConfigChanged((loaded) => {
     set({ loaded });
-    void reloadAll();
+    void reloadAll(true);
   }));
   const cfg = () => get().loaded.config;
 
@@ -2577,7 +2670,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     },
 
     reload: (pane: PaneId, tabId: number, focusName?: string) => reload(pane, tabId, focusName),
-    reloadAll,
+    reloadAll: () => reloadAll(),
     /** 비활성 패널의 활성 탭 경로(가상 탭이면 시작 위치). */
     inactivePath(): string {
       const s = get();

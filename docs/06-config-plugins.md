@@ -69,6 +69,7 @@ relative_date = true
 date_format = "%-d %b %Y"         # strftime
 time_format = "%H:%M"
 size_format = "adaptive"          # adaptive | adaptive_kibi | bytes | KB | MB | GB | TB | KiB | MiB | GiB | TiB
+folder_size_on_select = true      # 폴더를 선택하면 하위 파일의 총 용량을 백그라운드로 계산해 크기 칸과 상태 줄에 보여 준다 (끄면 계산하지 않는다)
 
 [environment]
 text_editor = "Visual Studio Code" # 편집 액션이 사용할 앱

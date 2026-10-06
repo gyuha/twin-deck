@@ -79,6 +79,10 @@ export interface Backend {
   startDiskUsage(root: string): Promise<number>;
   /** 실행 중인 검색/순회를 취소한다. 취소돼도 `done` 이벤트는 온다. */
   cancelSearch(id: number): Promise<void>;
+  /** 폴더 하나의 하위 총 용량(바이트). 숨김 파일 포함, 하드 링크는 한 번, 심볼릭 링크는 따라가지 않는다. 취소되면 null이다. */
+  dirSize(path: string): Promise<number | null>;
+  /** 계산 중인 `dirSize(path)`를 취소한다. 계산 중이 아니면 아무 일도 없다. */
+  cancelDirSize(path: string): Promise<void>;
   onSearchEvent(callback: (event: SearchEvent) => void): () => void;
   /** 마운트된 볼륨. 루트가 첫 항목이다. */
   listVolumes(): Promise<VolumeDto[]>;

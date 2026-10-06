@@ -29,6 +29,7 @@ relative_date = true
 date_format = "%-d %b %Y"
 time_format = "%H:%M"
 size_format = "adaptive"
+folder_size_on_select = true
 
 [environment]
 text_editor = ""

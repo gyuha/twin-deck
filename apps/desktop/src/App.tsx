@@ -78,7 +78,8 @@ function StatusBar() {
   const entries = useApp((s) => activeTab(s).entries);
   const selection = useApp((s) => activeTab(s).selection);
   const sizeFormat = useApp((s) => s.loaded.config.display.size_format);
-  const summary = useMemo(() => selectionSummary(entries, selection), [entries, selection]);
+  const dirSizes = useApp((s) => s.dirSizes);
+  const summary = useMemo(() => selectionSummary(entries, selection, dirSizes), [entries, selection, dirSizes]);
   const notice = useApp((s) => s.notice);
   const flash = useApp((s) => s.flash);
   const fileWarnings = useApp((s) => s.loaded.warnings.length);

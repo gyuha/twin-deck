@@ -126,6 +126,12 @@ export class TauriBackend implements Backend {
   async cancelSearch(id: number) {
     await commands.cancelSearch(id);
   }
+  async dirSize(path: string) {
+    return unwrap(await commands.dirSize(path));
+  }
+  async cancelDirSize(path: string) {
+    await commands.cancelDirSize(path);
+  }
   onSearchEvent(callback: (event: SearchEvent) => void) {
     const unlisten = [
       events.searchChunk.listen((e) => callback({ type: "chunk", id: e.payload.id, entries: e.payload.entries })),

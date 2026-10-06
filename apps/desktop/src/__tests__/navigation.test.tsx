@@ -108,7 +108,7 @@ describe("SEL-01 전체 선택과 해제", () => {
     const { user } = await renderApp();
     await user.keyboard("{Control>}a{/Control}");
     expect(selectedNames("left")).toHaveLength(5);
-    expect(screen.getByRole("status", { name: "상태 표시줄" })).toHaveTextContent("선택: 12 B / 12 B, 파일: 3/3, 폴더: 2/2");
+    expect(screen.getByRole("status", { name: "상태 표시줄" })).toHaveTextContent("파일: 3/3, 폴더: 2/2");
     await user.keyboard("{Escape}");
     expect(selectedNames("left")).toHaveLength(0);
   });

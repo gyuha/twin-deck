@@ -138,13 +138,15 @@ export const COLUMN_TITLES: Record<ColumnName, string> = {
 };
 
 /** 한 셀의 표시 문자열. */
-/** `dirSize`: 폴더에도 크기를 보여 준다(Disk Usage 결과는 폴더의 총 크기를 담고 있다). */
-export function cellText(e: EntryDto, column: ColumnName, display: Display, now?: number, dirSize = false): string {
+/** `dirSize`: 폴더에도 크기를 보여 준다(Disk Usage 결과는 폴더의 총 크기를 담고 있다). `folderBytes`: 그 폴더의 계산한 하위 용량(null은 계산 중). */
+export function cellText(e: EntryDto, column: ColumnName, display: Display, now?: number, dirSize = false, folderBytes?: number | null): string {
   switch (column) {
     case "name":
       return e.name;
     case "size":
-      return e.kind === "dir" && !dirSize ? "" : formatSize(e.size, display.size_format);
+      // `folderBytes`: 선택해서 계산한 폴더 하위 용량. 계산 전(undefined)이면 비우고, 계산 중(null)이면 `…`이다.
+      if (e.kind === "dir" && !dirSize) return folderBytes === undefined ? "" : folderBytes === null ? "…" : formatSize(folderBytes, display.size_format);
+      return formatSize(e.size, display.size_format);
     case "created":
       return formatDate(e.createdMs, display, now);
     case "modified":

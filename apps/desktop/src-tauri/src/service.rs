@@ -574,6 +574,8 @@ pub struct Service<T: Trasher> {
     watcher: Mutex<DirWatcher>,
     /// 실행 중인 검색/순회 작업의 취소 표시.
     searches: Arc<Mutex<HashMap<u32, CancelToken>>>,
+    /// 폴더 용량을 계산 중인 경로별 취소 표시(`dir_size`).
+    dir_sizes: Mutex<HashMap<String, CancelToken>>,
     next_search: AtomicU32,
     search_tx: Sender<SearchMsg>,
     file_clipboard: Box<dyn FileClipboard>,
@@ -593,6 +595,7 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
                 queue,
                 watcher: Mutex::new(watcher),
                 searches: Arc::default(),
+                dir_sizes: Mutex::new(HashMap::new()),
                 next_search: AtomicU32::new(0),
                 search_tx,
                 file_clipboard: Box::new(SystemFileClipboard),
@@ -760,6 +763,56 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
     /// 실행 중인 검색/순회 작업을 취소한다. 이미 끝났으면 아무 일도 없다.
     pub fn cancel_search(&self, id: u32) {
         if let Some(c) = self.searches.lock().unwrap().get(&id) {
+            c.cancel();
+        }
+    }
+
+    /// 폴더 하나의 하위 총 용량(바이트). 숨김 파일을 포함하고, 하드 링크는 한 번만, 심볼릭 링크는 따라가지 않고,
+    /// 다른 볼륨의 하위 폴더는 넘지 않는다. 계산하는 동안 `cancel_dir_size`로 취소할 수 있고 취소되면 `None`이다.
+    pub fn dir_size(&self, path: &str) -> ServiceResult<Option<f64>> {
+        let cancel = CancelToken::new();
+        // 같은 경로의 이전 계산이 남아 있으면 멈추고 이번 것으로 바꾼다.
+        if let Some(old) = self
+            .dir_sizes
+            .lock()
+            .unwrap()
+            .insert(path.to_string(), cancel.clone())
+        {
+            old.cancel();
+        }
+        let result = self.dir_size_with(path, &cancel);
+        let mut running = self.dir_sizes.lock().unwrap();
+        // 그 사이에 같은 경로로 새 계산이 등록됐다면 지우지 않는다.
+        if running.get(path).is_some_and(|c| c.same_as(&cancel)) {
+            running.remove(path);
+        }
+        result
+    }
+
+    /// `dir_size`의 계산 본체. 호출자가 취소 표시를 쥐고 있다.
+    pub(crate) fn dir_size_with(
+        &self,
+        path: &str,
+        cancel: &CancelToken,
+    ) -> ServiceResult<Option<f64>> {
+        let root = vp(path);
+        let entry = self.fs.stat(&root).map_err(|e| e.to_string())?;
+        if entry.kind != EntryKind::Dir {
+            return Err(format!("폴더가 아닙니다: {path}"));
+        }
+        let (_items, report) = td_search::disk_usage(
+            &self.fs,
+            &root,
+            &UsageOptions::default(),
+            cancel,
+            &mut |_| {},
+        );
+        Ok((!report.cancelled && !cancel.is_cancelled()).then_some(report.total_bytes as f64))
+    }
+
+    /// 경로의 폴더 용량 계산을 취소한다. 계산 중이 아니면 아무 일도 없다.
+    pub fn cancel_dir_size(&self, path: &str) {
+        if let Some(c) = self.dir_sizes.lock().unwrap().get(path) {
             c.cancel();
         }
     }
@@ -1829,6 +1882,80 @@ mod tests {
         let upper = format!("{root}/BOOK.CBZ");
         std::fs::rename(&dest, &upper).unwrap();
         assert_eq!(svc.preview(&upper).unwrap().kind, PreviewKindDto::Image);
+    }
+
+    #[test]
+    fn dir_size_sums_nested_files_including_hidden() {
+        let (_t, svc, _ch, root) = setup();
+        let dir = format!("{root}/proj");
+        std::fs::create_dir_all(format!("{dir}/sub/deep")).unwrap();
+        std::fs::write(format!("{dir}/a.txt"), vec![1u8; 100]).unwrap();
+        std::fs::write(format!("{dir}/.hidden"), vec![1u8; 7]).unwrap();
+        std::fs::write(format!("{dir}/sub/b.bin"), vec![1u8; 2000]).unwrap();
+        std::fs::write(format!("{dir}/sub/deep/c"), vec![1u8; 30]).unwrap();
+        assert_eq!(svc.dir_size(&dir).unwrap(), Some(2137.0));
+    }
+
+    #[test]
+    fn dir_size_of_empty_folder_is_zero() {
+        let (_t, svc, _ch, root) = setup();
+        let dir = format!("{root}/empty");
+        std::fs::create_dir_all(&dir).unwrap();
+        assert_eq!(svc.dir_size(&dir).unwrap(), Some(0.0));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn dir_size_counts_hard_links_once_and_does_not_follow_symlinks() {
+        let (_t, svc, _ch, root) = setup();
+        let dir = format!("{root}/links");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(format!("{dir}/a"), vec![1u8; 1000]).unwrap();
+        std::fs::hard_link(format!("{dir}/a"), format!("{dir}/b")).unwrap();
+        // 폴더를 가리키는 심볼릭 링크: 따라가지 않고 링크 자체의 크기만 센다.
+        let outside = format!("{root}/outside");
+        std::fs::create_dir_all(&outside).unwrap();
+        std::fs::write(format!("{outside}/big"), vec![1u8; 5000]).unwrap();
+        std::os::unix::fs::symlink(&outside, format!("{dir}/lnk")).unwrap();
+        let link_len = std::fs::symlink_metadata(format!("{dir}/lnk"))
+            .unwrap()
+            .len();
+        assert_eq!(svc.dir_size(&dir).unwrap(), Some(1000.0 + link_len as f64));
+    }
+
+    #[test]
+    fn dir_size_returns_none_when_cancelled() {
+        let (_t, svc, _ch, root) = setup();
+        let dir = format!("{root}/c");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(format!("{dir}/a"), vec![1u8; 10]).unwrap();
+        let cancel = CancelToken::new();
+        cancel.cancel();
+        assert_eq!(svc.dir_size_with(&dir, &cancel).unwrap(), None);
+    }
+
+    #[test]
+    fn cancel_dir_size_stops_a_running_calculation_by_path() {
+        let (_t, svc, _ch, root) = setup();
+        let dir = format!("{root}/running");
+        std::fs::create_dir_all(&dir).unwrap();
+        // 등록된 계산이 없으면 아무 일도 없고, 등록된 토큰은 취소로 표시된다.
+        svc.cancel_dir_size(&dir);
+        let token = CancelToken::new();
+        svc.dir_sizes
+            .lock()
+            .unwrap()
+            .insert(dir.clone(), token.clone());
+        svc.cancel_dir_size(&dir);
+        assert!(token.is_cancelled());
+    }
+
+    #[test]
+    fn dir_size_rejects_missing_paths_and_files() {
+        let (_t, svc, _ch, root) = setup();
+        assert!(svc.dir_size(&format!("{root}/nope")).is_err());
+        std::fs::write(format!("{root}/f.txt"), "x").unwrap();
+        assert!(svc.dir_size(&format!("{root}/f.txt")).is_err());
     }
 
     fn make_zip_tree(dir: &std::path::Path, dest: &str, files: &[&str]) {

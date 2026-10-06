@@ -71,6 +71,8 @@ pub struct Display {
     pub date_format: String,
     pub time_format: String,
     pub size_format: String,
+    /// 폴더를 선택하면 그 하위 파일의 총 용량을 백그라운드로 계산해 크기 칸과 상태 줄에 보여 준다.
+    pub folder_size_on_select: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

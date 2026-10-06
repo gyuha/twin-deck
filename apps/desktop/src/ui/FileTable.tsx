@@ -89,6 +89,7 @@ export function FileTable({ pane }: { pane: PaneId }) {
   const tab = useApp((s) => activeTab(s, pane));
   const isActive = useApp((s) => s.activePane === pane);
   const config = useApp((s) => s.loaded.config);
+  const dirSizes = useApp((s) => s.dirSizes);
   const rightClickSelect = config.behavior.table.right_click_select;
   const iconSize = config.behavior.table.icon_size;
   const columns = useMemo(() => parseColumns(config.view.table.columns), [config.view.table.columns]);
@@ -169,7 +170,7 @@ export function FileTable({ pane }: { pane: PaneId }) {
             {c.name === "name" && tab.quick ? (
               <QuickHighlight name={e.name} input={tab.quick} prefixOnly={config.behavior.quick_select.match_only_prefix} />
             ) : (
-              cellText(e, c.name, config.display, undefined, tab.virtual?.kind === "usage")
+              cellText(e, c.name, config.display, undefined, tab.virtual?.kind === "usage", dirSizes[e.path])
             )}
           </span>
         ))}

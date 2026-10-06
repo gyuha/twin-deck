@@ -550,6 +550,19 @@ pub fn start_disk_usage(svc: State<'_, AppService>, root: String) -> u32 {
     svc.start_disk_usage(&root, false)
 }
 
+/// 폴더 하나의 하위 총 용량(바이트). 오래 걸릴 수 있어 메인 스레드가 아닌 곳에서 돌린다. 취소되면 `None`.
+#[tauri::command(async)]
+#[specta::specta]
+pub fn dir_size(svc: State<'_, AppService>, path: String) -> ServiceResult<Option<f64>> {
+    svc.dir_size(&path)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn cancel_dir_size(svc: State<'_, AppService>, path: String) {
+    svc.cancel_dir_size(&path);
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn cancel_search(svc: State<'_, AppService>, id: u32) {
@@ -616,7 +629,9 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             start_find,
             start_flatten,
             start_disk_usage,
-            cancel_search
+            cancel_search,
+            dir_size,
+            cancel_dir_size
         ])
         .events(collect_events![
             DirChanged,

@@ -53,6 +53,7 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
       { key: "display.date_format", title: "날짜 형식", desc: "strftime 형식", control: { type: "text" } },
       { key: "display.time_format", title: "시간 형식", desc: "strftime 형식", control: { type: "text" } },
       { key: "display.size_format", title: "크기 형식", control: { type: "select", options: SIZE_FORMATS } },
+      { key: "display.folder_size_on_select", title: "선택한 폴더 용량 계산", desc: "폴더를 선택하면 하위 파일의 총 용량을 계산해 크기 칸과 상태 줄에 보여 줍니다", control: { type: "switch" } },
     ],
   },
   {

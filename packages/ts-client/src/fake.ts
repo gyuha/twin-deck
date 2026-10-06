@@ -576,6 +576,34 @@ export class FakeBackend implements Backend {
     this.finishSearch(id, true);
   }
 
+  /** 테스트용: `dirSize`가 계산하는 데 걸리는 시간(밀리초). 0이면 바로 끝난다. 취소를 시험하려고 늘린다. */
+  dirSizeDelayMs = 0;
+  /** 테스트용: 계산 중 취소를 확인하는 간격(밀리초). 늘리면 취소 결과가 늦게 돌아오는 경쟁을 만들 수 있다. */
+  dirSizePollMs = 10;
+  /** 테스트용: `dirSize`를 호출한 경로들(호출 순서대로). */
+  dirSizeCalls: string[] = [];
+  private dirSizeCancelled = new Set<string>();
+
+  /** 폴더 아래 파일 크기(내용 길이)의 합. 폴더가 아니면 거부한다. 취소되면 null이다. */
+  async dirSize(path: string): Promise<number | null> {
+    this.dirSizeCalls.push(path);
+    const node = this.need(path);
+    if (node.kind !== "dir") throw new BackendError(`폴더가 아닙니다: ${path}`);
+    this.dirSizeCancelled.delete(path);
+    for (let waited = 0; waited < this.dirSizeDelayMs; waited += this.dirSizePollMs) {
+      await new Promise((r) => setTimeout(r, this.dirSizePollMs));
+      if (this.dirSizeCancelled.has(path)) {
+        this.dirSizeCancelled.delete(path);
+        return null;
+      }
+    }
+    return [...this.nodes].filter(([k, n]) => k.startsWith(`${path}/`) && n.kind === "file" && !k.includes("!")).reduce((sum, [, n]) => sum + n.content.length, 0);
+  }
+
+  async cancelDirSize(path: string) {
+    this.dirSizeCancelled.add(path);
+  }
+
   async listVolumes() {
     return this.volumes.map((v) => ({ ...v }));
   }

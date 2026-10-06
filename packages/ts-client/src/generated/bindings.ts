@@ -365,6 +365,20 @@ async startDiskUsage(root: string) : Promise<number> {
 },
 async cancelSearch(id: number) : Promise<void> {
     await TAURI_INVOKE("cancel_search", { id });
+},
+/**
+ * 폴더 하나의 하위 총 용량(바이트). 오래 걸릴 수 있어 메인 스레드가 아닌 곳에서 돌린다. 취소되면 `None`.
+ */
+async dirSize(path: string) : Promise<Result<number | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("dir_size", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cancelDirSize(path: string) : Promise<void> {
+    await TAURI_INVOKE("cancel_dir_size", { path });
 }
 }
 
@@ -467,7 +481,11 @@ export type DirChanged = { path: string }
  * 경로가 놓인 파일시스템의 남은 용량과 전체 용량(바이트).
  */
 export type DiskSpaceDto = { free: number; total: number }
-export type Display = { relative_date: boolean; date_format: string; time_format: string; size_format: string }
+export type Display = { relative_date: boolean; date_format: string; time_format: string; size_format: string; 
+/**
+ * 폴더를 선택하면 그 하위 파일의 총 용량을 백그라운드로 계산해 크기 칸과 상태 줄에 보여 준다.
+ */
+folder_size_on_select: boolean }
 export type EntryDto = { name: string; path: string; kind: KindDto; 
 /**
  * 바이트 수. JS 숫자로 전달한다.
