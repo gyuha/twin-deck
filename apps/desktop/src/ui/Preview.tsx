@@ -86,7 +86,12 @@ export function Preview() {
   if (!p) return null;
   const d = p.data;
   return (
-    <div className={["fixed inset-0 bg-black/30", rect ? "" : "flex items-center justify-center"].join(" ")}>
+    <div
+      onMouseDown={(e) => {
+        if (previewConfig.close_on_outside_click && e.button === 0 && e.target === e.currentTarget) api.previewClose();
+      }}
+      className={["fixed inset-0 bg-black/30", rect ? "" : "flex items-center justify-center"].join(" ")}
+    >
       <div
         role="dialog"
         aria-label={`미리보기: ${p.name}`}

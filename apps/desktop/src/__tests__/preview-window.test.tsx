@@ -159,3 +159,31 @@ describe("미리보기 창 기억", () => {
     expect(box(current())).toEqual({ x: VW - 64, y: VH - 32, w: VW, h: 200 });
   });
 });
+
+describe("미리보기 바깥 클릭", () => {
+  const overlay = () => current().parentElement as HTMLElement;
+  const openWith = async (on: boolean) => {
+    const b = seed();
+    b.setConfig((l) => {
+      l.config.preview.close_on_outside_click = on;
+    });
+    const r = await renderApp(b, undefined, undefined, { snapshot: snapWith(null) });
+    await r.user.keyboard("{ArrowRight}");
+    await screen.findByRole("dialog", { name: /미리보기/ });
+  };
+  it("옵션이 켜져 있으면 바깥을 눌러 닫는다", async () => {
+    await openWith(true);
+    fireEvent.mouseDown(overlay(), { button: 0 });
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: /미리보기/ })).toBeNull());
+  });
+  it("옵션이 켜져 있어도 창 안쪽을 누르면 닫히지 않는다", async () => {
+    await openWith(true);
+    fireEvent.mouseDown(title(), { button: 0 });
+    expect(current()).toBeTruthy();
+  });
+  it("옵션이 꺼져 있으면 바깥을 눌러도 닫히지 않는다", async () => {
+    await openWith(false);
+    fireEvent.mouseDown(overlay(), { button: 0 });
+    expect(current()).toBeTruthy();
+  });
+});

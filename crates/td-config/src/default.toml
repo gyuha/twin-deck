@@ -42,6 +42,7 @@ trash = false
 [preview]
 audio_autoplay = false
 video_autoplay = false
+close_on_outside_click = false
 
 [layout]
 action_bar = ["core.edit", "core.copy", "core.move", "core.file.new_folder", "core.trash", "core.delete"]

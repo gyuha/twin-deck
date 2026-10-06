@@ -40,7 +40,8 @@
     },
     "preview": {
       "audio_autoplay": false,
-      "video_autoplay": false
+      "video_autoplay": false,
+      "close_on_outside_click": false
     },
     "layout": {
       "action_bar": [

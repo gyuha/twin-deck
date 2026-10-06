@@ -88,6 +88,8 @@ pub struct PreviewConfig {
     pub audio_autoplay: bool,
     /// 비디오 파일의 미리보기를 열면 바로 재생한다.
     pub video_autoplay: bool,
+    /// 미리보기 창 바깥을 클릭하면 미리보기를 닫는다.
+    pub close_on_outside_click: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

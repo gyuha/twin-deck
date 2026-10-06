@@ -62,6 +62,7 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
     items: [
       { key: "preview.audio_autoplay", title: "사운드 자동 재생", desc: "mp3, wav, ogg 같은 사운드 파일의 미리보기를 열면 바로 재생합니다", control: { type: "switch" } },
       { key: "preview.video_autoplay", title: "비디오 자동 재생", desc: "mp4, mov, webm 같은 비디오 파일의 미리보기를 열면 바로 재생합니다", control: { type: "switch" } },
+      { key: "preview.close_on_outside_click", title: "바깥 클릭으로 닫기", desc: "미리보기 창 바깥을 클릭하면 미리보기를 닫습니다", control: { type: "switch" } },
     ],
   },
   {

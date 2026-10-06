@@ -563,7 +563,11 @@ audio_autoplay: boolean;
 /**
  * 비디오 파일의 미리보기를 열면 바로 재생한다.
  */
-video_autoplay: boolean }
+video_autoplay: boolean; 
+/**
+ * 미리보기 창 바깥을 클릭하면 미리보기를 닫는다.
+ */
+close_on_outside_click: boolean }
 /**
  * 미리보기 (VIEW-01). 텍스트는 앞부분, 이미지는 data URL.
  */
