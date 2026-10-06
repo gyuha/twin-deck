@@ -57,6 +57,11 @@ export function useKeyboard({ app, keymap, registry }: Options) {
           void api.menuSelectNth(Number(digit[1]));
           return;
         }
+        if (s.menu?.kind === "favorites" && e.key === "+") {
+          e.preventDefault();
+          void api.menuAddFavoriteHere();
+          return;
+        }
         if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key.length === 1 || e.key === "Backspace")) return;
       }
       // 팝업 메뉴: 숫자키로 항목을 고른다.

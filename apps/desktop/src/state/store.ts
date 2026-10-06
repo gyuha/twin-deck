@@ -2300,6 +2300,23 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (m?.kind !== "recent") return;
       set({ recent: [], menu: { ...m, items: [], all: [], filter: "", cursor: 0 } });
     },
+    /** 즐겨찾기 메뉴에서 `+`: 활성 탭의 현재 폴더를 추가하고 메뉴를 다시 만든다. 이미 있는 폴더는 무시한다. */
+    async menuAddFavoriteHere() {
+      const m = get().menu;
+      if (m?.kind !== "favorites") return;
+      const norm = (p: string) => (p.length > 1 ? p.replace(/[\\/]+$/, "") : p).normalize("NFC");
+      const here = hereOf(activeTab(get()));
+      if ((m.all ?? []).some((it) => it.path !== undefined && norm(it.path) === norm(here))) return;
+      set({ notice: null });
+      try {
+        await backend.addFavorite(baseName(here) || here, here);
+        set({ loaded: await backend.getConfig() });
+      } catch (e) {
+        fail(e);
+        return;
+      }
+      await api.openMenu("favorites");
+    },
     /** 현재 폴더를 즐겨찾기에 추가한다. */
     async addFavoriteHere() {
       const tab = activeTab(get());

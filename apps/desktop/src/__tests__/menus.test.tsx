@@ -114,6 +114,26 @@ describe("NAV-08 Favorites", () => {
     expect(within(d).getByText("일치하는 항목 없음")).toBeInTheDocument();
   });
 
+  it("+를 누르면 현재 폴더를 추가하고, 이미 있는 폴더는 무시한다", async () => {
+    const { user } = await renderApp(withFavs(favs));
+    await user.keyboard("{Alt>}2{/Alt}");
+    let d = await menu("즐겨찾기");
+    await user.keyboard("+");
+    await waitFor(() => expect(options(d)).toEqual(["Downloads", "Src", "a"]));
+    expect(within(d).getByRole("textbox", { name: "필터" })).toHaveValue(""); // +는 필터에 들어가지 않는다
+    expect(within(d).getByText(/\+ 현재 폴더 추가/)).toBeInTheDocument();
+    await user.keyboard("+"); // 같은 폴더를 또 추가해도 늘지 않는다
+    await new Promise((r) => setTimeout(r, 50));
+    expect(options(d)).toEqual(["Downloads", "Src", "a"]);
+    await user.keyboard("{Escape}{Enter}"); // 메뉴를 닫고 docs로 이동
+    await waitFor(() => expect(crumbs()).toEqual(["/", "home", "a", "docs"]));
+    await user.keyboard("{Alt>}2{/Alt}");
+    d = await menu("즐겨찾기");
+    await user.keyboard("+"); // docs는 이미 Downloads로 들어 있다
+    await new Promise((r) => setTimeout(r, 50));
+    expect(options(d)).toEqual(["Downloads", "Src", "a"]);
+  });
+
   it("Return으로 커서 항목(Downloads → ${user.downloads})으로 이동한다", async () => {
     const { user } = await renderApp(withFavs(favs));
     await user.keyboard("{Alt>}2{/Alt}");
