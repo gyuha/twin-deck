@@ -7,6 +7,10 @@
 #   publish 배포: 이 OS의 파일을 올린 뒤 초안을 공개한다(그때 태그 v<버전>이 만들어진다).
 #           macOS용과 Windows용 파일이 모두 올라와 있어야 공개한다. 한쪽만 공개하려면 ALLOW_PARTIAL=1.
 #
+# 앱 안 업데이트: 업데이트용 압축 파일(.app.tar.gz)과 서명(.sig)도 올리고, latest.json에 이 OS의 항목을 병합해 올린다.
+# 업데이트 산출물은 서명 키로 빌드해야 만들어진다(task release:draft / release가 TAURI_SIGNING_PRIVATE_KEY 또는
+# TAURI_SIGNING_PRIVATE_KEY_PATH 환경변수로 키를 읽는다). 이 OS 파일이 없는 버전은 latest.json에 그 OS 항목이 없어서 그 OS는 건너뛴다.
+#
 # 환경 변수(시험용): DRY_RUN=1 이면 GitHub를 바꾸는 명령은 출력만 한다. VERSION_OVERRIDE=<버전> 이면 그 버전으로 올린다.
 set -euo pipefail
 
@@ -23,6 +27,10 @@ TAG="v$VERSION"
 APP="target/release/bundle/macos/$APP_NAME.app"
 ZIP="target/release/bundle/twin-deck-$VERSION-macos-$(uname -m).zip"
 ZIP_NAME="$(basename "$ZIP")"
+# 업데이트 산출물. GitHub는 파일 이름의 공백을 바꿔 버려서, 올릴 때 공백 없는 이름으로 복사한다.
+UPD_SRC="target/release/bundle/macos/$APP_NAME.app.tar.gz"
+UPD_NAME="twin-deck-$VERSION-macos-$(uname -m).app.tar.gz"
+case "$(uname -m)" in arm64) PLATFORM="darwin-aarch64" ;; *) PLATFORM="darwin-x86_64" ;; esac
 
 run() { if [[ "${DRY_RUN:-}" == "1" ]]; then echo "[DRY_RUN] $*"; else "$@"; fi; }
 
@@ -57,6 +65,22 @@ if [[ -n "$INFO" ]]; then
   fi
 fi
 
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+if [[ ! -f "$UPD_SRC" || ! -f "$UPD_SRC.sig" ]]; then
+  if [[ "${DRY_RUN:-}" == "1" ]]; then
+    # DRY_RUN은 흐름만 시험하므로 서명 키 없이 가짜 산출물로 대신한다.
+    echo "[DRY_RUN] 업데이트 산출물이 없어 가짜 파일로 대신합니다 (키 없이 시험 중)"
+    UPD_SRC="$WORK/fake.app.tar.gz"; echo fake >"$UPD_SRC"; echo "FAKE-SIGNATURE" >"$UPD_SRC.sig"
+  else
+    echo "업데이트 산출물이 없습니다: $UPD_SRC(.sig)" >&2
+    echo "서명 키 환경변수(TAURI_SIGNING_PRIVATE_KEY 또는 TAURI_SIGNING_PRIVATE_KEY_PATH)를 설정하고 task release:draft 로 다시 빌드하세요" >&2
+    exit 1
+  fi
+fi
+cp "$UPD_SRC" "$WORK/$UPD_NAME"
+cp "$UPD_SRC.sig" "$WORK/$UPD_NAME.sig"
+
 rm -f "$ZIP"
 ditto -c -k --keepParent "$APP" "$ZIP"
 NOTE="서명하지 않은 빌드입니다. macOS에서 처음 열 때 막히면: xattr -dr com.apple.quarantine \"/Applications/$APP_NAME.app\""
@@ -66,6 +90,14 @@ if [[ -z "$INFO" ]]; then
 else
   run gh release upload "$TAG" "$ZIP" --clobber
 fi
+
+# 업데이트용 파일과 latest.json. 이미 올라온 latest.json(다른 OS 것)을 받아 이 OS 항목만 병합한다.
+REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
+gh release download "$TAG" -p latest.json -D "$WORK" >/dev/null 2>&1 || true
+node scripts/update-manifest.mjs --version "$VERSION" --platform "$PLATFORM" \
+  --url "https://github.com/$REPO/releases/download/$TAG/$UPD_NAME" --sig-file "$WORK/$UPD_NAME.sig" \
+  --notes "Twin Deck $VERSION" --existing "$WORK/latest.json" --out "$WORK/latest.json"
+run gh release upload "$TAG" "$WORK/$UPD_NAME" "$WORK/$UPD_NAME.sig" "$WORK/latest.json" --clobber
 
 if [[ "$MODE" == "draft" ]]; then
   echo "드래프트 배포 완료: $TAG (비공개 초안, 태그 없음). 공개하려면 task release"
