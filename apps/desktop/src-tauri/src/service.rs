@@ -132,6 +132,79 @@ const ARCHIVE_PREVIEW_MAX_LINES: usize = 2000;
 
 /// 압축 파일(이름으로 형식을 알 수 있는 것)의 미리보기: 안의 항목을 들여쓴 텍스트 트리로 보여 준다.
 /// 압축 파일이 아니면 None(일반 미리보기로 간다). 이름은 압축인데 열 수 없거나 너무 크면 "기타"(종류와 크기)다.
+const DIR_PREVIEW_MAX_DEPTH: usize = 3;
+const DIR_PREVIEW_MAX_LINES: usize = 200;
+
+/// 폴더 미리보기: 하위 항목을 `├── └── │` 가지가 있는 ASCII 트리로 만든다(폴더 먼저, 이름순).
+/// 깊이·줄 수 상한을 넘으면 `truncated`. 읽을 수 없는 폴더는 `None`(기존 미리보기로 넘긴다).
+fn dir_preview(path: &str) -> Option<td_vfs::Preview> {
+    fn walk(
+        dir: &std::path::Path,
+        prefix: &str,
+        depth: usize,
+        lines: &mut Vec<String>,
+        truncated: &mut bool,
+    ) {
+        let Ok(rd) = std::fs::read_dir(dir) else {
+            return;
+        };
+        let mut items: Vec<(bool, String)> = rd
+            .flatten()
+            .map(|e| {
+                let is_dir = e.file_type().map(|t| t.is_dir()).unwrap_or(false);
+                (is_dir, e.file_name().to_string_lossy().into_owned())
+            })
+            .collect();
+        items.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(&b.1)));
+        let n = items.len();
+        for (i, (is_dir, name)) in items.into_iter().enumerate() {
+            if lines.len() >= DIR_PREVIEW_MAX_LINES {
+                *truncated = true;
+                return;
+            }
+            let last = i + 1 == n;
+            lines.push(format!(
+                "{prefix}{}{name}{}",
+                if last { "└── " } else { "├── " },
+                if is_dir { "/" } else { "" }
+            ));
+            if is_dir {
+                if depth + 1 >= DIR_PREVIEW_MAX_DEPTH {
+                    if std::fs::read_dir(dir.join(&name))
+                        .map(|mut r| r.next().is_some())
+                        .unwrap_or(false)
+                    {
+                        *truncated = true;
+                    }
+                } else {
+                    let next = format!("{prefix}{}", if last { "    " } else { "│   " });
+                    walk(&dir.join(&name), &next, depth + 1, lines, truncated);
+                }
+            }
+        }
+    }
+    let p = std::path::Path::new(path);
+    if !p.is_dir() {
+        return None;
+    }
+    let mut lines = Vec::new();
+    let mut truncated = false;
+    walk(p, "", 0, &mut lines, &mut truncated);
+    let mut text = if lines.is_empty() {
+        "(빈 폴더)".to_string()
+    } else {
+        lines.join("\n")
+    };
+    text.push('\n');
+    Some(td_vfs::Preview {
+        kind: td_vfs::PreviewKind::Text,
+        text: Some(text),
+        truncated,
+        size: 0,
+        data_url: None,
+    })
+}
+
 fn archive_preview(path: &str, extra_zip_exts: &[String]) -> Option<td_vfs::Preview> {
     let name = std::path::Path::new(path).file_name()?.to_string_lossy();
     td_archive::kind_for_name(&name, extra_zip_exts)?;
@@ -953,6 +1026,9 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
     pub fn preview(&self, path: &str) -> ServiceResult<PreviewDto> {
         if path.to_ascii_lowercase().ends_with(".cbz") && std::path::Path::new(path).is_file() {
             return Ok(cbz_preview(path).into());
+        }
+        if let Some(p) = dir_preview(path) {
+            return Ok(p.into());
         }
         if std::path::Path::new(path).is_file() {
             if let Some(p) = archive_preview(path, &self.fs.extra_zip_exts()) {
@@ -1780,7 +1856,8 @@ mod tests {
             svc.preview(&format!("{root}/b.bin")).unwrap().kind,
             PreviewKindDto::Other
         );
-        assert_eq!(svc.preview(&root).unwrap().kind, PreviewKindDto::Directory);
+        // 폴더는 하위 항목 트리 텍스트(preview_dir_* 테스트)
+        assert_eq!(svc.preview(&root).unwrap().kind, PreviewKindDto::Text);
         assert!(svc.preview(&format!("{root}/nope")).is_err());
     }
 
@@ -2004,6 +2081,48 @@ mod tests {
             .expect("zip 실행 불가");
         assert!(status.success());
         std::fs::remove_dir_all(&src).unwrap();
+    }
+
+    #[test]
+    fn preview_dir_lists_tree_folders_first() {
+        let (_t, svc, _ch, root) = setup();
+        let d = format!("{root}/proj");
+        std::fs::create_dir_all(format!("{d}/docs/adr")).unwrap();
+        std::fs::create_dir_all(format!("{d}/src")).unwrap();
+        for f in ["z.txt", "a.txt", "docs/readme.md", "docs/adr/0001.md"] {
+            std::fs::write(format!("{d}/{f}"), "x").unwrap();
+        }
+        let p = svc.preview(&d).unwrap();
+        assert_eq!(p.kind, PreviewKindDto::Text);
+        assert!(!p.truncated);
+        assert_eq!(
+            p.text.unwrap(),
+            "├── docs/\n│   ├── adr/\n│   │   └── 0001.md\n│   └── readme.md\n├── src/\n├── a.txt\n└── z.txt\n"
+        );
+    }
+
+    #[test]
+    fn preview_dir_stops_at_depth_limit() {
+        let (_t, svc, _ch, root) = setup();
+        let d = format!("{root}/deep");
+        std::fs::create_dir_all(format!("{d}/a/b/c/d")).unwrap();
+        std::fs::write(format!("{d}/a/b/c/d/x.txt"), "x").unwrap();
+        let p = svc.preview(&d).unwrap();
+        assert!(p.truncated);
+        assert_eq!(p.text.unwrap(), "└── a/\n    └── b/\n        └── c/\n");
+    }
+
+    #[test]
+    fn preview_dir_truncates_long_listings() {
+        let (_t, svc, _ch, root) = setup();
+        let d = format!("{root}/many");
+        std::fs::create_dir_all(&d).unwrap();
+        for i in 0..250 {
+            std::fs::write(format!("{d}/f{i:03}.txt"), "x").unwrap();
+        }
+        let p = svc.preview(&d).unwrap();
+        assert!(p.truncated);
+        assert_eq!(p.text.unwrap().lines().count(), 200);
     }
 
     #[test]

@@ -296,11 +296,31 @@ export class FakeBackend implements Backend {
     return label;
   }
 
+  /** Rust `dir_preview`와 같은 규칙(폴더 먼저·이름순, `├── └── │` 가지, 깊이 3·200줄 상한)의 트리 텍스트. */
+  private dirTree(root: string): string {
+    const lines: string[] = [];
+    const walk = (dir: string, prefix: string, depth: number) => {
+      const base = dir === "/" ? "/" : `${dir}/`;
+      const kids = [...this.nodes.entries()]
+        .filter(([p]) => p !== dir && p.startsWith(base) && !p.slice(base.length).includes("/"))
+        .map(([p, n]) => ({ name: p.slice(base.length), dir: n.kind === "dir" }))
+        .sort((a, b) => Number(b.dir) - Number(a.dir) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+      kids.forEach((k, i) => {
+        if (lines.length >= 200) return;
+        const last = i === kids.length - 1;
+        lines.push(`${prefix}${last ? "└── " : "├── "}${k.name}${k.dir ? "/" : ""}`);
+        if (k.dir && depth + 1 < 3) walk(`${base}${k.name}`, prefix + (last ? "    " : "│   "), depth + 1);
+      });
+    };
+    walk(root, "", 0);
+    return (lines.length ? lines.join("\n") : "(빈 폴더)") + "\n";
+  }
+
   /** Rust `read_preview`와 같은 규칙(확장자로 이미지 판별, NUL이 있으면 Other, 64KB 초과는 잘림)을 흉내 낸다. */
   async preview(path: string): Promise<PreviewDto> {
     const n = this.need(path);
     const base = { text: null, truncated: false, size: n.content.length, dataUrl: null };
-    if (n.kind === "dir") return { ...base, kind: "directory" };
+    if (n.kind === "dir") return { ...base, kind: "text", text: this.dirTree(path) };
     const ext = path.slice(path.lastIndexOf(".") + 1).toLowerCase();
     const mime = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", svg: "image/svg+xml" }[ext];
     if (mime) return { ...base, kind: "image", dataUrl: `data:${mime};base64,${btoa(n.content)}` };

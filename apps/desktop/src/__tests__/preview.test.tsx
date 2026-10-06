@@ -59,11 +59,11 @@ describe("VIEW-01 미리보기", () => {
     expect(d).toHaveTextContent("앞부분만 표시합니다");
   });
 
-  it("바이너리와 폴더는 미리 볼 수 없다고 알린다", async () => {
+  it("바이너리는 미리 볼 수 없다고 알리고 폴더는 트리로 보여 준다", async () => {
     const { user } = await renderApp(seed());
     await user.keyboard("{Control>}y{/Control}"); // docs (폴더는 오른쪽 키가 들어가므로 Mod+Y)
     let d = await dlg("미리보기: docs");
-    expect(d).toHaveTextContent("폴더 — 미리 볼 수 없는 형식");
+    expect(d).not.toHaveTextContent("미리 볼 수 없는 형식"); // 폴더는 트리 텍스트(folder-preview.test)
     await user.keyboard("{Escape}");
     await goTo(user, 3); // data.bin
     await user.keyboard("{ArrowRight}");

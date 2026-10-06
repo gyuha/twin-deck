@@ -93,7 +93,7 @@ Marta의 기본 키는 Total Commander 계열(F5 복사, F6 이동 등)을 따�
 | FIND-04 | 연산자 `=`, `==`, `is`, `equals`, `!=`, `isNot`, `contains`, `has`, `like`, `~=`, `startsWith`, `endsWith` | 같음 | P2 | 별칭 그대로 수용 |
 | FIND-05 | Flatten (하위 전체를 평면 목록으로) | `/docs/actions/flatten/` | P2 | |
 | FIND-06 | Analyze Disk Usage (하위 폴더 크기, 크기 내림차순, 가상 탭, 아카이브 안에서도 동작) | `/docs/actions/disk-usage/` | P2 | |
-| VIEW-01 | 미리보기 (Space 또는 Cmd+Y) | 홈/키맵 | P1 | Quick Look 사용 여부는 미확인. 앱 내 미리보기로 구현 |
+| VIEW-01 | 미리보기 (Space 또는 Cmd+Y) | 홈/키맵 | P1 | Quick Look 사용 여부는 미확인. 앱 내 미리보기로 구현. 폴더는 하위 항목을 ASCII 트리(`├── └── │`, 폴더 먼저·이름순, 깊이 3·200줄 상한)로 보여 준다 |
 
 ## 7. 아카이브
 
