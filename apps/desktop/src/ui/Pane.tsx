@@ -4,6 +4,7 @@ import type { PaneId } from "../state/store";
 import { Breadcrumb } from "./Breadcrumb";
 import { VirtualHeader } from "./VirtualHeader";
 import { FileTable } from "./FileTable";
+import { UsageTreemap } from "./UsageTreemap";
 import { DriveBar } from "./DriveBar";
 import { TabBar } from "./TabBar";
 
@@ -12,6 +13,7 @@ export function Pane({ pane }: { pane: PaneId }) {
   const isActive = useApp((s) => s.activePane === pane);
   const path = useApp((s) => activeTab(s, pane).path);
   const isVirtual = useApp((s) => !!activeTab(s, pane).virtual);
+  const treemap = useApp((s) => activeTab(s, pane).virtual?.kind === "usage" && activeTab(s, pane).virtual?.view === "treemap");
   const paneHighlight = useApp((s) => s.loaded.config.behavior.layout.pane_highlight);
   return (
     <section
@@ -37,7 +39,7 @@ export function Pane({ pane }: { pane: PaneId }) {
       <DriveBar pane={pane} />
       <TabBar pane={pane} />
       {isVirtual ? <VirtualHeader pane={pane} /> : <Breadcrumb pane={pane} path={path} />}
-      <FileTable pane={pane} />
+      {treemap ? <UsageTreemap pane={pane} /> : <FileTable pane={pane} />}
     </section>
   );
 }

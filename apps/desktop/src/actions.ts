@@ -19,6 +19,9 @@ export function navigationHandlers({ api }: AppStore): Partial<ActionHandlers> {
     "core.lookup.folder": () => api.lookup("folder"),
     "core.flatten": () => api.flatten(),
     "core.disk_usage": (_ctx, args) => api.diskUsage(args),
+    "core.disk_usage.treemap": (_ctx, args) => api.diskUsageTreemap(args),
+    // 일반 폴더에서는 그 폴더를 treemap으로 열고, Disk Usage 탭에서는 목록 ↔ treemap을 바꾼다.
+    "core.disk_usage.toggle_view": (ctx) => (ctx.usageTab ? api.toggleUsageView() : api.diskUsageTreemap()),
     "core.search.cancel": () => api.cancelSearch(),
     "core.reveal_in_tab": () => api.revealInTab(),
     "core.go.up": () => api.goUp(),

@@ -24,6 +24,8 @@ export interface ActionContext {
   virtualTab: boolean;
   /** 활성 탭의 검색/순회가 아직 진행 중인지. */
   searching: boolean;
+  /** 활성 탭이 Disk Usage 결과 탭인지(목록·treemap 어느 쪽이든). */
+  usageTab: boolean;
 }
 
 const hasTarget = (c: ActionContext) => c.selectedCount > 0 || c.hasCursorItem;
@@ -74,6 +76,8 @@ export const DEFAULT_ACTION_META = [
   { id: "core.lookup.folder", title: "Look Up (현재 폴더)", category: "Navigation", scopes: ["pane"], isApplicable: (c) => !c.virtualTab },
   { id: "core.flatten", title: "Flatten (하위 파일을 평면 목록으로)", category: "Navigation", scopes: ["pane"], isApplicable: (c) => !c.virtualTab },
   { id: "core.disk_usage", title: "디스크 사용량 분석 (인수: src)", category: "Navigation", scopes: ["pane"] },
+  { id: "core.disk_usage.treemap", title: "디스크 사용량 treemap (인수: src)", category: "Navigation", scopes: ["pane"] },
+  { id: "core.disk_usage.toggle_view", title: "디스크 사용량 treemap 켜기/전환 (일반 폴더에서는 열기, Disk Usage 탭에서는 목록 ↔ treemap)", category: "View", scopes: ["pane"] },
   { id: "core.search.cancel", title: "검색/분석 취소", category: "Navigation", scopes: ["pane"], isApplicable: (c) => c.searching },
   { id: "core.reveal_in_tab", title: "해당 폴더로 이동 (새 탭)", category: "Navigation", scopes: ["pane"], isApplicable: (c) => c.virtualTab && c.hasCursorItem },
   { id: "core.open.as_archive", title: "아카이브로 열기 (Open As)", category: "Navigation", scopes: ["pane"], isApplicable: (c) => c.hasCursorItem },
@@ -228,6 +232,9 @@ export const DEFAULT_BINDINGS: Binding[] = [
   b("pane", "core.pane.switch", "Tab"),
   // Ctrl+U는 Total Commander·Double Commander·Midnight Commander가 모두 "패널 맞바꾸기"에 쓰는 키다. macOS는 Cmd+U.
   b("pane", "core.pane.swap", "Mod+U"),
+  // Alt+T 하나로 폴더 용량 treemap을 연다(일반 폴더) / 목록 ↔ treemap을 바꾼다(Disk Usage 탭). core.disk_usage.treemap은 키 없이 Actions Panel·메뉴·인수(src)로 쓴다.
+  // 단독 `T`는 Quick Select가 가져가서 Alt+T다.
+  b("pane", "core.disk_usage.toggle_view", "Alt+T"),
   b("pane", "core.move.half_page_up", "Alt+PageUp"),
   b("pane", "core.move.half_page_down", "Alt+PageDown"),
   b("pane", "core.move.left", "Left"),

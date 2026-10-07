@@ -86,6 +86,8 @@ export interface VirtualTab {
   summary: SearchSummaryDto | null;
   /** Disk Usage의 지금까지 센 총 바이트. */
   totalBytes: number;
+  /** Disk Usage 탭을 보는 방식: 목록 또는 treemap(사각형 타일). 다른 종류의 가상 탭은 항상 "list"다. */
+  view: "list" | "treemap";
   /** 삭제/이동/휴지통을 보낸 뒤 실제로 사라졌는지 확인할 경로들. */
   recheck: string[];
 }
@@ -380,7 +382,7 @@ export function actionContext(s: AppState): ActionContext {
     hasCursorItem: !!cursorEntry(tab),
     selectedCount: tab.selection.size,
     tabCount: s.panes[s.activePane].tabs.length,
-    canGoUp: !tab.virtual && parentPath(tab.path) !== null,
+    canGoUp: tab.virtual?.kind === "usage" && tab.virtual.view === "treemap" ? parentPath(tab.virtual.base) !== null : !tab.virtual && parentPath(tab.path) !== null,
     canGoBack: !tab.virtual && tab.back.length > 0,
     canGoForward: !tab.virtual && tab.forward.length > 0,
     cursorIsDir: cursorEntry(tab)?.kind === "dir",
@@ -388,6 +390,7 @@ export function actionContext(s: AppState): ActionContext {
     multiColumn: tab.view.mode === "columns",
     virtualTab: !!tab.virtual,
     searching: !!tab.virtual?.running,
+    usageTab: tab.virtual?.kind === "usage",
   };
 }
 
@@ -1224,6 +1227,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     /** 열기: 폴더는 들어가고, 아카이브 파일은 폴더처럼 연다 (ARC-01). */
     async open() {
       const tab = activeTab(get());
+      if (tab.virtual?.kind === "usage" && tab.virtual.view === "treemap") return api.usageOpenOther();
       const c = cursorEntry(tab);
       if (c && isFolderEntry(c)) await api.navigate(c.path);
       else if (c?.kind === "file" && isArchiveName(c.name, cfg().file_systems.zip.additional_extensions)) {
@@ -1260,6 +1264,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     /** 상위 폴더. 아카이브 루트에서는 아카이브가 들어 있는 폴더로 나가고 커서는 그 아카이브 파일에 놓인다. */
     async goUp() {
       const tab = activeTab(get());
+      if (tab.virtual?.kind === "usage" && tab.virtual.view === "treemap") return api.usageUp();
       if (tab.virtual) return;
       const parent = parentPath(tab.path);
       if (parent !== null) await api.navigate(parent, archiveFileName(baseName(tab.path)));
@@ -1296,6 +1301,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     /** 오른쪽 키: 여러 컬럼 보기에서는 다음 컬럼, 그 밖에는 폴더면 들어가고 파일이면 미리보기를 연다. */
     async goRight() {
       const tab = activeTab(get());
+      if (tab.virtual?.kind === "usage" && tab.virtual.view === "treemap") return api.usageDescend();
       if (tab.view.mode === "columns") api.moveColumn(1);
       else if (isFolderEntry(cursorEntry(tab))) await api.open();
       else await api.previewToggle();
@@ -2704,7 +2710,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     },
 
     /** 새 가상 탭을 열고 결과를 받기 시작한다. */
-    async openVirtual(kind: VirtualKind, title: string, base: string, start: () => Promise<{ id: number; warnings: string[] }>) {
+    async openVirtual(kind: VirtualKind, title: string, base: string, start: () => Promise<{ id: number; warnings: string[] }>, view: "list" | "treemap" = "list") {
       set({ notice: null });
       let started: { id: number; warnings: string[] };
       try {
@@ -2718,7 +2724,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       tab.path = `virtual:${kind}:${tab.id}`;
       tab.history = [tab.path];
       tab.sort = kind === "usage" ? { key: "size", dir: "desc" } : null;
-      tab.virtual = { kind, title, base, jobId: started.id, running: true, cancelled: false, warnings: started.warnings, summary: null, totalBytes: 0, recheck: [] };
+      tab.virtual = { kind, title, base, jobId: started.id, running: true, cancelled: false, warnings: started.warnings, summary: null, totalBytes: 0, view, recheck: [] };
       set({ panes: { ...s.panes, [s.activePane]: { tabs: [...p.tabs, tab], active: p.tabs.length } } });
       // 탭이 생기기 전에 도착한 이벤트를 순서대로 반영한다
       for (const e of earlySearchEvents.get(started.id) ?? []) applySearchEvent(s.activePane, tab.id, e);
@@ -2816,12 +2822,70 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       await api.openVirtual("flatten", `Flatten: ${baseName(base) || base}`, base, async () => ({ id: await backend.startFlatten(base), warnings: [] }));
     },
 
-    /** Analyze Disk Usage (FIND-06). 인수 `src`가 있으면 그 폴더(`~` 확장), 없으면 현재 위치. */
-    async diskUsage(args?: Record<string, unknown>) {
+    /** Analyze Disk Usage (FIND-06). 인수 `src`가 있으면 그 폴더(`~` 확장), 없으면 현재 위치. `view`는 처음 보는 방식(목록 또는 treemap). */
+    async diskUsage(args?: Record<string, unknown>, view: "list" | "treemap" = "list") {
       const raw = typeof args?.src === "string" ? args.src : null;
       const src = raw === null ? hereOf(activeTab(get())) : expandPath(raw, get().userDirs);
       if (src === null) return fail("사용자 폴더를 알 수 없어 경로를 확장하지 못했습니다");
-      await api.openVirtual("usage", `Disk Usage: ${baseName(src) || src}`, src, async () => ({ id: await backend.startDiskUsage(src), warnings: [] }));
+      await api.openVirtual("usage", `Disk Usage: ${baseName(src) || src}`, src, async () => ({ id: await backend.startDiskUsage(src), warnings: [] }), view);
+    },
+    /** 같은 Disk Usage를 처음부터 treemap 보기로 연다(`core.disk_usage.treemap`). */
+    async diskUsageTreemap(args?: Record<string, unknown>) {
+      await api.diskUsage(args, "treemap");
+    },
+    /** Disk Usage 탭에서 목록 ↔ treemap을 바꾼다. 스캔·항목은 그대로다(`core.disk_usage.toggle_view`). */
+    toggleUsageView() {
+      patchActive((t) => (t.virtual?.kind === "usage" ? { virtual: { ...t.virtual, view: t.virtual.view === "treemap" ? "list" : "treemap" } } : {}));
+    },
+    /** Disk Usage 탭이 `path` 폴더를 기준으로 스캔을 다시 시작한다(내려가기·올라가기). 제목과 기준 폴더가 바뀌고 항목은 비운다. */
+    async usageRescan(path: string) {
+      const s = get();
+      const pane = s.activePane;
+      const tab = activeTab(s, pane);
+      const v = tab.virtual;
+      if (!v || v.kind !== "usage") return;
+      stopSearch(tab);
+      let id: number;
+      try {
+        id = await backend.startDiskUsage(path);
+      } catch (e) {
+        return fail(e);
+      }
+      patchTab(pane, tab.id, (t) => ({
+        entries: [],
+        cursor: 0,
+        virtual: t.virtual && { ...t.virtual, title: `Disk Usage: ${baseName(path) || path}`, base: path, jobId: id, running: true, cancelled: false, summary: null, totalBytes: 0, warnings: [] },
+      }));
+      for (const e of earlySearchEvents.get(id) ?? []) applySearchEvent(pane, tab.id, e);
+      earlySearchEvents.delete(id);
+    },
+    /** treemap에서 커서의 폴더 안으로 내려간다(더블클릭, →). 파일이면 아무것도 하지 않는다. */
+    async usageDescend() {
+      const tab = activeTab(get());
+      const c = cursorEntry(tab);
+      if (tab.virtual?.kind !== "usage" || !c || !isFolderEntry(c)) return;
+      await api.usageRescan(c.path);
+    },
+    /** treemap의 기준 폴더를 한 단계 위로 올린다(Backspace, ←). 파일 시스템 루트에서는 아무것도 하지 않는다. */
+    async usageUp() {
+      const tab = activeTab(get());
+      if (tab.virtual?.kind !== "usage") return;
+      const parent = parentPath(tab.virtual.base);
+      if (parent !== null && parent !== tab.virtual.base) await api.usageRescan(parent);
+    },
+    /**
+     * treemap의 타일(= 커서 항목)을 반대쪽 패널에 연다. 폴더는 그 폴더를, 파일은 그 파일이 있는 폴더를(커서를 그 파일에),
+     * 항목이 없으면 지금 보는 기준 폴더를 연다. treemap 탭은 그대로 남는다.
+     */
+    async usageOpenOther(baseFolder = false) {
+      const s = get();
+      const tab = activeTab(s);
+      if (tab.virtual?.kind !== "usage") return;
+      const c = baseFolder ? undefined : cursorEntry(tab); // "기타" 타일: 어느 항목인지 가리키지 않으므로 지금 보는 폴더를 연다
+      const target = other(s.activePane);
+      if (!c) await api.navigate(tab.virtual.base, undefined, "push", target);
+      else if (isFolderEntry(c)) await api.navigate(c.path, undefined, "push", target);
+      else await api.navigate(parentPath(c.path) ?? tab.virtual.base, c.name, "push", target);
     },
 
     /** 진행 중인 검색/분석을 취소한다. 그때까지 온 결과는 남는다. */
