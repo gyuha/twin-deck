@@ -16,3 +16,7 @@
 - 값이 100을 넘으면 적용하지 않고(100 취급), 50 미만은 50으로 올린다. 숫자가 아니면 100.
 - jsdom에는 테마 CSS가 없어 원래 글자색이 비어 있으므로 그때는 `currentColor`로 대신한다. 실제 앱에서는 테마 값을 쓴다.
 - 실제 앱(WKWebView)에서 색이 의도대로 섞이는지, 밝은 테마에서도 자연스러운지는 눈으로 확인하지 못했다.
+
+## 정정 (적대적 리뷰 후)
+- 이 기록이 적은 `behavior.text_brightness`(글자 밝기), `useTextBrightness`, `text-brightness.test.tsx`는 최종 구현에 없다. 사용자 요청이 바뀌어(밝기가 아니라 색 지정) 커밋 d7e2d7d에서 `behavior.text_color`와 색상환(react-colorful)으로 교체되었고, 테스트는 `text-color.test.tsx`다.
+- 아래 STATUS의 `verified`에 적힌 "text-brightness 6건"도 교체 전 구현의 검증 기록이다.
