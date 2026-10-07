@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { HexColorPicker } from "react-colorful";
 import { Button, Input, Select, SelectOption } from "@spacedrive/primitives";
 import { defaultBindingsFor } from "@twin-deck/actions";
 import { defaultLoaded } from "@twin-deck/ts-client";
@@ -12,6 +13,7 @@ type Control =
   | { type: "switch" }
   | { type: "int" }
   | { type: "text" }
+  | { type: "color" }
   | { type: "select"; options: readonly string[] }
   | { type: "fkey" };
 
@@ -37,6 +39,7 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
       { key: "behavior.theme", title: "테마", desc: "system은 OS의 밝기 설정을 따릅니다", control: { type: "select", options: THEMES } },
       { key: "behavior.ui_font", title: "UI 글꼴", desc: "앱 화면 전체의 글꼴. CSS font-family 값(예: Pretendard, sans-serif). 기본은 macOS Menlo·Windows Consolas. 비우면 앱 기본 고정폭", control: { type: "text" } },
       { key: "behavior.preview_font", title: "미리보기 글꼴", desc: "텍스트·코드·JSON·Markdown 미리보기 본문의 글꼴. 비우면 기본 글꼴", control: { type: "text" } },
+      { key: "behavior.text_color", title: "글자 색", desc: "앱 기본 글자색. 색상환으로 고르거나 #rrggbb를 씁니다. 비우면 테마 그대로이고, 흐린 글자는 이 색을 배경 쪽으로 섞어 자동으로 만듭니다", control: { type: "color" } },
       { key: "behavior.table.icon_size", title: "아이콘 크기", desc: "파일 목록 행의 아이콘(px)", control: { type: "int" } },
       { key: "behavior.table.zebra_rows", title: "줄무늬 행", desc: "파일 목록의 행 배경을 번갈아 옅게 칠합니다", control: { type: "switch" } },
       { key: "behavior.table.show_marks", title: "표시 칸", desc: "행 맨 앞의 선택(●)·폴더(▸) 표시 칸. 끄면 칸이 사라지고 선택은 굵은 강조색 글씨로만 보입니다", control: { type: "switch" } },
@@ -129,6 +132,62 @@ function EditableControl({ item, value, disabled, onCommit }: { item: Item; valu
         if (e.key === "Enter") commit();
       }}
     />
+  );
+}
+
+/**
+ * 색 한 칸: 현재 색 견본 버튼(누르면 색상환이 열림), `#rrggbb` 입력, 지우기(테마 그대로). 색상환을 끄는 동안에는 잠깐 쉬었다가 저장한다.
+ */
+function ColorControl({ item, value, disabled, onCommit }: { item: Item; value: string; disabled: boolean; onCommit: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => setDraft(value), [value]);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const valid = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(draft);
+  const commitText = () => {
+    if (draft === value) return;
+    if (draft.trim() === "" || valid) onCommit(draft.trim());
+    else setDraft(value);
+  };
+  const pick = (c: string) => {
+    setDraft(c);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => onCommit(c), 250);
+  };
+  return (
+    <div className="relative flex items-center gap-2">
+      <button
+        type="button"
+        aria-label={`${item.title} 선택`}
+        disabled={disabled}
+        onClick={() => setOpen((o) => !o)}
+        className="h-6 w-6 rounded border border-app-line"
+        style={{ background: valid ? draft : "transparent" }}
+      />
+      <Input
+        aria-label={item.title}
+        type="text"
+        value={draft}
+        placeholder="테마 그대로"
+        disabled={disabled}
+        size="sm"
+        className="w-32"
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commitText}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commitText();
+        }}
+      />
+      <Button type="button" size="sm" disabled={disabled || value === ""} aria-label={`${item.title} 지우기`} onClick={() => onCommit("")}>
+        지우기
+      </Button>
+      {open && (
+        <div data-testid="color-picker" className="absolute left-0 top-8 z-20 rounded border border-app-line bg-app-box p-2 shadow-lg">
+          <HexColorPicker color={valid ? draft : "#888888"} onChange={pick} />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -346,6 +405,9 @@ export function Settings() {
                           </SelectOption>
                         ))}
                       </Select>
+                    )}
+                    {item.control.type === "color" && (
+                      <ColorControl item={item} value={String(value ?? "")} disabled={!!broken} onCommit={(v) => void api.setConfigValue(item.key, { kind: "str", value: v })} />
                     )}
                     {(item.control.type === "int" || item.control.type === "text") && (
                       <EditableControl

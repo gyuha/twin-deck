@@ -23,6 +23,7 @@
     "mammoth": "^1.13.0",
     "occt-import-js": "^0.0.23",
     "react": "19.1.0",
+    "react-colorful": "^5.8.1",
     "react-dom": "19.1.0",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",

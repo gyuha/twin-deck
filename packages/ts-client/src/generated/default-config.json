@@ -4,6 +4,7 @@
       "theme": "system",
       "ui_font": "",
       "preview_font": "Menlo, Consolas, monospace",
+      "text_color": "",
       "table": {
         "icon_size": 16,
         "circular_selection": false,

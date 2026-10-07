@@ -7,6 +7,7 @@ favorites = []
 theme = "system"
 ui_font = ""
 preview_font = "Menlo, Consolas, monospace" # macOS 기본 Menlo, Windows 기본 Consolas, 그 밖은 시스템 고정폭
+text_color = "" # 앱 기본 글자색(#rrggbb). 비우면 테마 그대로
 
 [behavior.table]
 icon_size = 16

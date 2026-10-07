@@ -34,6 +34,8 @@ pub struct Behavior {
     pub ui_font: String,
     /// 미리보기 본문의 글꼴. CSS `font-family` 값이고 비우면 기본 글꼴이다.
     pub preview_font: String,
+    /// 앱 기본 글자색(`#rrggbb` 또는 `#rgb`). 비우면 테마 그대로다. 흐린 글자색은 이 색을 배경 쪽으로 섞어 만든다.
+    pub text_color: String,
     pub table: BehaviorTable,
     pub quick_select: QuickSelect,
     pub selection: SelectionConfig,
