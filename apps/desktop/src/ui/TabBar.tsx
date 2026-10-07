@@ -21,8 +21,8 @@ export function TabBar({ pane }: { pane: PaneId }) {
               ? // 칸형(Marta식): 폭을 균등 분할하고 활성 탭은 배경으로 구분한다. 좁아지면 이름을 말줄임으로 줄인다.
                 "min-w-0 flex-1 truncate border-r border-app-line px-2 py-1 text-center last:border-r-0 " + (i === active ? "bg-app-selected font-semibold" : "text-ink-faint")
               : i === active
-                ? "border-b-2 border-accent px-2 font-semibold"
-                : "px-2 text-ink-faint"
+                ? "border-b-2 border-accent px-2 py-1 font-semibold"
+                : "px-2 py-1 text-ink-faint"
           }
         >
           {t.virtual ? t.virtual.title : baseName(t.path) || t.path}
