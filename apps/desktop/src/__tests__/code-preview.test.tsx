@@ -32,6 +32,15 @@ describe("코드 미리보기 신택스 하이라이트", () => {
     expect(view.querySelector("script")).toBeNull();
   });
 
+  it(".plist는 XML로 칠한다", async () => {
+    const src = '<?xml version="1.0"?>\n<plist version="1.0"><dict><key>Name</key><string>td</string></dict></plist>\n';
+    const dlg = await open({ "/home/a/Info.plist": src }, "Info.plist");
+    const view = dlg.getByLabelText("코드 미리보기");
+    expect(view).toHaveAttribute("data-language", "xml");
+    expect(view.textContent).toBe(src);
+    expect([...view.querySelectorAll(".hljs-name")].some((n) => n.textContent === "dict")).toBe(true);
+  });
+
   it("언어를 모르는 텍스트와 JSON은 기존 보기를 쓴다", async () => {
     const dlg = await open({ "/home/a/notes.txt": "fn main() {}" }, "notes.txt");
     expect(dlg.getByLabelText("텍스트 미리보기")).toBeInTheDocument();

@@ -42,7 +42,7 @@ const BY_EXTENSION: Record<string, keyof typeof LANGUAGES> = {
   c: "c", h: "c", cc: "cpp", cpp: "cpp", cxx: "cpp", hpp: "cpp", hh: "cpp", cs: "csharp",
   php: "php", rb: "ruby", pl: "perl", pm: "perl", lua: "lua", dart: "dart", scala: "scala", r: "r",
   sh: "bash", bash: "bash", zsh: "bash", ps1: "powershell",
-  sql: "sql", css: "css", scss: "scss", less: "less", html: "xml", htm: "xml", xml: "xml", vue: "xml",
+  sql: "sql", css: "css", scss: "scss", less: "less", html: "xml", htm: "xml", xml: "xml", plist: "xml", vue: "xml",
   yml: "yaml", yaml: "yaml", toml: "ini", ini: "ini", cfg: "ini", conf: "ini",
   graphql: "graphql", gql: "graphql", diff: "diff", patch: "diff", mk: "makefile",
 };
