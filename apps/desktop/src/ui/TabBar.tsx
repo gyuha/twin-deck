@@ -11,7 +11,8 @@ export function TabBar({ pane }: { pane: PaneId }) {
   const { tabs, active } = useApp((s) => s.panes[pane]);
   const segments = useApp((s) => s.loaded.config.behavior.layout.tab_style === "segments");
   const { api } = useAppStore();
-  const [over, setOver] = useState<number | null>(null);
+  // 끌기 중: 끌린 탭(from)은 커서를 따라 dx만큼 움직이고, 지나는 탭들은 shift만큼 비켜 놓일 자리(to)를 보여 준다.
+  const [drag, setDrag] = useState<{ from: number; to: number; dx: number; shift: number } | null>(null);
   const justDragged = useRef(false);
   const tabIndexAt = (el: EventTarget | null) => {
     const tab = el instanceof Element ? el.closest('[role="tab"]') : null;
@@ -21,19 +22,26 @@ export function TabBar({ pane }: { pane: PaneId }) {
   const press = (e: React.MouseEvent, from: number) => {
     if (e.button !== 0 || tabs.length < 2) return;
     const [x, y] = [e.clientX, e.clientY];
+    // 누른 시점의 탭 위치. 끌린 탭이 커서 밑에서 움직이므로 놓일 자리는 이 위치로 판단한다(레이아웃이 없으면 마우스 밑 탭으로).
+    const list = (e.currentTarget as HTMLElement).closest('[role="tablist"]');
+    const rects = Array.from(list?.querySelectorAll('[role="tab"]') ?? []).map((el) => el.getBoundingClientRect());
+    const laidOut = rects.length === tabs.length && rects.every((r) => r.width > 0);
+    const next = rects[from + 1] ?? rects[from - 1];
+    const shift = laidOut ? (from + 1 < rects.length ? next.left - rects[from].left : rects[from].left - next.left) : 0;
     let dragging = false;
     let to = from;
     const move = (m: MouseEvent) => {
       if (!dragging && Math.hypot(m.clientX - x, m.clientY - y) < DRAG_THRESHOLD) return;
       dragging = true;
-      const at = tabIndexAt(m.target);
-      to = at >= 0 && at < tabs.length ? at : to;
-      setOver(to === from ? null : to);
+      const at = laidOut ? rects.findIndex((r) => m.clientX >= r.left && m.clientX < r.right) : tabIndexAt(m.target);
+      if (at >= 0 && at < tabs.length) to = at;
+      else if (laidOut) to = m.clientX < rects[0].left ? 0 : tabs.length - 1;
+      setDrag({ from, to, dx: m.clientX - x, shift });
     };
     const up = () => {
       window.removeEventListener("mousemove", move);
       window.removeEventListener("mouseup", up);
-      setOver(null);
+      setDrag(null);
       if (!dragging) return;
       // 끌기를 끝낸 직후의 click은 탭 전환으로 이어지지 않게 막는다(click이 오지 않아도 곧 풀린다).
       justDragged.current = true;
@@ -42,6 +50,14 @@ export function TabBar({ pane }: { pane: PaneId }) {
     };
     window.addEventListener("mousemove", move);
     window.addEventListener("mouseup", up);
+  };
+  /** 끌기 중 이 탭의 모양: 끌린 탭은 커서를 따르고, 사이의 탭은 한 칸 비킨다. */
+  const dragStyle = (i: number): React.CSSProperties | undefined => {
+    if (!drag) return undefined;
+    if (i === drag.from) return { transform: `translateX(${drag.dx}px)`, zIndex: 10, position: "relative", boxShadow: "0 2px 8px rgba(0,0,0,.35)", cursor: "grabbing" };
+    const between = drag.from < drag.to ? i > drag.from && i <= drag.to : i >= drag.to && i < drag.from;
+    const dir = drag.from < drag.to ? -1 : 1;
+    return { transform: between ? `translateX(${dir * drag.shift}px)` : undefined, transition: "transform 120ms" };
   };
   return (
     <div role="tablist" aria-label="탭" className={segments ? "flex border-b border-app-line text-sm" : "flex gap-1 border-b border-app-line px-1 text-sm"}>
@@ -56,8 +72,8 @@ export function TabBar({ pane }: { pane: PaneId }) {
           onClick={() => {
             if (!justDragged.current) api.activate(pane, i);
           }}
+          style={dragStyle(i)}
           className={
-            (over === i ? "outline outline-1 -outline-offset-1 outline-accent " : "") +
             (segments
               ? // 칸형(Marta식): 폭을 균등 분할하고 활성 탭은 배경으로 구분한다. 좁아지면 이름을 말줄임으로 줄인다.
                 "min-w-0 flex-1 truncate border-r border-app-line px-2 py-1 text-center last:border-r-0 " + (i === active ? "bg-app-selected font-semibold" : "text-ink-faint")

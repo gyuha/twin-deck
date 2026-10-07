@@ -74,4 +74,16 @@ describe("탭 끌어 순서 바꾸기", () => {
     await waitFor(() => expect(labels()).toEqual(["docs", "src", "a"]));
     expect(selected()).toBe(2);
   });
+
+  it("끄는 동안 끌린 탭은 커서를 따라 움직이고, 놓으면 원래 위치 표시가 사라진다", async () => {
+    await setup();
+    const [first, , last] = tabs();
+    press(first, 10);
+    move(last, 80);
+    expect(first.style.transform).toBe("translateX(70px)"); // 커서가 움직인 만큼 따라온다
+    expect(tabs()[1].style.transition).toContain("transform"); // 지나는 탭은 비켜 가며 움직인다
+    release(last, 80);
+    await waitFor(() => expect(labels()).toEqual(["docs", "src", "a"]));
+    for (const t of tabs()) expect(t.style.transform).toBe("");
+  });
 });
