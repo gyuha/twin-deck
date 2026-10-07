@@ -1505,13 +1505,20 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     },
     async closeTab() {
       const s = get();
-      const p = s.panes[s.activePane];
-      if (p.tabs.length <= 1) return;
-      stopSearch(p.tabs[p.active]); // 가상 탭을 닫으면 진행 중인 작업도 멈추고 결과를 버린다
-      const tabs = p.tabs.filter((_, i) => i !== p.active);
-      set({
-        panes: { ...s.panes, [s.activePane]: { tabs, active: Math.min(p.active, tabs.length - 1) } },
-      });
+      await api.closeTabAt(s.activePane, s.panes[s.activePane].active);
+    },
+    /**
+     * `pane`의 탭 `index`를 닫는다(탭 가운데 클릭, `core.tab.close`). 패널의 마지막 탭이거나 범위 밖이면 아무것도 바꾸지 않는다.
+     * 활성 탭을 닫으면 활성은 이웃으로 옮겨 가고, 다른 탭을 닫으면 활성 탭은 같은 탭을 계속 가리킨다. 활성 패널은 바꾸지 않는다.
+     */
+    async closeTabAt(pane: PaneId, index: number) {
+      const s = get();
+      const p = s.panes[pane];
+      if (p.tabs.length <= 1 || index < 0 || index >= p.tabs.length) return;
+      stopSearch(p.tabs[index]); // 가상 탭을 닫으면 진행 중인 작업도 멈추고 결과를 버린다
+      const tabs = p.tabs.filter((_, i) => i !== index);
+      const active = index === p.active ? Math.min(index, tabs.length - 1) : tabs.indexOf(p.tabs[p.active]);
+      set({ panes: { ...s.panes, [pane]: { tabs, active } } });
       await syncWatches();
     },
     /** 같은 패널 안에서 탭 `from`을 `to` 자리로 옮긴다. 활성 탭은 같은 탭을 계속 가리킨다. 범위 밖이거나 제자리면 아무것도 바꾸지 않는다. */

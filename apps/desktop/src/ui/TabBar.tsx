@@ -130,7 +130,19 @@ export function TabBar({ pane }: { pane: PaneId }) {
           type="button"
           tabIndex={-1}
           aria-selected={i === active}
-          onMouseDown={(e) => press(e, i)}
+          onMouseDown={(e) => {
+            if (e.button === 1) {
+              // 가운데 버튼: 끌기를 시작하지 않고 자동 스크롤도 막는다(닫기는 뗄 때 auxclick에서). 패널 활성화도 하지 않는다(다른 패널의 탭을 닫아도 활성 패널은 그대로).
+              e.preventDefault();
+              e.stopPropagation();
+            }
+            else press(e, i);
+          }}
+          onAuxClick={(e) => {
+            if (e.button !== 1) return;
+            e.preventDefault();
+            void api.closeTabAt(pane, i);
+          }}
           onClick={() => {
             if (!justDragged.current) api.activate(pane, i);
           }}
