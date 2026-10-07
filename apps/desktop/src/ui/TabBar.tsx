@@ -148,6 +148,8 @@ export function TabBar({ pane }: { pane: PaneId }) {
           }}
           style={dragStyle(i)}
           className={
+            // 탭은 키보드 대상이 아니라(tabIndex -1) 클릭으로만 포커스를 받는다. 기본 포커스 링이 미리보기 같은 키보드 조작 중에 테두리로 보이지 않게 끈다.
+            "outline-none " +
             (segments
               ? // 칸형(Marta식): 폭을 균등 분할하고 활성 탭은 배경으로 구분한다. 좁아지면 이름을 말줄임으로 줄인다.
                 "min-w-0 flex-1 truncate border-r border-app-line px-2 py-1 text-center last:border-r-0 " + (i === active ? "bg-app-selected font-semibold" : "text-ink-faint")

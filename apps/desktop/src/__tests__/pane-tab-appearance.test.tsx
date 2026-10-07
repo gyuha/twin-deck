@@ -104,7 +104,7 @@ describe("기본값에서는 지금 모양 그대로", () => {
     expect(pane("left").className).toBe("flex min-h-0 min-w-0 flex-1 flex-col border-2 border-accent");
     expect(pane("right").className).toBe("flex min-h-0 min-w-0 flex-1 flex-col border-2 border-transparent");
     expect(tablist("left").className).toBe("flex gap-1 border-b border-app-line px-1 text-sm");
-    expect(tabs("left")[0].className).toBe("border-b-2 border-accent px-2 py-1 font-semibold");
-    expect(tabs("left")[1].className).toBe("px-2 py-1 text-ink-faint");
+    expect(tabs("left")[0].className).toBe("outline-none border-b-2 border-accent px-2 py-1 font-semibold");
+    expect(tabs("left")[1].className).toBe("outline-none px-2 py-1 text-ink-faint");
   });
 });
