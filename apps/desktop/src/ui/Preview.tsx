@@ -13,6 +13,8 @@ import { MarkdownView } from "./MarkdownView";
 import { AudioView } from "./AudioView";
 import { VideoView } from "./VideoView";
 import { PdfView } from "./PdfView";
+import { ModelView } from "./ModelView";
+import { modelKindOf } from "../lib/model/kinds";
 
 const isMarkdown = (name: string) => /\.(md|markdown)$/i.test(name);
 
@@ -85,6 +87,7 @@ export function Preview() {
   }, [p?.path]);
   if (!p) return null;
   const d = p.data;
+  const model = p.isDir ? null : modelKindOf(p.name); // 3D 모델이면 서비스가 돌려준 kind와 무관하게 3D 뷰어로 보여 준다
   return (
     <div
       onMouseDown={(e) => {
@@ -122,7 +125,8 @@ export function Preview() {
               {p.error}
             </p>
           )}
-          {d?.kind === "text" && (
+          {d && model && <ModelView path={p.path} name={p.name} />}
+          {d?.kind === "text" && !model && (
             <>
               {isMarkdown(p.name) ? (
                 <MarkdownView text={d.text ?? ""} />
@@ -138,7 +142,7 @@ export function Preview() {
               {d.truncated && <p className="mt-1 text-xs text-ink-faint">앞부분만 표시합니다 (전체 {size(d.size)})</p>}
             </>
           )}
-          {d?.kind === "image" &&
+          {d?.kind === "image" && !model &&
             (d.dataUrl ? (
               <div className="flex h-full items-center justify-center">
                 <img src={d.dataUrl} alt={p.name} className="max-h-full max-w-full object-contain" />
@@ -159,7 +163,7 @@ export function Preview() {
             ) : (
               <p className="text-ink-faint">PDF가 너무 커서 미리 볼 수 없습니다 ({size(d.size)})</p>
             ))}
-          {(d?.kind === "directory" || d?.kind === "other") && (
+          {(d?.kind === "directory" || (d?.kind === "other" && !model)) && (
             <p className="text-ink-faint">
               {KIND_LABEL[d.kind]} — 미리 볼 수 없는 형식입니다{d.kind === "other" ? ` (${size(d.size)})` : ""}
             </p>

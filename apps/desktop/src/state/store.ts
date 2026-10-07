@@ -258,6 +258,8 @@ export function filterCatalog(items: readonly CatalogItem[], query: string): Cat
 export interface PreviewState {
   path: string;
   name: string;
+  /** 폴더 미리보기(하위 항목 트리). 폴더 이름이 `.stl` 같아도 3D 모델로 보지 않게 한다. */
+  isDir?: boolean;
   status: "loading" | "ready" | "error";
   data?: PreviewDto;
   error?: string;
@@ -937,7 +939,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
   let previewSeq = 0;
   async function loadPreview(entry: EntryDto) {
     const seq = ++previewSeq;
-    const base = { path: entry.path, name: entry.name };
+    const base = { path: entry.path, name: entry.name, isDir: entry.kind === "dir" };
     // 항목을 넘기는 동안은 이전 내용을 그대로 두어 창이 비었다 채워지며 깜빡이지 않게 한다.
     set((s) => ({ preview: { ...base, status: "loading", data: s.preview?.data } }));
     try {
