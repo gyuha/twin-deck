@@ -94,6 +94,7 @@ export const DEFAULT_ACTION_META = [
   { id: "core.view.mode", title: "표시 모드 (인수: mode)", category: "View", scopes: ["pane"] },
   { id: "core.pane.send", title: "반대편 패널로 보내기 (인수: to)", category: "Navigation", scopes: ["pane"] },
   { id: "core.pane.switch", title: "활성 패널 전환", category: "Navigation", scopes: ["pane"] },
+  { id: "core.pane.swap", title: "좌우 패널 바꾸기", category: "Navigation", scopes: ["pane"] },
   { id: "core.select.all", title: "전체 선택", category: "Selection", scopes: ["pane"] },
   // 검색/분석이 진행 중이면 선택이 없어도 Esc가 그 작업을 취소하므로 실행할 수 있다.
   { id: "core.select.none", title: "선택 해제", category: "Selection", scopes: ["pane"], isApplicable: (c) => c.selectedCount > 0 || c.searching },
@@ -225,6 +226,8 @@ export const DEFAULT_BINDINGS: Binding[] = [
   b("pane", "core.move.home", "Home"),
   b("pane", "core.move.end", "End"),
   b("pane", "core.pane.switch", "Tab"),
+  // Ctrl+U는 Total Commander·Double Commander·Midnight Commander가 모두 "패널 맞바꾸기"에 쓰는 키다. macOS는 Cmd+U.
+  b("pane", "core.pane.swap", "Mod+U"),
   b("pane", "core.move.half_page_up", "Alt+PageUp"),
   b("pane", "core.move.half_page_down", "Alt+PageDown"),
   b("pane", "core.move.left", "Left"),

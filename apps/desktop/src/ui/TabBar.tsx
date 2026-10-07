@@ -11,6 +11,7 @@ export function TabBar({ pane }: { pane: PaneId }) {
   const { tabs, active } = useApp((s) => s.panes[pane]);
   const segments = useApp((s) => s.loaded.config.behavior.layout.tab_style === "segments");
   const { api } = useAppStore();
+  const dropTarget = useApp((s) => s.tabDropTarget === pane);
   // 끌기 중: 끌린 탭(from)은 커서를 따라 dx만큼 움직이고, 지나는 탭들은 shift만큼 비켜 놓일 자리(to)를 보여 준다.
   const [drag, setDrag] = useState<{ from: number; to: number; dx: number; shift: number } | null>(null);
   const justDragged = useRef(false);
@@ -20,12 +21,25 @@ export function TabBar({ pane }: { pane: PaneId }) {
     return tab && list ? Array.from(list.querySelectorAll('[role="tab"]')).indexOf(tab) : -1;
   };
   const press = (e: React.MouseEvent, from: number) => {
-    if (e.button !== 0 || tabs.length < 2) return;
+    if (e.button !== 0) return; // 탭이 하나여도 끌 수 있다(다른 패널로 복사)
     const [x, y] = [e.clientX, e.clientY];
     // 누른 시점의 탭 위치. 끌린 탭이 커서 밑에서 움직이므로 놓일 자리는 이 위치로 판단한다(레이아웃이 없으면 마우스 밑 탭으로).
     const list = (e.currentTarget as HTMLElement).closest('[role="tablist"]');
     const rects = Array.from(list?.querySelectorAll('[role="tab"]') ?? []).map((el) => el.getBoundingClientRect());
     const laidOut = rects.length === tabs.length && rects.every((r) => r.width > 0);
+    // 반대쪽 패널의 탭 줄(누른 시점의 위치). 끌린 탭이 커서 밑에서 움직이므로 이벤트 대상이 아니라 좌표로 판단한다.
+    const otherPane: PaneId = pane === "left" ? "right" : "left";
+    const otherList = document.querySelector(`[role="tablist"][data-pane="${otherPane}"]`);
+    const otherBar = otherList?.getBoundingClientRect();
+    const otherRects = Array.from(otherList?.querySelectorAll('[role="tab"]') ?? []).map((el) => el.getBoundingClientRect());
+    const ownBar = list?.getBoundingClientRect();
+    const within = (r: DOMRect | undefined, px: number, py: number) => !!r && r.width > 0 && px >= r.left && px < r.right && py >= r.top && py <= r.bottom;
+    /** 반대쪽 탭 줄 위에서 놓을 자리: 중심이 커서보다 오른쪽인 첫 탭 앞, 없으면 맨 뒤. */
+    const insertAt = (px: number) => {
+      const i = otherRects.findIndex((r) => (r.left + r.right) / 2 > px);
+      return i < 0 ? otherRects.length : i;
+    };
+    let crossIndex: number | null = null; // 반대쪽 탭 줄 위에 있으면 거기서 놓을 자리
     // 사이 탭이 비키는 거리 = 끌린 탭 폭 + 탭 사이 틈(밑줄형은 `gap-1`, 칸형은 0).
     const gap = laidOut && rects.length > 1 ? rects[1].left - rects[0].right : 0;
     const shift = laidOut ? rects[from].width + gap : 0;
@@ -45,6 +59,7 @@ export function TabBar({ pane }: { pane: PaneId }) {
     let cancelled = false;
     let to = from;
     const stopListening = () => {
+      api.setTabDropTarget(null);
       window.removeEventListener("mousemove", move);
       window.removeEventListener("keydown", key, true);
       window.removeEventListener("blur", cancel);
@@ -66,8 +81,19 @@ export function TabBar({ pane }: { pane: PaneId }) {
       if (m.buttons === 0) return cancel(); // mouseup을 놓친 채 버튼이 이미 떼어져 있다
       if (!dragging && Math.hypot(m.clientX - x, m.clientY - y) < DRAG_THRESHOLD) return;
       dragging = true;
-      const at = targetAt(m);
-      if (at >= 0 && at < tabs.length) to = at;
+      if (!tabs[from]?.virtual && within(otherBar, m.clientX, m.clientY)) { // 가상 탭은 패널 간에 옮기지 않는다
+        // 반대쪽 패널의 탭 줄 위: 놓으면 그쪽으로 보낸다. 자기 패널 안의 탭은 비키지 않는다.
+        crossIndex = insertAt(m.clientX);
+        to = from;
+        api.setTabDropTarget(otherPane);
+      } else {
+        crossIndex = null;
+        api.setTabDropTarget(null);
+        // 자기 탭 줄에서 세로로 멀리 벗어나면(파일 목록 위 등) 순서를 바꾸지 않는다.
+        const nearOwn = !laidOut || !ownBar || (m.clientY >= ownBar.top - 24 && m.clientY <= ownBar.bottom + 24);
+        const at = nearOwn ? targetAt(m) : from;
+        if (at >= 0 && at < tabs.length) to = at;
+      }
       setDrag({ from, to, dx: m.clientX - x, shift });
     }
     function up() {
@@ -78,7 +104,9 @@ export function TabBar({ pane }: { pane: PaneId }) {
       // 끌기를 끝낸 직후의 click은 탭 전환으로 이어지지 않게 막는다(click이 오지 않아도 곧 풀린다).
       justDragged.current = true;
       setTimeout(() => (justDragged.current = false), 0);
-      if (!cancelled) api.moveTab(pane, from, to);
+      if (cancelled) return;
+      if (crossIndex !== null) void api.transferTab(pane, from, otherPane, crossIndex);
+      else api.moveTab(pane, from, to);
     }
     window.addEventListener("mousemove", move);
     window.addEventListener("keydown", key, true);
@@ -94,7 +122,7 @@ export function TabBar({ pane }: { pane: PaneId }) {
     return { transform: between ? `translateX(${dir * drag.shift}px)` : undefined, transition: "transform 120ms" };
   };
   return (
-    <div role="tablist" aria-label="탭" className={segments ? "flex border-b border-app-line text-sm" : "flex gap-1 border-b border-app-line px-1 text-sm"}>
+    <div role="tablist" aria-label="탭" data-pane={pane} data-drop-target={dropTarget ? "true" : undefined} className={segments ? "flex border-b border-app-line text-sm" : "flex gap-1 border-b border-app-line px-1 text-sm"}>
       {tabs.map((t, i) => (
         <button
           key={t.id}

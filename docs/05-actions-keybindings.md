@@ -123,6 +123,7 @@ Marta에서는 수정자 없는 단일 키 바인딩이 Quick Select에 가로�
 | `core.move.half_page_up` / `half_page_down` | 반 페이지 | `Alt+PageUp` / `Alt+PageDown` | 같음 | 자체 ID, 키 확인 |
 | `core.move.home` / `core.move.end` | 처음/끝 | `Home` / `End` | 같음 | 자체 |
 | `core.pane.switch` | 활성 패널 전환 | `Tab` | `Tab` | 자체 ID, 키 확인 |
+| `core.pane.swap` | 좌우 패널 바꾸기 | `Mod+U` | `Ctrl+U` | 자체 ID. 탭·폴더·커서·선택을 통째로 맞바꾸고 활성 패널은 내용을 따라간다. Ctrl+U는 Total·Double·Midnight Commander의 "패널 맞바꾸기" 키와 같다 |
 | `core.menu.volumes` | Volumes 메뉴 | `Alt+1` | `Alt+1` | 자체 ID, 키 확인 |
 | `core.menu.favorites` | Favorites 메뉴 (열린 뒤 글자·숫자 입력으로 이름·경로 필터, `Alt+숫자`로 n번째 선택, `Ctrl+=`로 현재 폴더 추가·이미 있으면 무시, `Ctrl+-`로 커서 항목을 즐겨찾기에서 삭제(폴더는 그대로)) | `Alt+2` | `Alt+2` | 자체 ID, 키 확인 |
 | `core.menu.recent` | Recent Locations (열린 뒤 글자·숫자 입력으로 경로 필터, `Alt+숫자`로 n번째 선택) | `Alt+3` | `Alt+3` | 자체 ID, 키 확인 |

@@ -38,6 +38,7 @@ export function navigationHandlers({ api }: AppStore): Partial<ActionHandlers> {
     "core.move.end": () => api.cursorEnd(),
     "core.pane.send": (_ctx, args) => api.paneSend(args),
     "core.pane.switch": () => api.switchPane(),
+    "core.pane.swap": () => api.swapPanes(),
     "core.select.all": () => api.selectAll(),
     "core.select.none": () => api.selectNone(),
     "core.select.toggle": () => api.toggleSelect(),

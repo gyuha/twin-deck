@@ -282,6 +282,8 @@ export interface AppState {
   preview: PreviewState | null;
   /** 진행 중인 드래그(행을 끌어 다른 폴더·패널에 놓기). 없으면 null. */
   drag: DragState | null;
+  /** 탭을 끌고 있을 때 놓일 반대쪽 패널(그 패널의 탭 줄이 놓일 곳으로 표시된다). 없으면 null. */
+  tabDropTarget: PaneId | null;
   /** 열려 있는 Actions Panel. */
   palette: PaletteState | null;
   /** 마지막 검색어. 다시 열면 이어서 보이고, 재시작 복원의 대상이다 (PANE-05). */
@@ -458,6 +460,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     dialog: null,
     preview: null,
     drag: null,
+    tabDropTarget: null,
     palette: null,
     lastPaletteQuery: snapshot?.paletteQuery ?? "",
     menu: null,
@@ -1445,6 +1448,14 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     switchPane() {
       set((s) => ({ activePane: other(s.activePane) }));
     },
+    /** 왼쪽과 오른쪽 패널의 내용(탭·폴더·커서·선택·남은 용량)을 서로 바꾼다. 활성 패널은 내용을 따라간다(왼쪽에서 작업하고 있었으면 이제 오른쪽에 있는 그 패널이 계속 활성이다). */
+    swapPanes() {
+      set((s) => ({
+        panes: { left: s.panes.right, right: s.panes.left },
+        diskSpace: { left: s.diskSpace.right, right: s.diskSpace.left },
+        activePane: other(s.activePane),
+      }));
+    },
 
     async newTab() {
       const s = get();
@@ -1477,6 +1488,36 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       tabs.splice(to, 0, moved);
       const active = tabs.indexOf(p.tabs[p.active]);
       set((s) => ({ panes: { ...s.panes, [pane]: { tabs, active } } }));
+    },
+    setTabDropTarget(pane: PaneId | null) {
+      if (get().tabDropTarget !== pane) set({ tabDropTarget: pane });
+    },
+    /**
+     * 탭 `index`를 반대쪽 패널(`to`)의 `toIndex` 자리로 보낸다. 원래 패널에 탭이 둘 이상이면 이동(탭 상태를 그대로 가져간다),
+     * 하나뿐이면 복사한다(원본은 그대로 두고 같은 경로의 새 탭을 만든다 — 원래 패널이 탭 0개가 되지 않게). 보낸 탭이 그 패널의 활성 탭이 되고 그 패널이 활성 패널이 된다.
+     * 가상 탭(검색 결과 등)·범위 밖·같은 패널이면 아무것도 바꾸지 않는다.
+     */
+    async transferTab(from: PaneId, index: number, to: PaneId, toIndex: number) {
+      if (from === to) return;
+      const s = get();
+      const src = s.panes[from];
+      const dst = s.panes[to];
+      const tab = src.tabs[index];
+      if (!tab || tab.virtual) return;
+      const at = Math.min(Math.max(toIndex, 0), dst.tabs.length);
+      const copying = src.tabs.length <= 1;
+      const incoming = copying ? newTab(tab.path) : tab;
+      const dstTabs = [...dst.tabs.slice(0, at), incoming, ...dst.tabs.slice(at)];
+      let srcPane = src;
+      if (!copying) {
+        const tabs = src.tabs.filter((_, i) => i !== index);
+        const kept = src.tabs[src.active];
+        const active = index === src.active ? Math.min(index, tabs.length - 1) : tabs.indexOf(kept);
+        srcPane = { tabs, active };
+      }
+      set((st) => ({ panes: { ...st.panes, [from]: srcPane, [to]: { tabs: dstTabs, active: at } }, activePane: to }));
+      if (copying) await reload(to, incoming.id);
+      await syncWatches();
     },
     cycleTab(delta: 1 | -1) {
       const s = get();
