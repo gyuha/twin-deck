@@ -73,6 +73,35 @@ export function layoutTreemap(items: TreemapItem[], w: number, h: number): Tile[
   return tiles;
 }
 
+/** "기타 N개" 타일의 id. 실제 경로와 겹치지 않는다. */
+export const OTHER = "\0other";
+
+export type Dir = "left" | "right" | "up" | "down";
+
+/**
+ * `id` 타일에서 `dir` 방향으로 화면에 인접한 타일의 id. 그 방향에서 변이 가장 가까운 타일 중 맞닿는 길이가 가장 긴 것,
+ * 그래도 같으면 중심이 가까운 것을 고른다. 그 방향에 타일이 없거나(가장자리) `id`가 없으면 `null`이다.
+ */
+export function neighborTile(tiles: Tile[], id: string, dir: Dir): string | null {
+  const cur = tiles.find((t) => t.id === id);
+  if (!cur) return null;
+  const eps = 1e-6;
+  const horizontal = dir === "left" || dir === "right";
+  const lo = (t: Tile) => (horizontal ? t.y : t.x);
+  const len = (t: Tile) => (horizontal ? t.h : t.w);
+  const gapOf = (t: Tile) =>
+    dir === "right" ? t.x - (cur.x + cur.w) : dir === "left" ? cur.x - (t.x + t.w) : dir === "down" ? t.y - (cur.y + cur.h) : cur.y - (t.y + t.h);
+  const overlapOf = (t: Tile) => Math.min(lo(cur) + len(cur), lo(t) + len(t)) - Math.max(lo(cur), lo(t));
+  const centerDist = (t: Tile) => Math.hypot(t.x + t.w / 2 - (cur.x + cur.w / 2), t.y + t.h / 2 - (cur.y + cur.h / 2));
+  const cands = tiles.filter((t) => t.id !== id && gapOf(t) >= -eps && overlapOf(t) > eps);
+  if (cands.length === 0) return null;
+  const near = Math.min(...cands.map(gapOf));
+  const best = cands
+    .filter((t) => gapOf(t) - near <= eps)
+    .sort((a, b) => overlapOf(b) - overlapOf(a) || centerDist(a) - centerDist(b));
+  return best[0].id;
+}
+
 export interface Other {
   /** 묶인 항목들의 id. */
   ids: string[];

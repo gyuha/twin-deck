@@ -1,21 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatSize } from "../lib/format";
-import { groupSmall, layoutTreemap } from "../lib/treemap";
+import { groupSmall, layoutTreemap, OTHER } from "../lib/treemap";
 import type { Tile } from "../lib/treemap";
 import { useApp, useAppStore } from "../state/context";
-import { activeTab } from "../state/store";
+import { activeTab, publishUsageTiles } from "../state/store";
 import type { PaneId } from "../state/store";
 
 /** 측정하지 못할 때(첫 그리기 전, 테스트)의 그림 크기. */
 const FALLBACK = { w: 800, h: 480 };
 /** 타일에 글자를 넣을 수 있는 최소 크기(px). */
 const LABEL_MIN = { w: 64, h: 34 };
-const OTHER = "\0other";
 
 /**
  * Disk Usage의 treemap 보기: 바로 아래 항목의 크기를 면적에 비례한 사각형 타일로 그린다(squarified).
- * 전체의 0.5% 미만인 항목은 "기타 N개" 타일 하나로 묶는다. 커서(↑↓·Home·End는 목록과 같은 크기순 이동)는 그 항목의 타일에 표시된다.
- * 타일 클릭·Enter는 반대쪽 패널에 그 폴더를 열고, 더블클릭·→는 그 폴더로 내려가며, Backspace·←는 한 단계 위로 올라간다.
+ * 전체의 0.5% 미만인 항목은 "기타 N개" 타일 하나로 묶는다. 커서는 그 항목의 타일에 표시된다.
+ * 방향키는 화면에서 인접한 타일로 커서를 옮기고(Home·End는 크기순 처음/끝), 타일 클릭·Enter는 반대쪽 패널에 그 폴더를 연다.
+ * 더블클릭·Shift+→·Mod+Enter는 그 폴더로 내려가며, Backspace는 한 단계 위로 올라간다.
  */
 export function UsageTreemap({ pane }: { pane: PaneId }) {
   const { api } = useAppStore();
@@ -41,6 +41,12 @@ export function UsageTreemap({ pane }: { pane: PaneId }) {
     const all = other ? [...kept, { id: OTHER, value: other.value }] : kept;
     return { tiles: layoutTreemap(all, size.w, size.h), other, byId: new Map(entries.map((e, i) => [e.path, i])) };
   }, [entries, size.w, size.h]);
+
+  // 방향키 이동이 화면과 같은 배치를 쓰도록 스토어에 알려 둔다.
+  useEffect(() => {
+    publishUsageTiles(pane, tiles);
+    return () => publishUsageTiles(pane, undefined);
+  }, [pane, tiles]);
 
   const cursorPath = entries[tab.cursor]?.path;
   const selectedId = cursorPath && other?.ids.includes(cursorPath) ? OTHER : cursorPath;

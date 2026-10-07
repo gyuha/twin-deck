@@ -77,6 +77,7 @@ export const DEFAULT_ACTION_META = [
   { id: "core.flatten", title: "Flatten (하위 파일을 평면 목록으로)", category: "Navigation", scopes: ["pane"], isApplicable: (c) => !c.virtualTab },
   { id: "core.disk_usage", title: "디스크 사용량 분석 (인수: src)", category: "Navigation", scopes: ["pane"] },
   { id: "core.disk_usage.treemap", title: "디스크 사용량 treemap (인수: src)", category: "Navigation", scopes: ["pane"] },
+  { id: "core.disk_usage.descend", title: "디스크 사용량 treemap에서 폴더 안으로 내려가기", category: "Navigation", scopes: ["pane"], isApplicable: (c) => c.usageTab },
   { id: "core.disk_usage.toggle_view", title: "디스크 사용량 treemap 켜기/전환 (일반 폴더에서는 열기, Disk Usage 탭에서는 목록 ↔ treemap)", category: "View", scopes: ["pane"] },
   { id: "core.search.cancel", title: "검색/분석 취소", category: "Navigation", scopes: ["pane"], isApplicable: (c) => c.searching },
   { id: "core.reveal_in_tab", title: "해당 폴더로 이동 (새 탭)", category: "Navigation", scopes: ["pane"], isApplicable: (c) => c.virtualTab && c.hasCursorItem },
@@ -216,6 +217,7 @@ export const DEFAULT_BINDINGS: Binding[] = [
   b("pane", "core.delete", "Shift+F8", "Delete"),
   b("pane", "core.open", "Return"),
   b("pane", "core.go.up", "Backspace"),
+  b("pane", "core.disk_usage.descend", "Mod+Return"),
   b("pane", "core.history.back", "Mod+["),
   b("pane", "core.history.forward", "Mod+]"),
   // Alt+←/→는 반대편 패널로 보낸다. 이미 그 쪽 패널이면 이전/다음 폴더로 간다(store.paneSend).

@@ -175,7 +175,8 @@ Shift+이동 키(범위의 선택 반전)는 액션이 아니라 `pane` 스코�
 | `core.lookup.folder` | Look Up (현재 폴더) | `Alt+Mod+P` | `Ctrl+Alt+P` | 자체 ID, 키 확인 |
 | `core.flatten` | Flatten | 없음 | 없음 | 자체 |
 | `core.disk_usage` | Analyze Disk Usage (인수) | 없음 | 없음 | 자체 |
-| `core.disk_usage.treemap` | 디스크 사용량 treemap (인수 `src`) | 없음 (`Alt+T`가 같은 일을 한다) | 없음 (`Alt+T`) | 자체 ID, 이슈 #25. 같은 Disk Usage 탭을 처음부터 treemap(크기에 비례한 사각형 타일) 보기로 연다. 전체의 0.5% 미만 항목은 "기타 N개" 타일로 묶는다. treemap 보기에서 `Enter`/타일 클릭은 반대쪽 패널에 그 폴더를 열고, `→`/더블클릭은 그 폴더로 내려가 다시 그리며, `Backspace`/`←`는 한 단계 위로 올라간다. `↑`/`↓`/`Home`/`End`는 목록과 같은 크기순 이동이다 |
+| `core.disk_usage.treemap` | 디스크 사용량 treemap (인수 `src`) | 없음 (`Alt+T`가 같은 일을 한다) | 없음 (`Alt+T`) | 자체 ID, 이슈 #25. 같은 Disk Usage 탭을 처음부터 treemap(크기에 비례한 사각형 타일) 보기로 연다. 전체의 0.5% 미만 항목은 "기타 N개" 타일로 묶는다. treemap 보기에서 방향키 `←` `→` `↑` `↓`는 화면에서 그 방향으로 인접한 타일로 선택을 옮기고(가장자리에서는 그대로, 이슈 #29), `Enter`/타일 클릭은 반대쪽 패널에 그 폴더를 열고, `Shift+→`/`Mod+Enter`/더블클릭은 그 폴더로 내려가 다시 그리며(파일 타일의 `Shift+→`는 미리보기), `Backspace`는 한 단계 위로 올라간다. `Home`/`End`는 목록과 같은 크기순 처음/끝이다 |
+| `core.disk_usage.descend` | 디스크 사용량 treemap에서 폴더 안으로 내려가기 | `Mod+Enter` | `Mod+Enter` | 자체 ID, 이슈 #29. Disk Usage 탭에서 선택한 폴더 타일 안으로 내려가 다시 그린다(파일 타일에서는 아무 일도 없다). `Shift+→`(폴더면 내려가고 파일이면 미리보기)와 더블클릭도 같은 일을 한다 |
 | `core.disk_usage.toggle_view` | 디스크 사용량 treemap 켜기/전환 | `Alt+T` | `Alt+T` | 자체 ID. 일반 폴더에서는 그 폴더를 treemap으로 열고(`core.disk_usage.treemap`과 같다), Disk Usage 탭에서는 새 스캔 없이 목록 ↔ treemap을 바꾼다. 단독 `T`는 Quick Select가 가져가서 `Alt+T`로 정했다 |
 | `core.search.cancel` | 검색/분석 취소 (진행 중인 가상 탭에서는 선택이 없을 때 `Escape`도 같다) | 없음 | 없음 | 자체 |
 | `core.reveal_in_tab` | 해당 폴더로 이동 (가상 탭 항목이 있는 폴더를 새 탭으로) | 없음 | 없음 | 자체 |

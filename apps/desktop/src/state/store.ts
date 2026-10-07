@@ -37,6 +37,8 @@ import type { ActionContext } from "@twin-deck/actions";
 import type { Scope } from "@twin-deck/keybinds";
 import { quickMatch } from "../lib/names";
 import { parseColumns } from "../lib/columns";
+import { neighborTile, OTHER } from "../lib/treemap";
+import type { Dir, Tile } from "../lib/treemap";
 import { rankBy } from "../lib/fuzzy";
 import { isInside, volumeOf } from "../lib/volumes";
 import { formatDateTime, formatOctal, formatPermissions, formatSize } from "../lib/format";
@@ -346,6 +348,13 @@ export const SPLIT_MIN = 0.15;
 const clampSplit = (r: number) => Math.min(1 - SPLIT_MIN, Math.max(SPLIT_MIN, Number.isFinite(r) ? r : 0.5));
 
 const other = (p: PaneId): PaneId => (p === "left" ? "right" : "left");
+
+/** 화면에 그려진 treemap의 타일 배치(패널별). 방향키 이동이 보이는 대로 이웃을 고르도록 UsageTreemap이 알려 준다. */
+const usageTiles: Partial<Record<PaneId, Tile[]>> = {};
+export function publishUsageTiles(pane: PaneId, tiles: Tile[] | undefined) {
+  usageTiles[pane] = tiles;
+}
+const isTreemap = (tab: TabState) => tab.virtual?.kind === "usage" && tab.virtual.view === "treemap";
 
 export const isActiveJob = (j: JobDto) => ["queued", "running", "paused"].includes(j.status);
 
@@ -1301,6 +1310,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     },
 
     moveCursor(delta: number) {
+      if (Math.abs(delta) === 1 && isTreemap(activeTab(get()))) return api.usageMove(delta < 0 ? "up" : "down");
       const circular = cfg().behavior.table.circular_selection;
       patchActive((t) => {
         const len = t.entries.length;
@@ -1325,13 +1335,14 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     },
     /** 왼쪽 키: 여러 컬럼 보기에서는 이전 컬럼, 그 밖에는 상위 폴더로 간다. */
     async goLeft() {
+      if (isTreemap(activeTab(get()))) return api.usageMove("left");
       if (activeTab(get()).view.mode === "columns") api.moveColumn(-1);
       else await api.goUp();
     },
     /** 오른쪽 키: 여러 컬럼 보기에서는 다음 컬럼, 그 밖에는 폴더면 들어가고 파일이면 미리보기를 연다. */
     async goRight() {
       const tab = activeTab(get());
-      if (tab.virtual?.kind === "usage" && tab.virtual.view === "treemap") return api.usageDescend();
+      if (isTreemap(tab)) return api.usageMove("right");
       if (tab.view.mode === "columns") api.moveColumn(1);
       else if (isFolderEntry(cursorEntry(tab))) await api.open();
       else await api.previewToggle();
@@ -2521,6 +2532,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     async previewToggle() {
       if (get().preview) return api.previewClose();
       const entry = cursorEntry(activeTab(get()));
+      // treemap에서 Shift+→는 폴더 타일이면 그 폴더로 내려가고, 파일 타일이면 미리보기를 연다.
+      if (isTreemap(activeTab(get())) && isFolderEntry(entry)) return api.usageDescend();
       if (entry) await loadPreview(entry);
     },
     previewClose() {
@@ -2896,14 +2909,28 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (p.tabs.length > 1) await api.closeTabAt(pane, p.active);
       else await api.navigate(tab.virtual.base);
     },
-    /** treemap에서 커서의 폴더 안으로 내려간다(더블클릭, →). 파일이면 아무것도 하지 않는다. */
+    /** treemap에서 커서를 화면에서 `dir` 방향으로 인접한 타일로 옮긴다(방향키). 그 방향에 타일이 없으면 그대로다. */
+    usageMove(dir: Dir) {
+      const s = get();
+      const tab = activeTab(s);
+      const tiles = usageTiles[s.activePane];
+      if (!isTreemap(tab) || !tiles?.length) return;
+      const ids = new Set(tiles.map((t) => t.id));
+      const path = tab.entries[tab.cursor]?.path;
+      // 타일이 없는 항목(작아서 "기타"로 묶인 것)의 커서는 "기타" 타일에 있다.
+      const next = neighborTile(tiles, path !== undefined && ids.has(path) ? path : OTHER, dir);
+      if (next === null) return;
+      const i = tab.entries.findIndex((e) => (next === OTHER ? !ids.has(e.path) : e.path === next));
+      if (i >= 0) api.setCursor(i);
+    },
+    /** treemap에서 커서의 폴더 안으로 내려간다(더블클릭, Shift+→, Mod+Enter). 파일이면 아무것도 하지 않는다. */
     async usageDescend() {
       const tab = activeTab(get());
       const c = cursorEntry(tab);
       if (tab.virtual?.kind !== "usage" || !c || !isFolderEntry(c)) return;
       await api.usageRescan(c.path);
     },
-    /** treemap의 기준 폴더를 한 단계 위로 올린다(Backspace, ←). 파일 시스템 루트에서는 아무것도 하지 않는다. */
+    /** treemap의 기준 폴더를 한 단계 위로 올린다(Backspace). 파일 시스템 루트에서는 아무것도 하지 않는다. */
     async usageUp() {
       const tab = activeTab(get());
       if (tab.virtual?.kind !== "usage") return;

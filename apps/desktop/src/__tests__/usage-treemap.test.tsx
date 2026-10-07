@@ -96,10 +96,10 @@ describe("Disk Usage treemap", () => {
     expect(tiles().length).toBeGreaterThan(0);
   });
 
-  it("Enter도 같다: ↓로 커서를 옮겨 docs에서 Enter", async () => {
+  it("Enter도 같다: →로 커서를 옮겨 docs에서 Enter", async () => {
     const { user } = await openTreemap();
     await waitFor(() => expect(selected()).toEqual(["big"])); // 첫 항목(가장 큼)
-    await user.keyboard("{ArrowDown}");
+    await user.keyboard("{ArrowRight}"); // big 오른쪽에 보이는 타일은 docs다
     expect(selected()).toEqual(["docs"]);
     await user.keyboard("{Enter}");
     await waitFor(() => expect(crumbs("right")).toEqual(["/", "home", "a", "docs"]));
@@ -119,15 +119,15 @@ describe("Disk Usage treemap", () => {
     await waitFor(() => expect(crumbs("right")).toEqual(["/", "home", "a"]));
   });
 
-  it("폴더 타일 더블클릭(또는 →)은 그 폴더로 스캔을 다시 시작하고 제목이 바뀐다, 파일 타일은 아무 일도 없다", async () => {
+  it("폴더 타일 더블클릭(또는 Shift+→)은 그 폴더로 스캔을 다시 시작하고 제목이 바뀐다, 파일 타일은 아무 일도 없다", async () => {
     const { user, backend } = await openTreemap();
     await waitDone();
     fireEvent.doubleClick(tileByName("docs"));
     await waitFor(() => expect(usageScans(backend)).toEqual(["/home/a", "/home/a/docs"]));
     await waitFor(() => expect(tabTitles()).toEqual(["a", "Disk Usage: docs"]));
     await waitFor(() => expect(tileTitles().some((t) => t.startsWith("deep"))).toBe(true));
-    // → 로 더 내려간다: 첫 타일(deep 폴더, 가장 큼)
-    await user.keyboard("{ArrowRight}");
+    // Shift+→ 로 더 내려간다: 첫 타일(deep 폴더, 가장 큼)
+    await user.keyboard("{Shift>}{ArrowRight}{/Shift}");
     await waitFor(() => expect(usageScans(backend)).toEqual(["/home/a", "/home/a/docs", "/home/a/docs/deep"]));
   });
 
@@ -138,26 +138,26 @@ describe("Disk Usage treemap", () => {
     await waitFor(() => expect(tileTitles().some((t) => t.startsWith("huge.bin"))).toBe(true));
     const before = usageScans(backend).length;
     fireEvent.doubleClick(tileByName("huge.bin"));
-    await user.keyboard("{ArrowRight}"); // 첫 타일이 파일(huge.bin)이다
+    await runAction(user, "core.disk_usage.descend"); // 첫 타일이 파일(huge.bin)이다
     expect(usageScans(backend).length).toBe(before);
   });
 
-  it("Backspace/←는 한 단계 위 폴더로 스캔을 다시 시작하고, 루트에서는 아무 일도 없다", async () => {
+  it("Backspace는 한 단계 위 폴더로 스캔을 다시 시작하고, 루트에서는 아무 일도 없다", async () => {
     const { user, backend } = await openTreemap();
     await waitDone();
     await user.keyboard("{Backspace}");
     await waitFor(() => expect(usageScans(backend)).toEqual(["/home/a", "/home"]));
-    await user.keyboard("{ArrowLeft}");
+    await user.keyboard("{Backspace}");
     await waitFor(() => expect(usageScans(backend)).toEqual(["/home/a", "/home", "/"]));
     await user.keyboard("{Backspace}");
     expect(usageScans(backend)).toEqual(["/home/a", "/home", "/"]);
   });
 
-  it("↑↓로 커서가 크기 순서대로 옮겨 가고 선택 타일이 표시된다", async () => {
+  it("방향키로 커서가 보이는 이웃 타일로 옮겨 가고 선택 타일이 표시된다", async () => {
     const { user } = await openTreemap();
     await waitFor(() => expect(selected()).toEqual(["big"]));
-    await user.keyboard("{ArrowDown}{ArrowDown}");
-    expect(selected()).toEqual(["기타 3개"]); // 세 번째 항목(report.txt)은 '기타' 타일 안에 있다
+    await user.keyboard("{ArrowRight}{ArrowDown}");
+    expect(selected()).toEqual(["기타 3개"]); // docs 아래에 보이는 타일은 '기타'다(그 안의 첫 항목에 커서가 있다)
     await user.keyboard("{ArrowUp}");
     expect(selected()).toEqual(["docs"]);
   });

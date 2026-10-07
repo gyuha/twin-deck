@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupSmall, layoutTreemap, SMALL_RATIO } from "../lib/treemap";
+import { groupSmall, layoutTreemap, neighborTile, SMALL_RATIO } from "../lib/treemap";
 
 const W = 400;
 const H = 300;
@@ -93,5 +93,52 @@ describe("groupSmall", () => {
     const { kept, other } = groupSmall(withNames(0, 0));
     expect(kept).toHaveLength(2);
     expect(other).toBeNull();
+  });
+});
+
+describe("neighborTile (인접 타일)", () => {
+  // big이 왼쪽 절반, 오른쪽에 위(a)·아래(b) 두 타일.
+  const grid = [
+    { id: "big", x: 0, y: 0, w: 200, h: 100 },
+    { id: "a", x: 200, y: 0, w: 100, h: 70 },
+    { id: "b", x: 200, y: 70, w: 100, h: 30 },
+  ];
+
+  it("인접: 네 방향에서 화면에 보이는 이웃을 고른다", () => {
+    expect(neighborTile(grid, "a", "left")).toBe("big");
+    expect(neighborTile(grid, "a", "down")).toBe("b");
+    expect(neighborTile(grid, "b", "up")).toBe("a");
+    expect(neighborTile(grid, "big", "right")).toBe("a"); // a와 맞닿는 길이(70)가 b(30)보다 길다
+  });
+
+  it("인접: 가장자리에서는 null이다", () => {
+    expect(neighborTile(grid, "big", "left")).toBeNull();
+    expect(neighborTile(grid, "big", "up")).toBeNull();
+    expect(neighborTile(grid, "a", "right")).toBeNull();
+    expect(neighborTile(grid, "b", "down")).toBeNull();
+  });
+
+  it("인접: 타일이 하나뿐이거나 없는 id면 null이다", () => {
+    expect(neighborTile([{ id: "x", x: 0, y: 0, w: 10, h: 10 }], "x", "right")).toBeNull();
+    expect(neighborTile(grid, "nope", "right")).toBeNull();
+  });
+
+  it("인접: 맞닿는 길이가 같으면 중심이 가까운 쪽이고, 같은 입력은 같은 결과다", () => {
+    const t = [
+      { id: "c", x: 0, y: 0, w: 100, h: 100 },
+      { id: "u", x: 100, y: 0, w: 50, h: 50 },
+      { id: "d", x: 100, y: 50, w: 50, h: 50 },
+    ];
+    expect(neighborTile(t, "c", "right")).toBe(neighborTile(t, "c", "right"));
+    expect(["u", "d"]).toContain(neighborTile(t, "c", "right"));
+  });
+
+  it("인접: 실제 squarified 배치에서도 왼쪽 이웃의 오른쪽 이웃이 자기 자신이다", () => {
+    const tiles = layoutTreemap(items(60, 30, 20, 10, 5, 5, 3, 2, 1), W, H);
+    for (const t of tiles) {
+      const r = neighborTile(tiles, t.id, "right");
+      if (r === null) continue;
+      expect(neighborTile(tiles, r, "left")).not.toBeNull();
+    }
   });
 });

@@ -25,6 +25,7 @@ export function navigationHandlers({ api }: AppStore): Partial<ActionHandlers> {
     "core.search.cancel": () => api.cancelSearch(),
     "core.reveal_in_tab": () => api.revealInTab(),
     "core.go.up": () => api.goUp(),
+    "core.disk_usage.descend": () => api.usageDescend(),
     "core.history.back": () => api.goBack(),
     "core.history.forward": () => api.goForward(),
     "core.move.up": () => api.moveCursor(-1),
