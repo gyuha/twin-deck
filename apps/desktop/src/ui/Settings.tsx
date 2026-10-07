@@ -39,7 +39,7 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
       { key: "behavior.theme", title: "테마", desc: "system은 OS의 밝기 설정을 따릅니다", control: { type: "select", options: THEMES } },
       { key: "behavior.ui_font", title: "UI 글꼴", desc: "앱 화면 전체의 글꼴. CSS font-family 값(예: Pretendard, sans-serif). 기본은 macOS Menlo·Windows Consolas. 비우면 앱 기본 고정폭", control: { type: "text" } },
       { key: "behavior.preview_font", title: "미리보기 글꼴", desc: "텍스트·코드·JSON·Markdown 미리보기 본문의 글꼴. 비우면 기본 글꼴", control: { type: "text" } },
-      { key: "behavior.text_color", title: "글자 색", desc: "앱 기본 글자색. 색상환으로 고르거나 #rrggbb를 씁니다. 비우면 테마 그대로이고, 흐린 글자는 이 색을 배경 쪽으로 섞어 자동으로 만듭니다", control: { type: "color" } },
+      { key: "behavior.text_color", title: "글자 색", desc: "앱 기본 글자색. 색상환으로 고르거나 #rrggbb를 씁니다. 비우면 테마 그대로이고, 흐린 글자는 이 색을 배경 쪽으로 섞어 자동으로 만듭니다. 색은 테마와 무관하게 하나라서, 테마(특히 system)가 바뀌면 읽기 어려울 수 있으니 그때는 비우세요", control: { type: "color" } },
       { key: "behavior.table.icon_size", title: "아이콘 크기", desc: "파일 목록 행의 아이콘(px)", control: { type: "int" } },
       { key: "behavior.table.zebra_rows", title: "줄무늬 행", desc: "파일 목록의 행 배경을 번갈아 옅게 칠합니다", control: { type: "switch" } },
       { key: "behavior.table.show_marks", title: "표시 칸", desc: "행 맨 앞의 선택(●)·폴더(▸) 표시 칸. 끄면 칸이 사라지고 선택은 굵은 강조색 글씨로만 보입니다", control: { type: "switch" } },
@@ -50,7 +50,7 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
       { key: "behavior.layout.show_action_bar", title: "Action Bar 표시", desc: "아래쪽 단축키 버튼 줄", control: { type: "switch" } },
       { key: "behavior.layout.action_bar_by_modifier", title: "Action Bar 조합키는 누를 때만", desc: "Shift 등을 누르는 동안에만 그 조합 키의 버튼을 보인다. 끄면 전부 보인다", control: { type: "switch" } },
       { key: "behavior.layout.recent_limit", title: "최근 위치 개수", desc: "최근 위치 메뉴에 기억하는 폴더 수(양쪽 패널 공용, 창을 닫아도 유지)", control: { type: "int" } },
-      { key: "behavior.layout.show_drive_bar", title: "드라이브 바 표시", desc: "패널 위의 볼륨 버튼, 남은 용량, 언마운트 줄", control: { type: "switch" } },
+      { key: "behavior.layout.show_drive_bar", title: "드라이브 바 표시", desc: "패널 위의 볼륨 버튼과 언마운트 한 줄(용량은 이 줄과 별개로 경로 표시줄 오른쪽 끝에 보입니다)", control: { type: "switch" } },
     ],
   },
   {

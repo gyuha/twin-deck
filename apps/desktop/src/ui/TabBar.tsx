@@ -26,29 +26,63 @@ export function TabBar({ pane }: { pane: PaneId }) {
     const list = (e.currentTarget as HTMLElement).closest('[role="tablist"]');
     const rects = Array.from(list?.querySelectorAll('[role="tab"]') ?? []).map((el) => el.getBoundingClientRect());
     const laidOut = rects.length === tabs.length && rects.every((r) => r.width > 0);
-    const next = rects[from + 1] ?? rects[from - 1];
-    const shift = laidOut ? (from + 1 < rects.length ? next.left - rects[from].left : rects[from].left - next.left) : 0;
+    // 사이 탭이 비키는 거리 = 끌린 탭 폭 + 탭 사이 틈(밑줄형은 `gap-1`, 칸형은 0).
+    const gap = laidOut && rects.length > 1 ? rects[1].left - rects[0].right : 0;
+    const shift = laidOut ? rects[from].width + gap : 0;
+    /** 커서 x가 놓일 탭: 탭 위면 그 탭, 틈이나 바깥이면 가장 가까운 탭. */
+    const targetAt = (m: MouseEvent) => {
+      if (!laidOut) return tabIndexAt(m.target);
+      const inside = rects.findIndex((r) => m.clientX >= r.left && m.clientX < r.right);
+      if (inside >= 0) return inside;
+      let best = 0;
+      rects.forEach((r, i) => {
+        const d = (v: DOMRect) => Math.min(Math.abs(m.clientX - v.left), Math.abs(m.clientX - v.right));
+        if (d(r) < d(rects[best])) best = i;
+      });
+      return best;
+    };
     let dragging = false;
+    let cancelled = false;
     let to = from;
-    const move = (m: MouseEvent) => {
+    const stopListening = () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("keydown", key, true);
+      window.removeEventListener("blur", cancel);
+    };
+    /** 끌기를 취소한다(Esc·창이 포커스를 잃음·버튼이 이미 떼어져 있음). 순서는 바꾸지 않고, 아직 오지 않은 mouseup이 뒤처리만 한다. */
+    function cancel() {
+      if (cancelled) return;
+      cancelled = true;
+      stopListening();
+      setDrag(null);
+    }
+    function key(e: KeyboardEvent) {
+      if (e.key !== "Escape" || !dragging) return;
+      e.preventDefault();
+      e.stopPropagation();
+      cancel();
+    }
+    function move(m: MouseEvent) {
+      if (m.buttons === 0) return cancel(); // mouseup을 놓친 채 버튼이 이미 떼어져 있다
       if (!dragging && Math.hypot(m.clientX - x, m.clientY - y) < DRAG_THRESHOLD) return;
       dragging = true;
-      const at = laidOut ? rects.findIndex((r) => m.clientX >= r.left && m.clientX < r.right) : tabIndexAt(m.target);
+      const at = targetAt(m);
       if (at >= 0 && at < tabs.length) to = at;
-      else if (laidOut) to = m.clientX < rects[0].left ? 0 : tabs.length - 1;
       setDrag({ from, to, dx: m.clientX - x, shift });
-    };
-    const up = () => {
-      window.removeEventListener("mousemove", move);
+    }
+    function up() {
+      stopListening();
       window.removeEventListener("mouseup", up);
       setDrag(null);
-      if (!dragging) return;
+      if (!dragging && !cancelled) return;
       // 끌기를 끝낸 직후의 click은 탭 전환으로 이어지지 않게 막는다(click이 오지 않아도 곧 풀린다).
       justDragged.current = true;
       setTimeout(() => (justDragged.current = false), 0);
-      api.moveTab(pane, from, to);
-    };
+      if (!cancelled) api.moveTab(pane, from, to);
+    }
     window.addEventListener("mousemove", move);
+    window.addEventListener("keydown", key, true);
+    window.addEventListener("blur", cancel);
     window.addEventListener("mouseup", up);
   };
   /** 끌기 중 이 탭의 모양: 끌린 탭은 커서를 따르고, 사이의 탭은 한 칸 비킨다. */

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import type { PreviewRect } from "@twin-deck/ts-client";
 import { languageFor } from "../lib/highlight";
-import { isArchiveName } from "@twin-deck/ts-client";
+import { isArchiveName, isArchivePath } from "@twin-deck/ts-client";
 import { clampRect, defaultRect, moveRect, resizeRect } from "../lib/previewRect";
 import type { Edge } from "../lib/previewRect";
 import { useApp, useAppStore } from "../state/context";
@@ -89,8 +89,27 @@ export function Preview() {
   }, [p?.path]);
   if (!p) return null;
   const d = p.data;
-  const model = p.isDir ? null : modelKindOf(p.name); // 3D 모델이면 서비스가 돌려준 kind와 무관하게 3D 뷰어로 보여 준다
+  // 항목을 넘기는 동안 `data`는 이전 파일의 것이다. 크기·내용으로 파일을 읽는 뷰어(3D·Office)는 새 항목의 데이터가 온 뒤에만 띄운다.
+  const fresh = p.status === "ready";
+  const model = p.isDir || isArchivePath(p.path) ? null : modelKindOf(p.name); // 3D 모델이면 서비스가 돌려준 kind와 무관하게 3D 뷰어로 보여 준다(압축 파일 안은 asset 프로토콜로 읽을 수 없어 제외)
   const office = p.isDir || model ? null : officeKindOf(p.name); // Office 문서도 같은 방식으로 kind와 무관하게 보여 준다
+  // 텍스트 본문. 3D 뷰어가 모델을 읽지 못하면 텍스트 형식은 이것으로 돌아간다.
+  const textBody = d?.kind === "text" ? (
+    <>
+              {isMarkdown(p.name) ? (
+                <MarkdownView text={d.text ?? ""} />
+              ) : isJson(p.name) ? (
+                <JsonView text={d.text ?? ""} />
+              ) : languageFor(p.name) ? (
+                <CodeView name={p.name} text={d.text ?? ""} />
+              ) : (
+                <pre aria-label="텍스트 미리보기" style={previewFont} className="whitespace-pre-wrap break-words font-mono text-xs">
+                  {d.text}
+                </pre>
+              )}
+              {d.truncated && <p className="mt-1 text-xs text-ink-faint">앞부분만 표시합니다 (전체 {size(d.size)})</p>}
+            </>
+  ) : null;
   return (
     <div
       onMouseDown={(e) => {
@@ -122,30 +141,15 @@ export function Preview() {
           </button>
         </div>
         <div ref={bodyRef} data-preview-body className={`td-thin-scroll min-h-0 flex-1 overflow-auto py-2 pl-3 pr-3 ${p.status === "loading" && d ? "opacity-60" : ""}`}>
-          {p.status === "loading" && !d && <p className="text-ink-faint">불러오는 중…</p>}
+          {p.status === "loading" && (!d || model || office) && <p className="text-ink-faint">불러오는 중…</p>}
           {p.status === "error" && (
             <p role="alert" className="text-status-error">
               {p.error}
             </p>
           )}
-          {d && model && <ModelView path={p.path} name={p.name} />}
-          {d && office && <OfficeView path={p.path} kind={office} fileSize={d.size} sizeText={size(d.size)} />}
-          {d?.kind === "text" && !model && !office && (
-            <>
-              {isMarkdown(p.name) ? (
-                <MarkdownView text={d.text ?? ""} />
-              ) : isJson(p.name) ? (
-                <JsonView text={d.text ?? ""} />
-              ) : languageFor(p.name) ? (
-                <CodeView name={p.name} text={d.text ?? ""} />
-              ) : (
-                <pre aria-label="텍스트 미리보기" style={previewFont} className="whitespace-pre-wrap break-words font-mono text-xs">
-                  {d.text}
-                </pre>
-              )}
-              {d.truncated && <p className="mt-1 text-xs text-ink-faint">앞부분만 표시합니다 (전체 {size(d.size)})</p>}
-            </>
-          )}
+          {d && model && fresh && <ModelView path={p.path} name={p.name} size={d.size} fallback={d.kind === "text" ? textBody : undefined} />}
+          {d && office && fresh && <OfficeView path={p.path} kind={office} fileSize={d.size} sizeText={size(d.size)} />}
+          {d?.kind === "text" && !model && !office && textBody}
           {d?.kind === "image" && !model && !office &&
             (d.dataUrl ? (
               <div className="flex h-full items-center justify-center">

@@ -19,9 +19,10 @@ export function OfficeView({ path, kind, fileSize, sizeText }: { path: string; k
     }
     setState({ status: "loading" });
     let disposed = false;
+    const abort = new AbortController();
     void (async () => {
       try {
-        const res = await fetch(api.fileUrl(path));
+        const res = await fetch(api.fileUrl(path), { signal: abort.signal });
         if (!res.ok) throw new Error(`파일을 읽지 못했습니다 (${res.status})`);
         const content = await readOffice(kind, await res.arrayBuffer());
         if (!disposed) setState({ status: "ready", content });
@@ -31,6 +32,7 @@ export function OfficeView({ path, kind, fileSize, sizeText }: { path: string; k
     })();
     return () => {
       disposed = true;
+      abort.abort(); // 다른 파일로 넘어가면 읽던 것을 멈춘다
     };
   }, [api, path, kind, fileSize, sizeText]);
   if (state.status === "loading") return <p className="text-ink-faint">불러오는 중…</p>;

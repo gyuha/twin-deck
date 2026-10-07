@@ -92,9 +92,8 @@ if [[ -z "$INFO" ]]; then
   # 대상 커밋을 main이 아니라 빌드한 커밋으로 고정한다(공개할 때 태그가 그 커밋에 붙는다).
   run gh release create "$TAG" "$ZIP" --draft --target "$SHA" --title "Twin Deck $VERSION" --notes-file "$NOTES_FILE"
 else
+  # 이미 있는 초안의 본문은 건드리지 않는다(사용자가 GitHub에서 고친 노트를 덮어쓰지 않는다). 본문은 처음 만들 때만 채운다.
   run gh release upload "$TAG" "$ZIP" --clobber
-  # 다른 OS가 먼저 만든 초안의 본문도 같은 변경 사항으로 맞춘다(초안일 때만 여기까지 온다).
-  run gh release edit "$TAG" --notes-file "$NOTES_FILE"
 fi
 
 # 업데이트용 파일과 latest.json. 이미 올라온 latest.json(다른 OS 것)을 받아 이 OS 항목만 병합한다.

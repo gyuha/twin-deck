@@ -56,7 +56,7 @@ Release/version: bump `version` in `apps/desktop/src-tauri/tauri.conf.json` **an
 
 0. `node scripts/release-notes.mjs --check`가 `CHANGELOG.md`에 이 버전 항목이 있는지 본다. 없으면 **빌드 전에** 멈춘다. 항목을 쓰는 방법은 아래 "릴리스 노트(변경 사항 기록)"에 있다.
 1. 번들을 만든다. 이 단계에서만 `--config '{"bundle":{"createUpdaterArtifacts":true}}'`로 업데이트 산출물(`.app.tar.gz`/NSIS 설치 파일과 `.sig`)을 켠다. 평소 `task bundle`은 키 없이 된다.
-2. 이 OS의 파일을 초안 릴리스(`v<버전>`)에 올린다. 릴리스 본문은 `CHANGELOG.md`의 이 버전 항목 + 전체 변경 내역 비교 링크 + 설치 안내로 채우고(다른 OS가 먼저 만든 초안이면 본문을 같은 내용으로 맞춘다), `latest.json`의 `notes`에도 같은 항목이 들어가 앱의 "업데이트 확인" 창에 보인다. 같은 커밋에서 빌드한 파일만 한 초안에 모인다. 업데이트용 파일과 `latest.json`도 올리고, `latest.json`은 `scripts/update-manifest.mjs`가 이미 올라온 다른 OS 항목을 지우지 않고 이 OS 항목만 합친다.
+2. 이 OS의 파일을 초안 릴리스(`v<버전>`)에 올린다. 릴리스 본문은 `CHANGELOG.md`의 이 버전 항목 + 전체 변경 내역 비교 링크 + 설치 안내로 채우고(다른 OS가 먼저 만든 초안이면 본문은 건드리지 않는다 — GitHub에서 고친 노트를 덮어쓰지 않으려는 것이라, 초안을 만든 뒤 CHANGELOG를 고쳤다면 초안 본문은 직접 고치거나 초안을 지우고 다시 만든다), `latest.json`의 `notes`에도 같은 항목이 들어가 앱의 "업데이트 확인" 창에 보인다. 같은 커밋에서 빌드한 파일만 한 초안에 모인다. 업데이트용 파일과 `latest.json`도 올리고, `latest.json`은 `scripts/update-manifest.mjs`가 이미 올라온 다른 OS 항목을 지우지 않고 이 OS 항목만 합친다.
 3. 초안에 macOS용과 Windows용 파일이 모두 있는지 본다. 부족하면 **공개하지 않고** 종료 코드 3으로 끝난다(한쪽만 공개하려면 `ALLOW_PARTIAL=1`). 한쪽 OS 파일이 없는 버전은 `latest.json`에 그 OS 항목이 없어서, 그 OS는 그 버전을 업데이트로 받지 않는다.
 4. 초안을 공개한다(`draft=false`). 이때 태그 `v<버전>`이 만들어지고 누구나 받을 수 있게 된다. **되돌릴 수 없다.**
 5. `scripts/update-tap.mjs <버전>`이 tap을 갱신한다: 공개 상태이고 이 저장소의 최신 릴리스인지 확인 → 공개 URL에서 macOS ZIP을 내려받아 GitHub가 준 sha256과 대조 → tap 저장소를 새로 받아 `Casks/twin-deck.rb`를 `scripts/update-homebrew-cask.mjs`로 갱신 → 바뀐 게 있으면 커밋하고 push. 그 뒤부터 `brew install --cask gyuha/tap/twin-deck`이 새 버전을 받는다.

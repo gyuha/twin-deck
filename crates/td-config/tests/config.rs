@@ -242,6 +242,43 @@ fn config_watch_reload() {
 }
 
 #[test]
+fn config_watch_same_size_edit_with_same_mtime_is_still_seen() {
+    // 수정 시각 해상도가 거친 파일 시스템에서는 같은 길이로 두 번 고치면 (시각, 크기)가 같다. 내용으로 비교해야 놓치지 않는다.
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("config.toml");
+    fs::write(&file, "[behavior.table]\nicon_size = 16\n").unwrap();
+    let (_store, rx) = ConfigStore::start(dir.path(), Platform::Linux).unwrap();
+    settle(&rx);
+
+    let (mtime, len) = {
+        let m = fs::metadata(&file).unwrap();
+        (m.modified().unwrap(), m.len())
+    };
+    fs::write(&file, "[behavior.table]\nicon_size = 18\n").unwrap();
+    fs::File::options()
+        .write(true)
+        .open(&file)
+        .unwrap()
+        .set_modified(mtime)
+        .unwrap();
+    assert_eq!(fs::metadata(&file).unwrap().modified().unwrap(), mtime);
+    assert_eq!(
+        fs::metadata(&file).unwrap().len(),
+        len,
+        "크기가 같아야 시험이 된다"
+    );
+    let loaded = loop {
+        let l = rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("같은 크기·같은 시각의 편집도 재로딩 이벤트가 와야 한다");
+        if l.config.behavior.table.icon_size == 18 {
+            break l;
+        }
+    };
+    assert!(loaded.warnings.is_empty());
+}
+
+#[test]
 fn config_watch_ignores_unrelated_files() {
     // 같은 폴더의 state.json은 커서·선택이 바뀔 때마다 저장된다. 설정이 그대로면 재로딩 이벤트를 보내지 않아야 한다
     // (보내면 화면이 설정을 다시 받아 메뉴바 등을 매번 다시 만든다).
@@ -283,6 +320,41 @@ fn config_watch_ignores_unrelated_files() {
         }
     };
     assert!(loaded.warnings.is_empty());
+}
+
+#[test]
+fn text_color_is_validated() {
+    let color = |v: &str| load(&format!("[behavior]\ntext_color = \"{v}\"\n"));
+    for ok in ["#1a2b3c", "#abc", "#ABCDEF", ""] {
+        let l = color(ok);
+        assert!(l.warnings.is_empty(), "{ok:?}: {:?}", l.warnings);
+        assert_eq!(l.config.behavior.text_color, ok);
+    }
+    for bad in [
+        "red",
+        "#12345",
+        "#gggggg",
+        "javascript:1",
+        "#abc; background:url(x)",
+        " #abc",
+    ] {
+        let l = color(bad);
+        assert_eq!(l.warnings.len(), 1, "{bad:?}: {:?}", l.warnings);
+        assert!(
+            l.warnings[0].message.contains("text_color"),
+            "{:?}",
+            l.warnings
+        );
+        assert_eq!(
+            l.config.behavior.text_color, "",
+            "{bad:?}는 기본값(빈 문자열)으로 돌아간다"
+        );
+    }
+    assert_eq!(
+        load("").config.behavior.text_color,
+        "",
+        "기본값은 테마 그대로"
+    );
 }
 
 #[test]

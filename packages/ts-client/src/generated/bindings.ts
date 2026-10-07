@@ -464,7 +464,7 @@ action_bar_by_modifier: boolean;
  */
 recent_limit: number; 
 /**
- * 패널 위의 드라이브 바(볼륨 버튼, 남은 용량, 언마운트).
+ * 패널 위의 드라이브 바(볼륨 버튼, 언마운트). 남은 용량은 이 바와 별개로 경로 표시줄 오른쪽 끝에 항상 보인다.
  */
 show_drive_bar: boolean; 
 /**

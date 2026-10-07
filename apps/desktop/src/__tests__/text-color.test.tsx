@@ -68,4 +68,11 @@ describe("글자 색 (behavior.text_color)", () => {
     await waitFor(() => expect(vars()).toEqual(["", "", ""]));
     fireEvent.keyDown(document.body, { key: "Escape" });
   });
+
+  it("설정 화면의 '글자 색' 설명에 테마가 바뀌면 읽기 어려울 수 있다는 한계가 적혀 있다", async () => {
+    const { user } = await renderApp(seedBackend());
+    await user.keyboard("{Control>},{/Control}");
+    await screen.findByRole("dialog", { name: "설정" });
+    expect(screen.getByText(/테마\(특히 system\)가 바뀌면 읽기 어려울 수/)).toBeInTheDocument();
+  });
 });

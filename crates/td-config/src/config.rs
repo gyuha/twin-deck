@@ -77,7 +77,7 @@ pub struct BehaviorLayout {
     pub action_bar_by_modifier: bool,
     /// 최근 위치 메뉴에 기억하는 폴더 수(두 패널 공용). 1 이상.
     pub recent_limit: u32,
-    /// 패널 위의 드라이브 바(볼륨 버튼, 남은 용량, 언마운트).
+    /// 패널 위의 드라이브 바(볼륨 버튼, 언마운트). 남은 용량은 이 바와 별개로 경로 표시줄 오른쪽 끝에 항상 보인다.
     pub show_drive_bar: bool,
     /// 활성 패널을 감싸는 accent 테두리를 보인다. 끄면 두 패널 모두 테두리가 투명이다(폭은 그대로).
     pub pane_highlight: bool,

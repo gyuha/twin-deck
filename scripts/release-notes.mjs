@@ -5,10 +5,11 @@
 // 사용:
 //   node scripts/release-notes.mjs <버전> [--repo owner/name]   릴리스 본문(변경 사항 + 전체 비교 링크 + 설치 안내)
 //   node scripts/release-notes.mjs <버전> --plain               변경 사항만(제목 표시 없이). latest.json의 notes용
+//   --out <파일>을 더하면 표준출력 대신 그 파일에 UTF-8로 쓴다(PowerShell이 표준출력을 콘솔 코드페이지로 읽어 한글이 깨지는 것을 피한다)
 //   node scripts/release-notes.mjs --check                      tauri.conf.json의 버전(또는 VERSION_OVERRIDE) 항목이 있는지만 확인
 // 환경 변수: CHANGELOG_FILE(기본 CHANGELOG.md, 시험용), VERSION_OVERRIDE
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 /** `## 0.5.1 (2026-10-07)` 같은 제목 아래 다음 `## ` 제목 전까지의 본문. 없거나 비어 있으면 null. */
@@ -82,8 +83,9 @@ function main() {
     console.log(`CHANGELOG.md에 ${version} 항목이 있습니다`);
     return;
   }
+  const emit = (text) => (opt("--out") ? writeFileSync(opt("--out"), text, "utf8") : process.stdout.write(text));
   if (flag("--plain")) {
-    console.log(plainNotes(section));
+    emit(`${plainNotes(section)}\n`);
     return;
   }
   let prev = null;
@@ -92,7 +94,7 @@ function main() {
   } catch {
     /* git이 없으면 비교 링크만 뺀다 */
   }
-  process.stdout.write(releaseBody(section, { version, prev, repo: opt("--repo") }));
+  emit(releaseBody(section, { version, prev, repo: opt("--repo") }));
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

@@ -73,4 +73,18 @@ describe("update-manifest", () => {
     expect(merged.platforms["windows-x86_64"].signature).toBe("SIGWIN");
     expect((await run(["--version", "9.9.9", "--platform", "windows-x86_64", "--url", "https://x/w", "--sig-file", join(dir, "win.sig"), "--existing", out, "--out", out])).code).toBe(1);
   });
+
+  test("CLI: --notes-file은 UTF-8 파일의 내용(한글·큰따옴표·줄바꿈·--)을 그대로 notes에 넣는다", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "um-"));
+    writeFileSync(join(dir, "m.sig"), "SIGMAC\n");
+    const notes = '### 추가\n- "업데이트 확인" 창에 변경 사항이 보입니다\n- `--notes` 같은 인수처럼 보이는 줄\n- 한글 노트';
+    writeFileSync(join(dir, "notes.txt"), notes, "utf8");
+    const out = join(dir, "latest.json");
+    const p = Bun.spawn(
+      ["node", join(import.meta.dir, "update-manifest.mjs"), "--version", "1.2.3", "--platform", "darwin-aarch64", "--url", "https://x/m", "--sig-file", join(dir, "m.sig"), "--notes-file", join(dir, "notes.txt"), "--out", out],
+      { stdout: "pipe", stderr: "pipe" },
+    );
+    expect(await p.exited).toBe(0);
+    expect(JSON.parse(readFileSync(out, "utf8")).notes).toBe(notes);
+  });
 });

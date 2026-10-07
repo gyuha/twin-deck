@@ -835,8 +835,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     applyQueue(jobs);
   }));
   // 설정이 바뀌면 컬럼 명세(정렬 표시)나 표시 옵션이 달라질 수 있으니 목록을 다시 정렬한다.
-  // 설정 폴더 감시는 그 폴더의 어떤 파일이 바뀌어도(커서·선택이 바뀔 때마다 저장하는 state.json 포함) 알리므로, 이때의 다시 읽기는
-  // 폴더 내용이 바뀐 것이 아니다 — 계산해 둔 폴더 용량을 지우지 않는다.
+  // 설정 폴더 감시는 config.toml·keybindings.toml의 내용이 바뀔 때만 알린다(같은 폴더의 state.json은 커서·선택이 바뀔 때마다 저장되지만 무시한다).
+  // 이때의 다시 읽기는 설정이 바뀐 것이지 폴더 내용이 바뀐 것이 아니다 — 계산해 둔 폴더 용량을 지우지 않는다.
   subscribe(() => backend.onConfigChanged((loaded) => {
     set({ loaded });
     void reloadAll(true);

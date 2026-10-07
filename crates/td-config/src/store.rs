@@ -4,7 +4,7 @@ use std::sync::mpsc::RecvTimeoutError;
 use std::sync::mpsc::{self, Receiver};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -24,14 +24,12 @@ pub struct ConfigStore {
 /// 파일 이벤트가 늦거나 유실돼도 설정이 반영되도록, 이 주기로 파일 상태를 직접 비교한다.
 const POLL: Duration = Duration::from_secs(1);
 
-type Signature = [Option<(SystemTime, u64)>; 2];
+type Signature = [Option<String>; 2];
 
-/// `config.toml`, `keybindings.toml`의 (수정 시각, 크기). 없으면 None.
+/// `config.toml`, `keybindings.toml`의 내용. 없거나 읽지 못하면 None.
+/// 수정 시각과 크기로는 같은 길이로 두 번 고친 편집(`16` → `18`)을 타임스탬프 해상도가 거친 파일 시스템에서 놓칠 수 있어 내용을 비교한다(두 파일 합쳐 몇 KB).
 fn signature(dir: &Path) -> Signature {
-    ["config.toml", "keybindings.toml"].map(|name| {
-        let meta = fs::metadata(dir.join(name)).ok()?;
-        Some((meta.modified().ok()?, meta.len()))
-    })
+    ["config.toml", "keybindings.toml"].map(|name| fs::read_to_string(dir.join(name)).ok())
 }
 
 /// 문법 오류로 읽기에 실패한 파일이 있는지 (그 파일의 내용은 이전 값을 유지해야 한다).
@@ -45,6 +43,8 @@ impl ConfigStore {
     /// 시작하며 한 번 읽고, 이후 변경이 있을 때마다 새 `Loaded`를 수신기로 보낸다.
     pub fn start(dir: &Path, platform: Platform) -> std::io::Result<(Self, Receiver<Loaded>)> {
         fs::create_dir_all(dir)?;
+        // 기준 서명은 처음 읽기 전에 구한다. 그 사이에 파일이 바뀌어도 다음 확인에서 서명이 달라 다시 읽는다.
+        let initial = signature(dir);
         let current = Arc::new(Mutex::new(load_dir(dir, platform)));
         let (mut watcher, changes) =
             DirWatcher::new().map_err(|e| std::io::Error::other(e.to_string()))?;
@@ -55,7 +55,7 @@ impl ConfigStore {
         let (tx, rx) = mpsc::channel();
         let (cur, d) = (Arc::clone(&current), dir.to_path_buf());
         thread::spawn(move || {
-            let mut last = signature(&d);
+            let mut last = initial;
             loop {
                 match changes.recv_timeout(POLL) {
                     Ok(_) => while changes.try_recv().is_ok() {},

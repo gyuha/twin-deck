@@ -243,6 +243,9 @@ fn archive_preview(path: &str, extra_zip_exts: &[String]) -> Option<td_vfs::Prev
     })
 }
 
+/// 압축 미리보기 트리의 최대 깊이. 이보다 깊은 경로는 이 깊이에서 `…` 하나로 줄인다(깊은 중첩 트리를 만들면 해제할 때 재귀가 스택을 넘긴다).
+const ARCHIVE_TREE_MAX_DEPTH: usize = 32;
+
 /// 압축 안의 경로 목록을 폴더 미리보기와 같은 `├── └── │` 가지 트리 줄로 만든다(폴더 먼저, 이름순).
 /// 압축에 폴더 항목이 따로 없어도 경로에서 폴더를 만든다. 줄 수가 `max_lines`를 넘으면 거기서 멈추고 `true`를 돌려준다.
 fn archive_tree_lines(paths: &[(&str, bool)], max_lines: usize) -> (Vec<String>, bool) {
@@ -283,14 +286,24 @@ fn archive_tree_lines(paths: &[(&str, bool)], max_lines: usize) -> (Vec<String>,
             .split('/')
             .filter(|p| !p.is_empty())
             .collect();
-        let Some((last, dirs)) = parts.split_last() else {
+        let too_deep = parts.len() > ARCHIVE_TREE_MAX_DEPTH;
+        let kept = if too_deep {
+            &parts[..ARCHIVE_TREE_MAX_DEPTH - 1]
+        } else {
+            &parts[..]
+        };
+        let Some((last, dirs)) = (if too_deep {
+            Some((&"…", kept))
+        } else {
+            kept.split_last()
+        }) else {
             continue;
         };
         let mut node = &mut root;
         for part in dirs {
             node = node.dirs.entry((*part).to_string()).or_default();
         }
-        if *is_dir {
+        if *is_dir && !too_deep {
             node.dirs.entry((*last).to_string()).or_default();
         } else {
             node.files.insert((*last).to_string());
@@ -2205,6 +2218,66 @@ mod tests {
         assert_eq!(lines, ["├── empty/", "└── only/"]);
         let (lines, truncated) = archive_tree_lines(&[], 100);
         assert!(lines.is_empty() && !truncated);
+    }
+
+    /// 작은 스택(256KB) 스레드에서 실행한다. 재귀가 깊으면 스택 오버플로로 프로세스가 중단된다.
+    fn on_small_stack<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> T {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(f)
+            .unwrap()
+            .join()
+            .unwrap()
+    }
+
+    #[test]
+    fn archive_tree_lines_deep_path_does_not_overflow_a_small_stack() {
+        let deep = format!("{}f.txt", "a/".repeat(100_000));
+        let (lines, _truncated) = on_small_stack(move || {
+            let (lines, truncated) = archive_tree_lines(&[(deep.as_str(), false)], 2000);
+            (lines, truncated)
+        });
+        assert!(!lines.is_empty() && lines.len() <= 2000);
+        assert!(lines[0].starts_with("└── a/"));
+    }
+
+    /// 비압축·크기 0인 항목 하나만 든 zip을 직접 쓴다(디스크에 3만 단계 폴더를 만들 수 없어서 `zip` 명령을 쓸 수 없다).
+    fn write_single_entry_zip(dest: &str, name: &str) {
+        let n = name.len() as u16;
+        let mut z: Vec<u8> = Vec::new();
+        z.extend([0x50, 0x4b, 0x03, 0x04, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0]); // 로컬 헤더(버전 20, 저장, 시각 0)
+        z.extend([0; 12]); // crc32, 압축 크기, 원본 크기 = 0
+        z.extend(n.to_le_bytes());
+        z.extend([0, 0]);
+        z.extend(name.as_bytes());
+        let cd_offset = z.len() as u32;
+        z.extend([0x50, 0x4b, 0x01, 0x02, 20, 0, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        z.extend([0; 12]); // crc32, 압축 크기, 원본 크기
+        z.extend(n.to_le_bytes());
+        z.extend([0; 12]); // 추가 필드, 주석, 디스크 번호, 내부·외부 속성 길이
+        z.extend([0, 0, 0, 0]); // 로컬 헤더 오프셋
+        z.extend(name.as_bytes());
+        let cd_size = z.len() as u32 - cd_offset;
+        z.extend([0x50, 0x4b, 0x05, 0x06, 0, 0, 0, 0, 1, 0, 1, 0]);
+        z.extend(cd_size.to_le_bytes());
+        z.extend(cd_offset.to_le_bytes());
+        z.extend([0, 0]);
+        std::fs::write(dest, z).unwrap();
+    }
+
+    #[test]
+    fn archive_tree_lines_deep_zip_preview_survives_a_small_stack() {
+        let t = tempfile::tempdir().unwrap();
+        let dest = t.path().join("deep.zip").to_string_lossy().into_owned();
+        write_single_entry_zip(&dest, &format!("{}f", "a/".repeat(32_000)));
+        let p = on_small_stack(move || archive_preview(&dest, &[]));
+        let p = p.expect("zip은 미리보기 대상이다");
+        assert_ne!(
+            p.kind,
+            td_vfs::PreviewKind::Other,
+            "항목을 읽지 못해 기타로 떨어지면 안 된다"
+        );
+        assert!(p.text.unwrap().starts_with("└── a/"));
     }
 
     #[test]

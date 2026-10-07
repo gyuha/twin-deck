@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { extractSection, plainNotes, previousTag, releaseBody } from "./release-notes.mjs";
@@ -102,5 +102,13 @@ describe("CLI", () => {
     expect(await ok.exited).toBe(0);
     const bad = Bun.spawn(["node", join(import.meta.dir, "release-notes.mjs"), "--check"], { stdout: "pipe", stderr: "pipe", env: { ...process.env, CHANGELOG_FILE: f, VERSION_OVERRIDE: "7.7.7" } });
     expect(await bad.exited).toBe(1);
+  });
+
+  test("--out은 표준출력 대신 UTF-8 파일에 쓴다(PowerShell이 한글을 콘솔 코드페이지로 읽는 문제를 피한다)", async () => {
+    const out = join(mkdtempSync(join(tmpdir(), "rn-")), "notes.txt");
+    const r = await run(["0.5.0", "--plain", "--out", out], logFile());
+    expect(r.code).toBe(0);
+    expect(r.out).toBe("");
+    expect(readFileSync(out, "utf8").length).toBeGreaterThan(0);
   });
 });

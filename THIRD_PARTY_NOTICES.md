@@ -35,3 +35,21 @@ crates.io에서 받아 쓰는 permissive 라이선스 라이브러리이며 코�
 |---|---|---|---|
 | @spacedrive/primitives | 0.2.4 | MIT (spaceui 저장소 표기. 패키지 매니페스트에는 license 필드가 없다) | 설정 화면의 Switch, Select, Input, Button (radix 기반) |
 | @spacedrive/tokens | 0.2.3 | MIT (spaceui 저장소 표기, 2026-10-01 GitHub API로 확인. 패키지 매니페스트에는 license 필드가 없다) | 색 토큰, 테마 7종(dark, light, midnight, noir, slate, nord, mocha), 글자 크기 체계 |
+
+## 미리보기·설정 화면에 더한 npm 라이브러리 (v0.5.1 이후)
+
+3D 모델·Office 문서 미리보기와 글자색 설정 화면을 위해 `apps/desktop/package.json`에 더한 npm 패키지다. 코드를 복사해 온 것은 없고, 버전과 라이선스는 설치된 각 패키지의 `package.json`(`license` 필드)에서 읽었다. 라이선스 호환성에 대한 법률 판단이 아니라 출처 기록이다.
+
+| npm 패키지 | 버전 | 라이선스 | 용도 |
+|---|---|---|---|
+| three | 0.186.1 | MIT | 3D 모델 미리보기(렌더러와 STL·OBJ·PLY·FBX·glTF·3MF·USDZ·GCode 로더) |
+| occt-import-js | 0.0.23 | LGPL-2.1 | STEP·IGES 읽기. 안에 든 OpenCascade(Open CASCADE Technology) 컴파일 결과(`occt-import-js.wasm`)를 수정 없이 별도 wasm 파일로 불러온다. 라이선스 원문은 패키지의 `dist/license.occt.txt`·`dist/license.occt-import-js.txt`, 소스는 https://github.com/kovacsv/occt-import-js |
+| mammoth | 1.13.0 | BSD-2-Clause | docx 미리보기(HTML 변환) |
+| xlsx (SheetJS) | 0.20.3 | Apache-2.0 | xlsx 미리보기. npm이 아니라 SheetJS CDN 타르볼(`https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz`)에서 받는다 |
+| jszip | 3.10.2 | MIT OR GPL-3.0-or-later | pptx 미리보기(압축 해제) |
+| dompurify | 3.4.16 | MPL-2.0 OR Apache-2.0 | docx 미리보기 HTML 정화 |
+| react-colorful | 5.8.1 | MIT | 설정 화면의 글자색 색상환 |
+
+### Draco 디코더 (번들 자산)
+
+`apps/desktop/public/draco/`의 `draco_decoder.js`·`draco_decoder.wasm`·`draco_wasm_wrapper.js`는 Draco 압축 glTF를 읽는 디코더로, Google Draco(https://github.com/google/draco, Apache-2.0)의 빌드 결과다. 이 저장소에서 `draco_decoder.wasm`을 설치된 `three/examples/jsm/libs/draco/gltf/draco_decoder.wasm`과 비교했고 같은 파일이다(SHA-1 앞 12자리 `11866a8962e6`). 수정하지 않았다. 테스트가 쓰는 npm 패키지 `draco3d`(1.5.7, Apache-2.0)와는 별개다.

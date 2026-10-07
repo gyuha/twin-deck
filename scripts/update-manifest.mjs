@@ -3,7 +3,8 @@
 // 읽어 이 플랫폼 항목만 더하거나 바꾼다. 올리지 않은 OS의 항목은 만들지 않는다(그 OS는 그 버전을 건너뛴다).
 //
 // 사용: node scripts/update-manifest.mjs --version 0.5.0 --platform darwin-aarch64 --url <URL> --sig-file <.sig 파일>
-//        [--existing <기존 latest.json>] [--notes <릴리스 노트>] [--pub-date <RFC 3339>] --out <latest.json>
+//        [--existing <기존 latest.json>] [--notes <릴리스 노트> | --notes-file <UTF-8 파일>] [--pub-date <RFC 3339>] --out <latest.json>
+// --notes-file은 노트를 명령줄 인수로 넘기지 않게 한다(Windows PowerShell 5.1은 인수 안의 큰따옴표를 이스케이프하지 않고 한글 인코딩이 깨질 수 있다).
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
@@ -44,7 +45,7 @@ function main() {
     platform: a.platform,
     url: a.url,
     signature: readFileSync(a["sig-file"], "utf8"),
-    notes: a.notes,
+    notes: a["notes-file"] ? readFileSync(a["notes-file"], "utf8").trimEnd() : a.notes,
     pubDate: a["pub-date"],
   });
   writeFileSync(a.out, JSON.stringify(merged, null, 2) + "\n");

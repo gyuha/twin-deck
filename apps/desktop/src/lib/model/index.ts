@@ -5,6 +5,9 @@ import type { ModelFormat } from "./kinds";
 export { modelKindOf } from "./kinds";
 export type { ModelFormat } from "./kinds";
 
+/** 이보다 큰 모델 파일은 읽지 않는다(전체를 메모리에 올려 메인 스레드에서 파싱하므로). */
+export const MODEL_MAX_BYTES = 100 * 1024 * 1024;
+
 export interface LoadOptions {
   /** glTF가 가리키는 외부 파일(.bin, 텍스처)의 상대 주소를 실제 주소로 바꾼다. */
   resolve?: (uri: string) => string;
@@ -98,7 +101,8 @@ export async function loadModel(name: string, data: ArrayBuffer, opts: LoadOptio
       if (opts.dracoLoader) loader.setDRACOLoader(opts.dracoLoader as never);
       else {
         const { DRACOLoader } = await import("three/addons/loaders/DRACOLoader.js");
-        loader.setDRACOLoader(new DRACOLoader(manager).setDecoderPath(`${import.meta.env.BASE_URL}draco/`));
+        // 디코더는 앱 자원이라 glTF 외부 파일용 URL 수정자(`manager`)를 거치면 모델 폴더 아래의 없는 주소로 바뀐다. 매니저를 따로 쓴다.
+        loader.setDRACOLoader(new DRACOLoader().setDecoderPath(`${import.meta.env.BASE_URL}draco/`));
       }
       return new Promise((resolve, reject) => loader.parse(data, "", (g) => resolve(g.scene), reject));
     }

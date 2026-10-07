@@ -1,3 +1,4 @@
+import DOMPurify from "dompurify";
 import type { OfficeFormat } from "./kinds";
 
 /** 파일이 이보다 크면 읽지 않는다(메모리와 압축 해제 시간 제한). */
@@ -19,10 +20,27 @@ export async function readOffice(kind: OfficeFormat, data: ArrayBuffer): Promise
   return readPptx(data);
 }
 
+/** 미리보기에 허용하는 태그. 문서 서식(문단·제목·표·목록·굵게·기울임·그림)만이고 스크립트가 될 수 있는 것은 없다. */
+const DOCX_TAGS = ["p", "br", "h1", "h2", "h3", "h4", "h5", "h6", "strong", "em", "b", "i", "u", "s", "sub", "sup", "ul", "ol", "li", "table", "thead", "tbody", "tfoot", "tr", "th", "td", "a", "img", "blockquote", "span", "div"];
+
+/**
+ * 문서에서 만든 HTML에서 실행될 수 있는 것을 모두 지운다(`on*` 속성, script·iframe·svg·style·link, `javascript:` 주소 등).
+ * 허용 목록으로만 남기고, 속성은 표의 병합(`colspan`·`rowspan`)과 그림(`src`는 `data:image/`만, `alt`)만 허용한다.
+ */
+export function sanitizeDocxHtml(html: string): string {
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: DOCX_TAGS,
+    ALLOWED_ATTR: ["colspan", "rowspan", "src", "alt"],
+    ALLOWED_URI_REGEXP: /^data:image\//i,
+    ALLOW_DATA_ATTR: false,
+  });
+}
+
 async function readDocx(data: ArrayBuffer): Promise<OfficeContent> {
   const mammoth = await import("mammoth/mammoth.browser");
-  const { value } = await mammoth.convertToHtml({ arrayBuffer: data });
-  const body = new DOMParser().parseFromString(value, "text/html").body;
+  // 문서에 내장된 스타일 맵(`mammoth/style-map`)은 임의의 태그·속성을 만들 수 있어 쓰지 않는다.
+  const { value } = await mammoth.convertToHtml({ arrayBuffer: data }, { includeEmbeddedStyleMap: false });
+  const body = new DOMParser().parseFromString(sanitizeDocxHtml(value), "text/html").body;
   const blocks = Array.from(body.children);
   for (const b of blocks.slice(DOCX_BLOCKS)) b.remove();
   for (const a of Array.from(body.querySelectorAll("a"))) a.removeAttribute("href"); // 미리보기에서 링크가 이동하지 않게 한다

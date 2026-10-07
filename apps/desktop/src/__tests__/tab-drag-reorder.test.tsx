@@ -18,7 +18,7 @@ const tabs = () => within(screen.getAllByRole("tablist")[0]).getAllByRole("tab")
 const labels = () => tabs().map((t) => t.textContent);
 const selected = () => tabs().findIndex((t) => t.getAttribute("aria-selected") === "true");
 const press = (el: Element, x: number) => fireEvent.mouseDown(el, { button: 0, clientX: x, clientY: 10 });
-const move = (el: Element, x: number) => fireEvent.mouseMove(el, { clientX: x, clientY: 10 });
+const move = (el: Element, x: number) => fireEvent.mouseMove(el, { buttons: 1, clientX: x, clientY: 10 }); // 끄는 동안 왼쪽 버튼이 눌려 있다(buttons: 1)
 const release = (el: Element, x: number) => fireEvent.mouseUp(el, { button: 0, clientX: x, clientY: 10 });
 const setup = () => renderApp(seedBackend(), undefined, undefined, { snapshot });
 
