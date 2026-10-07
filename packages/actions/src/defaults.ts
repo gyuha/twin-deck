@@ -243,7 +243,7 @@ export const DEFAULT_BINDINGS: Binding[] = [
   b("pane", "core.select.none", "Escape"),
   // Space는 선택 토글이다. 미리보기는 오른쪽 키(core.move.right가 파일에서 연다)와 Mod+Y다.
   b("pane", "core.select.toggle", "Insert", "Space", "Shift+Space"),
-  b("pane", "core.preview", "Mod+Y"),
+  b("pane", "core.preview", "Mod+Y", "Shift+Right"),
   b("preview", "core.preview.close", "Escape", "Space", "Left", "Mod+Y"),
   b("preview", "core.preview.open", "Return"),
   b("preview", "core.preview.prev", "Up"),
