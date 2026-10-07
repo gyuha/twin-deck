@@ -67,6 +67,11 @@ fi
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
+# 릴리스 본문: CHANGELOG.md의 이 버전 항목 + 전체 비교 링크 + 설치 안내. 항목이 없으면 여기서 멈춘다(아직 아무것도 올리지 않았다).
+REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
+NOTES_FILE="$WORK/notes.md"
+node scripts/release-notes.mjs "$VERSION" --repo "$REPO" >"$NOTES_FILE" || exit 1
+NOTES_PLAIN="$(node scripts/release-notes.mjs "$VERSION" --plain)"
 if [[ ! -f "$UPD_SRC" || ! -f "$UPD_SRC.sig" ]]; then
   if [[ "${DRY_RUN:-}" == "1" ]]; then
     # DRY_RUN은 흐름만 시험하므로 서명 키 없이 가짜 산출물로 대신한다.
@@ -83,20 +88,20 @@ cp "$UPD_SRC.sig" "$WORK/$UPD_NAME.sig"
 
 rm -f "$ZIP"
 ditto -c -k --keepParent "$APP" "$ZIP"
-NOTE="서명하지 않은 빌드입니다. macOS에서 처음 열 때 막히면: xattr -dr com.apple.quarantine \"/Applications/$APP_NAME.app\""
 if [[ -z "$INFO" ]]; then
   # 대상 커밋을 main이 아니라 빌드한 커밋으로 고정한다(공개할 때 태그가 그 커밋에 붙는다).
-  run gh release create "$TAG" "$ZIP" --draft --target "$SHA" --title "Twin Deck $VERSION" --generate-notes --notes "$NOTE"
+  run gh release create "$TAG" "$ZIP" --draft --target "$SHA" --title "Twin Deck $VERSION" --notes-file "$NOTES_FILE"
 else
   run gh release upload "$TAG" "$ZIP" --clobber
+  # 다른 OS가 먼저 만든 초안의 본문도 같은 변경 사항으로 맞춘다(초안일 때만 여기까지 온다).
+  run gh release edit "$TAG" --notes-file "$NOTES_FILE"
 fi
 
 # 업데이트용 파일과 latest.json. 이미 올라온 latest.json(다른 OS 것)을 받아 이 OS 항목만 병합한다.
-REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
 gh release download "$TAG" -p latest.json -D "$WORK" >/dev/null 2>&1 || true
 node scripts/update-manifest.mjs --version "$VERSION" --platform "$PLATFORM" \
   --url "https://github.com/$REPO/releases/download/$TAG/$UPD_NAME" --sig-file "$WORK/$UPD_NAME.sig" \
-  --notes "Twin Deck $VERSION" --existing "$WORK/latest.json" --out "$WORK/latest.json"
+  --notes "$NOTES_PLAIN" --existing "$WORK/latest.json" --out "$WORK/latest.json"
 run gh release upload "$TAG" "$WORK/$UPD_NAME" "$WORK/$UPD_NAME.sig" "$WORK/latest.json" --clobber
 
 if [[ "$MODE" == "draft" ]]; then

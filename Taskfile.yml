@@ -129,6 +129,8 @@ tasks:
     desc: "[드래프트 배포] 이 OS의 파일을 비공개 초안(draft) 릴리스에 올린다. 공개하지 않고 태그도 만들지 않는다. macOS와 Windows에서 각각 실행하면 같은 초안에 모인다"
     prompt: "[드래프트 배포] 번들을 만들어 GitHub의 비공개 초안 릴리스에 올립니다. 공개되지 않고 태그도 만들어지지 않습니다. 계속할까요?"
     cmds:
+      # 긴 빌드 전에 먼저: CHANGELOG.md에 이 버전의 변경 사항이 적혀 있어야 한다
+      - node scripts/release-notes.mjs --check
       - task: bundle:release
       - task: release:mac
         vars: { MODE: draft }
@@ -139,6 +141,7 @@ tasks:
     desc: "[배포] 이 OS의 파일을 올린 뒤 릴리스를 공개한다(태그가 만들어진다). macOS용과 Windows용 파일이 초안에 모두 있어야 공개하고, 부족하면 공개하지 않고 안내한다(한쪽만이면 ALLOW_PARTIAL=1)"
     prompt: "[배포] 번들을 만들어 GitHub 릴리스에 올리고 공개합니다(태그가 만들어지고 누구나 받을 수 있게 됩니다). macOS와 Windows 파일이 모두 있을 때만 공개합니다. 계속할까요?"
     cmds:
+      - node scripts/release-notes.mjs --check
       - task: bundle:release
       - task: release:mac
         vars: { MODE: publish }

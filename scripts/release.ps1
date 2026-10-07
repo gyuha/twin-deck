@@ -57,6 +57,14 @@ if (-not (Test-Path $sigSrc)) {
 Copy-Item $setup.FullName (Join-Path $Work $UpdName)
 Copy-Item $sigSrc (Join-Path $Work "$UpdName.sig")
 
+# 릴리스 본문: CHANGELOG.md의 이 버전 항목 + 전체 비교 링크 + 설치 안내. 항목이 없으면 여기서 멈춘다(아직 아무것도 올리지 않았다).
+$Repo = (gh repo view --json nameWithOwner -q .nameWithOwner)
+$NotesFile = Join-Path $Work "notes.md"
+$notesBody = node scripts/release-notes.mjs $Version --repo $Repo
+if ($LASTEXITCODE -ne 0) { throw "CHANGELOG.md에 $Version 항목이 없습니다" }
+[System.IO.File]::WriteAllText($NotesFile, (($notesBody -join "`n") + "`n"), (New-Object System.Text.UTF8Encoding($false)))
+$notesPlain = (node scripts/release-notes.mjs $Version --plain) -join "`n"
+
 $info = Get-ReleaseInfo
 if ($info) {
   if (-not $info.draft) { throw "$Tag 는 이미 공개된 릴리스입니다. tauri.conf.json과 Cargo.toml의 버전을 올리세요" }
@@ -65,18 +73,19 @@ if ($info) {
     throw "초안($Tag)은 $($info.target_commitish.Substring(0,7)) 커밋 기준인데 지금은 $($Sha.Substring(0,7)) 입니다. 같은 커밋에서 빌드하거나 초안을 지우고 다시 만드세요"
   }
   Invoke-Gh @("release", "upload", $Tag, $setup.FullName, "--clobber")
+  # 다른 OS가 먼저 만든 초안의 본문도 같은 변경 사항으로 맞춘다(초안일 때만 여기까지 온다).
+  Invoke-Gh @("release", "edit", $Tag, "--notes-file", $NotesFile)
 } else {
   # 대상 커밋을 main이 아니라 빌드한 커밋으로 고정한다(공개할 때 태그가 그 커밋에 붙는다).
-  Invoke-Gh @("release", "create", $Tag, $setup.FullName, "--draft", "--target", $Sha, "--title", "Twin Deck $Version", "--generate-notes")
+  Invoke-Gh @("release", "create", $Tag, $setup.FullName, "--draft", "--target", $Sha, "--title", "Twin Deck $Version", "--notes-file", $NotesFile)
 }
 
 # 업데이트용 파일과 latest.json. 이미 올라온 latest.json(다른 OS 것)을 받아 이 OS 항목만 병합한다.
-$Repo = (gh repo view --json nameWithOwner -q .nameWithOwner)
 $manifest = Join-Path $Work "latest.json"
 gh release download $Tag -p latest.json -D $Work 2>$null | Out-Null
 node scripts/update-manifest.mjs --version $Version --platform windows-x86_64 `
   --url "https://github.com/$Repo/releases/download/$Tag/$UpdName" --sig-file (Join-Path $Work "$UpdName.sig") `
-  --notes "Twin Deck $Version" --existing $manifest --out $manifest
+  --notes $notesPlain --existing $manifest --out $manifest
 if ($LASTEXITCODE -ne 0) { throw "latest.json 만들기 실패" }
 Invoke-Gh @("release", "upload", $Tag, (Join-Path $Work $UpdName), (Join-Path $Work "$UpdName.sig"), $manifest, "--clobber")
 
