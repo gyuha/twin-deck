@@ -172,6 +172,35 @@ describe("Disk Usage treemap", () => {
     await waitFor(() => expect(screen.getByRole("status", { name: "검색 상태" })).toHaveTextContent("취소됨"));
   });
 
+  it("삭제하면 사라진 항목을 빼고 같은 기준 폴더로 용량을 새로 계산한다", async () => {
+    const { user, backend } = await openTreemap();
+    expect(usageScans(backend)).toEqual(["/home/a"]);
+    await user.keyboard("{Shift>}{F8}{/Shift}"); // 커서는 가장 큰 big
+    await screen.findByRole("dialog");
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(backend.exists("/home/a/big")).toBe(false));
+    await waitFor(() => expect(usageScans(backend)).toEqual(["/home/a", "/home/a"])); // 같은 폴더를 다시 스캔한다
+    await waitFor(() => expect(tileTitles().some((t) => t.startsWith("big"))).toBe(false));
+    await waitFor(() => expect(tileTitles().some((t) => t.startsWith("docs"))).toBe(true));
+    await waitDone();
+    expect(tabTitles()).toEqual(["a", "Disk Usage: a"]); // 탭과 제목은 그대로다
+  });
+
+  it("목록 보기에서도 삭제하면 용량을 새로 계산한다", async () => {
+    const backend = searchBackend();
+    const { user } = await renderApp(backend);
+    await runAction(user, "core.disk_usage");
+    await waitDone();
+    expect(usageScans(backend)).toEqual(["/home/a"]);
+    await user.keyboard("{Shift>}{F8}{/Shift}"); // 가장 큰 big
+    await screen.findByRole("dialog");
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(backend.exists("/home/a/big")).toBe(false));
+    await waitFor(() => expect(usageScans(backend)).toEqual(["/home/a", "/home/a"]));
+    await waitFor(() => expect(entryNames("left")).toEqual(["docs", "report.txt", "pack.zip", "src"]));
+    await waitDone();
+  });
+
   it("목록 보기의 기존 동작은 그대로다(core.disk_usage)", async () => {
     const backend = searchBackend();
     const { user } = await renderApp(backend);

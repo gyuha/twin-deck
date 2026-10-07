@@ -90,6 +90,8 @@ export interface VirtualTab {
   view: "list" | "treemap";
   /** 삭제/이동/휴지통을 보낸 뒤 실제로 사라졌는지 확인할 경로들. */
   recheck: string[];
+  /** Disk Usage: 항목이 사라져 합계·크기가 옛 값이다. 작업이 모두 끝나면 같은 폴더를 다시 스캔한다. */
+  stale?: boolean;
 }
 
 /** 파일 찾기 다이얼로그(기본 탭)의 입력값. */
@@ -546,10 +548,31 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     }
   }
 
-  /** 가상 탭: 삭제/이동/휴지통을 보낸 경로가 실제로 사라졌으면 결과에서 뺀다. 작업이 모두 끝나면 확인을 멈춘다. */
+  /** 이 Disk Usage 탭이 `path` 폴더를 기준으로 스캔을 (다시) 시작한다. 항목은 비우고 제목은 `path`의 이름으로 맞춘다. */
+  async function startUsageScan(pane: PaneId, tab: TabState, path: string) {
+    stopSearch(tab);
+    let id: number;
+    try {
+      id = await backend.startDiskUsage(path);
+    } catch (e) {
+      return fail(e);
+    }
+    patchTab(pane, tab.id, (t) => ({
+      entries: [],
+      cursor: 0,
+      virtual: t.virtual && { ...t.virtual, title: `Disk Usage: ${baseName(path) || path}`, base: path, jobId: id, running: true, cancelled: false, summary: null, totalBytes: 0, warnings: [], stale: false },
+    }));
+    for (const e of earlySearchEvents.get(id) ?? []) applySearchEvent(pane, tab.id, e);
+    earlySearchEvents.delete(id);
+  }
+
+  /**
+   * 가상 탭: 삭제/이동/휴지통을 보낸 경로가 실제로 사라졌으면 결과에서 뺀다. 작업이 모두 끝나면 확인을 멈춘다.
+   * Disk Usage는 항목을 뺀 것만으로는 합계·크기·treemap이 옛 값이라, 작업이 모두 끝나면 같은 폴더를 다시 스캔한다.
+   */
   async function revalidateVirtual(pane: PaneId, tab: TabState) {
     const v = tab.virtual!;
-    if (v.recheck.length === 0) return;
+    if (v.recheck.length === 0 && !v.stale) return;
     const gone = new Set<string>();
     for (const path of v.recheck) {
       try {
@@ -568,9 +591,16 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         entries,
         cursor: idx >= 0 ? idx : Math.min(t.cursor, Math.max(entries.length - 1, 0)),
         selection: new Set([...t.selection].filter((p) => !gone.has(p))),
-        virtual: { ...t.virtual, recheck: idle ? [] : t.virtual.recheck.filter((p) => !gone.has(p)) },
+        virtual: { ...t.virtual, recheck: idle ? [] : t.virtual.recheck.filter((p) => !gone.has(p)), stale: t.virtual.kind === "usage" && (t.virtual.stale || gone.size > 0) },
       };
     });
+    if (!idle) return;
+    const now = get().panes[pane].tabs.find((t) => t.id === tab.id);
+    if (now?.virtual?.kind === "usage" && now.virtual.stale) {
+      // 겹쳐 불린 revalidate가 스캔을 두 번 시작하지 않게, 시작을 기다리기 전에 표시부터 내린다.
+      patchTab(pane, tab.id, (t) => ({ virtual: t.virtual && { ...t.virtual, stale: false } }));
+      await startUsageScan(pane, now, now.virtual.base);
+    }
   }
 
   const watched = new Set<string>();
@@ -2844,20 +2874,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const tab = activeTab(s, pane);
       const v = tab.virtual;
       if (!v || v.kind !== "usage") return;
-      stopSearch(tab);
-      let id: number;
-      try {
-        id = await backend.startDiskUsage(path);
-      } catch (e) {
-        return fail(e);
-      }
-      patchTab(pane, tab.id, (t) => ({
-        entries: [],
-        cursor: 0,
-        virtual: t.virtual && { ...t.virtual, title: `Disk Usage: ${baseName(path) || path}`, base: path, jobId: id, running: true, cancelled: false, summary: null, totalBytes: 0, warnings: [] },
-      }));
-      for (const e of earlySearchEvents.get(id) ?? []) applySearchEvent(pane, tab.id, e);
-      earlySearchEvents.delete(id);
+      await startUsageScan(pane, tab, path);
     },
     /** treemap에서 커서의 폴더 안으로 내려간다(더블클릭, →). 파일이면 아무것도 하지 않는다. */
     async usageDescend() {
