@@ -10,7 +10,7 @@
 | PANE-02 | done | apps/desktop/src/__tests__/navigation.test.tsx | 탭마다 경로/커서/선택/이력 보유. 표시 모드·정렬은 M2 |
 | PANE-04 | done | apps/desktop/src/__tests__/navigation.test.tsx | 새 탭, 닫기, 다음/이전. 마지막 탭은 닫기 액션이 비활성(docs/07은 홈으로 이동으로 정의, Marta 동작 미확인) |
 | NAV-01 | done | apps/desktop/src/__tests__/navigation.test.tsx | PageUp/Down은 10행 단위(화면 높이 미반영) |
-| NAV-03 | done | apps/desktop/src/__tests__/navigation.test.tsx | Enter/Backspace/`..` 더블클릭. `..`는 커서 대상이 아닌 별도 버튼 |
+| NAV-03 | done | apps/desktop/src/__tests__/navigation.test.tsx | Enter/Backspace. 처음에는 `..` 더블클릭용 별도 버튼이 있었으나 이슈 #22에서 그 줄을 제거했다(상위 이동은 Backspace·←·경로 표시줄 조각 클릭) |
 | NAV-12 | done | apps/desktop/src/__tests__/navigation.test.tsx | 조각 클릭으로 이동 |
 | SEL-01 | done | apps/desktop/src/__tests__/navigation.test.tsx | Mod+A, Esc |
 | SEL-02 | done | apps/desktop/src/__tests__/navigation.test.tsx | Shift+↑/↓만 지원(반전 방식). `extend` 전환 설정은 M2 |

@@ -30,7 +30,7 @@ Marta의 중심 모델은 "활성 패널이 source, 비활성 패널이 target"�
 |---|---|---|---|---|
 | NAV-01 | 방향키, Home/End, PageUp/PageDown 이동 | `/docs/navigation/` | P0 | |
 | NAV-02 | Opt+PageUp/PageDown 반 페이지 스크롤 | `/docs/navigation/` | P1 | Alt로 매핑 |
-| NAV-03 | Return/더블클릭으로 열기, Backspace 또는 `..` 더블클릭으로 상위 이동 | `/docs/navigation/base/` | P0 | |
+| NAV-03 | Return/더블클릭으로 열기, Backspace·←·경로 표시줄 조각 클릭으로 상위 이동 (`..` 줄은 두지 않는다) | `/docs/navigation/base/` | P0 | |
 | NAV-04 | Open With… | `/docs/navigation/` | P2 | OS별 앱 목록/실행 ([09](09-platform-support.md)) |
 | NAV-05 | 다중 컬럼 모드에서 좌우 이동 | `/docs/navigation/` | P1 | |
 | NAV-06 | 순환 선택, 우클릭 선택, Quick Select 접두 일치/아무 문자 활성화 옵션 | `/docs/navigation/` | P1 | 설정 키로 제공 |

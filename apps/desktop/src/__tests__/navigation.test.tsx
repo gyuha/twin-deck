@@ -86,11 +86,6 @@ describe("NAV-03 열기와 상위 이동", () => {
     expect(breadcrumb("left")).toEqual(["/", "home", "a"]);
   });
 
-  it("'..' 항목 더블클릭으로 상위 이동", async () => {
-    const { user } = await renderApp();
-    await user.dblClick(screen.getAllByRole("button", { name: "상위 폴더" })[0]);
-    await waitFor(() => expect(breadcrumb("left")).toEqual(["/", "home"]));
-  });
 });
 
 describe("NAV-12 브레드크럼", () => {

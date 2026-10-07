@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Rect, Virtualizer } from "@tanstack/react-virtual";
-import { parentPath } from "@twin-deck/ts-client";
 import type { EntryDto } from "@twin-deck/ts-client";
 import { parseColumns } from "../lib/columns";
 import type { ColumnSpec } from "../lib/columns";
@@ -212,20 +211,6 @@ export function FileTable({ pane }: { pane: PaneId }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col text-sm">
-      {parentPath(tab.path) !== null && (
-        <button
-          type="button"
-          tabIndex={-1}
-          aria-label="상위 폴더"
-          onDoubleClick={() => {
-            activate();
-            void api.goUp();
-          }}
-          className="px-2 py-0.5 text-left text-ink-faint"
-        >
-          ..
-        </button>
-      )}
       {!multi && (
         <div
           role="row"
