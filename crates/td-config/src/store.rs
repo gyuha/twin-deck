@@ -57,16 +57,15 @@ impl ConfigStore {
         thread::spawn(move || {
             let mut last = signature(&d);
             loop {
-                let by_event = match changes.recv_timeout(POLL) {
-                    Ok(_) => {
-                        while changes.try_recv().is_ok() {}
-                        true
-                    }
-                    Err(RecvTimeoutError::Timeout) => false,
+                match changes.recv_timeout(POLL) {
+                    Ok(_) => while changes.try_recv().is_ok() {},
+                    Err(RecvTimeoutError::Timeout) => {}
                     Err(RecvTimeoutError::Disconnected) => return,
-                };
+                }
+                // 이벤트가 와도 설정 파일이 그대로면 알리지 않는다. 이 폴더에는 커서·선택이 바뀔 때마다 저장하는
+                // state.json도 있어서, 알리면 화면이 설정을 다시 받아 메뉴바 등을 매번 다시 만든다.
                 let now = signature(&d);
-                if !by_event && now == last {
+                if now == last {
                     continue;
                 }
                 last = now;

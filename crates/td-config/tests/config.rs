@@ -242,6 +242,50 @@ fn config_watch_reload() {
 }
 
 #[test]
+fn config_watch_ignores_unrelated_files() {
+    // 같은 폴더의 state.json은 커서·선택이 바뀔 때마다 저장된다. 설정이 그대로면 재로딩 이벤트를 보내지 않아야 한다
+    // (보내면 화면이 설정을 다시 받아 메뉴바 등을 매번 다시 만든다).
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(
+        dir.path().join("config.toml"),
+        "[core.confirm]\ntrash = false\n",
+    )
+    .unwrap();
+    let (_store, rx) = ConfigStore::start(dir.path(), Platform::Linux).unwrap();
+    settle(&rx);
+
+    for i in 0..3 {
+        fs::write(dir.path().join("state.json.tmp"), format!("{{\"n\":{i}}}")).unwrap();
+        fs::rename(
+            dir.path().join("state.json.tmp"),
+            dir.path().join("state.json"),
+        )
+        .unwrap();
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    assert!(
+        rx.recv_timeout(Duration::from_millis(2500)).is_err(),
+        "설정 파일이 안 바뀌었는데 재로딩 이벤트가 왔다"
+    );
+
+    // 그래도 설정 파일이 바뀌면 반영된다
+    fs::write(
+        dir.path().join("config.toml"),
+        "[core.confirm]\ntrash = true\n",
+    )
+    .unwrap();
+    let loaded = loop {
+        let l = rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("재로딩 이벤트");
+        if l.config.core.confirm.trash {
+            break l;
+        }
+    };
+    assert!(loaded.warnings.is_empty());
+}
+
+#[test]
 fn favorite_append_roundtrip() {
     let dir = tempfile::tempdir().unwrap();
     let file = dir.path().join("config.toml");
