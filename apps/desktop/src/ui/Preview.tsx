@@ -15,6 +15,8 @@ import { VideoView } from "./VideoView";
 import { PdfView } from "./PdfView";
 import { ModelView } from "./ModelView";
 import { modelKindOf } from "../lib/model/kinds";
+import { OfficeView } from "./OfficeView";
+import { officeKindOf } from "../lib/office/kinds";
 
 const isMarkdown = (name: string) => /\.(md|markdown)$/i.test(name);
 
@@ -88,6 +90,7 @@ export function Preview() {
   if (!p) return null;
   const d = p.data;
   const model = p.isDir ? null : modelKindOf(p.name); // 3D 모델이면 서비스가 돌려준 kind와 무관하게 3D 뷰어로 보여 준다
+  const office = p.isDir || model ? null : officeKindOf(p.name); // Office 문서도 같은 방식으로 kind와 무관하게 보여 준다
   return (
     <div
       onMouseDown={(e) => {
@@ -126,7 +129,8 @@ export function Preview() {
             </p>
           )}
           {d && model && <ModelView path={p.path} name={p.name} />}
-          {d?.kind === "text" && !model && (
+          {d && office && <OfficeView path={p.path} kind={office} fileSize={d.size} sizeText={size(d.size)} />}
+          {d?.kind === "text" && !model && !office && (
             <>
               {isMarkdown(p.name) ? (
                 <MarkdownView text={d.text ?? ""} />
@@ -142,7 +146,7 @@ export function Preview() {
               {d.truncated && <p className="mt-1 text-xs text-ink-faint">앞부분만 표시합니다 (전체 {size(d.size)})</p>}
             </>
           )}
-          {d?.kind === "image" && !model &&
+          {d?.kind === "image" && !model && !office &&
             (d.dataUrl ? (
               <div className="flex h-full items-center justify-center">
                 <img src={d.dataUrl} alt={p.name} className="max-h-full max-w-full object-contain" />
@@ -163,7 +167,7 @@ export function Preview() {
             ) : (
               <p className="text-ink-faint">PDF가 너무 커서 미리 볼 수 없습니다 ({size(d.size)})</p>
             ))}
-          {(d?.kind === "directory" || (d?.kind === "other" && !model)) && (
+          {(d?.kind === "directory" || (d?.kind === "other" && !model && !office)) && (
             <p className="text-ink-faint">
               {KIND_LABEL[d.kind]} — 미리 볼 수 없는 형식입니다{d.kind === "other" ? ` (${size(d.size)})` : ""}
             </p>

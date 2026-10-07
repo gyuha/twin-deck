@@ -19,12 +19,15 @@
     "@twin-deck/material-icons": "workspace:*",
     "@twin-deck/ts-client": "workspace:*",
     "highlight.js": "^11.12.0",
+    "jszip": "^3.10.2",
+    "mammoth": "^1.13.0",
     "occt-import-js": "^0.0.23",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "three": "^0.186.1",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zustand": "^5.0.0"
   },
   "devDependencies": {

@@ -93,7 +93,7 @@ Marta의 기본 키는 Total Commander 계열(F5 복사, F6 이동 등)을 따�
 | FIND-04 | 연산자 `=`, `==`, `is`, `equals`, `!=`, `isNot`, `contains`, `has`, `like`, `~=`, `startsWith`, `endsWith` | 같음 | P2 | 별칭 그대로 수용 |
 | FIND-05 | Flatten (하위 전체를 평면 목록으로) | `/docs/actions/flatten/` | P2 | |
 | FIND-06 | Analyze Disk Usage (하위 폴더 크기, 크기 내림차순, 가상 탭, 아카이브 안에서도 동작) | `/docs/actions/disk-usage/` | P2 | |
-| VIEW-01 | 미리보기 (Space 또는 Cmd+Y) | 홈/키맵 | P1 | Quick Look 사용 여부는 미확인. 앱 내 미리보기로 구현. 폴더는 하위 항목을 ASCII 트리(`├── └── │`, 폴더 먼저·이름순, 깊이 3·200줄 상한)로 보여 준다. 3D 모델(GLB·GLTF·OBJ·FBX·STL·3MF·PLY·STEP/STP·IGES/IGS·USDZ·GCODE)은 three.js로 렌더링하며(회전·확대, Draco 압축 glTF 포함, 로더는 지연 로드) 확장자로 고른다 |
+| VIEW-01 | 미리보기 (Space 또는 Cmd+Y) | 홈/키맵 | P1 | Quick Look 사용 여부는 미확인. 앱 내 미리보기로 구현. 폴더는 하위 항목을 ASCII 트리(`├── └── │`, 폴더 먼저·이름순, 깊이 3·200줄 상한)로 보여 준다. 3D 모델(GLB·GLTF·OBJ·FBX·STL·3MF·PLY·STEP/STP·IGES/IGS·USDZ·GCODE)은 three.js로 렌더링하며(회전·확대, Draco 압축 glTF 포함, 로더는 지연 로드) 확장자로 고른다. Office 문서(docx·xlsx·pptx)는 디스크 위 파일만 첫 부분(docx 앞 100블록, xlsx 첫 시트 앞 100행, pptx 첫 슬라이드 텍스트)을 보여 주고 20MB를 넘으면 읽지 않으며, 상단 가운데에 "데이터 미리보기이며 실제 문서 화면과 다릅니다"를 항상 표시한다 |
 
 ## 7. 아카이브
 
