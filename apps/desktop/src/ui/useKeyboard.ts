@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { actionContext, scopeStack } from "../state/store";
+import { actionContext, activeTab, scopeStack } from "../state/store";
 import type { AppStore } from "../state/store";
 import type { ActionRegistry } from "@twin-deck/actions";
 import type { ActionContext } from "@twin-deck/actions";
@@ -97,6 +97,13 @@ export function useKeyboard({ app, keymap, registry }: Options) {
       if (top === "quickSelect" && e.key === "Backspace" && plain) {
         e.preventDefault();
         api.quickBackspace();
+        return;
+      }
+      // Disk Usage 탭에서 수식키 없는 `q`는 그 탭에서 나간다(이슈 #26). Quick Select가 진행 중이면(top === "quickSelect") 검색어다.
+      // 한글 입력기에서는 e.key가 'ㅂ'이라 물리 키(e.code)로 판정한다. 키맵은 pane 스코프의 글자 바인딩을 거부하므로 여기서 가로챈다.
+      if (top === "pane" && e.code === "KeyQ" && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && activeTab(s).virtual?.kind === "usage") {
+        e.preventDefault();
+        void api.usageExit();
         return;
       }
       const hit = keymap.resolveBinding(e, stack);

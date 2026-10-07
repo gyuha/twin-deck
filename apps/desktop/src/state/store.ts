@@ -2883,6 +2883,19 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (!v || v.kind !== "usage") return;
       await startUsageScan(pane, tab, path);
     },
+    /**
+     * Disk Usage 탭에서 나간다(`q`). 탭을 닫아(진행 중인 스캔은 취소) 이웃 탭으로 돌아가고, 그 패널의 유일한 탭이면 닫을 수 없으므로
+     * 기준 폴더의 일반 탭으로 바꾼다. Disk Usage 탭이 아니면 아무것도 하지 않는다.
+     */
+    async usageExit() {
+      const s = get();
+      const pane = s.activePane;
+      const p = s.panes[pane];
+      const tab = p.tabs[p.active];
+      if (tab?.virtual?.kind !== "usage") return;
+      if (p.tabs.length > 1) await api.closeTabAt(pane, p.active);
+      else await api.navigate(tab.virtual.base);
+    },
     /** treemap에서 커서의 폴더 안으로 내려간다(더블클릭, →). 파일이면 아무것도 하지 않는다. */
     async usageDescend() {
       const tab = activeTab(get());
