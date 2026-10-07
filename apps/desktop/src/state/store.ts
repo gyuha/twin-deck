@@ -1467,6 +1467,17 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       });
       await syncWatches();
     },
+    /** 같은 패널 안에서 탭 `from`을 `to` 자리로 옮긴다. 활성 탭은 같은 탭을 계속 가리킨다. 범위 밖이거나 제자리면 아무것도 바꾸지 않는다. */
+    moveTab(pane: PaneId, from: number, to: number) {
+      const p = get().panes[pane];
+      const n = p.tabs.length;
+      if (from === to || from < 0 || to < 0 || from >= n || to >= n) return;
+      const tabs = [...p.tabs];
+      const [moved] = tabs.splice(from, 1);
+      tabs.splice(to, 0, moved);
+      const active = tabs.indexOf(p.tabs[p.active]);
+      set((s) => ({ panes: { ...s.panes, [pane]: { tabs, active } } }));
+    },
     cycleTab(delta: 1 | -1) {
       const s = get();
       const p = s.panes[s.activePane];
