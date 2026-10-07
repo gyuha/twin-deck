@@ -1,14 +1,16 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { createStore } from "zustand/vanilla";
 import { Breadcrumb } from "../ui/Breadcrumb";
 import { StoreContext } from "../state/context";
 import type { AppStore } from "../state/store";
 
 function renderCrumb(path: string) {
   const api = { activate: vi.fn(), navigate: vi.fn().mockResolvedValue(undefined) };
+  const store = createStore(() => ({ diskSpace: { left: null, right: null }, loaded: { config: { display: { size_format: "auto" } } } }));
   render(
-    <StoreContext.Provider value={{ api } as unknown as AppStore}>
+    <StoreContext.Provider value={{ api, store } as unknown as AppStore}>
       <Breadcrumb pane="left" path={path} />
     </StoreContext.Provider>,
   );

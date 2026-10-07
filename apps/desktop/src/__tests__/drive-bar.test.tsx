@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { BackendError } from "@twin-deck/ts-client";
 import { crumbs } from "./search-helpers";
@@ -13,6 +13,7 @@ const setup = () => {
 };
 const bar = (side: "왼쪽" | "오른쪽") => screen.getByRole("toolbar", { name: `드라이브 (${side} 패널)` });
 const info = (side: "왼쪽" | "오른쪽") => screen.getByRole("group", { name: `현재 볼륨 (${side} 패널)` });
+const pathNav = (side: "왼쪽" | "오른쪽") => screen.getAllByRole("navigation", { name: "경로" })[side === "왼쪽" ? 0 : 1];
 const volButton = (side: "왼쪽" | "오른쪽", name: string) => within(bar(side)).getByRole("button", { name });
 const leftCrumbs = () => crumbs();
 
@@ -45,25 +46,25 @@ describe("드라이브 바", () => {
 
   it("현재 볼륨의 남은 용량이 표시된다", async () => {
     await renderApp(setup());
-    await waitFor(() => expect(info("왼쪽")).toHaveTextContent("73.8 GB 남음"));
-    expect(info("오른쪽")).toHaveTextContent("73.8 GB 남음");
-    expect(within(info("왼쪽")).getByText("73.8 GB 남음")).toHaveAttribute("title", "전체 500.0 GB");
+    await waitFor(() => expect(pathNav("왼쪽")).toHaveTextContent("73.8 GB 남음"));
+    expect(pathNav("오른쪽")).toHaveTextContent("73.8 GB 남음");
+    expect(within(pathNav("왼쪽")).getByText("73.8 GB 남음")).toHaveAttribute("title", "전체 500.0 GB");
   });
 
   it("다른 볼륨으로 가면 그 볼륨의 남은 용량으로 바뀐다", async () => {
     const { user } = await renderApp(setup());
-    await waitFor(() => expect(info("왼쪽")).toHaveTextContent("73.8 GB 남음"));
+    await waitFor(() => expect(pathNav("왼쪽")).toHaveTextContent("73.8 GB 남음"));
     await user.click(volButton("왼쪽", "USB"));
-    await waitFor(() => expect(info("왼쪽")).toHaveTextContent("1.5 GB 남음"));
+    await waitFor(() => expect(pathNav("왼쪽")).toHaveTextContent("1.5 GB 남음"));
     expect(volButton("왼쪽", "USB")).toHaveAttribute("aria-pressed", "true"); // 볼륨 이름은 버튼의 강조로 알린다
-    expect(info("오른쪽")).toHaveTextContent("73.8 GB 남음"); // 오른쪽은 그대로
+    expect(pathNav("오른쪽")).toHaveTextContent("73.8 GB 남음"); // 오른쪽은 그대로
   });
 
   it("현재 볼륨을 언마운트하면 그 볼륨 안의 패널은 첫 번째 볼륨으로 옮겨지고 목록에서 빠진다", async () => {
     const backend = setup();
     const { user } = await renderApp(backend);
     await user.click(volButton("왼쪽", "USB"));
-    await waitFor(() => expect(info("왼쪽")).toHaveTextContent("1.5 GB 남음"));
+    await waitFor(() => expect(pathNav("왼쪽")).toHaveTextContent("1.5 GB 남음"));
     await user.click(within(info("왼쪽")).getByRole("button", { name: "언마운트" }));
     await waitFor(() => expect(backend.unmounted).toEqual(["/Volumes/USB"]));
     await waitFor(() => expect(leftCrumbs()).toEqual(["/"])); // 첫 번째 볼륨의 루트
@@ -74,8 +75,8 @@ describe("드라이브 바", () => {
 
   it("루트 볼륨에는 언마운트 버튼이 없다", async () => {
     const { user } = await renderApp(setup());
-    await waitFor(() => expect(info("왼쪽")).toHaveTextContent("73.8 GB 남음"));
-    expect(within(info("왼쪽")).queryByRole("button", { name: "언마운트" })).toBeNull();
+    await waitFor(() => expect(pathNav("왼쪽")).toHaveTextContent("73.8 GB 남음"));
+    expect(within(bar("왼쪽")).queryByRole("button", { name: "언마운트" })).toBeNull();
     await user.click(volButton("왼쪽", "USB"));
     await waitFor(() => expect(within(info("왼쪽")).getByRole("button", { name: "언마운트" })).toBeInTheDocument());
   });
@@ -87,7 +88,7 @@ describe("드라이브 바", () => {
     };
     const { user } = await renderApp(backend);
     await user.click(volButton("왼쪽", "USB"));
-    await waitFor(() => expect(info("왼쪽")).toHaveTextContent("1.5 GB 남음"));
+    await waitFor(() => expect(pathNav("왼쪽")).toHaveTextContent("1.5 GB 남음"));
     await user.click(within(info("왼쪽")).getByRole("button", { name: "언마운트" }));
     expect(await screen.findByText(/사용 중이라 언마운트할 수 없습니다/)).toBeInTheDocument();
     expect(leftCrumbs()).toEqual(["/"]);
@@ -118,7 +119,7 @@ describe("드라이브 바", () => {
     const log = trackWatches(backend);
     const { user } = await renderApp(backend);
     await user.click(volButton("왼쪽", "USB"));
-    await waitFor(() => expect(info("왼쪽")).toHaveTextContent("1.5 GB 남음"));
+    await waitFor(() => expect(pathNav("왼쪽")).toHaveTextContent("1.5 GB 남음"));
     await waitFor(() => expect(log).toContain("watch /Volumes/USB"));
     await user.click(within(info("왼쪽")).getByRole("button", { name: "언마운트" }));
     await waitFor(() => expect(log).toContain("unmount /Volumes/USB"));
@@ -131,7 +132,7 @@ describe("드라이브 바", () => {
     const { user } = await renderApp(backend);
     await user.click(volButton("왼쪽", "USB"));
     await user.click(volButton("오른쪽", "USB"));
-    await waitFor(() => expect(info("오른쪽")).toHaveTextContent("1.5 GB 남음"));
+    await waitFor(() => expect(pathNav("오른쪽")).toHaveTextContent("1.5 GB 남음"));
     await user.click(within(info("왼쪽")).getByRole("button", { name: "언마운트" }));
     await waitFor(() => expect(backend.unmounted).toEqual(["/Volumes/USB"]));
     const rightCrumbs = () =>
@@ -145,7 +146,7 @@ describe("드라이브 바", () => {
   it("다른 볼륨에 있는 반대쪽 패널은 옮기지 않는다", async () => {
     const { user } = await renderApp(setup());
     await user.click(volButton("왼쪽", "USB"));
-    await waitFor(() => expect(info("왼쪽")).toHaveTextContent("1.5 GB 남음"));
+    await waitFor(() => expect(pathNav("왼쪽")).toHaveTextContent("1.5 GB 남음"));
     await user.click(within(info("왼쪽")).getByRole("button", { name: "언마운트" }));
     await waitFor(() => expect(leftCrumbs()).toEqual(["/"]));
     const right = within(screen.getAllByRole("navigation", { name: "경로" })[1]).getAllByRole("button");
@@ -158,47 +159,54 @@ describe("드라이브 바", () => {
     await renderApp(backend);
     await waitFor(() => expect(volButton("왼쪽", "/")).toHaveAttribute("aria-pressed", "true"));
     await new Promise((r) => setTimeout(r, 50));
-    expect(info("왼쪽")).not.toHaveTextContent("남음");
+    expect(pathNav("왼쪽")).not.toHaveTextContent("남음");
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  describe("한 줄: 볼륨 버튼 줄의 오른쪽 끝에 남은 용량·언마운트", () => {
-    it("남은 용량 글자가 드라이브 툴바 안에 있다(별도의 둘째 줄이 아니다)", async () => {
+  describe("남은 용량은 경로 표시줄 오른쪽 끝, 언마운트는 드라이브 줄 오른쪽 끝", () => {
+    it("남은 용량이 경로 표시줄의 오른쪽 끝(ml-auto)에 있고 툴팁에 전체 용량이 보인다", async () => {
       await renderApp(setup());
-      await waitFor(() => expect(within(bar("왼쪽")).getByText("73.8 GB 남음")).toBeInTheDocument());
-      expect(within(bar("오른쪽")).getByText("73.8 GB 남음")).toBeInTheDocument();
+      await waitFor(() => expect(within(pathNav("왼쪽")).getByText("73.8 GB 남음")).toBeInTheDocument());
+      const free = within(pathNav("왼쪽")).getByText("73.8 GB 남음");
+      expect(free.className).toContain("ml-auto");
+      expect(free).toHaveAttribute("title", "전체 500.0 GB");
+      expect(within(pathNav("오른쪽")).getByText("73.8 GB 남음")).toBeInTheDocument();
     });
 
-    it("'현재 볼륨' 그룹에는 용량만 있고 볼륨 이름 글자는 없다", async () => {
-      await renderApp(setup());
-      await waitFor(() => expect(info("왼쪽")).toHaveTextContent("73.8 GB 남음"));
-      expect(info("왼쪽").textContent).toBe("73.8 GB 남음");
+    it("드라이브 바를 꺼도 남은 용량은 경로 표시줄에 그대로 보인다", async () => {
+      const backend = setup();
+      backend.setConfig((l) => (l.config.behavior.layout.show_drive_bar = false));
+      await renderApp(backend);
+      await waitFor(() => expect(within(pathNav("왼쪽")).getByText("73.8 GB 남음")).toBeInTheDocument());
+      expect(screen.queryByRole("toolbar", { name: /^드라이브/ })).toBeNull();
     });
 
-    it("드라이브 바는 한 줄이다: 툴바 말고 다른 줄이 없다", async () => {
+    it("드라이브 줄에는 용량이 없다", async () => {
       await renderApp(setup());
-      await waitFor(() => expect(info("왼쪽")).toHaveTextContent("73.8 GB 남음"));
-      expect(bar("왼쪽").parentElement?.children).toHaveLength(1);
-      expect(bar("오른쪽").parentElement?.children).toHaveLength(1);
+      await waitFor(() => expect(pathNav("왼쪽")).toHaveTextContent("73.8 GB 남음"));
+      expect(bar("왼쪽")).not.toHaveTextContent("남음");
     });
 
-    it("루트가 아닌 볼륨이 현재일 때 언마운트가 툴바의 마지막 버튼이고 오른쪽 끝 블록(ml-auto)에 있다", async () => {
+    it("루트가 아닌 볼륨이 현재일 때만 드라이브 줄 오른쪽 끝 블록(ml-auto)에 언마운트가 있고, 용량은 경로 표시줄에서 그 볼륨 것으로 바뀐다", async () => {
       const { user } = await renderApp(setup());
-      await waitFor(() => expect(info("왼쪽")).toHaveTextContent("73.8 GB 남음"));
+      await waitFor(() => expect(pathNav("왼쪽")).toHaveTextContent("73.8 GB 남음"));
+      expect(screen.queryByRole("group", { name: "현재 볼륨 (왼쪽 패널)" })).toBeNull(); // 루트: 오른쪽 블록이 없다
       await user.click(volButton("왼쪽", "USB"));
       await waitFor(() => expect(within(bar("왼쪽")).getByRole("button", { name: "언마운트" })).toBeInTheDocument());
       const buttons = within(bar("왼쪽")).getAllByRole("button");
       expect(buttons.map((b) => b.getAttribute("aria-label") ?? b.textContent)).toEqual(["/", "USB", "언마운트"]);
       expect(info("왼쪽").className).toContain("ml-auto");
       expect(info("왼쪽")).toContainElement(buttons[2]);
-      expect(info("왼쪽")).toHaveTextContent("1.5 GB 남음");
+      expect(info("왼쪽").textContent).toBe("⏏ 언마운트");
+      await waitFor(() => expect(pathNav("왼쪽")).toHaveTextContent("1.5 GB 남음"));
     });
 
-    it("루트가 현재일 때는 오른쪽 끝에 용량만 있고 언마운트는 없다", async () => {
+    it("경로를 직접 입력하는 동안에는 남은 용량을 숨긴다", async () => {
       await renderApp(setup());
-      await waitFor(() => expect(info("왼쪽")).toHaveTextContent("73.8 GB 남음"));
-      expect(within(bar("왼쪽")).queryByRole("button", { name: "언마운트" })).toBeNull();
+      await waitFor(() => expect(pathNav("왼쪽")).toHaveTextContent("73.8 GB 남음"));
+      fireEvent.contextMenu(pathNav("왼쪽"));
+      expect(await screen.findByRole("textbox", { name: "경로 입력" })).toBeInTheDocument();
+      expect(pathNav("왼쪽")).not.toHaveTextContent("남음");
     });
   });
 });
-
