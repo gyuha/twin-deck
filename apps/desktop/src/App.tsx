@@ -158,7 +158,10 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
     return { keymap: km, warnings: [...merged.warnings, ...km.warnings, ...extra] };
   }, [platform, loaded, registry]);
   useKeyboard({ app, keymap, registry });
-  useTheme(loaded.config.behavior.theme);
+  // 설정의 테마 목록에서 이동 중인 테마(저장 전 임시 미리보기). 설정값이 바뀌면 걷는다.
+  const [themePreview, setThemePreview] = useState<string | null>(null);
+  useEffect(() => setThemePreview(null), [loaded.config.behavior.theme]);
+  useTheme(themePreview ?? loaded.config.behavior.theme);
   useUiFont(loaded.config.behavior.ui_font);
   useTextColor(loaded.config.behavior.text_color);
 
@@ -249,7 +252,7 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
         <ContextMenu />
         <QueueIndicator />
         <QueuePopup />
-        <Settings />
+        <Settings onThemePreview={setThemePreview} />
         <Help />
         <FindDialog />
         <Dialog />

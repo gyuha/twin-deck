@@ -285,7 +285,7 @@ function FKeyAdder({ disabled }: { disabled: boolean }) {
 }
 
 /** 사용자 설정을 항목별 컨트롤로 바꾸는 화면(`Mod+,`). 바꾸는 즉시 저장한다. */
-export function Settings() {
+export function Settings({ onThemePreview }: { onThemePreview?: (theme: string | null) => void }) {
   const open = useApp((s) => s.settingsOpen);
   const section = useApp((s) => s.settingsSection);
   const config = useApp((s) => s.loaded.config);
@@ -304,6 +304,10 @@ export function Settings() {
   const broken = useApp((s) => s.loaded.warnings.find((w) => w.message.startsWith("TOML 문법 오류")));
   const error = useApp((s) => s.settingsError);
   const { api } = useAppStore();
+  // 설정 화면이 닫히면(테마 목록을 연 채로 닫혀도) 임시 미리보기를 걷는다.
+  useEffect(() => {
+    if (!open) onThemePreview?.(null);
+  }, [open, onThemePreview]);
   if (!open) return null;
   const defaults = defaultLoaded().config;
   const current = SECTIONS[section];
@@ -425,6 +429,7 @@ export function Settings() {
                         options={item.control.options}
                         disabled={!!broken}
                         onChange={(v) => void api.setConfigValue(item.key, { kind: "str", value: v })}
+                        onPreview={item.key === "behavior.theme" ? onThemePreview : undefined}
                       />
                     )}
                     {item.control.type === "color" && (

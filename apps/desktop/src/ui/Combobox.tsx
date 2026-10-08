@@ -12,6 +12,8 @@ interface Props {
   value: string;
   options: readonly ComboOption[];
   onChange: (value: string) => void;
+  /** 목록에서 강조 항목이 바뀔 때 그 값으로 호출한다(저장하지 않는 임시 미리보기). 확정 없이 닫으면 null로 호출한다. */
+  onPreview?: (value: string | null) => void;
   disabled?: boolean;
   /** 트리거 버튼의 접근성 이름. */
   label: string;
@@ -25,7 +27,7 @@ const LIST_MAX = 256;
  * 검색할 수 있는 선택 상자(shadcn combobox 구조): 트리거 버튼을 누르면 검색 입력과 목록이 뜬다.
  * 입력으로 퍼지 필터링하고 ↑↓로 고르고 Enter로 확정, Esc는 이 목록만 닫는다(설정 화면은 닫히지 않는다).
  */
-export function Combobox({ value, options, onChange, disabled, label, className }: Props) {
+export function Combobox({ value, options, onChange, onPreview, disabled, label, className }: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(0);
@@ -33,6 +35,7 @@ export function Combobox({ value, options, onChange, disabled, label, className 
   const trigger = useRef<HTMLButtonElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const listId = useId();
+  const touched = useRef(false); // 사용자가 커서를 움직이기 전(열었을 때의 현재 값 위치)에는 미리보기를 하지 않는다
 
   const shown = useMemo(() => {
     if (query.trim() === "") return options;
@@ -55,11 +58,17 @@ export function Combobox({ value, options, onChange, disabled, label, className 
     }
     setQuery("");
     setCursor(Math.max(0, options.findIndex((o) => o.value === value)));
+    touched.current = false;
     setOpen(true);
   };
   const close = () => {
     setOpen(false);
     trigger.current?.focus();
+  };
+  // 확정 없이 닫는다(Esc·바깥 클릭·트리거 다시 누르기): 미리보기를 걷는다.
+  const cancel = () => {
+    onPreview?.(null);
+    close();
   };
   const choose = (o: ComboOption) => {
     onChange(o.value);
@@ -70,6 +79,11 @@ export function Combobox({ value, options, onChange, disabled, label, className 
     if (open) input.current?.focus();
   }, [open]);
   useEffect(() => setCursor(0), [query]);
+  useEffect(() => {
+    if (open && touched.current) onPreview?.(shown[cursor]?.value ?? null);
+    // onPreview는 부모가 매번 새로 만들 수 있어 의존성에서 뺀다(커서 이동에만 반응).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, cursor, shown]);
   useEffect(() => {
     if (open) document.getElementById(`${listId}-${cursor}`)?.scrollIntoView?.({ block: "nearest" });
   }, [open, cursor, listId]);
@@ -85,7 +99,7 @@ export function Combobox({ value, options, onChange, disabled, label, className 
         aria-expanded={open}
         aria-controls={open ? listId : undefined}
         disabled={disabled}
-        onClick={() => (open ? close() : show())}
+        onClick={() => (open ? cancel() : show())}
         className={
           "flex h-[25px] min-w-0 items-center justify-between gap-2 rounded-md border border-app-line bg-app-input px-3 text-xs text-ink shadow-sm outline-none focus:ring-2 disabled:opacity-50 " +
           (className ?? "w-56")
@@ -97,7 +111,7 @@ export function Combobox({ value, options, onChange, disabled, label, className 
         </span>
       </button>
       {open && (
-        <div className="fixed inset-0 z-50" onMouseDown={close}>
+        <div className="fixed inset-0 z-50" onMouseDown={cancel}>
           <div
             className="fixed rounded-md border border-app-line bg-app-box p-1 shadow-2xl"
             style={{ left: box.left, width: box.width, top: box.top, bottom: box.bottom }}
@@ -111,14 +125,18 @@ export function Combobox({ value, options, onChange, disabled, label, className 
               aria-activedescendant={shown.length > 0 ? `${listId}-${cursor}` : undefined}
               value={query}
               placeholder="검색…"
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                touched.current = true;
+                setQuery(e.target.value);
+              }}
               onKeyDown={(e) => {
                 if (e.nativeEvent.isComposing) return; // 한글 조합 중 Enter/화살표는 조합 확정용이다
                 const move = e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : 0;
+                if (move) touched.current = true;
                 if (move) setCursor((c) => (shown.length === 0 ? 0 : (c + move + shown.length) % shown.length));
                 else if (e.key === "Enter") {
                   if (shown[cursor]) choose(shown[cursor]);
-                } else if (e.key === "Escape") close();
+                } else if (e.key === "Escape") cancel();
                 else return;
                 // 설정 화면의 Esc/방향키 처리로 번지지 않게 막는다.
                 e.preventDefault();
@@ -133,7 +151,10 @@ export function Combobox({ value, options, onChange, disabled, label, className 
                   id={`${listId}-${i}`}
                   role="option"
                   aria-selected={o.value === value}
-                  onMouseEnter={() => setCursor(i)}
+                  onMouseEnter={() => {
+                    touched.current = true;
+                    setCursor(i);
+                  }}
                   onClick={() => choose(o)}
                   className={
                     "flex h-7 cursor-pointer items-center justify-between rounded px-2 text-sm " + (i === cursor ? "bg-accent text-accent-ink" : "text-ink")
