@@ -26,7 +26,6 @@ import { PaneSplit } from "./ui/PaneSplit";
 import { ContextMenu } from "./ui/ContextMenu";
 import { PopupMenu } from "./ui/PopupMenu";
 import { QueueIndicator, QueuePopup } from "./ui/Queue";
-import { Settings } from "./ui/Settings";
 import { UiContext, useUi } from "./ui/uiContext";
 import { useKeyboard } from "./ui/useKeyboard";
 
@@ -242,7 +241,7 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
       <UiContext.Provider value={{ registry, keymap, platform }}>
       <BarWarnings base={warnings} />
       <main className="flex h-screen flex-col">
-        <PaneSplit />
+        <PaneSplit onThemePreview={setThemePreview} />
         <StatusBar />
         <ActionBar />
         <ActionsPalette />
@@ -252,7 +251,6 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
         <ContextMenu />
         <QueueIndicator />
         <QueuePopup />
-        <Settings onThemePreview={setThemePreview} />
         <Help />
         <FindDialog />
         <Dialog />

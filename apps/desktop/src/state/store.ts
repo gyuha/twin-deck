@@ -307,6 +307,8 @@ export interface AppState {
   /** 패널별 현재 볼륨의 용량. 알 수 없으면 null. */
   diskSpace: Record<PaneId, DiskSpaceDto | null>;
   settingsOpen: boolean;
+  /** 설정이 떠 있는 패널(열 때의 활성 패널). 설정은 그 패널 자리에 뜬다. */
+  settingsPane: PaneId;
   /** 도움말(단축키 목록) 화면이 열려 있는지. */
   helpOpen: boolean;
   /** 파일 찾기 다이얼로그. 닫혀 있으면 null. `error`는 시작을 거부당한 이유(잘못된 정규식 등). */
@@ -407,7 +409,7 @@ export function actionContext(s: AppState): ActionContext {
 
 export function scopeStack(s: AppState): Scope[] {
   if (s.dialog) return ["dialog", "pane", "global"];
-  // 설정 화면은 메인 창을 덮는 모달이다(settings 스코프).
+  // 설정 화면은 활성 패널 자리에 뜨지만 키는 설정이 받는다(settings 스코프).
   if (s.settingsOpen) return ["settings", "global"];
   // 도움말(단축키 목록)도 메인 창을 덮는 모달이다(help 스코프).
   if (s.helpOpen) return ["help", "global"];
@@ -485,6 +487,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     volumes: [],
     diskSpace: { left: null, right: null },
     settingsOpen: false,
+    settingsPane: "left",
     helpOpen: false,
     find: null,
     lastFind: null,
@@ -2687,7 +2690,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       }
     },
     openSettings() {
-      set({ settingsOpen: true, settingsSection: 0, settingsError: null });
+      set((s) => ({ settingsOpen: true, settingsPane: s.activePane, settingsSection: 0, settingsError: null }));
     },
     closeSettings() {
       set({ settingsOpen: false, settingsError: null });

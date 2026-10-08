@@ -3,7 +3,7 @@ import { useApp, useAppStore } from "../state/context";
 import { Pane } from "./Pane";
 
 /** 왼쪽·오른쪽 패널과 그 사이의 구분선. 구분선을 끌어 너비 비율을 바꾸고, 더블클릭하면 반반으로 되돌린다. */
-export function PaneSplit() {
+export function PaneSplit({ onThemePreview }: { onThemePreview?: (theme: string | null) => void }) {
   const split = useApp((s) => s.split);
   const { api } = useAppStore();
   const box = useRef<HTMLDivElement>(null);
@@ -14,7 +14,7 @@ export function PaneSplit() {
   return (
     <div ref={box} className="flex min-h-0 flex-1">
       <div className="flex min-h-0 min-w-0" style={{ width: `${split * 100}%` }}>
-        <Pane pane="left" />
+        <Pane pane="left" onThemePreview={onThemePreview} />
       </div>
       <div
         role="separator"
@@ -35,7 +35,7 @@ export function PaneSplit() {
         onDoubleClick={() => api.setSplit(0.5)}
       />
       <div className="flex min-h-0 min-w-0 flex-1">
-        <Pane pane="right" />
+        <Pane pane="right" onThemePreview={onThemePreview} />
       </div>
     </div>
   );

@@ -286,7 +286,6 @@ function FKeyAdder({ disabled }: { disabled: boolean }) {
 
 /** 사용자 설정을 항목별 컨트롤로 바꾸는 화면(`Mod+,`). 바꾸는 즉시 저장한다. */
 export function Settings({ onThemePreview }: { onThemePreview?: (theme: string | null) => void }) {
-  const open = useApp((s) => s.settingsOpen);
   const section = useApp((s) => s.settingsSection);
   const config = useApp((s) => s.loaded.config);
   // F키 탭은 고정 F1~F12 뒤에 설정 파일의 조합키 항목이 이어진다.
@@ -304,18 +303,15 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
   const broken = useApp((s) => s.loaded.warnings.find((w) => w.message.startsWith("TOML 문법 오류")));
   const error = useApp((s) => s.settingsError);
   const { api } = useAppStore();
-  // 설정 화면이 닫히면(테마 목록을 연 채로 닫혀도) 임시 미리보기를 걷는다.
-  useEffect(() => {
-    if (!open) onThemePreview?.(null);
-  }, [open, onThemePreview]);
-  if (!open) return null;
+  // 설정 화면이 닫히면(테마 목록을 연 채로 닫혀도) 임시 미리보기를 걷는다. 설정은 열려 있는 동안만 이 패널에 그려진다.
+  useEffect(() => () => onThemePreview?.(null), [onThemePreview]);
   const defaults = defaultLoaded().config;
   const current = SECTIONS[section];
   const items: Item[] = current.title === "F키" ? [...current.items, ...comboKeys.map((k): Item => ({ key: `fkeys.${k}`, title: k, control: { type: "fkey" } }))] : current.items;
   return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-app text-ink">
-      <div role="dialog" aria-modal="true" aria-label="설정" className="flex min-h-0 flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-app-line px-4 py-2">
+    <div className="flex min-h-0 flex-1 flex-col bg-app text-ink">
+      <div role="dialog" aria-label="설정" className="flex min-h-0 flex-1 flex-col">
+        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-app-line px-4 py-2">
           <h2 className="text-base font-semibold">설정</h2>
           <div className="flex items-center gap-3">
             {/* 확인 창이 설정 화면에 가려지지 않게 설정을 닫고 확인한다. */}
@@ -344,8 +340,8 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
               : error}
           </div>
         )}
-        <div className="flex min-h-0 flex-1">
-          <nav role="tablist" aria-label="설정 섹션" aria-orientation="vertical" className="w-40 shrink-0 border-r border-app-line bg-sidebar p-2">
+        <div className="flex min-h-0 flex-1 flex-col">
+          <nav role="tablist" aria-label="설정 섹션" aria-orientation="horizontal" className="td-thin-scroll flex shrink-0 gap-1 overflow-x-auto border-b border-app-line bg-sidebar p-2">
             {SECTIONS.map((s, i) => (
               <button
                 key={s.title}
@@ -354,7 +350,7 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
                 aria-selected={i === section}
                 onClick={() => api.setSettingsSection(i)}
                 className={
-                  "block w-full rounded-md px-3 py-1.5 text-left text-sm " +
+                  "shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 text-sm " +
                   (i === section ? "bg-sidebar-selected text-sidebar-ink" : "text-sidebar-ink-dull hover:bg-sidebar-button")
                 }
               >
