@@ -1,0 +1,25 @@
+name: GitHub Light (Legacy)
+accent: "#f9826c"
+cursor: "#f9826c"
+background: "#f6f8fa"
+foreground: "#586069"
+details: lighter
+terminal_colors:
+  bright:
+    black: "#959da5"
+    blue: "#005cc5"
+    cyan: "#3192aa"
+    green: "#22863a"
+    magenta: "#5a32a3"
+    red: "#cb2431"
+    white: "#d1d5da"
+    yellow: "#b08800"
+  normal:
+    black: "#24292e"
+    blue: "#0366d6"
+    cyan: "#1b7c83"
+    green: "#28a745"
+    magenta: "#5a32a3"
+    red: "#d73a49"
+    white: "#6a737d"
+    yellow: "#dbab09"

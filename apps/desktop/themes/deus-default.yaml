@@ -1,0 +1,25 @@
+name: Deus Default
+accent: "#98c379"
+cursor: "#98c379"
+background: "#2c323b"
+foreground: "#eaeaea"
+details: darker
+terminal_colors:
+  bright:
+    black: "#666666"
+    blue: "#73ba9f"
+    cyan: "#2bcec2"
+    green: "#90c966"
+    magenta: "#c858e9"
+    red: "#ec3e45"
+    white: "#ffffff"
+    yellow: "#edbf69"
+  normal:
+    black: "#242a32"
+    blue: "#83a598"
+    cyan: "#70c0ba"
+    green: "#98c379"
+    magenta: "#c678dd"
+    red: "#d54e53"
+    white: "#eaeaea"
+    yellow: "#e5c07b"

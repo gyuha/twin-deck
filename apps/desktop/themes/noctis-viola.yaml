@@ -1,0 +1,25 @@
+name: Noctis Viola
+accent: "#bf8ef1"
+cursor: "#bf8ef1"
+background: "#291d35"
+foreground: "#ccbfd9"
+details: darker
+terminal_colors:
+  bright:
+    black: "#594e65"
+    blue: "#60b6eb"
+    cyan: "#60dbeb"
+    green: "#60ebb1"
+    magenta: "#e798b3"
+    red: "#e97749"
+    white: "#ccbfd9"
+    yellow: "#e69533"
+  normal:
+    black: "#362f3d"
+    blue: "#49ace9"
+    cyan: "#49d6e9"
+    green: "#49e9a6"
+    magenta: "#df769b"
+    red: "#e66533"
+    white: "#bfafcf"
+    yellow: "#e4b781"

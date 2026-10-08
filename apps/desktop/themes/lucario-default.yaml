@@ -1,0 +1,25 @@
+name: Lucario Default
+accent: "#f0cc04"
+cursor: "#f0cc04"
+background: "#2b3e50"
+foreground: "#f8f8f2"
+details: darker
+terminal_colors:
+  bright:
+    black: "#2f3943"
+    blue: "#d6acff"
+    cyan: "#b9ecfd"
+    green: "#72cc5a"
+    magenta: "#d4a9ff"
+    red: "#ff6541"
+    white: "#ffffff"
+    yellow: "#ffffa5"
+  normal:
+    black: "#19242f"
+    blue: "#5c98cd"
+    cyan: "#8be0fd"
+    green: "#199c4b"
+    magenta: "#ca94ff"
+    red: "#e94b35"
+    white: "#f8f8f2"
+    yellow: "#f0cc04"

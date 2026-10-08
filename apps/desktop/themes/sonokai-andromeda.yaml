@@ -1,0 +1,25 @@
+name: Sonokai Andromeda
+accent: "#edc763"
+cursor: "#edc763"
+background: "#2b2d3a"
+foreground: "#e1e3e4"
+details: darker
+terminal_colors:
+  bright:
+    black: "#7e8294"
+    blue: "#6dcae8"
+    cyan: "#f89860"
+    green: "#9ed06c"
+    magenta: "#bb97ee"
+    red: "#fb617e"
+    white: "#e1e3e4"
+    yellow: "#edc763"
+  normal:
+    black: "#181a1c"
+    blue: "#6dcae8"
+    cyan: "#f89860"
+    green: "#9ed06c"
+    magenta: "#bb97ee"
+    red: "#fb617e"
+    white: "#e1e3e4"
+    yellow: "#edc763"

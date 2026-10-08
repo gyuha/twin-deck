@@ -1,0 +1,25 @@
+name: Sonokai Maia
+accent: "#e3d367"
+cursor: "#e3d367"
+background: "#273136"
+foreground: "#e1e2e3"
+details: darker
+terminal_colors:
+  bright:
+    black: "#82878b"
+    blue: "#78cee9"
+    cyan: "#f3a96a"
+    green: "#9cd57b"
+    magenta: "#baa0f8"
+    red: "#f76c7c"
+    white: "#e1e2e3"
+    yellow: "#e3d367"
+  normal:
+    black: "#1c1e1f"
+    blue: "#78cee9"
+    cyan: "#f3a96a"
+    green: "#9cd57b"
+    magenta: "#baa0f8"
+    red: "#f76c7c"
+    white: "#e1e2e3"
+    yellow: "#e3d367"

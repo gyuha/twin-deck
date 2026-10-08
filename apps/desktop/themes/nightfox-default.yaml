@@ -1,0 +1,25 @@
+name: Nightfox Default
+accent: "#63cdcf"
+cursor: "#63cdcf"
+background: "#192330"
+foreground: "#cdcecf"
+details: darker
+terminal_colors:
+  bright:
+    black: "#575860"
+    blue: "#86abdc"
+    cyan: "#7ad5d6"
+    green: "#8ebaa4"
+    magenta: "#baa1e2"
+    red: "#d16983"
+    white: "#e4e4e5"
+    yellow: "#e0c989"
+  normal:
+    black: "#393b44"
+    blue: "#719cd6"
+    cyan: "#63cdcf"
+    green: "#81b29a"
+    magenta: "#9d79d6"
+    red: "#c94f6d"
+    white: "#dfdfe0"
+    yellow: "#dbc074"

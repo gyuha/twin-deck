@@ -7,6 +7,7 @@ dev:
     bun run --cwd apps/desktop tauri dev
 
 gen-types:
+    node scripts/gen-themes.mjs
     UPDATE_BINDINGS=1 cargo test -p twin-deck-desktop up_to_date
 
 test:

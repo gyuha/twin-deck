@@ -1,0 +1,25 @@
+name: Miasma Default
+accent: "#b36d43"
+cursor: "#b36d43"
+background: "#222222"
+foreground: "#c2c2b0"
+details: darker
+terminal_colors:
+  bright:
+    black: "#666666"
+    blue: "#78824b"
+    cyan: "#c9a554"
+    green: "#5f875f"
+    magenta: "#bb7744"
+    red: "#685742"
+    white: "#d7c483"
+    yellow: "#b36d43"
+  normal:
+    black: "#000000"
+    blue: "#78824b"
+    cyan: "#c9a554"
+    green: "#5f875f"
+    magenta: "#bb7744"
+    red: "#685742"
+    white: "#d7c483"
+    yellow: "#b36d43"

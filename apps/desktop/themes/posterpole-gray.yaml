@@ -1,0 +1,25 @@
+name: Posterpole Gray
+accent: "#778c73"
+cursor: "#778c73"
+background: "#1f1f1f"
+foreground: "#c6c0b9"
+details: darker
+terminal_colors:
+  bright:
+    black: "#a5a59c"
+    blue: "#8a99a8"
+    cyan: "#aabbba"
+    green: "#92a38f"
+    magenta: "#ccb3c6"
+    red: "#bc8f8f"
+    white: "#c6c0b9"
+    yellow: "#d9ac8c"
+  normal:
+    black: "#2c2c30"
+    blue: "#6c7f93"
+    cyan: "#8ea4a2"
+    green: "#778c73"
+    magenta: "#b894af"
+    red: "#a97070"
+    white: "#afa79d"
+    yellow: "#cc9166"

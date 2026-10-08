@@ -121,7 +121,7 @@ describe("커서 행 꽉 채움 (behavior.table.cursor_fill)", () => {
     const row = rows().find((x) => x.getAttribute("data-cursor") === "true")!;
     expect(row.getAttribute("aria-selected")).toBe("true");
     expect(row.className).toContain("bg-accent");
-    expect(row.className).not.toContain("text-accent");
+    expect(row.className.split(/\s+/)).not.toContain("text-accent"); // 글자색이 배경색(accent)과 같은 클래스가 아니다(text-accent-ink는 강조색 위 글자색이라 괜찮다)
   });
 
   it("끄면(기본) 커서 행에 꽉 채움 속성이 없다", async () => {

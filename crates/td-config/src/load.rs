@@ -8,6 +8,7 @@ use toml::{Table, Value};
 use crate::config::{Config, FavoriteDto, FavoriteLeaf};
 use crate::keybindings::{self, BindingSpec};
 use crate::merge::merge_user;
+use crate::themes::THEME_IDS;
 use crate::DEFAULTS;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -94,9 +95,8 @@ const ENUMS: [(&str, &str, &[&str]); 5] = [
     (
         "behavior",
         "theme",
-        &[
-            "dark", "light", "midnight", "noir", "slate", "nord", "mocha", "system",
-        ],
+        // 이 셋 말고 apps/desktop/themes의 테마 이름(`themes::THEME_IDS`)도 허용한다(`is_allowed`).
+        &["system", "light", "dark"],
     ),
     ("behavior.selection", "shift_mode", &["invert", "extend"]),
     (
@@ -124,6 +124,11 @@ const ENUMS: [(&str, &str, &[&str]); 5] = [
     ),
 ];
 
+/// `behavior.theme`은 고정 목록 말고 생성된 테마 이름 목록도 받는다.
+fn is_allowed(section: &str, key: &str, v: &str, allowed: &[&str]) -> bool {
+    allowed.contains(&v) || ((section, key) == ("behavior", "theme") && THEME_IDS.contains(&v))
+}
+
 /// 허용값이 정해진 키가 벗어나면 기본값으로 되돌리고 경고한다.
 fn validate_enums(merged: &mut Table, defaults: &Table, warnings: &mut Vec<Warning>) {
     for (section, key, allowed) in ENUMS {
@@ -138,14 +143,19 @@ fn validate_enums(merged: &mut Table, defaults: &Table, warnings: &mut Vec<Warni
         let Some(v) = cur.get(key).and_then(Value::as_str) else {
             continue;
         };
-        if allowed.contains(&v) {
+        if is_allowed(section, key, v, allowed) {
             continue;
         }
         warnings.push(Warning::new(
             "config.toml",
             format!(
-                "{section}.{key}: '{v}'는 허용되지 않는 값입니다 ({})",
-                allowed.join(", ")
+                "{section}.{key}: '{v}'는 허용되지 않는 값입니다 ({}{})",
+                allowed.join(", "),
+                if (section, key) == ("behavior", "theme") {
+                    " 또는 테마 이름(apps/desktop/themes의 파일 이름, 예: catppuccin-mocha)"
+                } else {
+                    ""
+                }
             ),
         ));
         let default = get(defaults).and_then(|d| d.get(key).cloned());

@@ -37,7 +37,7 @@ export function ContextMenu() {
             onClick={() => enabled && void api.ctxSelect(it)}
             className={[
               "mx-1 flex h-6 items-center justify-between rounded px-2",
-              i === cursor ? "bg-accent text-white" : "",
+              i === cursor ? "bg-accent text-accent-ink" : "",
               enabled ? "" : "opacity-40",
             ].join(" ")}
           >

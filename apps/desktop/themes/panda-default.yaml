@@ -1,0 +1,25 @@
+name: Panda Default
+accent: "#19f9d8"
+cursor: "#19f9d8"
+background: "#292a2b"
+foreground: "#cccccc"
+details: darker
+terminal_colors:
+  bright:
+    black: "#757575"
+    blue: "#6fc1ff"
+    cyan: "#bcaafe"
+    green: "#19f9d8"
+    magenta: "#ff9ac1"
+    red: "#ff2c6d"
+    white: "#e6e6e6"
+    yellow: "#ffcc95"
+  normal:
+    black: "#000000"
+    blue: "#45a9f9"
+    cyan: "#b084eb"
+    green: "#19f9d8"
+    magenta: "#ff75b5"
+    red: "#ff2c6d"
+    white: "#cdcdcd"
+    yellow: "#ffb86c"

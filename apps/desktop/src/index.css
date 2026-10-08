@@ -2,11 +2,6 @@
 @import "@spacedrive/tokens/theme";
 @import "@spacedrive/tokens/css/themes/dark";
 @import "@spacedrive/tokens/css/themes/light";
-@import "@spacedrive/tokens/css/themes/midnight";
-@import "@spacedrive/tokens/css/themes/noir";
-@import "@spacedrive/tokens/css/themes/slate";
-@import "@spacedrive/tokens/css/themes/nord";
-@import "@spacedrive/tokens/css/themes/mocha";
 @import "./theme.css";
 /* @spacedrive/primitives가 쓰는 Tailwind 클래스를 만들도록 패키지를 스캔한다(설정 화면에서만 쓴다). */
 @source "../../../node_modules/@spacedrive/primitives/dist/index.js";

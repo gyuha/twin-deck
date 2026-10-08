@@ -1,0 +1,25 @@
+name: Noctis Minimus
+accent: "#5998c0"
+cursor: "#5998c0"
+background: "#0e1920"
+foreground: "#c5cdd3"
+details: darker
+terminal_colors:
+  bright:
+    black: "#425866"
+    blue: "#68a4ca"
+    cyan: "#84c0c8"
+    green: "#84c8ab"
+    magenta: "#c88da2"
+    red: "#ca8468"
+    white: "#c5d1d3"
+    yellow: "#d1aa7b"
+  normal:
+    black: "#182a35"
+    blue: "#6196b8"
+    cyan: "#72b7c0"
+    green: "#72c09f"
+    magenta: "#c28097"
+    red: "#c08872"
+    white: "#c5cdd3"
+    yellow: "#c8a984"

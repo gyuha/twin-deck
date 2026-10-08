@@ -1,0 +1,25 @@
+name: Zenbones Duckbones
+accent: "#e39500"
+cursor: "#e39500"
+background: "#0e101a"
+foreground: "#ebefc0"
+details: darker
+terminal_colors:
+  bright:
+    black: "#2b2f46"
+    blue: "#00b4e0"
+    cyan: "#00b4e0"
+    green: "#58db9e"
+    magenta: "#b3a1e6"
+    red: "#ff4821"
+    white: "#b3b692"
+    yellow: "#f6a100"
+  normal:
+    black: "#0e101a"
+    blue: "#00a3cb"
+    cyan: "#00a3cb"
+    green: "#5dcd97"
+    magenta: "#795ccc"
+    red: "#e03600"
+    white: "#ebefc0"
+    yellow: "#e39500"

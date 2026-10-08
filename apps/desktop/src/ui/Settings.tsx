@@ -4,6 +4,7 @@ import { Button, Input, Select, SelectOption } from "@spacedrive/primitives";
 import { defaultBindingsFor } from "@twin-deck/actions";
 import { defaultLoaded } from "@twin-deck/ts-client";
 import { APP_ACTIONS, APP_LAUNCH_ACTION, APP_OPEN_FOLDER_ACTION } from "../lib/fkeys";
+import { THEMES } from "../lib/themes.generated";
 import { useApp, useAppStore } from "../state/context";
 import { Combobox } from "./Combobox";
 import { Switch } from "./Switch";
@@ -24,7 +25,8 @@ interface Item {
   control: Control;
 }
 
-const THEMES = ["system", "dark", "light", "midnight", "noir", "slate", "nord", "mocha"] as const;
+// system·light·dark 뒤에 apps/desktop/themes의 테마 이름이 이어진다(td-config의 THEME_IDS와 같은 생성 원본).
+const THEME_CHOICES = ["system", "light", "dark", ...THEMES.map((t) => t.id)] as const;
 // size_format의 허용 값은 td-config의 검증 목록과 같아야 한다(crates/td-config/src/load.rs).
 const SIZE_FORMATS = ["adaptive", "adaptive_kibi", "bytes", "KB", "MB"] as const;
 // folder_style의 허용 값도 td-config의 검증 목록(ENUMS)과 같아야 한다.
@@ -36,7 +38,7 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
   {
     title: "모양",
     items: [
-      { key: "behavior.theme", title: "테마", desc: "system은 OS의 밝기 설정을 따릅니다", control: { type: "select", options: THEMES } },
+      { key: "behavior.theme", title: "테마", desc: "system은 OS의 밝기 설정을 따라 Catppuccin Mocha(다크)/Latte(라이트)를 씁니다. light·dark도 같은 둘이고, 그 밖의 이름은 그 테마 하나를 씁니다", control: { type: "select", options: THEME_CHOICES } },
       { key: "behavior.ui_font", title: "UI 글꼴", desc: "앱 화면 전체의 글꼴. CSS font-family 값(예: Pretendard, sans-serif). 기본은 macOS Menlo·Windows Consolas. 비우면 앱 기본 고정폭", control: { type: "text" } },
       { key: "behavior.preview_font", title: "미리보기 글꼴", desc: "텍스트·코드·JSON·Markdown 미리보기 본문의 글꼴. 비우면 기본 글꼴", control: { type: "text" } },
       { key: "behavior.text_color", title: "글자 색", desc: "앱 기본 글자색. 색상환으로 고르거나 #rrggbb를 씁니다. 비우면 테마 그대로이고, 흐린 글자는 이 색을 배경 쪽으로 섞어 자동으로 만듭니다. 색은 테마와 무관하게 하나라서, 테마(특히 system)가 바뀌면 읽기 어려울 수 있으니 그때는 비우세요", control: { type: "color" } },

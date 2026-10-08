@@ -1,0 +1,25 @@
+name: Nordic Default
+accent: "#ebcb8b"
+cursor: "#ebcb8b"
+background: "#242933"
+foreground: "#bbc3d4"
+details: darker
+terminal_colors:
+  bright:
+    black: "#3b4252"
+    blue: "#88c0d0"
+    cyan: "#9fc6c5"
+    green: "#b1c89d"
+    magenta: "#be9d88"
+    red: "#c5727a"
+    white: "#d8dee9"
+    yellow: "#efd49f"
+  normal:
+    black: "#191d24"
+    blue: "#5e81ac"
+    cyan: "#8fbcbb"
+    green: "#a3be8c"
+    magenta: "#b48ead"
+    red: "#bf616a"
+    white: "#bbc3d4"
+    yellow: "#ebcb8b"

@@ -175,7 +175,7 @@ export function FileTable({ pane }: { pane: PaneId }) {
           cursor
             ? isActive
               ? fill
-                ? "border-accent bg-accent text-white"
+                ? "border-accent bg-accent text-accent-ink"
                 : "border-accent bg-app-selected"
               : "border-ink-faint bg-app-selected"
             : stripe === "odd"

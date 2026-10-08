@@ -1,0 +1,25 @@
+name: Gotham Default
+accent: "#2aa889"
+cursor: "#2aa889"
+background: "#0c1014"
+foreground: "#99d1ce"
+details: darker
+terminal_colors:
+  bright:
+    black: "#0c1014"
+    blue: "#195466"
+    cyan: "#33859e"
+    green: "#2aa889"
+    magenta: "#4e5166"
+    red: "#c23127"
+    white: "#99d1ce"
+    yellow: "#edb443"
+  normal:
+    black: "#0c1014"
+    blue: "#195466"
+    cyan: "#33859e"
+    green: "#2aa889"
+    magenta: "#4e5166"
+    red: "#c23127"
+    white: "#99d1ce"
+    yellow: "#edb443"

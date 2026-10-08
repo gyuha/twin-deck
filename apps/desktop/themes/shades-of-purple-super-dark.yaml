@@ -1,0 +1,25 @@
+name: Shades of Purple Super Dark
+accent: "#fad000"
+cursor: "#fad000"
+background: "#15152b"
+foreground: "#ffffff"
+details: darker
+terminal_colors:
+  bright:
+    black: "#5c5c61"
+    blue: "#6943ff"
+    cyan: "#80fcff"
+    green: "#3ad900"
+    magenta: "#fb94ff"
+    red: "#e33937"
+    white: "#ffffff"
+    yellow: "#fad000"
+  normal:
+    black: "#000000"
+    blue: "#7857fe"
+    cyan: "#80fcff"
+    green: "#3ad900"
+    magenta: "#ff2c70"
+    red: "#e33937"
+    white: "#ffffff"
+    yellow: "#fad000"

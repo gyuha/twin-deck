@@ -1,0 +1,25 @@
+name: Rosé Pine Moon
+accent: "#e0def4"
+cursor: "#e0def4"
+background: "#2a273f"
+foreground: "#e0def4"
+details: darker
+terminal_colors:
+  bright:
+    black: "#908caa"
+    blue: "#9ccfd8"
+    cyan: "#ea9a97"
+    green: "#3e8fb0"
+    magenta: "#c4a7e7"
+    red: "#eb6f92"
+    white: "#e0def4"
+    yellow: "#f6c177"
+  normal:
+    black: "#393552"
+    blue: "#9ccfd8"
+    cyan: "#ea9a97"
+    green: "#3e8fb0"
+    magenta: "#c4a7e7"
+    red: "#eb6f92"
+    white: "#e0def4"
+    yellow: "#f6c177"

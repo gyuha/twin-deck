@@ -1,0 +1,25 @@
+name: Zenbones Tokyobones Light
+accent: "#8f5e14"
+cursor: "#8f5e14"
+background: "#d6d7dc"
+foreground: "#333a57"
+details: lighter
+terminal_colors:
+  bright:
+    black: "#adb0bd"
+    blue: "#26467a"
+    cyan: "#34645d"
+    green: "#26554f"
+    magenta: "#503875"
+    red: "#7e3242"
+    white: "#56618d"
+    yellow: "#794e0d"
+  normal:
+    black: "#d6d7dc"
+    blue: "#34548c"
+    cyan: "#176775"
+    green: "#34645d"
+    magenta: "#5a4a79"
+    red: "#8b4351"
+    white: "#333a57"
+    yellow: "#8f5e14"

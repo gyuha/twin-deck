@@ -447,7 +447,7 @@ fn columns_spec_parse() {
 
 #[test]
 fn theme_setting_is_validated() {
-    // 아직 사용자 정의 테마(P3)는 없으므로 알 수 없는 이름은 경고하고 기본값
+    // 알 수 없는 이름은 경고하고 기본값
     let l = load("[behavior]\ntheme = \"sakura\"\n");
     assert_eq!(l.config.behavior.theme, "system");
     assert!(
@@ -458,14 +458,28 @@ fn theme_setting_is_validated() {
 }
 
 #[test]
-fn theme_accepts_spaceui_themes() {
+fn theme_accepts_system_light_dark_and_every_theme_file_name() {
     assert_eq!(load("").config.behavior.theme, "system");
-    for t in [
-        "dark", "light", "midnight", "noir", "slate", "nord", "mocha", "system",
-    ] {
+    let ids = td_config::THEME_IDS;
+    assert_eq!(ids.len(), 112);
+    for t in ["system", "light", "dark"].iter().chain(ids.iter()) {
         let l = load(&format!("[behavior]\ntheme = \"{t}\"\n"));
         assert!(l.warnings.is_empty(), "{t}: {:?}", l.warnings);
-        assert_eq!(l.config.behavior.theme, t);
+        assert_eq!(l.config.behavior.theme, *t);
+    }
+    assert!(ids.contains(&"catppuccin-mocha") && ids.contains(&"catppuccin-latte"));
+}
+
+#[test]
+fn old_spaceui_theme_names_warn_and_fall_back_to_system() {
+    for old in ["midnight", "noir", "slate", "nord", "mocha"] {
+        let l = load(&format!("[behavior]\ntheme = \"{old}\"\n"));
+        assert_eq!(l.config.behavior.theme, "system", "{old}");
+        assert!(
+            l.warnings.iter().any(|w| w.message.contains(old)),
+            "{old}: {:?}",
+            l.warnings
+        );
     }
 }
 
@@ -506,14 +520,14 @@ fn user_value_set_creates_file_and_tables_with_each_type() {
     set_user_value(
         d.path(),
         "behavior.theme",
-        ConfigValue::Str("midnight".into()),
+        ConfigValue::Str("dracula-default".into()),
     )
     .unwrap();
     set_user_value(d.path(), "core.confirm.delete", ConfigValue::Bool(false)).unwrap();
     set_user_value(d.path(), "behavior.table.icon_size", ConfigValue::Int(24)).unwrap();
     let l = load_dir(d.path(), Platform::Linux);
     assert!(l.warnings.is_empty(), "{:?}", l.warnings);
-    assert_eq!(l.config.behavior.theme, "midnight");
+    assert_eq!(l.config.behavior.theme, "dracula-default");
     assert!(!l.config.core.confirm.delete);
     assert_eq!(l.config.behavior.table.icon_size, 24);
 }

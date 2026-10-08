@@ -155,7 +155,7 @@ export function FindDialog() {
             )}
           </div>
           <div className="flex w-36 shrink-0 flex-col gap-2 pt-7">
-            <button type="submit" className="h-8 w-full rounded-md bg-accent px-3 text-sm font-semibold text-white">
+            <button type="submit" className="h-8 w-full rounded-md bg-accent px-3 text-sm font-semibold text-accent-ink">
               시작
             </button>
             <button type="button" className={btn} disabled={!running} onClick={() => api.cancelFinds()}>

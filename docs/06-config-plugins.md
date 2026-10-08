@@ -47,7 +47,7 @@ Marta에서 확인된 옵션 이름을 그대로 옮길 수 있는 곳은 옮기
 
 ```toml
 [behavior]
-theme = "dark"                    # 내장 테마 이름 또는 themes/ 의 파일 이름
+theme = "system"                  # system·light·dark 또는 테마 이름(예: dracula-default)
 
 [behavior.table]
 icon_size = 16
@@ -198,7 +198,12 @@ working_directory = "${active.folder.path}"
 
 테마는 CSS 변수(디자인 토큰)의 집합이다. `@spacedrive/tokens`를 기반으로 하고, 사용자 테마는 그 값을 덮어쓴다.
 
-- 구현됨(2026-10-01): `behavior.theme`은 spaceui 테마 7종(`dark`, `light`, `midnight`, `noir`, `slate`, `nord`, `mocha`)과 `system`(OS 설정에 따라 dark/light) 중 하나다. 기본값은 `system`. 테마는 `<html>`의 클래스로 바뀐다. 사용자 정의 테마 파일(아래 예시)은 아직 없다.
+- 구현됨(2026-10-08): `behavior.theme`은 `system`, `light`, `dark`, 또는 Warp 테마 112개의 이름(`apps/desktop/themes/*.yaml`의 파일 이름, 예: `catppuccin-mocha`, `dracula-default`) 중 하나다. 기본값은 `system`이다.
+  - `light`는 `catppuccin-latte`, `dark`는 `catppuccin-mocha`, `system`은 OS가 다크면 Mocha, 아니면 Latte다. 테마 이름을 고르면 그 테마 하나를 쓴다.
+  - 색은 테마 YAML의 `background`·`foreground`·`accent`와 터미널 normal의 `red`·`green`·`yellow`·`blue`로 계산한다: 배경→`app`, 글자→`ink`, `accent`→`accent`(YAML 그대로, 그 위 글자는 흰색/검정 중 대비가 큰 쪽), 터미널 색→상태색(오류·경고·성공·정보). 표면 단계(`app-box`·`app-line`·`app-hover` 등)는 배경에 글자색을 6~20% 섞어 만들고, 흐린 글자는 모든 테마에서 배경과의 대비가 3.0 이상이 되게 섞는다. 계산은 `lib/themeColors.ts`다.
+  - YAML은 빌드 때만 읽는다: `scripts/gen-themes.mjs`(`task gen-types`)가 `src/lib/themes.generated.ts`(색 표)와 `crates/td-config/src/themes.rs`(허용 이름 목록)를 만든다. 앱은 실행 중에 YAML을 읽지 않고, 사용자가 YAML을 넣는 기능은 아직 없다(아래 예시).
+  - 옛 spaceui 이름(`midnight`, `noir`, `slate`, `nord`, `mocha`)은 없어졌다. 설정에 남아 있으면 경고하고 `system`으로 돌아간다.
+  - `<html>`에는 `data-theme`(dark/light), `data-color-theme`(테마 이름), 클래스(dark/light)가 걸리고 색 토큰은 인라인 `--color-*`다. 설정을 읽기 전에는 spaceui의 dark/light 기본값이 보인다.
 
 ```toml
 # themes/my-theme.toml
@@ -213,7 +218,7 @@ cursor = "#3a3f4b"
 text = "#e6e6e6"
 ```
 
-- 내장 테마: spaceui의 7종과 `system` (위 "구현됨" 참고). Marta의 5종(Kon, Dark, Classic, Sakura, Commander)에 해당하는 테마는 P3에서 별도로 디자인한다. Marta 테마 파일은 복사하지 않는다.
+- 내장 테마: Warp 테마 112개와 `system`·`light`·`dark` (위 "구현됨" 참고). Marta의 5종(Kon, Dark, Classic, Sakura, Commander)에 해당하는 테마는 P3에서 별도로 디자인한다. Marta 테마 파일은 복사하지 않는다.
 - 테마 전환은 `core.theme.switch` 액션(즉시 미리보기)과 `behavior.theme` 설정으로 한다.
 - 터미널 색상은 xterm.js 테마 객체로 매핑한다. Marta의 `.ettyTheme` 형식은 지원하지 않는다.
 - 테마 키 이름(`pane_active_border` 등)은 토큰 목록을 [07](07-ui-spec.md)과 함께 확정한다. 지금 이름은 예시다.

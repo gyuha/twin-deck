@@ -1,0 +1,25 @@
+name: Zenbones Seoulbones Dark
+accent: "#ffdf9b"
+cursor: "#ffdf9b"
+background: "#4b4b4b"
+foreground: "#dddddd"
+details: darker
+terminal_colors:
+  bright:
+    black: "#6c6465"
+    blue: "#a2c8e9"
+    cyan: "#6bcacb"
+    green: "#8fcd92"
+    magenta: "#b2b3da"
+    red: "#eb99b1"
+    white: "#a8a8a8"
+    yellow: "#ffe5b3"
+  normal:
+    black: "#4b4b4b"
+    blue: "#97bdde"
+    cyan: "#6fbdbe"
+    green: "#98bd99"
+    magenta: "#a5a6c5"
+    red: "#e388a3"
+    white: "#dddddd"
+    yellow: "#ffdf9b"

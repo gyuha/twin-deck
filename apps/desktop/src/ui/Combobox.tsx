@@ -136,7 +136,7 @@ export function Combobox({ value, options, onChange, disabled, label, className 
                   onMouseEnter={() => setCursor(i)}
                   onClick={() => choose(o)}
                   className={
-                    "flex h-7 cursor-pointer items-center justify-between rounded px-2 text-sm " + (i === cursor ? "bg-accent text-white" : "text-ink")
+                    "flex h-7 cursor-pointer items-center justify-between rounded px-2 text-sm " + (i === cursor ? "bg-accent text-accent-ink" : "text-ink")
                   }
                 >
                   <span className="truncate">{o.label}</span>

@@ -1,0 +1,25 @@
+name: Tender Default
+accent: "#ffc24b"
+cursor: "#ffc24b"
+background: "#282828"
+foreground: "#eeeeee"
+details: darker
+terminal_colors:
+  bright:
+    black: "#1d1d1d"
+    blue: "#b3deef"
+    cyan: "#73cef4"
+    green: "#c9d05c"
+    magenta: "#d3b987"
+    red: "#f43753"
+    white: "#ffffff"
+    yellow: "#ffc24b"
+  normal:
+    black: "#282828"
+    blue: "#b3deef"
+    cyan: "#73cef4"
+    green: "#c9d05c"
+    magenta: "#d3b987"
+    red: "#f43753"
+    white: "#eeeeee"
+    yellow: "#ffc24b"

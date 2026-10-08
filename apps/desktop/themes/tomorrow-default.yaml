@@ -1,0 +1,25 @@
+name: Tomorrow Default
+accent: "#eab700"
+cursor: "#eab700"
+background: "#ffffff"
+foreground: "#4d4d4c"
+details: lighter
+terminal_colors:
+  bright:
+    black: "#000000"
+    blue: "#4271ae"
+    cyan: "#3e999f"
+    green: "#718c00"
+    magenta: "#8959a8"
+    red: "#c82829"
+    white: "#ffffff"
+    yellow: "#eab700"
+  normal:
+    black: "#000000"
+    blue: "#4271ae"
+    cyan: "#3e999f"
+    green: "#718c00"
+    magenta: "#8959a8"
+    red: "#c82829"
+    white: "#ffffff"
+    yellow: "#eab700"

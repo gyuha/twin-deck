@@ -1,0 +1,25 @@
+name: GitHub Dark High Contrast
+accent: "#ff967d"
+cursor: "#ff967d"
+background: "#010409"
+foreground: "#f0f3f6"
+details: darker
+terminal_colors:
+  bright:
+    black: "#9ea7b3"
+    blue: "#91cbff"
+    cyan: "#56d4dd"
+    green: "#4ae168"
+    magenta: "#dbb7ff"
+    red: "#ffb1af"
+    white: "#ffffff"
+    yellow: "#f7c843"
+  normal:
+    black: "#7a828e"
+    blue: "#71b7ff"
+    cyan: "#39c5cf"
+    green: "#26cd4d"
+    magenta: "#cb9eff"
+    red: "#ff9492"
+    white: "#d9dee3"
+    yellow: "#f0b72f"

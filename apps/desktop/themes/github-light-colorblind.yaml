@@ -1,0 +1,25 @@
+name: GitHub Light Colorblind
+accent: "#fd8c73"
+cursor: "#fd8c73"
+background: "#f6f8fa"
+foreground: "#24292f"
+details: lighter
+terminal_colors:
+  bright:
+    black: "#57606a"
+    blue: "#218bff"
+    cyan: "#3192aa"
+    green: "#0969da"
+    magenta: "#a475f9"
+    red: "#8a4600"
+    white: "#8c959f"
+    yellow: "#633c01"
+  normal:
+    black: "#24292f"
+    blue: "#0969da"
+    cyan: "#1b7c83"
+    green: "#0550ae"
+    magenta: "#8250df"
+    red: "#b35900"
+    white: "#6e7781"
+    yellow: "#4d2d00"

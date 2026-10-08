@@ -1,0 +1,25 @@
+name: GitHub Dark (Legacy)
+accent: "#f9826c"
+cursor: "#f9826c"
+background: "#1f2428"
+foreground: "#d1d5da"
+details: darker
+terminal_colors:
+  bright:
+    black: "#959da5"
+    blue: "#79b8ff"
+    cyan: "#56d4dd"
+    green: "#85e89d"
+    magenta: "#b392f0"
+    red: "#f97583"
+    white: "#fafbfc"
+    yellow: "#ffea7f"
+  normal:
+    black: "#586069"
+    blue: "#2188ff"
+    cyan: "#39c5cf"
+    green: "#34d058"
+    magenta: "#b392f0"
+    red: "#ea4a5a"
+    white: "#d1d5da"
+    yellow: "#ffea7f"

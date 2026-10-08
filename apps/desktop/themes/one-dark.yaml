@@ -1,0 +1,25 @@
+name: One Dark
+accent: "#61afef"
+cursor: "#61afef"
+background: "#282c34"
+foreground: "#abb2bf"
+details: darker
+terminal_colors:
+  bright:
+    black: "#5c6370"
+    blue: "#61afef"
+    cyan: "#56b6c2"
+    green: "#98c379"
+    magenta: "#c678dd"
+    red: "#e06c75"
+    white: "#ffffff"
+    yellow: "#d19a66"
+  normal:
+    black: "#1e2127"
+    blue: "#61afef"
+    cyan: "#56b6c2"
+    green: "#98c379"
+    magenta: "#c678dd"
+    red: "#e06c75"
+    white: "#abb2bf"
+    yellow: "#d19a66"

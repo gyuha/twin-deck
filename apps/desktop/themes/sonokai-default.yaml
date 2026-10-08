@@ -1,0 +1,25 @@
+name: Sonokai Default
+accent: "#e7c664"
+cursor: "#e7c664"
+background: "#2c2e34"
+foreground: "#e2e2e3"
+details: darker
+terminal_colors:
+  bright:
+    black: "#7f8490"
+    blue: "#76cce0"
+    cyan: "#f39660"
+    green: "#9ed072"
+    magenta: "#b39df3"
+    red: "#fc5d7c"
+    white: "#e2e2e3"
+    yellow: "#e7c664"
+  normal:
+    black: "#181819"
+    blue: "#76cce0"
+    cyan: "#f39660"
+    green: "#9ed072"
+    magenta: "#b39df3"
+    red: "#fc5d7c"
+    white: "#e2e2e3"
+    yellow: "#e7c664"

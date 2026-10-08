@@ -1,0 +1,25 @@
+name: Cobalt2 Default
+accent: "#ffc600"
+cursor: "#ffc600"
+background: "#122738"
+foreground: "#ffffff"
+details: darker
+terminal_colors:
+  bright:
+    black: "#0050a4"
+    blue: "#0088ff"
+    cyan: "#80fcff"
+    green: "#3ad900"
+    magenta: "#fb94ff"
+    red: "#ff628c"
+    white: "#ffffff"
+    yellow: "#ffc600"
+  normal:
+    black: "#000000"
+    blue: "#0088ff"
+    cyan: "#80fcff"
+    green: "#3ad900"
+    magenta: "#fb94ff"
+    red: "#ff628c"
+    white: "#ffffff"
+    yellow: "#ffc600"

@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { act, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { THEME_BY_ID, themeVars } from "../lib/themeColors";
 import { renderApp, seedBackend } from "./helpers";
 
 const theme = () => document.documentElement.getAttribute("data-theme");
@@ -63,35 +64,63 @@ describe("CFG-03 라이트/다크 테마", () => {
   });
 });
 
-describe("spaceui 테마", () => {
-  const cls = () => document.documentElement.className;
+describe("Warp 테마 적용", () => {
+  const root = () => document.documentElement;
+  const colorTheme = () => root().dataset.colorTheme;
+  const v = (name: string) => root().style.getPropertyValue(name);
 
   it.each([
-    ["dark", "dark"],
-    ["light", "light"],
-    ["midnight", "midnight-theme"],
-    ["noir", "noir-theme"],
-    ["slate", "slate-theme"],
-    ["nord", "nord-theme"],
-    ["mocha", "mocha-theme"],
-  ])("spaceui: %s 테마는 <html>에 %s 클래스를 건다", async (name, className) => {
-    await renderApp(seed(name));
-    await waitFor(() => expect(theme()).toBe(name));
-    expect(cls()).toBe(className);
+    ["light", "catppuccin-latte", "light"],
+    ["dark", "catppuccin-mocha", "dark"],
+    ["dracula-default", "dracula-default", "dark"],
+    ["solarized-light", "solarized-light", "light"],
+  ])("설정 %s는 %s 테마이고 밝기는 %s다(data-theme·클래스·color-scheme 기준)", async (setting, id, mode) => {
+    await renderApp(seed(setting));
+    await waitFor(() => expect(colorTheme()).toBe(id));
+    expect(theme()).toBe(mode);
+    expect(root().className).toBe(mode);
   });
 
-  it("spaceui: 테마를 바꾸면 이전 테마 클래스가 남지 않는다", async () => {
-    const b = seed("midnight");
+  it("<html>에 해당 테마의 --color-* 인라인 값이 걸린다", async () => {
+    await renderApp(seed("dark"));
+    await waitFor(() => expect(colorTheme()).toBe("catppuccin-mocha"));
+    const expected = themeVars(THEME_BY_ID.get("catppuccin-mocha")!);
+    for (const [name, value] of Object.entries(expected)) expect(v(name), name).toBe(value);
+    expect(v("--color-app")).toBe("#1e1e2e");
+  });
+
+  it("테마를 바꾸면 이전 테마의 값이 남지 않는다", async () => {
+    const b = seed("dracula-default");
     await renderApp(b);
-    await waitFor(() => expect(cls()).toBe("midnight-theme"));
-    await act(async () => b.setConfig((l) => (l.config.behavior.theme = "nord")));
-    await waitFor(() => expect(cls()).toBe("nord-theme"));
+    await waitFor(() => expect(colorTheme()).toBe("dracula-default"));
+    await act(async () => b.setConfig((l) => (l.config.behavior.theme = "catppuccin-latte")));
+    await waitFor(() => expect(colorTheme()).toBe("catppuccin-latte"));
+    for (const [name, value] of Object.entries(themeVars(THEME_BY_ID.get("catppuccin-latte")!))) expect(v(name), name).toBe(value);
+    expect(root().className).toBe("light");
   });
 
-  it("spaceui: system은 OS 다크 모드면 dark 클래스", async () => {
-    vi.stubGlobal("matchMedia", (q: string) => ({ media: q, matches: true, addEventListener() {}, removeEventListener() {} }));
+  it("system은 OS 다크 모드면 Mocha, 아니면 Latte이고 OS 설정이 바뀌면 따라간다", async () => {
+    let dark = true;
+    const listeners = new Set<() => void>();
+    vi.stubGlobal("matchMedia", (q: string) => ({
+      media: q,
+      get matches() {
+        return dark;
+      },
+      addEventListener: (_: string, l: () => void) => listeners.add(l),
+      removeEventListener: (_: string, l: () => void) => listeners.delete(l),
+    }));
     await renderApp(seed("system"));
-    await waitFor(() => expect(cls()).toBe("dark"));
+    await waitFor(() => expect(colorTheme()).toBe("catppuccin-mocha"));
+    dark = false;
+    await act(async () => listeners.forEach((l) => l()));
+    await waitFor(() => expect(colorTheme()).toBe("catppuccin-latte"));
+  });
+
+  it.each(["midnight", "noir", "slate", "nord", "mocha", "sakura"])("옛 이름·알 수 없는 값 %s는 system처럼 동작한다", async (old) => {
+    vi.stubGlobal("matchMedia", (q: string) => ({ media: q, matches: true, addEventListener() {}, removeEventListener() {} }));
+    await renderApp(seed(old));
+    await waitFor(() => expect(colorTheme()).toBe("catppuccin-mocha"));
   });
 });
 
@@ -103,12 +132,11 @@ describe("spaceui 토큰 가드", () => {
   );
   const code = files.map((f) => readFileSync(f, "utf8")).join("\n");
 
-  it("spaceui: index.css가 tokens와 테마 7종을 불러온다", () => {
+  it("spaceui: index.css가 tokens와 기본값용 dark·light만 불러온다(실제 색은 Warp 테마에서 계산한다)", () => {
     const css = readFileSync(join(src, "index.css"), "utf8");
     expect(css).toContain("@spacedrive/tokens/theme");
-    for (const t of ["dark", "light", "midnight", "noir", "slate", "nord", "mocha"]) {
-      expect(css).toContain(`@spacedrive/tokens/css/themes/${t}`);
-    }
+    for (const t of ["dark", "light"]) expect(css).toContain(`@spacedrive/tokens/css/themes/${t}`);
+    for (const t of ["midnight", "noir", "slate", "nord", "mocha"]) expect(css).not.toContain(`@spacedrive/tokens/css/themes/${t}`);
   });
 
   it("spaceui: 컴포넌트가 Tailwind 기본 팔레트(숫자 붙은 색)를 쓰지 않는다", () => {

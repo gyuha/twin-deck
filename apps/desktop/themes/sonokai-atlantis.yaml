@@ -1,0 +1,25 @@
+name: Sonokai Atlantis
+accent: "#eacb64"
+cursor: "#eacb64"
+background: "#2a2f38"
+foreground: "#e1e3e4"
+details: darker
+terminal_colors:
+  bright:
+    black: "#828a9a"
+    blue: "#72cce8"
+    cyan: "#f69c5e"
+    green: "#9dd274"
+    magenta: "#ba9cf3"
+    red: "#ff6578"
+    white: "#e1e3e4"
+    yellow: "#eacb64"
+  normal:
+    black: "#181a1c"
+    blue: "#72cce8"
+    cyan: "#f69c5e"
+    green: "#9dd274"
+    magenta: "#ba9cf3"
+    red: "#ff6578"
+    white: "#e1e3e4"
+    yellow: "#eacb64"

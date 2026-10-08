@@ -1,8 +1,13 @@
 /*
- * 색은 @spacedrive/tokens(spaceui, MIT)의 의미 기반 토큰을 쓴다(index.css에서 불러온다).
- * 테마는 <html>의 클래스(.dark, .light, .midnight-theme …)로 바뀐다(App.tsx의 useTheme).
+ * 색은 @spacedrive/tokens(spaceui, MIT)의 의미 기반 토큰 이름을 쓴다(index.css에서 불러온다). dark·light는 설정을 읽기 전의 기본값이다.
+ * 실제 값은 Warp 테마(apps/desktop/themes)에서 계산해 <html>에 인라인 `--color-*`로 건다(App.tsx의 useTheme, lib/themeColors.ts).
  * Tailwind 기본 팔레트(neutral-500 등)는 tokens가 지우므로 컴포넌트에서 쓰지 않는다(theme.test.tsx가 검사한다).
  */
+/* 강조색 위 글자색. 테마마다 흰색/검정 중 대비가 큰 쪽이 인라인으로 덮어쓴다. */
+@theme {
+  --color-accent-ink: #ffffff;
+}
+
 html {
   color-scheme: dark;
 }

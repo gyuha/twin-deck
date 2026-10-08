@@ -1,0 +1,25 @@
+name: Zenbones Forestbones Dark
+accent: "#ddbd7f"
+cursor: "#ddbd7f"
+background: "#2c343a"
+foreground: "#e7dcc4"
+details: darker
+terminal_colors:
+  bright:
+    black: "#45525c"
+    blue: "#7ac9c0"
+    cyan: "#7dd093"
+    green: "#b0ce7b"
+    magenta: "#e5a7c4"
+    red: "#ed9294"
+    white: "#b2a790"
+    yellow: "#edc77a"
+  normal:
+    black: "#2c343a"
+    blue: "#7fbcb4"
+    cyan: "#83c193"
+    green: "#a9c181"
+    magenta: "#d69ab7"
+    red: "#e67c7f"
+    white: "#e7dcc4"
+    yellow: "#ddbd7f"

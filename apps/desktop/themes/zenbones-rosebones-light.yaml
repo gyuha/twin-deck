@@ -1,0 +1,25 @@
+name: Zenbones Rosebones Light
+accent: "#ec9d33"
+cursor: "#ec9d33"
+background: "#fbf6f0"
+foreground: "#724341"
+details: lighter
+terminal_colors:
+  bright:
+    black: "#e8c48b"
+    blue: "#407d88"
+    cyan: "#407d88"
+    green: "#1c5970"
+    magenta: "#855aac"
+    red: "#a54a66"
+    white: "#a4635f"
+    yellow: "#c68223"
+  normal:
+    black: "#fbf6f0"
+    blue: "#5795a0"
+    cyan: "#5795a0"
+    green: "#286a84"
+    magenta: "#917ba9"
+    red: "#b5637a"
+    white: "#724341"
+    yellow: "#ec9d33"

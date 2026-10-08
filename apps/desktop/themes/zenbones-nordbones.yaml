@@ -1,0 +1,25 @@
+name: Zenbones Nordbones
+accent: "#cf866f"
+cursor: "#cf866f"
+background: "#2f3541"
+foreground: "#ebeef3"
+details: darker
+terminal_colors:
+  bright:
+    black: "#475063"
+    blue: "#89cac8"
+    cyan: "#82cce0"
+    green: "#a8cc86"
+    magenta: "#cf97c5"
+    red: "#d6787f"
+    white: "#a5b4cd"
+    yellow: "#e09680"
+  normal:
+    black: "#2f3541"
+    blue: "#8fbcba"
+    cyan: "#87bfce"
+    green: "#a4be8d"
+    magenta: "#b38dac"
+    red: "#c1616a"
+    white: "#ebeef3"
+    yellow: "#cf866f"

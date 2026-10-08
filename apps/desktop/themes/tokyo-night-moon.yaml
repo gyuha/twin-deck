@@ -1,0 +1,25 @@
+name: Tokyo Night Moon
+accent: "#82aaff"
+cursor: "#82aaff"
+background: "#222436"
+foreground: "#c8d3f5"
+details: darker
+terminal_colors:
+  bright:
+    black: "#444a73"
+    blue: "#82aaff"
+    cyan: "#86e1fc"
+    green: "#c3e88d"
+    magenta: "#c099ff"
+    red: "#ff757f"
+    white: "#c8d3f5"
+    yellow: "#ffc777"
+  normal:
+    black: "#1b1d2b"
+    blue: "#82aaff"
+    cyan: "#86e1fc"
+    green: "#c3e88d"
+    magenta: "#c099ff"
+    red: "#ff757f"
+    white: "#828bb8"
+    yellow: "#ffc777"

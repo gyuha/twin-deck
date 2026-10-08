@@ -1,0 +1,25 @@
+name: Sonokai Espresso
+accent: "#f0c66f"
+cursor: "#f0c66f"
+background: "#312c2b"
+foreground: "#e4e3e1"
+details: darker
+terminal_colors:
+  bright:
+    black: "#90817b"
+    blue: "#81d0c9"
+    cyan: "#f08d71"
+    green: "#a6cd77"
+    magenta: "#9fa0e1"
+    red: "#f86882"
+    white: "#e4e3e1"
+    yellow: "#f0c66f"
+  normal:
+    black: "#1f1e1c"
+    blue: "#81d0c9"
+    cyan: "#f08d71"
+    green: "#a6cd77"
+    magenta: "#9fa0e1"
+    red: "#f86882"
+    white: "#e4e3e1"
+    yellow: "#f0c66f"

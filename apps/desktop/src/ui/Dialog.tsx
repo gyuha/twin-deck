@@ -183,7 +183,7 @@ export function Dialog() {
             <button
               type="button"
               disabled={dialog.kind === "multirename" && !canMultiRename(dialog)}
-              className="rounded bg-accent px-3 py-0.5 text-white disabled:opacity-40"
+              className="rounded bg-accent px-3 py-0.5 text-accent-ink disabled:opacity-40"
               onClick={() => api.dialogConfirm()}
             >
               {dialog.kind === "name" && dialog.confirmLabel ? dialog.confirmLabel : dialog.kind === "multirename" ? "이름 바꾸기" : "확인"}

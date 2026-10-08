@@ -1,0 +1,25 @@
+name: Sonokai Shusia
+accent: "#e5c463"
+cursor: "#e5c463"
+background: "#2d2a2e"
+foreground: "#e3e1e4"
+details: darker
+terminal_colors:
+  bright:
+    black: "#848089"
+    blue: "#7accd7"
+    cyan: "#ef9062"
+    green: "#9ecd6f"
+    magenta: "#ab9df2"
+    red: "#f85e84"
+    white: "#e3e1e4"
+    yellow: "#e5c463"
+  normal:
+    black: "#1a181a"
+    blue: "#7accd7"
+    cyan: "#ef9062"
+    green: "#9ecd6f"
+    magenta: "#ab9df2"
+    red: "#f85e84"
+    white: "#e3e1e4"
+    yellow: "#e5c463"

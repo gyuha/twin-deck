@@ -1,0 +1,25 @@
+name: Apprentice Default
+accent: "#5f875f"
+cursor: "#5f875f"
+background: "#262626"
+foreground: "#bcbcbc"
+details: darker
+terminal_colors:
+  bright:
+    black: "#444444"
+    blue: "#87afd7"
+    cyan: "#5fafaf"
+    green: "#87af87"
+    magenta: "#8787af"
+    red: "#ff8700"
+    white: "#ffffff"
+    yellow: "#ffffaf"
+  normal:
+    black: "#1c1c1c"
+    blue: "#5f87af"
+    cyan: "#5f8787"
+    green: "#5f875f"
+    magenta: "#5f5f87"
+    red: "#af5f5f"
+    white: "#6c6c6c"
+    yellow: "#87875f"

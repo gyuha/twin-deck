@@ -20,8 +20,9 @@ tasks:
       - swift scripts/generate-icons.swift
 
   gen-types:
-    desc: Rust 타입에서 TS 바인딩(bindings.ts)과 기본 설정 fixture 재생성
+    desc: Rust 타입에서 TS 바인딩(bindings.ts)과 기본 설정 fixture 재생성, 테마 YAML에서 색 표(themes.generated.ts)·이름 목록(themes.rs) 재생성
     cmds:
+      - node scripts/gen-themes.mjs
       - cargo test -p twin-deck-desktop up_to_date
     env:
       UPDATE_BINDINGS: "1"

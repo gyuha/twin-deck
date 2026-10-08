@@ -1,0 +1,25 @@
+name: Nightfox Duskfox
+accent: "#9ccfd8"
+cursor: "#9ccfd8"
+background: "#232136"
+foreground: "#e0def4"
+details: darker
+terminal_colors:
+  bright:
+    black: "#47407d"
+    blue: "#65b1cd"
+    cyan: "#a6dae3"
+    green: "#b1d196"
+    magenta: "#ccb1ed"
+    red: "#f083a2"
+    white: "#e2e0f7"
+    yellow: "#f9cb8c"
+  normal:
+    black: "#393552"
+    blue: "#569fba"
+    cyan: "#9ccfd8"
+    green: "#a3be8c"
+    magenta: "#c4a7e7"
+    red: "#eb6f92"
+    white: "#e0def4"
+    yellow: "#f6c177"

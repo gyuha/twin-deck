@@ -1,0 +1,25 @@
+name: Everforest Dark
+accent: "#83c092"
+cursor: "#83c092"
+background: "#2d353b"
+foreground: "#d3c6aa"
+details: darker
+terminal_colors:
+  bright:
+    black: "#859289"
+    blue: "#7fbbb3"
+    cyan: "#83c092"
+    green: "#a7c080"
+    magenta: "#d699b6"
+    red: "#e67e80"
+    white: "#d3c6aa"
+    yellow: "#dbbc7f"
+  normal:
+    black: "#343f44"
+    blue: "#7fbbb3"
+    cyan: "#83c092"
+    green: "#a7c080"
+    magenta: "#d699b6"
+    red: "#e67e80"
+    white: "#d3c6aa"
+    yellow: "#dbbc7f"

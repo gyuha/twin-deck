@@ -53,7 +53,7 @@ export function DragLayer() {
       data-drag-ghost
       data-valid={drag.target ? "true" : "false"}
       style={{ position: "fixed", left: drag.x + 14, top: drag.y + 14 }}
-      className={["pointer-events-none z-50 flex items-center gap-1 rounded bg-accent px-1.5 py-0.5 text-xs text-white shadow", drag.target ? "" : "opacity-50"].join(" ")}
+      className={["pointer-events-none z-50 flex items-center gap-1 rounded bg-accent px-1.5 py-0.5 text-xs text-accent-ink shadow", drag.target ? "" : "opacity-50"].join(" ")}
     >
       <span data-drag-badge className="font-bold">
         {drag.ctrl ? "−" : "+"}

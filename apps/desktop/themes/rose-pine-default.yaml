@@ -1,0 +1,25 @@
+name: Rosé Pine Default
+accent: "#e0def4"
+cursor: "#e0def4"
+background: "#1f1d2e"
+foreground: "#e0def4"
+details: darker
+terminal_colors:
+  bright:
+    black: "#908caa"
+    blue: "#9ccfd8"
+    cyan: "#ebbcba"
+    green: "#31748f"
+    magenta: "#c4a7e7"
+    red: "#eb6f92"
+    white: "#e0def4"
+    yellow: "#f6c177"
+  normal:
+    black: "#26233a"
+    blue: "#9ccfd8"
+    cyan: "#ebbcba"
+    green: "#31748f"
+    magenta: "#c4a7e7"
+    red: "#eb6f92"
+    white: "#e0def4"
+    yellow: "#f6c177"

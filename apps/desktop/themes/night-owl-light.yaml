@@ -1,0 +1,25 @@
+name: Night Owl Light
+accent: "#2aa298"
+cursor: "#2aa298"
+background: "#f6f6f6"
+foreground: "#403f53"
+details: lighter
+terminal_colors:
+  bright:
+    black: "#403f53"
+    blue: "#288ed7"
+    cyan: "#2aa298"
+    green: "#08916a"
+    magenta: "#d6438a"
+    red: "#de3d3b"
+    white: "#93a1a1"
+    yellow: "#daaa01"
+  normal:
+    black: "#403f53"
+    blue: "#288ed7"
+    cyan: "#2aa298"
+    green: "#08916a"
+    magenta: "#d6438a"
+    red: "#de3d3b"
+    white: "#93a1a1"
+    yellow: "#e0af02"

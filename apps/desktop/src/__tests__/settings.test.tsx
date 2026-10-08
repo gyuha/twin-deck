@@ -69,9 +69,21 @@ describe("설정 값 바꾸기", () => {
     await open(user);
     await dialog();
     await user.click(within(screen.getByRole("group", { name: "테마" })).getByRole("combobox"));
-    await user.click(await screen.findByRole("option", { name: "midnight" }));
-    await waitFor(async () => expect((await backend.getConfig()).config.behavior.theme).toBe("midnight"));
-    await waitFor(() => expect(document.documentElement.className).toBe("midnight-theme"));
+    await user.click(await screen.findByRole("option", { name: "dracula-default" }));
+    await waitFor(async () => expect((await backend.getConfig()).config.behavior.theme).toBe("dracula-default"));
+    await waitFor(() => expect(document.documentElement.dataset.colorTheme).toBe("dracula-default"));
+  });
+
+  it("테마 선택 목록은 system·light·dark와 Warp 테마 112개(총 115개)이고 옛 이름은 없다", async () => {
+    const { user } = await renderApp();
+    await open(user);
+    await dialog();
+    await user.click(within(screen.getByRole("group", { name: "테마" })).getByRole("combobox"));
+    const names = (await screen.findAllByRole("option")).map((o) => o.textContent);
+    expect(names.length).toBe(115);
+    expect(names.slice(0, 3)).toEqual(["system", "light", "dark"]);
+    expect(names).toContain("catppuccin-mocha");
+    for (const old of ["midnight", "noir", "slate", "nord", "mocha"]) expect(names).not.toContain(old);
   });
 
   it("숫자 입력(아이콘 크기)은 Enter로 저장된다", async () => {

@@ -23,7 +23,7 @@ export function QueueIndicator() {
     <div
       role="status"
       aria-label="작업 큐 진행"
-      className="fixed right-2 top-2 rounded bg-accent px-2 py-0.5 text-xs text-white"
+      className="fixed right-2 top-2 rounded bg-accent px-2 py-0.5 text-xs text-accent-ink"
     >
       작업 {active.length}개 · {done}/{total} <span className="opacity-80">(=)</span>
     </div>

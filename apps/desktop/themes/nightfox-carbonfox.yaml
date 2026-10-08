@@ -1,0 +1,25 @@
+name: Nightfox Carbonfox
+accent: "#33b1ff"
+cursor: "#33b1ff"
+background: "#161616"
+foreground: "#f2f4f8"
+details: darker
+terminal_colors:
+  bright:
+    black: "#484848"
+    blue: "#8cb6ff"
+    cyan: "#52bdff"
+    green: "#46c880"
+    magenta: "#c8a5ff"
+    red: "#f16da6"
+    white: "#e4e4e5"
+    yellow: "#2dc7c4"
+  normal:
+    black: "#282828"
+    blue: "#78a9ff"
+    cyan: "#33b1ff"
+    green: "#25be6a"
+    magenta: "#be95ff"
+    red: "#ee5396"
+    white: "#dfdfe0"
+    yellow: "#08bdba"

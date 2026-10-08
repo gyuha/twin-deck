@@ -1,0 +1,25 @@
+name: Zenbones Tokyobones Dark
+accent: "#e1b068"
+cursor: "#e1b068"
+background: "#1a1b26"
+foreground: "#c0caf5"
+details: darker
+terminal_colors:
+  bright:
+    black: "#36384d"
+    blue: "#90affa"
+    cyan: "#74dbcb"
+    green: "#6de5d3"
+    magenta: "#c6acfa"
+    red: "#f98ea0"
+    white: "#7e98eb"
+    yellow: "#f2ba64"
+  normal:
+    black: "#1a1b26"
+    blue: "#7ba2f7"
+    cyan: "#2bc4de"
+    green: "#74dbcb"
+    magenta: "#bb9bf7"
+    red: "#f77890"
+    white: "#c0caf5"
+    yellow: "#e1b068"

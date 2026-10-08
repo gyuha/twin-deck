@@ -1,0 +1,25 @@
+name: Noctis Bordo
+accent: "#f18eb0"
+cursor: "#f18eb0"
+background: "#272022"
+foreground: "#cbbec2"
+details: darker
+terminal_colors:
+  bright:
+    black: "#69545b"
+    blue: "#60b6eb"
+    cyan: "#60dbeb"
+    green: "#60ebb1"
+    magenta: "#e798b3"
+    red: "#e97749"
+    white: "#cbbec2"
+    yellow: "#e69533"
+  normal:
+    black: "#47393e"
+    blue: "#49ace9"
+    cyan: "#49d6e9"
+    green: "#49e9a6"
+    magenta: "#df769b"
+    red: "#e66533"
+    white: "#b9acb0"
+    yellow: "#e4b781"

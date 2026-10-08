@@ -1,0 +1,25 @@
+name: One Light
+accent: "#2f5af3"
+cursor: "#2f5af3"
+background: "#f8f8f8"
+foreground: "#2a2b33"
+details: lighter
+terminal_colors:
+  bright:
+    black: "#000000"
+    blue: "#2f5af3"
+    cyan: "#3e953a"
+    green: "#3e953a"
+    magenta: "#a00095"
+    red: "#de3d35"
+    white: "#ffffff"
+    yellow: "#d2b67b"
+  normal:
+    black: "#000000"
+    blue: "#2f5af3"
+    cyan: "#3e953a"
+    green: "#3e953a"
+    magenta: "#a00095"
+    red: "#de3d35"
+    white: "#bbbbbb"
+    yellow: "#d2b67b"

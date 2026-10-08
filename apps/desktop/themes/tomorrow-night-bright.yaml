@@ -1,0 +1,25 @@
+name: Tomorrow Night Bright
+accent: "#e7c547"
+cursor: "#e7c547"
+background: "#000000"
+foreground: "#eaeaea"
+details: darker
+terminal_colors:
+  bright:
+    black: "#000000"
+    blue: "#7aa6da"
+    cyan: "#70c0b1"
+    green: "#b9ca4a"
+    magenta: "#c397d8"
+    red: "#d54e53"
+    white: "#ffffff"
+    yellow: "#e7c547"
+  normal:
+    black: "#000000"
+    blue: "#7aa6da"
+    cyan: "#70c0b1"
+    green: "#b9ca4a"
+    magenta: "#c397d8"
+    red: "#d54e53"
+    white: "#ffffff"
+    yellow: "#e7c547"

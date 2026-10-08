@@ -19,6 +19,7 @@ import { Dialog } from "./ui/Dialog";
 import { DragLayer } from "./ui/DragLayer";
 import { Preview } from "./ui/Preview";
 import { fkeyBindings } from "./lib/fkeys";
+import { resolveTheme, themeVars } from "./lib/themeColors";
 import { FindDialog } from "./ui/FindDialog";
 import { Help } from "./ui/Help";
 import { PaneSplit } from "./ui/PaneSplit";
@@ -47,31 +48,27 @@ export function detectPlatform(): Platform {
   return "linux";
 }
 
-/** spaceui(@spacedrive/tokens) 테마 이름 → `<html>`에 거는 클래스. */
-const THEME_CLASS: Record<string, string> = {
-  dark: "dark",
-  light: "light",
-  midnight: "midnight-theme",
-  noir: "noir-theme",
-  slate: "slate-theme",
-  nord: "nord-theme",
-  mocha: "mocha-theme",
-};
-
-/** 설정 `behavior.theme`을 `<html data-theme>`과 테마 클래스에 반영한다. system은 OS 설정에 따라 dark/light. */
-function useTheme(theme: string) {
+/**
+ * 설정 `behavior.theme`을 `<html>`에 반영한다: 테마의 색 토큰을 인라인 `--color-*`로 걸고, `data-theme`(dark/light)·`data-color-theme`(테마 이름)·
+ * 클래스(dark/light, `color-scheme`용)를 정한다. system은 OS가 다크인지에 따라 Mocha/Latte이고 OS 설정이 바뀌면 따라간다.
+ * 모든 테마가 같은 토큰 묶음을 덮어쓰므로 이전 테마의 값이 남지 않는다.
+ */
+function useTheme(setting: string) {
   useEffect(() => {
     const media = typeof window.matchMedia === "function" ? window.matchMedia("(prefers-color-scheme: dark)") : null;
     const apply = () => {
-      const name = theme === "system" ? (media?.matches ? "dark" : "light") : theme in THEME_CLASS ? theme : "light";
-      document.documentElement.dataset.theme = name;
-      document.documentElement.className = THEME_CLASS[name];
+      const t = resolveTheme(setting, !!media?.matches);
+      const root = document.documentElement;
+      for (const [name, value] of Object.entries(themeVars(t))) root.style.setProperty(name, value);
+      root.dataset.theme = t.dark ? "dark" : "light";
+      root.dataset.colorTheme = t.id;
+      root.className = t.dark ? "dark" : "light";
     };
     apply();
-    if (theme !== "system" || !media) return;
+    if (!media) return;
     media.addEventListener("change", apply);
     return () => media.removeEventListener("change", apply);
-  }, [theme]);
+  }, [setting]);
 }
 
 function StatusBar() {
