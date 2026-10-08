@@ -1136,6 +1136,11 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
         if path.to_ascii_lowercase().ends_with(".cbz") && std::path::Path::new(path).is_file() {
             return Ok(cbz_preview(path).into());
         }
+        if self.fs.is_archive_path(&vp(path)) {
+            return td_vfs::read_preview_vfs(&self.fs, &vp(path), td_vfs::PreviewLimits::default())
+                .map(PreviewDto::from)
+                .map_err(|e| e.to_string());
+        }
         if let Some(p) = dir_preview(path) {
             return Ok(p.into());
         }
@@ -2525,6 +2530,44 @@ mod tests {
         assert_eq!(p.kind, PreviewKindDto::Text);
         assert!(p.truncated);
         assert_eq!(p.text.unwrap().lines().count(), 2000);
+    }
+
+    #[test]
+    fn preview_archive_entry_shows_text_and_image_content() {
+        let (_t, svc, _ch, root) = setup();
+        let zip = format!("{root}/a.zip");
+        let png = vec![0x89u8, b'P', b'N', b'G', 1, 2, 3];
+        let mut z = td_archive::ZipEdit::create(Path::new(&zip)).unwrap();
+        z.add_file(
+            "d/a.txt",
+            td_archive::Source::Bytes("안녕\n".as_bytes().to_vec()),
+        );
+        z.add_file("d/p.png", td_archive::Source::Bytes(png.clone()));
+        z.add_file("d/bin.dat", td_archive::Source::Bytes(vec![0, 1, 2]));
+        z.add_file("d/m.mp4", td_archive::Source::Bytes(b"video".to_vec()));
+        z.commit().unwrap();
+
+        let t = svc.preview(&format!("{zip}!/d/a.txt")).unwrap();
+        assert_eq!(
+            (t.kind, t.text.as_deref(), t.truncated),
+            (PreviewKindDto::Text, Some("안녕\n"), false)
+        );
+        let i = svc.preview(&format!("{zip}!/d/p.png")).unwrap();
+        assert_eq!(i.kind, PreviewKindDto::Image);
+        assert_eq!(i.data_url, td_vfs::image_data_url("p.png", &png));
+        assert_eq!(
+            svc.preview(&format!("{zip}!/d/bin.dat")).unwrap().kind,
+            PreviewKindDto::Other
+        );
+        assert_eq!(
+            svc.preview(&format!("{zip}!/d/m.mp4")).unwrap().kind,
+            PreviewKindDto::Other
+        );
+        assert_eq!(
+            svc.preview(&format!("{zip}!/d")).unwrap().kind,
+            PreviewKindDto::Directory
+        );
+        assert!(svc.preview(&format!("{zip}!/d/nope.txt")).is_err());
     }
 
     #[test]

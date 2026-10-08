@@ -5,7 +5,7 @@ use std::io::Read;
 
 use base64::Engine;
 
-use crate::{Result, VfsError, VfsPath};
+use crate::{EntryKind, Result, Vfs, VfsError, VfsPath};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PreviewKind {
@@ -170,10 +170,20 @@ pub fn read_preview(path: &VfsPath, limits: PreviewLimits) -> Result<Preview> {
     File::open(path.as_path())
         .and_then(|f| f.take(limits.text_bytes as u64 + 3).read_to_end(&mut buf))
         .map_err(|e| VfsError::io(path, e))?;
+    Ok(text_preview(&buf, size, limits, base))
+}
+
+/// 앞부분 바이트(`limits.text_bytes + 3`까지)를 텍스트 미리보기로 만든다. 바이너리나 유효하지 않은 UTF-8이면 `Other`.
+fn text_preview(
+    buf: &[u8],
+    size: u64,
+    limits: PreviewLimits,
+    base: impl Fn(PreviewKind) -> Preview,
+) -> Preview {
     let cut = buf.len().min(limits.text_bytes);
     let truncated = size > limits.text_bytes as u64;
     if buf[..cut].contains(&0) {
-        return Ok(base(PreviewKind::Other));
+        return base(PreviewKind::Other);
     }
     // 앞부분이 유효한 UTF-8이면 텍스트. 잘림 때문에 끝이 깨진 경우만 허용한다.
     let text = match std::str::from_utf8(&buf[..cut]) {
@@ -181,11 +191,48 @@ pub fn read_preview(path: &VfsPath, limits: PreviewLimits) -> Result<Preview> {
         Err(e) if truncated && e.error_len().is_none() => {
             std::str::from_utf8(&buf[..e.valid_up_to()]).unwrap_or("")
         }
-        Err(_) => return Ok(base(PreviewKind::Other)),
+        Err(_) => return base(PreviewKind::Other),
     };
-    Ok(Preview {
+    Preview {
         text: Some(text.to_string()),
         truncated,
         ..base(PreviewKind::Text)
-    })
+    }
+}
+
+/// 실제 파일시스템이 아닌 `Vfs`(압축 안 항목 등)의 파일을 미리본다. 글과 이미지만 내용을 싣고,
+/// 영상·오디오·PDF 같은 나머지는 `Other`다(바이트를 한꺼번에 싣지 않는 종류라 이 경로에서는 다루지 않는다).
+pub fn read_preview_vfs(fs: &dyn Vfs, path: &VfsPath, limits: PreviewLimits) -> Result<Preview> {
+    let entry = fs.stat(path)?;
+    let size = entry.size;
+    let base = |kind| Preview {
+        kind,
+        text: None,
+        truncated: false,
+        size,
+        data_url: None,
+    };
+    if entry.kind == EntryKind::Dir {
+        return Ok(base(PreviewKind::Directory));
+    }
+    let name = path.file_name().unwrap_or_default();
+    if image_mime(&name).is_some() {
+        if size > limits.image_bytes {
+            return Ok(Preview {
+                truncated: true,
+                ..base(PreviewKind::Image)
+            });
+        }
+        let bytes = fs.read_head(path, limits.image_bytes as usize)?;
+        return Ok(Preview {
+            data_url: image_data_url(&name, &bytes),
+            ..base(PreviewKind::Image)
+        });
+    }
+    if is_video(&name) || audio_mime(&name).is_some() || name.to_ascii_lowercase().ends_with(".pdf")
+    {
+        return Ok(base(PreviewKind::Other));
+    }
+    let buf = fs.read_head(path, limits.text_bytes + 3)?;
+    Ok(text_preview(&buf, size, limits, base))
 }
