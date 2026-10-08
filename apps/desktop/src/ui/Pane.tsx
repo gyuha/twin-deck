@@ -21,6 +21,8 @@ export function Pane({ pane, onThemePreview }: { pane: PaneId; onThemePreview?: 
   const isVirtual = useApp((s) => !!activeTab(s, pane).virtual);
   const treemap = useApp((s) => activeTab(s, pane).virtual?.kind === "usage" && activeTab(s, pane).virtual?.view === "treemap");
   const paneHighlight = useApp((s) => s.loaded.config.behavior.layout.pane_highlight);
+  // 끌어 온 파일이 이 패널의 현재 폴더에 놓일 대상이다(폴더 행 위가 아닐 때).
+  const dropHere = useApp((s) => !!s.drag?.target && !s.drag.target.row && s.drag.target.pane === pane);
   const hasSettings = useApp((s) => s.settingsOpen && s.settingsPane === pane); // 설정이 이 패널 자리에 떠 있다
   const otherHasSettings = useApp((s) => s.settingsOpen && s.settingsPane !== pane); // 설정은 반대쪽에 있고 이 패널은 결과를 보여 준다(누름 무시)
   // 반대쪽 패널은 눌러도(클릭·더블클릭·우클릭·끌기 시작) 아무 일도 하지 않는다. 캡처 단계에서 막아 안쪽 행·탭이 받지 못하게 한다. 휠 스크롤은 막지 않는다.
@@ -33,6 +35,7 @@ export function Pane({ pane, onThemePreview }: { pane: PaneId; onThemePreview?: 
       aria-label={pane === "left" ? "왼쪽 패널" : "오른쪽 패널"}
       data-active={isActive}
       data-pane={pane}
+      data-drop-target={dropHere ? "true" : undefined}
       onMouseDown={(e) => {
         api.activate(pane);
         if (e.button === 3 || e.button === 4) e.preventDefault(); // 웹뷰가 자체 뒤로가기를 하지 않게
@@ -47,6 +50,7 @@ export function Pane({ pane, onThemePreview }: { pane: PaneId; onThemePreview?: 
       className={[
         "flex min-h-0 min-w-0 flex-1 flex-col border-2",
         isActive && paneHighlight ? "border-accent" : "border-transparent",
+        ...(dropHere ? ["bg-accent/10"] : []),
       ].join(" ")}
     >
       {hasSettings ? (

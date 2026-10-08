@@ -45,7 +45,7 @@ export function DragLayer() {
     };
   }, [api]);
 
-  if (!drag) return null;
+  if (!drag || drag.external) return null; // 다른 앱에서 끌어 오는 중에는 OS가 끌기 그림을 그린다
   const label = drag.paths.length === 1 ? baseName(drag.paths[0]) : `${drag.paths.length}개 항목`;
   return (
     <div

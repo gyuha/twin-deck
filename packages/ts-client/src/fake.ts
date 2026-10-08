@@ -1,6 +1,6 @@
 import { archiveRoot, isArchivePath } from "./archive";
 import { BackendError, baseName, joinPath, parentPath } from "./backend";
-import type { Backend, SearchEvent } from "./backend";
+import type { Backend, FileDropEvent, SearchEvent } from "./backend";
 import type {
   ConfigValue,
   ConflictDto,
@@ -1076,5 +1076,17 @@ export class FakeBackend implements Backend {
   onDirChanged(callback: (path: string) => void) {
     this.listeners.add(callback);
     return () => void this.listeners.delete(callback);
+  }
+
+  private fileDropListeners = new Set<(e: FileDropEvent) => void>();
+
+  onFileDrop(callback: (e: FileDropEvent) => void) {
+    this.fileDropListeners.add(callback);
+    return () => void this.fileDropListeners.delete(callback);
+  }
+
+  /** 다른 앱(Finder)에서 파일을 끌어 오는 이벤트를 흉내 낸다. */
+  emitFileDrop(e: FileDropEvent): void {
+    for (const l of [...this.fileDropListeners]) l(e);
   }
 }

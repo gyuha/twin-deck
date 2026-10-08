@@ -19,6 +19,7 @@ import {
 import type {
   Backend,
   ConfigValue,
+  FileDropEvent,
   ConflictDto,
   EntryDto,
   ExpectedFileDto,
@@ -154,7 +155,10 @@ export interface DropTarget {
 
 export interface DragState {
   paths: string[];
-  sourcePane: PaneId;
+  /** 끌기를 시작한 패널. 다른 앱(Finder)에서 끌어 온 것이면 null. */
+  sourcePane: PaneId | null;
+  /** 다른 앱에서 끌어 오는 중(OS가 끌기 그림을 그리고 놓기는 Tauri 이벤트로 온다). */
+  external?: boolean;
   x: number;
   y: number;
   /** Control 키가 눌려 있다(이동). 아니면 복사. */
@@ -795,6 +799,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
   }
   subscribe(() => store.subscribe((s) => syncDirSizes(s)));
 
+  // 다른 앱(Finder)에서 끌어 온 파일: Tauri가 OS 드롭을 가로채 이벤트로 알린다(이슈 #39).
+  subscribe(() => backend.onFileDrop((e) => api.externalDrop(e, typeof document !== "undefined" && document.elementFromPoint ? document.elementFromPoint(e.x, e.y) : null)));
   subscribe(() => backend.onDirChanged((path) => {
     for (const pane of ["left", "right"] as const) {
       for (const t of get().panes[pane].tabs) if (t.path === path) void reload(pane, t.id);
@@ -1147,7 +1153,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
   }
 
   /** 커서 아래 요소에서 드롭 대상을 정한다: 폴더 행이면 그 폴더 안으로, 아니면 그 패널의 현재 폴더(같은 패널·가상 탭은 받지 않는다). */
-  function dropTargetAt(el: Element | null, drag: { paths: string[]; sourcePane: PaneId }): DropTarget | null {
+  function dropTargetAt(el: Element | null, drag: { paths: string[]; sourcePane: PaneId | null }): DropTarget | null {
     const row = el?.closest<HTMLElement>("[data-row-kind='dir']");
     if (row) {
       const path = row.dataset.path;
@@ -1865,6 +1871,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     /** 마우스가 움직였다. 드래그 중이면 표시와 대상을 갱신하고, 누른 상태면 거리를 재어 드래그를 시작한다. `el`은 커서 아래 요소. */
     dragMove(x: number, y: number, ctrl: boolean, el: Element | null) {
       let drag = get().drag;
+      if (drag?.external) return; // 다른 앱에서 끌어 오는 중에는 앱 안 끌기로 바꾸지 않는다
       if (!drag) {
         const p = pendingDrag;
         if (!p || Math.hypot(x - p.x, y - p.y) < DRAG_START_PX) return;
@@ -1886,6 +1893,37 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         return;
       }
       set({ drag: { ...drag, x, y, ctrl, target: dropTargetAt(el, drag) } });
+    },
+    /**
+     * 다른 앱(Finder)에서 끌어 온 파일 이벤트 (이슈 #39). 끄는 동안(`enter`/`over`)에는 놓을 대상(폴더 행, 아니면 패널의 현재 폴더)을
+     * 강조 상태로 알리고, 놓으면(`drop`) 그 폴더로 **복사**한다(Tauri 이벤트에는 수정키가 없어 이동은 하지 않는다).
+     * `el`은 이벤트 좌표 아래의 요소다.
+     */
+    externalDrop(e: FileDropEvent, el: Element | null) {
+      if (e.type === "leave") {
+        if (get().drag?.external) set({ drag: null });
+        return;
+      }
+      const prev = get().drag;
+      const paths = e.type === "over" ? (prev?.external ? prev.paths : []) : e.paths;
+      const base = { paths, sourcePane: null, x: e.x, y: e.y, ctrl: false, external: true as const };
+      const target = dropTargetAt(el, base);
+      if (e.type !== "drop") {
+        set({ drag: { ...base, target } });
+        return;
+      }
+      set({ drag: null });
+      if (paths.length === 0) return;
+      if (!target) {
+        // 가상 탭(검색 결과 등)에는 놓을 수 없다고 알린다. 패널 밖에 놓은 것은 조용히 무시한다.
+        const pane = el?.closest<HTMLElement>("section[data-pane]")?.dataset.pane as PaneId | undefined;
+        if (pane && activeTab(get(), pane).virtual) fail("검색 결과 같은 가상 탭에는 파일을 놓을 수 없습니다");
+        return;
+      }
+      // 이미 그 폴더 안에 있는 항목은 건너뛴다(같은 폴더로 복사해 봐야 복제본만 생긴다).
+      const srcs = paths.filter((p) => parentPath(p) !== target.dir);
+      if (srcs.length === 0) return flash("이미 이 폴더에 있는 항목입니다");
+      void api.dropTransfer(srcs, target.dir, false);
     },
     /** 끌던 파일을 운영체제 드래그로 넘긴다(창 밖으로 나갔을 때). 아카이브 안의 항목은 실제 파일이 아니라 보낼 수 없다. */
     async dragOutOfWindow(paths: string[]) {
@@ -1911,7 +1949,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     dragRelease(ctrl: boolean): boolean {
       pendingDrag = null;
       const drag = get().drag;
-      if (!drag) return false;
+      if (!drag || drag.external) return false;
       set({ drag: null });
       justDragged = true;
       setTimeout(() => (justDragged = false), 0);

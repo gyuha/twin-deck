@@ -1,7 +1,8 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { BackendError } from "./backend";
-import type { Backend, SearchEvent } from "./backend";
+import type { Backend, FileDropEvent, SearchEvent } from "./backend";
 import { commands, events } from "./generated/bindings";
 import type { ConfigValue, ConflictDto, ExpectedFileDto, FileInfoDto, FindSpecDto, JobDto, LoadedState, PreviewDto, Snapshot, JobKindDto, Loaded, QueueItemDto, Result, WriteTextResultDto } from "./generated/bindings";
 
@@ -11,6 +12,25 @@ function unwrap<T>(r: Result<T, string>): T {
 }
 
 /** Tauri command/event로 Rust 코어를 호출하는 구현. */
+/** Tauri의 드래그 앤 드롭 이벤트 중 우리가 쓰는 모양(물리 좌표). */
+type TauriDragDrop =
+  | { type: "enter"; paths: string[]; position: { x: number; y: number } }
+  | { type: "over"; position: { x: number; y: number } }
+  | { type: "drop"; paths: string[]; position: { x: number; y: number } }
+  | { type: "leave" };
+
+/** Tauri 드래그 앤 드롭 이벤트를 `FileDropEvent`로 바꾼다. 물리 좌표를 `scale`(devicePixelRatio)로 나눠 CSS px로 만든다. */
+export function toFileDropEvent(payload: TauriDragDrop, scale: number): FileDropEvent {
+  if (payload.type === "leave") return { type: "leave", paths: [], x: 0, y: 0 };
+  const s = scale > 0 ? scale : 1;
+  return {
+    type: payload.type,
+    paths: payload.type === "over" ? [] : payload.paths,
+    x: payload.position.x / s,
+    y: payload.position.y / s,
+  };
+}
+
 export class TauriBackend implements Backend {
   async listDir(path: string, showHidden: boolean) {
     return unwrap(await commands.listDir(path, showHidden));
@@ -201,5 +221,16 @@ export class TauriBackend implements Backend {
     return () => {
       void unlisten.then((fn) => fn());
     };
+  }
+  onFileDrop(callback: (e: FileDropEvent) => void) {
+    try {
+      const unlisten = getCurrentWebview().onDragDropEvent((e) => callback(toFileDropEvent(e.payload as TauriDragDrop, window.devicePixelRatio || 1)));
+      return () => {
+        void unlisten.then((fn) => fn(), () => {});
+      };
+    } catch {
+      // 웹뷰 정보가 없는 환경(IPC만 흉내 낸 테스트 등)에서는 받을 이벤트가 없다.
+      return () => {};
+    }
   }
 }

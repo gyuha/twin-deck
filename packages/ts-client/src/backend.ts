@@ -14,6 +14,16 @@ export class BackendError extends Error {}
  * UI가 파일시스템에 접근하는 유일한 통로.
  * 실제 앱은 `TauriBackend`, UI 테스트는 `FakeBackend`를 쓴다.
  */
+/** Finder 같은 다른 앱에서 파일을 끌어 올 때의 이벤트. 좌표는 창 안의 CSS px(Tauri가 주는 물리 좌표를 `devicePixelRatio`로 나눈 값)이다. */
+export interface FileDropEvent {
+  /** `enter`: 끌어 들어옴, `over`: 창 위에서 움직임, `drop`: 놓음, `leave`: 놓지 않고 나감. */
+  type: "enter" | "over" | "drop" | "leave";
+  /** `enter`·`drop`에만 있다. 나머지는 빈 목록. */
+  paths: string[];
+  x: number;
+  y: number;
+}
+
 export interface Backend {
   /** 폴더 먼저, 이름순으로 정렬된 목록. */
   listDir(path: string, showHidden: boolean): Promise<EntryDto[]>;
@@ -119,6 +129,8 @@ export interface Backend {
   unwatch(path: string): Promise<void>;
   /** 감시 중인 디렉터리가 바뀌면 호출된다. 구독 해제 함수를 돌려준다. */
   onDirChanged(callback: (path: string) => void): () => void;
+  /** 다른 앱(Finder 등)에서 끌어 온 파일 이벤트를 받는다. 구독 해제 함수를 돌려준다. */
+  onFileDrop(callback: (e: FileDropEvent) => void): () => void;
 }
 
 /** 마지막 경로 구분자(`/` 또는 `\`)의 위치. 없으면 -1. */
