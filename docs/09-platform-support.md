@@ -18,7 +18,7 @@ Marta는 macOS 전용(Swift 네이티브, macOS 11 이상)이다 `[높음]`. twi
 | 외부 터미널 (F11) | Terminal.app, iTerm | Windows Terminal, cmd, PowerShell | 배포판 기본 터미널. 설정 필요 |
 | 전역 Look Up | 라이브 순회, 옵션으로 Spotlight | 라이브 순회 | 라이브 순회 |
 | 파일 감시 | FSEvents (notify) | ReadDirectoryChangesW (notify) | inotify (notify) |
-| 미리보기 | 앱 내. 옵션: Quick Look | 앱 내 | 앱 내 |
+| 미리보기 | 앱 내. Office 문서는 Quick Look | 앱 내. docx는 미리보기 처리기 | 앱 내 |
 | 웹뷰 | WKWebView | WebView2 | WebKitGTK |
 | 패키지 | `.dmg` (서명/공증) | `.msi` 또는 NSIS 설치 | `.AppImage`, `.deb` |
 | CLI 등록 | `/usr/local/bin` 링크 또는 앱 내 설치 액션 | PATH 등록 (설치기) | `/usr/local/bin` 또는 패키지 |

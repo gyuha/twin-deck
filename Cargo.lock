@@ -4861,6 +4861,7 @@ dependencies = [
  "td-volumes",
  "td-watch",
  "tempfile",
+ "windows 0.61.3",
 ]
 
 [[package]]

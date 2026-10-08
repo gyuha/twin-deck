@@ -97,7 +97,7 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
     items: [
       { key: "preview.audio_autoplay", title: "사운드 자동 재생", desc: "mp3, wav, ogg 같은 사운드 파일의 미리보기를 열면 바로 재생합니다", control: { type: "switch" } },
       { key: "preview.video_autoplay", title: "비디오 자동 재생", desc: "mp4, mov, webm 같은 비디오 파일의 미리보기를 열면 바로 재생합니다", control: { type: "switch" } },
-      { key: "preview.office", title: "Office 문서 미리보기", desc: "docx, xlsx, pptx 파일의 데이터 미리보기를 보여 줍니다. 실제 문서 화면이 아니라 데이터만 보는 기능이라 서식·배치·그림은 나오지 않고, 문서를 읽는 데 시간이 걸릴 수 있어 기본은 꺼 둡니다. macOS는 이 설정과 관계없이 Office 문서를 Quick Look으로 실제 문서 모습 그대로 보여 줍니다", control: { type: "switch" } },
+      { key: "preview.office", title: "Office 문서 미리보기", desc: "docx, xlsx, pptx 파일의 데이터 미리보기를 보여 줍니다. 실제 문서 화면이 아니라 데이터만 보는 기능이라 서식·배치·그림은 나오지 않고, 문서를 읽는 데 시간이 걸릴 수 있어 기본은 꺼 둡니다. macOS는 Quick Look, Windows의 docx는 설치된 Office의 미리보기 처리기로 이 설정과 관계없이 실제 문서 모습 그대로 보여 주고, 이 설정은 그 밖의 경우(Linux, Windows의 xlsx·pptx, Office가 없는 Windows)에만 쓰입니다", control: { type: "switch" } },
       { key: "preview.close_on_outside_click", title: "바깥 클릭으로 닫기", desc: "미리보기 창 바깥을 클릭하면 미리보기를 닫습니다", control: { type: "switch" } },
     ],
   },

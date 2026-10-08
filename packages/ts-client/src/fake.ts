@@ -12,7 +12,9 @@ import type {
   LoadedState,
   PreviewDto,
   QueueItemDto,
+  PreviewRectDto,
   QuickLookDto,
+  ShowOutcome,
   SearchStartDto,
   Snapshot,
   UserDirsDto,
@@ -373,6 +375,37 @@ export class FakeBackend implements Backend {
     const n = this.need(path);
     if (this.quickLookResponder) return this.quickLookResponder(path);
     return { html: n.content, dir: `/tmp/ql${path}.qlpreview`, sheets: [] };
+  }
+
+  /** 테스트용: 미리보기 처리기 호출 기록(호출 순서대로). */
+  readonly previewHandlerCalls: Array<{ call: "show" | "setRect" | "setVisible" | "close"; path?: string; rect?: PreviewRectDto; visible?: boolean }> = [];
+  /** 테스트용: 처리기가 있다고 답할 경로. 기본은 모두 없음(false)이다. */
+  previewHandlerAvailable: (path: string) => boolean = () => false;
+  /** 테스트용: 인터넷에서 받아 막힌 것으로 답할 경로. `unblockFile`이 지운다. */
+  readonly previewHandlerBlocked = new Set<string>();
+  /** 테스트용: `unblockFile`을 부른 경로들. */
+  readonly unblocked: string[] = [];
+  /** 테스트용: 처리기 응답을 바꾼다(지연·오류 흉내). true는 그렸다, false는 처리기 없음. */
+  previewHandlerResponder: ((path: string) => Promise<boolean>) | null = null;
+
+  async previewHandlerShow(path: string, rect: PreviewRectDto): Promise<ShowOutcome> {
+    this.previewHandlerCalls.push({ call: "show", path, rect });
+    if (this.previewHandlerBlocked.has(path)) return "blocked";
+    const shown = this.previewHandlerResponder ? await this.previewHandlerResponder(path) : this.previewHandlerAvailable(path);
+    return shown ? "shown" : "unavailable";
+  }
+  async unblockFile(path: string): Promise<void> {
+    this.unblocked.push(path);
+    this.previewHandlerBlocked.delete(path);
+  }
+  async previewHandlerSetRect(rect: PreviewRectDto): Promise<void> {
+    this.previewHandlerCalls.push({ call: "setRect", rect });
+  }
+  async previewHandlerSetVisible(visible: boolean): Promise<void> {
+    this.previewHandlerCalls.push({ call: "setVisible", visible });
+  }
+  async previewHandlerClose(): Promise<void> {
+    this.previewHandlerCalls.push({ call: "close" });
   }
 
   async globFilter(pattern: string, names: string[]) {

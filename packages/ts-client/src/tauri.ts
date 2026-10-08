@@ -4,7 +4,7 @@ import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { BackendError } from "./backend";
 import type { Backend, FileDropEvent, SearchEvent } from "./backend";
 import { commands, events } from "./generated/bindings";
-import type { ConfigValue, ConflictDto, ExpectedFileDto, FileInfoDto, FindSpecDto, JobDto, LoadedState, PreviewDto, QuickLookDto, Snapshot, JobKindDto, Loaded, QueueItemDto, Result, WriteTextResultDto } from "./generated/bindings";
+import type { ConfigValue, ConflictDto, ExpectedFileDto, FileInfoDto, FindSpecDto, JobDto, LoadedState, PreviewDto, PreviewRectDto, QuickLookDto, ShowOutcome, Snapshot, JobKindDto, Loaded, QueueItemDto, Result, WriteTextResultDto } from "./generated/bindings";
 
 function unwrap<T>(r: Result<T, string>): T {
   if (r.status === "error") throw new BackendError(r.error);
@@ -103,6 +103,21 @@ export class TauriBackend implements Backend {
   }
   async quickLookPreview(path: string, seq: number): Promise<QuickLookDto> {
     return unwrap(await commands.quicklookPreview(path, seq));
+  }
+  async previewHandlerShow(path: string, rect: PreviewRectDto): Promise<ShowOutcome> {
+    return unwrap(await commands.previewHandlerShow(path, rect));
+  }
+  previewHandlerSetRect(rect: PreviewRectDto): Promise<void> {
+    return commands.previewHandlerSetRect(rect);
+  }
+  previewHandlerSetVisible(visible: boolean): Promise<void> {
+    return commands.previewHandlerSetVisible(visible);
+  }
+  previewHandlerClose(): Promise<void> {
+    return commands.previewHandlerClose();
+  }
+  async unblockFile(path: string): Promise<void> {
+    unwrap(await commands.unblockFile(path));
   }
   globFilter(pattern: string, names: string[]) {
     return commands.globFilter(pattern, names);

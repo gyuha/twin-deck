@@ -27,7 +27,7 @@ export function seedBackend() {
 
 export async function renderApp(
   backend = seedBackend(),
-  platform: "linux" | "mac" = "linux",
+  platform: "linux" | "mac" | "windows" = "linux",
   paths: { left: string; right: string } = { left: "/home/a", right: "/home/b" },
   opts: { emptyLeft?: boolean; snapshot?: Snapshot | null; stateWarning?: string | null } = {},
 ) {

@@ -15,7 +15,7 @@ macOS에는 Finder의 Quick Look이 쓰는 생성기(`/System/Library/QuickLook/
 
 ## 결정
 
-- macOS에서는 Office 문서(docx·xlsx·pptx, doc·xls·ppt, docm·xlsm·pptm)를 `preview.office` 설정과 관계없이 Quick Look HTML로 보여 준다. Windows는 기존 데이터 미리보기(`preview.office`, 기본 꺼짐)를 그대로 쓴다.
+- macOS에서는 Office 문서(docx·xlsx·pptx, doc·xls·ppt, docm·xlsm·pptm)를 `preview.office` 설정과 관계없이 Quick Look HTML로 보여 준다. Windows는 기존 데이터 미리보기(`preview.office`, 기본 꺼짐)를 그대로 썼으나, 이후 [ADR-0015](0015-windows-office-preview-handler.md)로 Windows 미리보기 처리기로 바뀌었다(처리기가 없을 때만 이 데이터 미리보기로 돌아간다).
 - Rust가 `qlmanage -p -o`를 10초 시간 제한으로 실행하고, 다른 항목으로 넘어가면 돌던 프로세스를 종료한다. 파일 크기 상한은 두지 않는다.
 - 프런트엔드는 결과를 **Blob URL** + `sandbox="allow-same-origin"`(`allow-scripts` 없음) iframe에 띄운다. 문서 쪽 스크립트는 하나도 실행되지 않는다.
   - `srcdoc`은 쓰지 않는다. srcdoc 문서는 doctype이 없어도 늘 표준 모드라 단위 없는 길이가 무시되고, pptx가 회색 바탕만 남는다(2026-10-08 WKWebView 실측: srcdoc은 `CSS1Compat`·`width: 720` 무시, Blob URL은 `BackCompat`·적용).

@@ -117,7 +117,8 @@ pub struct PreviewConfig {
     /// 미리보기 창 바깥을 클릭하면 미리보기를 닫는다.
     pub close_on_outside_click: bool,
     /// Office 문서(docx·xlsx·pptx)의 데이터 미리보기를 보여 준다. 읽기가 느리고 실제 문서 화면과 달라 기본은 끈다.
-    /// macOS는 이 값과 관계없이 Office 문서에 Quick Look 미리보기를 쓴다(ADR-0014).
+    /// macOS는 이 값과 관계없이 Office 문서에 Quick Look 미리보기를 쓰고(ADR-0014), Windows는 docx에 미리보기 처리기를 쓴다(ADR-0015).
+    /// 그 밖의 경우(Linux, Windows의 xlsx·pptx, Office가 없는 Windows)만 이 값이 쓰인다.
     pub office: bool,
 }
 

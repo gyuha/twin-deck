@@ -1,4 +1,4 @@
-import type { ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, ExpectedFileDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, LoadedState, PreviewDto, QueueItemDto, QuickLookDto, SearchStartDto, SearchSummaryDto, Snapshot, UpdateInfoDto, UserDirsDto, VolumeDto, WriteTextResultDto } from "./generated/bindings";
+import type { ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, ExpectedFileDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, LoadedState, PreviewDto, PreviewRectDto, QueueItemDto, QuickLookDto, SearchStartDto, ShowOutcome, SearchSummaryDto, Snapshot, UpdateInfoDto, UserDirsDto, VolumeDto, WriteTextResultDto } from "./generated/bindings";
 
 /** Look Up / Flatten / Disk Usage가 스트리밍으로 보내는 이벤트. 작업마다 마지막은 `done`이다. */
 export type SearchEvent =
@@ -64,6 +64,20 @@ export interface Backend {
    * 더 큰 순번의 요청이 오면 이전 요청은 취소 오류로 끝나고, 늦게 들어온 작은 순번의 요청은 바로 취소된다.
    */
   quickLookPreview(path: string, seq: number): Promise<QuickLookDto>;
+  /**
+   * Windows 미리보기 처리기(탐색기 미리보기 창이 쓰는 것, ADR-0015)로 `path`를 앱 창 위 `rect`(웹뷰 기준 CSS 픽셀) 자리에 띄운다.
+   * 결과: "shown"(그렸다), "unavailable"(이 형식의 처리기가 없거나 Windows가 아니다), "blocked"(인터넷에서 받은 파일이라 Office가 막는다 — 차단을 풀면 보인다).
+   * 그리지 못하면 오류로 거부된다. 어느 쪽이든 "shown"이 아니면 호출하는 쪽이 다른 미리보기로 돌아간다.
+   */
+  previewHandlerShow(path: string, rect: PreviewRectDto): Promise<ShowOutcome>;
+  /** 처리기 창의 자리가 바뀌었다(미리보기 영역이 움직이거나 크기가 바뀜). */
+  previewHandlerSetRect(rect: PreviewRectDto): Promise<void>;
+  /** 대화상자·메뉴 같은 것이 위에 뜨는 동안 처리기 창을 숨기고(false), 닫히면 다시 보인다(true). */
+  previewHandlerSetVisible(visible: boolean): Promise<void>;
+  /** 처리기 창을 내린다. */
+  previewHandlerClose(): Promise<void>;
+  /** 인터넷에서 받은 파일의 차단 표시(Zone.Identifier)를 지운다(탐색기의 "차단 해제"). 파일 내용은 그대로다. 사용자가 누를 때만 부른다. */
+  unblockFile(path: string): Promise<void>;
   /** glob 패턴과 일치하는 이름의 인덱스 (Select Group). */
   globFilter(pattern: string, names: string[]): Promise<number[]>;
   /** 웹뷰가 파일을 직접 읽어 재생할 수 있는 주소(비디오처럼 큰 파일을 데이터로 싣지 않고 스트리밍한다). */

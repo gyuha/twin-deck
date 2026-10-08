@@ -18,6 +18,8 @@ import {
 } from "@twin-deck/ts-client";
 import type {
   Backend,
+  PreviewRectDto,
+  ShowOutcome,
   ConfigValue,
   FileDropEvent,
   ConflictDto,
@@ -1944,6 +1946,23 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     /** macOS Quick Look이 만든 Office 문서 미리보기(ADR-0014). `seq`는 요청 순번(클수록 최근)이다. */
     quickLookPreview(path: string, seq: number) {
       return backend.quickLookPreview(path, seq);
+    },
+    /** Windows 미리보기 처리기(ADR-0015): 앱 창 위 `rect`(웹뷰 기준 CSS 픽셀) 자리에 `path`를 띄운다. 결과는 shown·unavailable(처리기 없음)·blocked(인터넷에서 받은 파일). */
+    previewHandlerShow(path: string, rect: PreviewRectDto): Promise<ShowOutcome> {
+      return backend.previewHandlerShow(path, rect);
+    },
+    previewHandlerSetRect(rect: PreviewRectDto) {
+      return backend.previewHandlerSetRect(rect);
+    },
+    previewHandlerSetVisible(visible: boolean) {
+      return backend.previewHandlerSetVisible(visible);
+    },
+    previewHandlerClose() {
+      return backend.previewHandlerClose();
+    },
+    /** 인터넷에서 받은 파일의 차단 표시를 지운다(탐색기의 "차단 해제"). 사용자가 버튼을 눌렀을 때만 부른다. */
+    unblockFile(path: string) {
+      return backend.unblockFile(path);
     },
     /** Quick Look 미리보기가 시트 `count`개짜리 파일을 열었다. 첫 시트부터 보인다. */
     previewSheetsLoaded(path: string, count: number) {

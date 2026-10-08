@@ -16,7 +16,9 @@ import { PdfView } from "./PdfView";
 import { ModelView } from "./ModelView";
 import { modelKindOf } from "../lib/model/kinds";
 import { OfficeView } from "./OfficeView";
-import { officeKindOf, quickLookKindOf } from "../lib/office/kinds";
+import { officeKindOf, quickLookKindOf, usesPreviewHandler } from "../lib/office/kinds";
+import { PreviewHandlerView } from "./PreviewHandlerView";
+import type { HandlerUnavailable } from "./PreviewHandlerView";
 import { QuickLookView } from "./QuickLookView";
 import { useUi } from "./uiContext";
 
@@ -53,6 +55,8 @@ export function Preview() {
   const { api } = useAppStore();
   const { platform } = useUi();
   const edit = useApp((s) => s.previewEdit);
+  // Windows 미리보기 처리기를 쓸 수 없다고 알려 온 파일(처리기가 없거나 못 그림). 이 파일은 지금까지의 미리보기로 보여 준다.
+  const [handlerFailed, setHandlerFailed] = useState<({ path: string } & HandlerUnavailable) | null>(null);
   const [copied, setCopied] = useState(false); // 복사 버튼이 잠깐 "복사됨"을 보이는 동안
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
@@ -105,14 +109,18 @@ export function Preview() {
   const model = p.isDir || isArchivePath(p.path) ? null : modelKindOf(p.name); // 3D 모델이면 서비스가 돌려준 kind와 무관하게 3D 뷰어로 보여 준다(압축 파일 안은 asset 프로토콜로 읽을 수 없어 제외)
   // macOS는 Office 문서를 설정과 관계없이 Quick Look 미리보기로 보여 준다(ADR-0014). 압축 안은 실제 파일이 아니라 제외한다.
   const ql = platform === "mac" && !p.isDir && !model && !isArchivePath(p.path) ? quickLookKindOf(p.name) : null;
-  const officeKind = p.isDir || model || ql ? null : officeKindOf(p.name);
+  // Windows는 docx를 미리보기 처리기(탐색기 미리보기 창이 쓰는 것)로 앱 창 위에 겹쳐 보여 준다(ADR-0015). 다른 형식은 지금까지의 방식이다. 설정과 관계없고,
+  // 처리기를 쓸 수 없으면(없거나 못 그림) 아래의 지금까지의 미리보기로 돌아간다.
+  const hKind = platform === "windows" && !p.isDir && !model && !isArchivePath(p.path) && handlerFailed?.path !== p.path && usesPreviewHandler(p.name) ? quickLookKindOf(p.name) : null;
+  const native = ql !== null || hKind !== null;
+  const officeKind = p.isDir || model || native ? null : officeKindOf(p.name);
   // Office 문서도 같은 방식으로 kind와 무관하게 보여 준다. 설정 `preview.office`가 꺼져 있으면(기본) 미리 볼 수 없는 형식으로 둔다.
   const office = previewConfig.office ? officeKind : null;
   const officeOff = !previewConfig.office && officeKind !== null;
   // 텍스트 본문. 3D 뷰어가 모델을 읽지 못하면 텍스트 형식은 이것으로 돌아간다.
   // 텍스트 계열(텍스트·코드·마크다운·JSON)이 3D·Office 뷰어 없이 그려질 때만 복사 버튼을 보인다.
-  const showCopy = fresh && d?.kind === "text" && !model && !office && !ql;
-  const editing = !!edit && edit.path === p.path && d?.kind === "text" && !model && !office && !ql;
+  const showCopy = fresh && d?.kind === "text" && !model && !office && !native;
+  const editing = !!edit && edit.path === p.path && d?.kind === "text" && !model && !office && !native;
   const textBody = d?.kind === "text" ? (
     <>
               {isMarkdown(p.name) ? (
@@ -192,7 +200,32 @@ export function Preview() {
           </button>
         </div>
         <div ref={bodyRef} data-preview-body className={`td-thin-scroll min-h-0 flex-1 select-text overflow-auto py-2 pl-3 pr-3 ${p.status === "loading" && d ? "opacity-60" : ""}`}>
-          {p.status === "loading" && !ql && (!d || model || office) && <p className="text-ink-faint">불러오는 중…</p>}
+          {handlerFailed?.path === p.path && handlerFailed.blocked && (
+            <p data-preview-handler-blocked className="mb-1 flex flex-wrap items-center gap-2 text-xs text-ink-faint">
+              인터넷에서 받은 파일이라 Office가 미리보기를 막습니다.
+              <button
+                type="button"
+                tabIndex={-1}
+                onClick={() => {
+                  const path = p.path;
+                  // 사용자가 누를 때만 그 파일의 차단 표시를 지운다(탐색기 파일 속성의 "차단 해제"와 같다). 풀리면 처리기로 다시 보여 준다.
+                  api.unblockFile(path).then(
+                    () => setHandlerFailed(null),
+                    (e: unknown) => setHandlerFailed({ path, reason: e instanceof Error ? e.message : String(e) }),
+                  );
+                }}
+                className="rounded border border-app-line px-2 py-0.5 text-ink hover:bg-app-selected"
+              >
+                차단 해제하고 보기
+              </button>
+            </p>
+          )}
+          {handlerFailed?.path === p.path && handlerFailed.reason && (
+            <p data-preview-handler-error className="mb-1 text-xs text-ink-faint">
+              미리보기 처리기를 쓰지 못했습니다: {handlerFailed.reason}
+            </p>
+          )}
+          {p.status === "loading" && !native && (!d || model || office) && <p className="text-ink-faint">불러오는 중…</p>}
           {p.status === "error" && (
             <p role="alert" className="text-status-error">
               {p.error}
@@ -201,7 +234,8 @@ export function Preview() {
           {d && model && fresh && <ModelView path={p.path} name={p.name} size={d.size} fallback={d.kind === "text" ? textBody : undefined} />}
           {d && office && fresh && <OfficeView path={p.path} kind={office} fileSize={d.size} sizeText={size(d.size)} />}
           {ql && <QuickLookView key={p.path} path={p.path} name={p.name} fit={ql === "document"} />}
-          {d?.kind === "text" && !model && !office && !ql &&
+          {hKind && <PreviewHandlerView key={p.path} path={p.path} suspended={live !== null} onUnavailable={(why) => setHandlerFailed({ path: p.path, ...why })} />}
+          {d?.kind === "text" && !model && !office && !native &&
             (editing ? (
               <textarea
                 data-preview-edit
@@ -225,7 +259,7 @@ export function Preview() {
             ) : (
               <div onDoubleClick={() => void api.previewEditStart()}>{textBody}</div>
             ))}
-          {d?.kind === "image" && !model && !office && !ql &&
+          {d?.kind === "image" && !model && !office && !native &&
             (d.dataUrl ? (
               <div className="flex h-full items-center justify-center">
                 <img src={d.dataUrl} alt={p.name} className="max-h-full max-w-full object-contain" />
@@ -246,7 +280,7 @@ export function Preview() {
             ) : (
               <p className="text-ink-faint">PDF가 너무 커서 미리 볼 수 없습니다 ({size(d.size)})</p>
             ))}
-          {(d?.kind === "directory" || (d?.kind === "other" && !model && !office && !ql)) && (
+          {(d?.kind === "directory" || (d?.kind === "other" && !model && !office && !native)) && (
             <p className="text-ink-faint">
               {KIND_LABEL[d.kind]} — {officeOff ? "Office 문서 미리보기가 꺼져 있습니다 (설정의 미리보기에서 켤 수 있습니다)" : "미리 볼 수 없는 형식입니다"}
               {d.kind === "other" ? ` (${size(d.size)})` : ""}

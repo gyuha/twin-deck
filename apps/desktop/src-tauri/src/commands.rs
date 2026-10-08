@@ -271,6 +271,100 @@ pub fn quicklook_preview(
     svc.quicklook_preview(&path, seq)
 }
 
+/// 웹뷰 기준 CSS 픽셀 사각형(미리보기 자리).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Type)]
+pub struct PreviewRectDto {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+fn physical(window: &tauri::WebviewWindow, r: PreviewRectDto) -> crate::preview_handler::PxRect {
+    let css = crate::preview_handler::CssRect {
+        x: r.x,
+        y: r.y,
+        width: r.width,
+        height: r.height,
+    };
+    crate::preview_handler::physical_rect(css, window.scale_factor().unwrap_or(1.0))
+}
+
+/// Windows 미리보기 처리기로 `path`를 앱 창 위 `rect` 자리에 띄운다 (ADR-0015). 이 형식의 처리기가 없거나 Windows가 아니면 false.
+/// 처리기가 문서를 그릴 때까지 기다리므로 메인 스레드가 아닌 곳에서 돌린다.
+#[tauri::command(async)]
+#[specta::specta]
+pub fn preview_handler_show(
+    window: tauri::WebviewWindow,
+    handlers: State<'_, crate::preview_handler::PreviewHandlers>,
+    path: String,
+    rect: PreviewRectDto,
+) -> ServiceResult<crate::preview_handler::ShowOutcome> {
+    #[cfg(windows)]
+    let parent = window.hwnd().map_err(|e| e.to_string())?.0 as isize;
+    #[cfg(not(windows))]
+    let parent = 0isize;
+    let focus_target = window.clone();
+    let on_click = std::sync::Arc::new(move || {
+        let _ = focus_target.set_focus();
+    });
+    handlers.show(
+        window.label(),
+        parent,
+        &path,
+        physical(&window, rect),
+        on_click,
+    )
+}
+
+/// 인터넷에서 받아 Office가 미리보기를 막는 파일의 차단 표시(Zone.Identifier)를 지운다. 탐색기 파일 속성의 "차단 해제"와 같고 파일 내용은 건드리지 않는다.
+/// 사용자가 버튼을 눌렀을 때만 부른다. Windows가 아니면 아무것도 하지 않는다.
+#[tauri::command]
+#[specta::specta]
+pub fn unblock_file(path: String) -> ServiceResult<()> {
+    #[cfg(windows)]
+    {
+        crate::preview_host::unblock(&path)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = path;
+        Ok(())
+    }
+}
+
+/// 처리기 창의 자리(웹 화면의 미리보기 영역)가 바뀌었다.
+#[tauri::command]
+#[specta::specta]
+pub fn preview_handler_set_rect(
+    window: tauri::WebviewWindow,
+    handlers: State<'_, crate::preview_handler::PreviewHandlers>,
+    rect: PreviewRectDto,
+) {
+    handlers.set_rect(window.label(), physical(&window, rect));
+}
+
+/// 대화상자·메뉴 같은 것이 위에 뜨는 동안 처리기 창을 숨기고(false), 닫히면 다시 보인다(true). 문서는 다시 읽지 않는다.
+#[tauri::command]
+#[specta::specta]
+pub fn preview_handler_set_visible(
+    window: tauri::WebviewWindow,
+    handlers: State<'_, crate::preview_handler::PreviewHandlers>,
+    visible: bool,
+) {
+    handlers.set_visible(window.label(), visible);
+}
+
+/// 처리기 창을 내린다(다른 항목으로 넘어가거나 미리보기를 닫을 때).
+#[tauri::command]
+#[specta::specta]
+pub fn preview_handler_close(
+    window: tauri::WebviewWindow,
+    handlers: State<'_, crate::preview_handler::PreviewHandlers>,
+) {
+    handlers.close(window.label());
+}
+
 /// `pattern`과 일치하는 이름의 인덱스를 돌려준다 (Select Group).
 #[tauri::command]
 #[specta::specta]
@@ -672,6 +766,11 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             file_info,
             preview_file,
             quicklook_preview,
+            preview_handler_show,
+            preview_handler_set_rect,
+            preview_handler_set_visible,
+            preview_handler_close,
+            unblock_file,
             write_text_file,
             glob_filter,
             reveal_path,

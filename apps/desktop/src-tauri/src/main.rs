@@ -1,6 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod commands;
+mod preview_handler;
+#[cfg(windows)]
+mod preview_host;
 mod quicklook;
 mod service;
 
@@ -52,6 +55,7 @@ fn main() {
         )
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(service)
+        .manage(preview_handler::PreviewHandlers::default())
         .manage(AppLaunch::new(
             td_launch::SystemLauncher,
             td_launch::Os::current(),

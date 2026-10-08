@@ -21,6 +21,8 @@ export type {
   ViewSnap,
   PreviewDto,
   PreviewKindDto,
+  PreviewRectDto,
+  ShowOutcome,
   Warning,
   FavoriteDto,
   FavoriteLeaf,

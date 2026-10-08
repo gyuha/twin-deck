@@ -26,3 +26,13 @@ export function quickLookKindOf(name: string): QuickLookKind | null {
   const ext = base.slice(dot + 1).toLowerCase();
   return QUICKLOOK_DOCUMENTS.includes(ext) ? "document" : QUICKLOOK_SHEETS.includes(ext) ? "sheet" : null;
 }
+
+/**
+ * Windows 미리보기 처리기(ADR-0015)로 보여 줄 형식인가. 지금은 docx만이다.
+ * xlsx·pptx는 처리기가 그려지지 않는 경우가 있어(pptx는 스크롤바만 보임) 지금까지의 미리보기(설정 `preview.office`)를 쓴다.
+ */
+export function usesPreviewHandler(name: string): boolean {
+  const base = name.slice(Math.max(name.lastIndexOf("/"), name.lastIndexOf("\\")) + 1);
+  const dot = base.lastIndexOf(".");
+  return dot > 0 && base.slice(dot + 1).toLowerCase() === "docx";
+}
