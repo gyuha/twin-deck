@@ -116,6 +116,15 @@ function StatusBar() {
     </button>
     );
   };
+  // 메뉴바가 없는 Windows·Linux에서 설정 화면과 단축키 목록을 여는 버튼(이슈 #40). 현재 키는 title에 보인다.
+  const entryButton = (label: string, actionId: string, open: () => void) => {
+    const key = keymap.keysFor(actionId)[0];
+    return (
+      <button type="button" tabIndex={-1} aria-label={label} title={key ? `${label} (${formatKey(key, platform)})` : label} onClick={open} className="rounded border border-app-line px-1.5 hover:bg-app-selected">
+        {label === "설정" ? label : "단축키"}
+      </button>
+    );
+  };
   return (
     <footer role="status" aria-label="상태 표시줄" className="flex items-center border-t border-app-line px-2 py-0.5 text-xs">
       선택: {summary.bytes.selected === 0 ? "0" : formatSpace(summary.bytes.selected, sizeFormat)} / {formatSpace(summary.bytes.total, sizeFormat)}, 파일: {summary.files.selected}/{summary.files.total}, 폴더: {summary.dirs.selected}/{summary.dirs.total}
@@ -131,6 +140,8 @@ function StatusBar() {
         </span>
       )}
       <span className="ml-auto flex gap-1">
+        {entryButton("설정", "core.settings.open", () => api.openSettings())}
+        {entryButton("단축키 목록", "core.help", () => api.openHelp())}
         {viewToggle("숨김 파일 표시", "숨김 파일", showHidden, () => api.toggleHidden(), "core.view.hidden")}
         {viewToggle("드라이브 바 표시", "Drive Bar", showDriveBar, () => api.toggleLayoutFlag("show_drive_bar"), "core.view.drive_bar")}
         {viewToggle("Action Bar 표시", "Action Bar", showActionBar, () => api.toggleLayoutFlag("show_action_bar"), "core.view.action_bar")}

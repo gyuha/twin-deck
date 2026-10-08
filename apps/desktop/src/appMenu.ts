@@ -36,6 +36,27 @@ async function addViewToggles(menu: Menu, run: (actionId: string) => void, flags
   }
 }
 
+/** 설정 화면과 단축키 목록(도움말 화면)을 여는 메뉴 항목. 앱 메뉴와 Help 메뉴에 한 줄씩 넣는다(이슈 #40). */
+async function addEntryItems(menu: Menu, run: (actionId: string) => void, keyOf?: KeyOf): Promise<void> {
+  const item = (text: string, actionId: string) => MenuItem.new({ id: actionId, text: withKey(text, keyOf?.(actionId)), action: () => run(actionId) });
+  const items = await menu.items();
+  const app = items[0];
+  if (app instanceof Submenu) {
+    // 기본 앱 메뉴는 `About, 구분선, Services…` 순서라, 첫 구분선 뒤에 항목과 구분선을 끼운다.
+    await app.insert(await item("설정…", "core.settings.open"), 2);
+    await app.insert(await PredefinedMenuItem.new({ item: "Separator" }), 3);
+  }
+  let help: Submenu | null = null;
+  for (const it of items) {
+    if (it instanceof Submenu && (await it.text()) === "Help") help = it;
+  }
+  if (!help) {
+    help = await Submenu.new({ text: "Help", items: [] });
+    await menu.append(help);
+  }
+  await help.append(await item("단축키 목록", "core.help"));
+}
+
 /** 첫 번째 메뉴(앱 메뉴)의 제목과 About/Hide/Quit 항목 이름을 `Twin Deck`으로 맞춘다. */
 async function renameAppMenu(menu: Menu): Promise<void> {
   const app = (await menu.items())[0];
@@ -108,6 +129,7 @@ export async function installFileMenu(
   );
   await file.prepend(entries);
   await addViewToggles(menu, run, flags, keyOf);
+  await addEntryItems(menu, run, keyOf);
   await renameAppMenu(menu);
   await menu.setAsAppMenu();
 }

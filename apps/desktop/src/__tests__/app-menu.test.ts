@@ -8,6 +8,8 @@ let submenus: FakeSubmenu[] = [];
 let prepended: unknown[] = [];
 
 const renamed: string[] = [];
+const appended: Record<string, unknown[]> = {};
+const inserted: Record<string, { pos: number; item: unknown }[]> = {};
 const viewAdds: unknown[] = [];
 const checks: { id: string; text: string; checked: boolean; action: () => void }[] = [];
 class FakeItem {
@@ -34,7 +36,11 @@ class FakeSubmenu {
     return this.children;
   }
   async append(item: unknown) {
-    viewAdds.push(item);
+    if (this.label !== "Help") viewAdds.push(item);
+    (appended[this.label] ??= []).push(item);
+  }
+  async insert(item: unknown, pos: number) {
+    (inserted[this.label] ??= []).push({ pos, item });
   }
   async prepend(items: unknown[]) {
     calls.push(`prepend:${this.label}:${items.length}`);
@@ -73,6 +79,7 @@ vi.mock("@tauri-apps/api/menu", () => ({
   Menu: {
     default: async () => ({
       items: async () => submenus,
+      append: async (item: FakeSubmenu) => void submenus.push(item),
       insert: async (item: FakeSubmenu, pos: number) => {
         calls.push(`insert:${item.label}@${pos}`);
         submenus.splice(pos, 0, item);
@@ -92,14 +99,16 @@ beforeEach(() => {
   renamed.length = 0;
   viewAdds.length = 0;
   checks.length = 0;
-  submenus = [new FakeSubmenu("twin-deck"), new FakeSubmenu("File"), new FakeSubmenu("Edit"), new FakeSubmenu("View")];
+  for (const k of Object.keys(appended)) delete appended[k];
+  for (const k of Object.keys(inserted)) delete inserted[k];
+  submenus = [new FakeSubmenu("twin-deck"), new FakeSubmenu("File"), new FakeSubmenu("Edit"), new FakeSubmenu("View"), new FakeSubmenu("Help")];
 });
 
 describe("상단 메뉴바 File 메뉴", () => {
   it("기본 메뉴의 File 맨 앞에 항목을 끼워 넣고 앱 메뉴로 지정한다", async () => {
     await installFileMenu(() => {});
     expect(calls).toEqual([`prepend:File:${FILE_MENU.length}`, "setAsAppMenu"]);
-    expect(created.map((c) => c.text)).toEqual(FILE_MENU.flatMap((e) => (e ? [e.text] : [])));
+    expect(created.filter((c) => FILE_MENU.some((e) => e?.actionId === c.id)).map((c) => c.text)).toEqual(FILE_MENU.flatMap((e) => (e ? [e.text] : [])));
     expect(prepended).toHaveLength(FILE_MENU.length);
   });
 
@@ -205,7 +214,7 @@ describe("상단 메뉴바 File 메뉴", () => {
   });
 
   it("File 메뉴가 없으면 만들어 두 번째 자리에 넣는다", async () => {
-    submenus = [new FakeSubmenu("twin-deck"), new FakeSubmenu("Edit"), new FakeSubmenu("View")];
+    submenus = [new FakeSubmenu("twin-deck"), new FakeSubmenu("Edit"), new FakeSubmenu("View"), new FakeSubmenu("Help")];
     await installFileMenu(() => {});
     expect(calls).toEqual(["newSubmenu:File", "insert:File@1", `prepend:File:${FILE_MENU.length}`, "setAsAppMenu"]);
   });
@@ -228,5 +237,37 @@ describe("창별 설치", () => {
     expect(installs()).toBe(2);
     unlisten();
     expect(focusHandlers).toHaveLength(0);
+  });
+});
+
+describe("설정·단축키 목록 메뉴 항목 (이슈 #40)", () => {
+  const keyOf = (id: string) => ({ "core.settings.open": "Cmd+,", "core.help": "F1" })[id];
+  const find = (id: string) => created.find((c) => c.id === id);
+
+  it("앱 메뉴(첫 메뉴)에 '설정… (키)'를 구분선 뒤에, Help 메뉴에 '단축키 목록 (키)'를 넣는다", async () => {
+    await installFileMenu(() => {}, undefined, keyOf);
+    expect(find("core.settings.open")?.text).toBe("설정… (Cmd+,)");
+    expect(find("core.help")?.text).toBe("단축키 목록 (F1)");
+    expect(inserted["twin-deck"]?.map((i) => i.pos)).toEqual([2, 3]); // 항목, 그 뒤 구분선
+    expect(appended["Help"]).toHaveLength(1);
+  });
+
+  it("키가 없으면 글자만, 키가 바뀌면 글자도 바뀐다", async () => {
+    await installFileMenu(() => {});
+    expect(find("core.settings.open")?.text).toBe("설정…");
+    created.length = 0;
+    await installFileMenu(() => {}, undefined, (id) => (id === "core.settings.open" ? "Cmd+." : undefined));
+    expect(find("core.settings.open")?.text).toBe("설정… (Cmd+.)");
+  });
+
+  it("Help 메뉴가 없으면 만들고, 두 항목을 누르면 해당 액션을 실행한다", async () => {
+    const run = vi.fn();
+    submenus = submenus.filter((m) => m.label !== "Help");
+    await installFileMenu(run, undefined, keyOf);
+    expect(calls).toContain("newSubmenu:Help");
+    find("core.settings.open")!.action!();
+    find("core.help")!.action!();
+    expect(run.mock.calls).toEqual([["core.settings.open"], ["core.help"]]);
+    for (const id of ["core.settings.open", "core.help"]) expect(find(id)).not.toHaveProperty("accelerator");
   });
 });
