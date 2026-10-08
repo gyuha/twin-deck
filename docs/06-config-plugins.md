@@ -202,6 +202,7 @@ working_directory = "${active.folder.path}"
   - `light`는 `catppuccin-latte`, `dark`는 `catppuccin-mocha`, `system`은 OS가 다크면 Mocha, 아니면 Latte다. 테마 이름을 고르면 그 테마 하나를 쓴다.
   - 색은 테마 YAML의 `background`·`foreground`·`accent`와 터미널 normal의 `red`·`green`·`yellow`·`blue`로 계산한다: 배경→`app`, 글자→`ink`, `accent`→`accent`(YAML 그대로, 그 위 글자는 흰색/검정 중 대비가 큰 쪽), 터미널 색→상태색(오류·경고·성공·정보). 표면 단계(`app-box`·`app-line`·`app-hover` 등)는 배경에 글자색을 6~20% 섞어 만들고, 흐린 글자는 모든 테마에서 배경과의 대비가 3.0 이상이 되게 섞는다. 계산은 `lib/themeColors.ts`다.
   - YAML은 빌드 때만 읽는다: `scripts/gen-themes.mjs`(`task gen-types`)가 `src/lib/themes.generated.ts`(색 표)와 `crates/td-config/src/themes.rs`(허용 이름 목록)를 만든다. 앱은 실행 중에 YAML을 읽지 않고, 사용자가 YAML을 넣는 기능은 아직 없다(아래 예시).
+  - 설정 화면의 테마 선택은 검색 상자다(F키 동작 선택과 같은 `Combobox`). 보이는 이름(`Dracula Default · 어두움`)뿐 아니라 파일 이름(`dracula-default`)과 밝기(`어두움`/`밝음`)로도 찾고, ↑↓로 고르고 Enter로 확정한다.
   - 옛 spaceui 이름(`midnight`, `noir`, `slate`, `nord`, `mocha`)은 없어졌다. 설정에 남아 있으면 경고하고 `system`으로 돌아간다.
   - `<html>`에는 `data-theme`(dark/light), `data-color-theme`(테마 이름), 클래스(dark/light)가 걸리고 색 토큰은 인라인 `--color-*`다. 설정을 읽기 전에는 spaceui의 dark/light 기본값이 보인다.
 

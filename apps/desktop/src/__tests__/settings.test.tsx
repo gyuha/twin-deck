@@ -64,26 +64,48 @@ describe("설정 값 바꾸기", () => {
     await waitFor(async () => expect((await backend.getConfig()).config.behavior.table.circular_selection).toBe(true));
   });
 
-  it("테마는 선택 상자에서 고르면 즉시 바뀐다", async () => {
+  it("테마는 검색 상자에서 고르면 즉시 바뀐다", async () => {
     const { user, backend } = await renderApp();
     await open(user);
     await dialog();
     await user.click(within(screen.getByRole("group", { name: "테마" })).getByRole("combobox"));
-    await user.click(await screen.findByRole("option", { name: "dracula-default" }));
+    await user.click(await screen.findByRole("option", { name: /Dracula Default/ }));
     await waitFor(async () => expect((await backend.getConfig()).config.behavior.theme).toBe("dracula-default"));
     await waitFor(() => expect(document.documentElement.dataset.colorTheme).toBe("dracula-default"));
   });
 
-  it("테마 선택 목록은 system·light·dark와 Warp 테마 112개(총 115개)이고 옛 이름은 없다", async () => {
+  it("테마 목록은 system·light·dark와 Warp 테마 112개(총 115개)이고 옛 이름은 없다", async () => {
     const { user } = await renderApp();
     await open(user);
     await dialog();
     await user.click(within(screen.getByRole("group", { name: "테마" })).getByRole("combobox"));
-    const names = (await screen.findAllByRole("option")).map((o) => o.textContent);
+    const names = within(await screen.findByRole("listbox", { name: "테마" })).getAllByRole("option").map((o) => o.textContent ?? "");
     expect(names.length).toBe(115);
-    expect(names.slice(0, 3)).toEqual(["system", "light", "dark"]);
-    expect(names).toContain("catppuccin-mocha");
-    for (const old of ["midnight", "noir", "slate", "nord", "mocha"]) expect(names).not.toContain(old);
+    expect(names.slice(0, 3).map((n) => n.split(" · ")[0].replace("✓", ""))).toEqual(["system", "light", "dark"]);
+    expect(names.some((n) => n.startsWith("Catppuccin Mocha"))).toBe(true);
+    for (const old of ["midnight", "noir", "slate", "nord", "mocha"]) expect(names.some((n) => n.startsWith(`${old} `))).toBe(false);
+  });
+
+  it("테마 검색: 보이는 이름·파일 이름·밝기로 찾고 Enter로 고른다", async () => {
+    const { user, backend } = await renderApp();
+    await open(user);
+    await dialog();
+    await user.click(within(screen.getByRole("group", { name: "테마" })).getByRole("combobox"));
+    const search = await screen.findByRole("searchbox", { name: "테마 검색" });
+    const shown = () => within(screen.getByRole("listbox", { name: "테마" })).queryAllByRole("option").map((o) => o.textContent ?? "");
+    await user.type(search, "dracula");
+    // 검색어가 그대로 들어 있는 Dracula Default·Dracula Soft가 맨 앞이고, 글자만 흩어져 맞는 항목은 뒤로 밀린다(퍼지 검색, F키 선택 상자와 같은 규칙).
+    expect(shown().slice(0, 2).every((n) => n.startsWith("Dracula"))).toBe(true);
+    expect(shown().length).toBeLessThan(10); // 112개가 다 나오지 않는다
+    await user.clear(search);
+    await user.type(search, "catppuccin-latte"); // 파일 이름으로
+    expect(shown()[0]).toContain("Catppuccin Latte");
+    await user.clear(search);
+    await user.type(search, "밝음");
+    expect(shown().length).toBe(32);
+    await user.clear(search);
+    await user.type(search, "solarized-light{Enter}");
+    await waitFor(async () => expect((await backend.getConfig()).config.behavior.theme).toBe("solarized-light"));
   });
 
   it("숫자 입력(아이콘 크기)은 Enter로 저장된다", async () => {
