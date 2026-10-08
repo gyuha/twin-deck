@@ -11,9 +11,9 @@ use td_state::{LoadedState, Snapshot, Spawner};
 use td_volumes::{SystemUnmounter, Volumes};
 
 use crate::service::{
-    edit, open_file, reveal, reveal_config, ConflictDto, EntryDto, FileInfoDto, FindSpecDto,
-    JobDto, JobKindDto, PreviewDto, QueueItemDto, SearchStartDto, SearchSummaryDto, Service,
-    ServiceResult,
+    edit, open_file, reveal, reveal_config, ConflictDto, EntryDto, ExpectedFileDto, FileInfoDto,
+    FindSpecDto, JobDto, JobKindDto, PreviewDto, QueueItemDto, SearchStartDto, SearchSummaryDto,
+    Service, ServiceResult, WriteTextResultDto,
 };
 
 pub type AppService = Service<SystemTrash>;
@@ -238,6 +238,18 @@ pub fn reveal_config_dir(
 #[specta::specta]
 pub fn file_info(svc: State<'_, AppService>, path: String) -> ServiceResult<FileInfoDto> {
     svc.file_info(&path)
+}
+
+/// 텍스트 파일을 덮어쓴다(미리보기 편집 저장). `expected`가 있으면 쓰기 직전에 파일 상태를 비교한다.
+#[tauri::command]
+#[specta::specta]
+pub fn write_text_file(
+    svc: State<'_, AppService>,
+    path: String,
+    text: String,
+    expected: Option<ExpectedFileDto>,
+) -> ServiceResult<WriteTextResultDto> {
+    svc.write_text_file(&path, &text, expected)
 }
 
 #[tauri::command]
@@ -646,6 +658,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             new_window,
             file_info,
             preview_file,
+            write_text_file,
             glob_filter,
             reveal_path,
             open_path,

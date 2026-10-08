@@ -1,3 +1,5 @@
+import { detectEol, editBlockReason, toDisk, toEditor } from "../lib/previewEdit";
+import type { Eol } from "../lib/previewEdit";
 import { buildNewNames, DEFAULT_RENAME_OPTIONS, needsTempStep, validateNames } from "../lib/multiRename";
 import type { RenameOptions } from "../lib/multiRename";
 import { createStore } from "zustand/vanilla";
@@ -19,6 +21,7 @@ import type {
   ConfigValue,
   ConflictDto,
   EntryDto,
+  ExpectedFileDto,
   JobDto,
   Loaded,
   PreviewDto,
@@ -164,7 +167,9 @@ export const CONFLICT_CHOICES: readonly ConflictDto[] = ["overwrite", "skip", "r
 export type DialogState =
   | { kind: "name"; title: string; value: string; error: string | null; selectStem: boolean; goto?: boolean; label?: string; confirmLabel?: string; option?: { label: string; checked: boolean } }
   | { kind: "multirename"; title: string; items: { path: string; name: string; isDir: boolean; modifiedMs: number | null }[]; existing: string[]; options: RenameOptions }
-  | { kind: "confirm"; title: string; lines: string[] }
+  | { kind: "confirm"; title: string; lines: string[]; confirmLabel?: string }
+  /** 선택지 중 하나를 고르는 창(확인이면 고른 번호, 취소면 null). */
+  | { kind: "choice"; title: string; lines: string[]; choices: string[]; selected: number }
   | { kind: "conflict"; title: string; existing: string; selected: number; remaining: number; all: boolean }
   | { kind: "info"; title: string; lines: string[] }
   /** 실행 중인 전송(복사/이동) 작업의 진행 창. */
@@ -271,6 +276,19 @@ export interface PreviewState {
   error?: string;
 }
 
+/** 미리보기 안의 텍스트 편집 (이슈 #38). `text`는 편집 상자의 값(줄바꿈은 LF)이고, `base`는 마지막으로 저장했거나 처음 읽은 값이다. */
+export interface PreviewEdit {
+  path: string;
+  text: string;
+  base: string;
+  /** 파일의 원래 줄바꿈. 저장할 때 되돌린다. */
+  eol: Eol;
+  /** 편집을 시작하거나 마지막으로 저장했을 때 본 파일의 크기·수정 시각(저장 시 밖에서 바뀌었는지 비교한다). */
+  expected: ExpectedFileDto;
+  /** 저장 직후 잠깐 "저장됨"을 보이는 동안 true. */
+  saved: boolean;
+}
+
 export interface AppState {
   panes: Record<PaneId, PaneState>;
   activePane: PaneId;
@@ -286,6 +304,8 @@ export interface AppState {
   dialog: DialogState | null;
   /** 열려 있는 미리보기 (VIEW-01). */
   preview: PreviewState | null;
+  /** 미리보기에서 편집 중인 텍스트. 편집 중이 아니면 null. */
+  previewEdit: PreviewEdit | null;
   /** 진행 중인 드래그(행을 끌어 다른 폴더·패널에 놓기). 없으면 null. */
   drag: DragState | null;
   /** 탭을 끌고 있을 때 놓일 반대쪽 패널(그 패널의 탭 줄이 놓일 곳으로 표시된다). 없으면 null. */
@@ -488,6 +508,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     diskSpace: { left: null, right: null },
     settingsOpen: false,
     settingsPane: "left",
+    previewEdit: null,
     helpOpen: false,
     find: null,
     lastFind: null,
@@ -984,6 +1005,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
   }
 
   // 미리보기 요청 순번: 항목을 빠르게 넘길 때 늦게 온 이전 응답이 화면을 덮지 않게 한다.
+  let savedTimer: ReturnType<typeof setTimeout> | undefined;
   let previewSeq = 0;
   async function loadPreview(entry: EntryDto) {
     const seq = ++previewSeq;
@@ -1646,7 +1668,9 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       set((s) =>
         s.dialog?.kind === "conflict"
           ? { dialog: { ...s.dialog, selected: (index + CONFLICT_CHOICES.length) % CONFLICT_CHOICES.length } }
-          : {},
+          : s.dialog?.kind === "choice"
+            ? { dialog: { ...s.dialog, selected: (index + s.dialog.choices.length) % s.dialog.choices.length } }
+            : {},
       );
     },
     /** 충돌 창의 "남은 항목에도 같은 선택 적용"을 켜고 끈다. */
@@ -1676,6 +1700,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         result = d.option ? { value: d.value, checked: d.option.checked } : d.value;
       } else if (d.kind === "conflict") {
         result = { choice: CONFLICT_CHOICES[d.selected], all: d.all };
+      } else if (d.kind === "choice") {
+        result = d.selected;
       }
       set({ dialog: null });
       pending?.(result);
@@ -2119,6 +2145,18 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       ];
       await ask<boolean>({ kind: "info", title: `정보: ${info.name}`, lines });
     },
+    /** 미리보기 중인 텍스트의 원문(보이는 부분)을 클립보드로 복사한다. 아직 읽는 중이거나 텍스트가 아니면 아무것도 하지 않는다. */
+    async previewCopyText() {
+      const pv = get().preview;
+      const editing = get().previewEdit;
+      const text = editing && editing.path === pv?.path ? editing.text : pv?.status === "ready" ? pv.data?.text : null;
+      if (text === null || text === undefined) return;
+      try {
+        await backend.copyText(text);
+      } catch (e) {
+        fail(e);
+      }
+    },
     /** 폴더 경로 복사 (OP-15, F12). */
     async copyFolderPath() {
       const path = hereOf(activeTab(get()));
@@ -2540,17 +2578,26 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (entry) await loadPreview(entry);
     },
     previewClose() {
+      // 편집 중이면 저장하지 않은 변경을 먼저 확인한다(저장하거나 버리거나 취소).
+      if (get().previewEdit) {
+        void api.previewEditEnd().then((done) => {
+          if (done) api.previewClose();
+        });
+        return;
+      }
       previewSeq++;
       set({ preview: null });
     },
     /** 미리보기에서 Return: 닫고, 압축 파일이면 압축을 풀고 아니면 연다. */
     async previewOpen() {
+      if (get().previewEdit && !(await api.previewEditEnd())) return;
       api.previewClose();
       if (isArchiveEntry(cursorEntry(activeTab(get())), cfg().file_systems.zip.additional_extensions)) await api.extract();
       else await api.open();
     },
     /** 미리보기에서 →: 폴더면 그 안으로 들어가 첫 항목을 미리보고(항목이 없으면 미리보기를 닫는다), 아니면 다음 항목이다. */
     async previewForward() {
+      if (get().previewEdit && !(await api.previewEditEnd())) return;
       const entry = cursorEntry(activeTab(get()));
       if (entry?.kind !== "dir") return api.previewMove(1);
       await api.navigate(entry.path);
@@ -2561,9 +2608,91 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     },
     /** 미리보기를 연 채 커서를 옮기고 새 항목을 보여 준다. */
     async previewMove(delta: 1 | -1) {
+      if (get().previewEdit && !(await api.previewEditEnd())) return;
       api.moveCursor(delta);
       const entry = cursorEntry(activeTab(get()));
       if (entry) await loadPreview(entry);
+    },
+
+    /**
+     * 미리보기 본문을 편집 상자로 바꾼다(더블클릭). 디스크 위의 일반 파일이고 전체가 읽혔고(64KB 이하) UTF-8 텍스트이며
+     * 줄바꿈이 LF만이거나 CRLF만일 때만 시작하고, 아니면 이유를 알리고 시작하지 않는다(저장하면 파일이 망가질 수 있다).
+     */
+    async previewEditStart() {
+      const pv = get().preview;
+      if (!pv || get().previewEdit) return;
+      const reason = pv.status !== "ready" ? "아직 읽는 중입니다" : editBlockReason({ path: pv.path, kind: pv.data?.kind, truncated: !!pv.data?.truncated, text: pv.data?.text });
+      if (reason) return flash(reason);
+      const raw = pv.data?.text as string;
+      let info;
+      try {
+        info = await backend.fileInfo(pv.path);
+      } catch (e) {
+        return fail(e);
+      }
+      // 미리보기를 읽은 뒤 파일이 바뀌었으면(크기가 다르면) 낡은 내용을 편집하게 하지 않는다.
+      if (info.size !== pv.data?.size) return flash("편집할 수 없습니다: 미리보기를 연 뒤 파일이 바뀌었습니다. 미리보기를 다시 열어 주세요");
+      if (get().preview?.path !== pv.path || get().previewEdit) return; // 그 사이 다른 파일로 넘어갔다
+      const text = toEditor(raw);
+      set({ previewEdit: { path: pv.path, text, base: text, eol: detectEol(raw) as Eol, expected: { size: info.size, modifiedMs: info.modifiedMs }, saved: false } });
+    },
+    previewEditChange(text: string) {
+      set((s) => (s.previewEdit ? { previewEdit: { ...s.previewEdit, text, saved: false } } : {}));
+    },
+    /**
+     * 편집한 글자를 파일에 쓴다(Mod+S). 저장한 뒤에도 편집 상태는 유지한다.
+     * 편집을 시작한 뒤 파일이 밖에서 바뀌었으면 쓰지 않고 덮어쓸지 묻는다. 저장했으면 true.
+     */
+    async previewEditSave(force = false): Promise<boolean> {
+      const e = get().previewEdit;
+      if (!e) return false;
+      const body = toDisk(e.text, e.eol);
+      let r;
+      try {
+        r = await backend.writeTextFile(e.path, body, force ? null : e.expected);
+      } catch (err) {
+        fail(err);
+        return false;
+      }
+      if (!r.saved) {
+        const overwrite = await ask<boolean>({
+          kind: "confirm",
+          title: "파일이 밖에서 바뀌었습니다",
+          lines: ["편집을 시작한 뒤 다른 곳에서 이 파일이 바뀌었습니다.", "덮어쓰면 그 변경이 사라집니다."],
+          confirmLabel: "덮어쓰기",
+        });
+        return overwrite ? api.previewEditSave(true) : false;
+      }
+      const cur = get().previewEdit;
+      if (!cur || cur.path !== e.path) return true; // 저장하는 동안 편집이 끝났다
+      set((s) => ({
+        previewEdit: { ...cur, base: e.text, expected: { size: r.size, modifiedMs: r.modifiedMs }, saved: true },
+        preview: s.preview && s.preview.path === e.path && s.preview.data ? { ...s.preview, data: { ...s.preview.data, text: body, size: r.size } } : s.preview,
+      }));
+      clearTimeout(savedTimer);
+      savedTimer = setTimeout(() => set((s) => (s.previewEdit ? { previewEdit: { ...s.previewEdit, saved: false } } : {})), 1500);
+      return true;
+    },
+    /**
+     * 편집을 끝낸다(Esc 등). 저장하지 않은 변경이 있으면 "저장 / 버리기 / 취소"를 묻는다.
+     * 편집 상태가 없어졌으면 true, 취소했거나 저장에 실패해 편집이 남았으면 false.
+     */
+    async previewEditEnd(): Promise<boolean> {
+      const e = get().previewEdit;
+      if (!e) return true;
+      if (e.text !== e.base) {
+        const choice = await ask<number>({
+          kind: "choice",
+          title: "저장하지 않은 변경",
+          lines: ["편집한 내용을 저장하지 않고 끝내면 사라집니다."],
+          choices: ["저장", "버리기"],
+          selected: 0,
+        });
+        if (choice === null) return false;
+        if (choice === 0 && !(await api.previewEditSave())) return false;
+      }
+      set({ previewEdit: null });
+      return true;
     },
 
     /**
@@ -2571,6 +2700,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
      * 다음이 없으면(맨 끝) 앞 파일로, 남은 파일이 없으면 미리보기를 닫는다.
      */
     async previewDelete() {
+      if (get().previewEdit && !(await api.previewEditEnd())) return;
       const p = get().preview;
       if (!p) return;
       const tab = activeTab(get());

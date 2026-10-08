@@ -22,6 +22,8 @@ export function useKeyboard({ app, keymap, registry }: Options) {
       if (e.isComposing) return;
       // 경로 표시줄의 직접 입력 중에는 글자·방향키가 단축키로 가지 않게 한다(입력창이 처리한다).
       if (e.target instanceof Element && e.target.closest("[data-path-edit]")) return;
+      // 미리보기 편집 상자: 글자·방향키·Space·Enter·Delete는 상자가 받는다. Mod+S(저장)만 단축키로 간다(Esc는 상자가 직접 처리한다).
+      if (e.target instanceof Element && e.target.closest("[data-preview-edit]") && !((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "s")) return;
       const s = store.getState();
       const stack = scopeStack(s);
       const top = stack[0];
@@ -70,6 +72,15 @@ export function useKeyboard({ app, keymap, registry }: Options) {
         e.preventDefault();
         void api.menuSelectNth(Number(e.key));
         return;
+      }
+      // 선택 창(저장하지 않은 변경 등): 방향키로 고른다. Return 확인·Esc 취소는 기본 키다.
+      if (top === "dialog" && s.dialog?.kind === "choice" && plain) {
+        const step = { ArrowUp: -1, ArrowLeft: -1, ArrowDown: 1, ArrowRight: 1 }[e.key];
+        if (step) {
+          e.preventDefault();
+          api.dialogSetChoice(s.dialog.selected + step);
+          return;
+        }
       }
       // 충돌 다이얼로그: 방향키로 고르고 O/S/R로 바로 확정한다. A는 "남은 항목에도 적용"을 켜고 끈다.
       if (top === "dialog" && s.dialog?.kind === "conflict" && plain) {

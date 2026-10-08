@@ -143,6 +143,23 @@ export function Dialog() {
             ))}
           </ul>
         )}
+        {dialog.kind === "choice" && (
+          <>
+            <ul className="mb-2 list-inside list-disc">
+              {dialog.lines.map((l) => (
+                <li key={l}>{l}</li>
+              ))}
+            </ul>
+            <div role="radiogroup" aria-label={dialog.title} className="flex flex-col gap-1">
+              {dialog.choices.map((c, i) => (
+                <div key={c} role="radio" aria-checked={i === dialog.selected} className={i === dialog.selected ? "font-bold underline" : ""} onClick={() => api.dialogSetChoice(i)}>
+                  {i === dialog.selected ? "▶ " : "  "}
+                  {c}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
         {dialog.kind === "conflict" && (
           <>
             <p className="mb-2 break-all">{dialog.existing}</p>
@@ -186,7 +203,7 @@ export function Dialog() {
               className="rounded bg-accent px-3 py-0.5 text-accent-ink disabled:opacity-40"
               onClick={() => api.dialogConfirm()}
             >
-              {dialog.kind === "name" && dialog.confirmLabel ? dialog.confirmLabel : dialog.kind === "multirename" ? "이름 바꾸기" : "확인"}
+              {(dialog.kind === "name" || dialog.kind === "confirm") && dialog.confirmLabel ? dialog.confirmLabel : dialog.kind === "multirename" ? "이름 바꾸기" : "확인"}
             </button>
           </div>
         )}

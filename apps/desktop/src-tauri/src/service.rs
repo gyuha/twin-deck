@@ -373,6 +373,23 @@ impl From<td_vfs::Preview> for PreviewDto {
     }
 }
 
+/// `write_text_file`이 쓰기 전에 확인할 파일 상태(편집을 시작할 때 본 값). 시각은 epoch 밀리초.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ExpectedFileDto {
+    pub size: f64,
+    pub modified_ms: Option<f64>,
+}
+
+/// `write_text_file`의 결과. `saved`가 false이면 파일이 기대와 달라 쓰지 않은 것이고, 크기·시각은 지금 파일의 값이다.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct WriteTextResultDto {
+    pub saved: bool,
+    pub size: f64,
+    pub modified_ms: Option<f64>,
+}
+
 /// 파일 정보 대화상자용 (OP-14). 시각은 epoch 밀리초, 모르면 null.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -1060,6 +1077,52 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
             .map_err(|e| e.to_string())?;
         sort_entries(&mut entries);
         Ok(entries.iter().map(EntryDto::from).collect())
+    }
+
+    /// 텍스트 파일을 덮어쓴다(미리보기 편집 저장). 없는 파일이나 폴더에는 쓰지 않고 새로 만들지도 않는다.
+    /// `expected`가 있으면 쓰기 직전에 크기·수정 시각을 비교해 달라졌으면 쓰지 않고 `saved: false`를 돌려준다(밖에서 바뀐 파일 보호).
+    /// 같은 폴더의 임시 파일에 쓴 뒤 이름을 바꾸고(원자적), 기존 파일의 권한을 유지한다. 링크는 가리키는 실제 파일에 쓴다.
+    pub fn write_text_file(
+        &self,
+        path: &str,
+        text: &str,
+        expected: Option<ExpectedFileDto>,
+    ) -> ServiceResult<WriteTextResultDto> {
+        let real = std::fs::canonicalize(path).map_err(|e| format!("{path}: {e}"))?;
+        let meta = std::fs::metadata(&real).map_err(|e| format!("{path}: {e}"))?;
+        if !meta.is_file() {
+            return Err(format!("{path}: 파일이 아닙니다"));
+        }
+        let stat = |m: &std::fs::Metadata| (m.len() as f64, ms(m.modified().ok()));
+        if let Some(exp) = expected {
+            let (size, modified_ms) = stat(&meta);
+            if size != exp.size || modified_ms != exp.modified_ms {
+                return Ok(WriteTextResultDto {
+                    saved: false,
+                    size,
+                    modified_ms,
+                });
+            }
+        }
+        let (dir, name) = match (real.parent(), real.file_name()) {
+            (Some(d), Some(n)) => (d, n.to_string_lossy().into_owned()),
+            _ => return Err(format!("{path}: 쓸 위치를 알 수 없습니다")),
+        };
+        let tmp = dir.join(format!(".{name}.td-save-{}.tmp", std::process::id()));
+        let written = std::fs::write(&tmp, text.as_bytes())
+            .and_then(|()| std::fs::set_permissions(&tmp, meta.permissions()))
+            .and_then(|()| std::fs::rename(&tmp, &real));
+        if let Err(e) = written {
+            let _ = std::fs::remove_file(&tmp);
+            return Err(format!("{path}: {e}"));
+        }
+        let after = std::fs::metadata(&real).map_err(|e| format!("{path}: {e}"))?;
+        let (size, modified_ms) = stat(&after);
+        Ok(WriteTextResultDto {
+            saved: true,
+            size,
+            modified_ms,
+        })
     }
 
     pub fn file_info(&self, path: &str) -> ServiceResult<FileInfoDto> {
@@ -1830,6 +1893,124 @@ mod tests {
                 .symlink(&format!("{root}/missing"), &target, ConflictDto::Rename)
                 .is_err());
         }
+    }
+
+    #[test]
+    fn write_text_saves_exact_content_and_reports_the_new_stat() {
+        let (_t, svc, _ch, root) = setup();
+        let path = format!("{root}/a.txt");
+        std::fs::write(&path, "before").unwrap();
+        let text = "새 내용\r\n둘째 줄\r\n"; // 받은 글자를 그대로 쓴다(줄바꿈 변환은 호출한 쪽 몫)
+        let r = svc.write_text_file(&path, text, None).unwrap();
+        assert!(r.saved);
+        assert_eq!(std::fs::read(&path).unwrap(), text.as_bytes());
+        assert_eq!(r.size, text.len() as f64);
+        let info = svc.file_info(&path).unwrap();
+        assert_eq!((r.size, r.modified_ms), (info.size, info.modified_ms));
+    }
+
+    #[test]
+    fn write_text_refuses_when_the_file_changed_and_leaves_it_alone() {
+        let (_t, svc, _ch, root) = setup();
+        let path = format!("{root}/a.txt");
+        std::fs::write(&path, "열 때의 내용").unwrap();
+        let info = svc.file_info(&path).unwrap();
+        let expected = ExpectedFileDto {
+            size: info.size,
+            modified_ms: info.modified_ms,
+        };
+        // 밖에서 크기가 바뀌었다.
+        std::fs::write(&path, "밖에서 바뀐 더 긴 내용").unwrap();
+        let r = svc
+            .write_text_file(&path, "내 편집", Some(expected.clone()))
+            .unwrap();
+        assert!(!r.saved, "바뀐 파일은 쓰지 않는다");
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            "밖에서 바뀐 더 긴 내용"
+        );
+        // 같은 크기로 바뀌고 수정 시각만 달라도 막는다.
+        let info = svc.file_info(&path).unwrap();
+        let stale = ExpectedFileDto {
+            size: info.size,
+            modified_ms: info.modified_ms.map(|m| m - 5000.0),
+        };
+        let r = svc.write_text_file(&path, "내 편집", Some(stale)).unwrap();
+        assert!(!r.saved);
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            "밖에서 바뀐 더 긴 내용"
+        );
+        // 기대값이 맞으면 쓴다.
+        let ok = ExpectedFileDto {
+            size: info.size,
+            modified_ms: info.modified_ms,
+        };
+        assert!(
+            svc.write_text_file(&path, "내 편집", Some(ok))
+                .unwrap()
+                .saved
+        );
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "내 편집");
+    }
+
+    #[test]
+    fn write_text_without_expected_overwrites() {
+        let (_t, svc, _ch, root) = setup();
+        let path = format!("{root}/a.txt");
+        std::fs::write(&path, "원래").unwrap();
+        assert!(
+            svc.write_text_file(&path, "덮어쓴 내용", None)
+                .unwrap()
+                .saved
+        );
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "덮어쓴 내용");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn write_text_keeps_the_file_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+        let (_t, svc, _ch, root) = setup();
+        let path = format!("{root}/script.sh");
+        std::fs::write(&path, "#!/bin/sh\n").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o750)).unwrap();
+        svc.write_text_file(&path, "#!/bin/sh\necho hi\n", None)
+            .unwrap();
+        assert_eq!(
+            std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o750
+        );
+    }
+
+    #[test]
+    fn write_text_leaves_no_temp_file_behind() {
+        let (_t, svc, _ch, root) = setup();
+        let path = format!("{root}/a.txt");
+        std::fs::write(&path, "x").unwrap();
+        svc.write_text_file(&path, "y", None).unwrap();
+        let mut names: Vec<String> = std::fs::read_dir(&root)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        names.sort();
+        assert_eq!(names, ["a.txt"]);
+    }
+
+    #[test]
+    fn write_text_refuses_missing_files_and_folders() {
+        let (_t, svc, _ch, root) = setup();
+        svc.mkdir(&format!("{root}/d")).unwrap();
+        assert!(svc
+            .write_text_file(&format!("{root}/nope.txt"), "x", None)
+            .is_err());
+        assert!(
+            !std::path::Path::new(&format!("{root}/nope.txt")).exists(),
+            "없는 파일을 새로 만들지 않는다"
+        );
+        assert!(svc
+            .write_text_file(&format!("{root}/d"), "x", None)
+            .is_err());
     }
 
     #[test]

@@ -61,6 +61,17 @@ async previewFile(path: string) : Promise<Result<PreviewDto, string>> {
 }
 },
 /**
+ * 텍스트 파일을 덮어쓴다(미리보기 편집 저장). `expected`가 있으면 쓰기 직전에 파일 상태를 비교한다.
+ */
+async writeTextFile(path: string, text: string, expected: ExpectedFileDto | null) : Promise<Result<WriteTextResultDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("write_text_file", { path, text, expected }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * `pattern`과 일치하는 이름의 인덱스를 돌려준다 (Select Group).
  */
 async globFilter(pattern: string, names: string[]) : Promise<number[]> {
@@ -588,6 +599,10 @@ mode: number | null; hidden: boolean;
 linkIsDir: boolean }
 export type Environment = { text_editor: string; terminal: string }
 /**
+ * `write_text_file`이 쓰기 전에 확인할 파일 상태(편집을 시작할 때 본 값). 시각은 epoch 밀리초.
+ */
+export type ExpectedFileDto = { size: number; modifiedMs: number | null }
+/**
  * 즐겨찾기 항목. `kind`는 "item" | "separator" | "group". 그룹은 한 단계까지 지원한다.
  */
 export type FavoriteDto = { kind: string; name: string | null; path: string | null; items?: FavoriteLeaf[] }
@@ -768,6 +783,10 @@ export type Warning = { file: string; message: string;
  * TOML 문법 오류의 위치(1부터).
  */
 line: number | null }
+/**
+ * `write_text_file`의 결과. `saved`가 false이면 파일이 기대와 달라 쓰지 않은 것이고, 크기·시각은 지금 파일의 값이다.
+ */
+export type WriteTextResultDto = { saved: boolean; size: number; modifiedMs: number | null }
 /**
  * ZIP으로도 열 확장자 (ARC-01). 점 없이 쓴다(`docx`).
  */

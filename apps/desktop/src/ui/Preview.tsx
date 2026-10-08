@@ -49,6 +49,14 @@ export function Preview() {
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const saved = useApp((s) => s.previewRect);
   const { api } = useAppStore();
+  const edit = useApp((s) => s.previewEdit);
+  const [copied, setCopied] = useState(false); // 복사 버튼이 잠깐 "복사됨"을 보이는 동안
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => {
+    setCopied(false);
+    clearTimeout(copiedTimer.current);
+    return () => clearTimeout(copiedTimer.current);
+  }, [p?.path]);
   // 끄는 동안의 창 모양. 놓을 때 한 번만 저장한다.
   const [live, setLive] = useState<PreviewRect | null>(null);
   const stopDrag = useRef<(() => void) | null>(null);
@@ -97,6 +105,9 @@ export function Preview() {
   const office = previewConfig.office ? officeKind : null;
   const officeOff = !previewConfig.office && officeKind !== null;
   // 텍스트 본문. 3D 뷰어가 모델을 읽지 못하면 텍스트 형식은 이것으로 돌아간다.
+  // 텍스트 계열(텍스트·코드·마크다운·JSON)이 3D·Office 뷰어 없이 그려질 때만 복사 버튼을 보인다.
+  const showCopy = fresh && d?.kind === "text" && !model && !office;
+  const editing = !!edit && edit.path === p.path && d?.kind === "text" && !model && !office;
   const textBody = d?.kind === "text" ? (
     <>
               {isMarkdown(p.name) ? (
@@ -139,11 +150,43 @@ export function Preview() {
         >
           {p.name}
         </h2>
+          {editing && (
+            <span data-preview-edit-state className="mr-2 shrink-0 text-xs text-ink-dull">
+              {edit.saved ? "저장됨" : edit.text !== edit.base ? "편집 중 ●" : "편집 중"}
+            </span>
+          )}
+          {showCopy && (
+            <button
+              type="button"
+              aria-label="텍스트 복사"
+              title={d?.truncated ? `텍스트 복사 (앞부분만 복사됩니다 — 전체 ${size(d.size)})` : "텍스트 복사"}
+              onClick={() => {
+                void api.previewCopyText();
+                setCopied(true);
+                clearTimeout(copiedTimer.current);
+                copiedTimer.current = setTimeout(() => setCopied(false), 1500);
+              }}
+              data-copied={copied ? "true" : undefined}
+              className="mr-1 flex size-6 shrink-0 items-center justify-center rounded text-ink-dull hover:bg-app-selected hover:text-ink"
+            >
+              {/* 글자 대신 아이콘: 복사 직후 잠깐 체크 표시로 바뀐다. */}
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                {copied ? (
+                  <path d="M3 8.5l3.2 3.2L13 4.8" />
+                ) : (
+                  <>
+                    <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" />
+                    <path d="M10.5 5.5v-2a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 2.5 3.5V9A1.5 1.5 0 0 0 4 10.5h1.5" />
+                  </>
+                )}
+              </svg>
+            </button>
+          )}
           <button type="button" aria-label="닫기" title="닫기 (Esc)" onClick={() => api.previewClose()} className="mx-2 flex size-6 shrink-0 items-center justify-center rounded text-ink-dull hover:bg-app-selected hover:text-ink">
             ✕
           </button>
         </div>
-        <div ref={bodyRef} data-preview-body className={`td-thin-scroll min-h-0 flex-1 overflow-auto py-2 pl-3 pr-3 ${p.status === "loading" && d ? "opacity-60" : ""}`}>
+        <div ref={bodyRef} data-preview-body className={`td-thin-scroll min-h-0 flex-1 select-text overflow-auto py-2 pl-3 pr-3 ${p.status === "loading" && d ? "opacity-60" : ""}`}>
           {p.status === "loading" && (!d || model || office) && <p className="text-ink-faint">불러오는 중…</p>}
           {p.status === "error" && (
             <p role="alert" className="text-status-error">
@@ -152,7 +195,30 @@ export function Preview() {
           )}
           {d && model && fresh && <ModelView path={p.path} name={p.name} size={d.size} fallback={d.kind === "text" ? textBody : undefined} />}
           {d && office && fresh && <OfficeView path={p.path} kind={office} fileSize={d.size} sizeText={size(d.size)} />}
-          {d?.kind === "text" && !model && !office && textBody}
+          {d?.kind === "text" && !model && !office &&
+            (editing ? (
+              <textarea
+                data-preview-edit
+                aria-label="텍스트 편집"
+                // eslint-disable-next-line jsx-a11y/no-autofocus
+                autoFocus
+                spellCheck={false}
+                value={edit.text}
+                onChange={(e) => api.previewEditChange(e.target.value)}
+                onKeyDown={(e) => {
+                  // Esc는 미리보기 닫기가 아니라 편집 종료다(한글 조합 중의 Esc는 조합 취소에 쓰인다).
+                  if (e.key === "Escape" && !e.nativeEvent.isComposing) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    void api.previewEditEnd();
+                  }
+                }}
+                style={previewFont}
+                className="block h-full min-h-48 w-full resize-none bg-transparent font-mono text-xs outline-none"
+              />
+            ) : (
+              <div onDoubleClick={() => void api.previewEditStart()}>{textBody}</div>
+            ))}
           {d?.kind === "image" && !model && !office &&
             (d.dataUrl ? (
               <div className="flex h-full items-center justify-center">
@@ -181,7 +247,9 @@ export function Preview() {
             </p>
           )}
         </div>
-        <p className="shrink-0 border-t border-app-line bg-app-dark-box px-3 py-2 text-xs text-ink-faint">↑↓ 이전/다음 항목 · PageUp/PageDown 스크롤 · Enter {isArchiveName(p.name, zipExts) ? "압축 풀기" : "열기"} · Delete 삭제 · Space/Esc 닫기</p>
+        <p className="shrink-0 border-t border-app-line bg-app-dark-box px-3 py-2 text-xs text-ink-faint">
+          {editing ? "Mod+S 저장 · Esc 편집 종료" : `↑↓ 이전/다음 항목 · PageUp/PageDown 스크롤 · Enter ${isArchiveName(p.name, zipExts) ? "압축 풀기" : "열기"} · Delete 삭제 · Space/Esc 닫기 · 본문 더블클릭 편집`}
+        </p>
       </div>
     </div>
   );

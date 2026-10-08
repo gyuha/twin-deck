@@ -3,7 +3,7 @@ import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { BackendError } from "./backend";
 import type { Backend, SearchEvent } from "./backend";
 import { commands, events } from "./generated/bindings";
-import type { ConfigValue, ConflictDto, FileInfoDto, FindSpecDto, JobDto, LoadedState, PreviewDto, Snapshot, JobKindDto, Loaded, QueueItemDto, Result } from "./generated/bindings";
+import type { ConfigValue, ConflictDto, ExpectedFileDto, FileInfoDto, FindSpecDto, JobDto, LoadedState, PreviewDto, Snapshot, JobKindDto, Loaded, QueueItemDto, Result, WriteTextResultDto } from "./generated/bindings";
 
 function unwrap<T>(r: Result<T, string>): T {
   if (r.status === "error") throw new BackendError(r.error);
@@ -62,6 +62,9 @@ export class TauriBackend implements Backend {
   }
   async fileInfo(path: string): Promise<FileInfoDto> {
     return unwrap(await commands.fileInfo(path));
+  }
+  async writeTextFile(path: string, text: string, expected: ExpectedFileDto | null): Promise<WriteTextResultDto> {
+    return unwrap(await commands.writeTextFile(path, text, expected));
   }
   loadState(): Promise<LoadedState> {
     return commands.loadState();

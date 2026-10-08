@@ -19,6 +19,8 @@ import type {
   DiskSpaceDto,
   UpdateInfoDto,
   FindSpecDto,
+  ExpectedFileDto,
+  WriteTextResultDto,
 } from "./generated/bindings";
 import { globMatch } from "./glob";
 import defaultConfigJson from "./generated/default-config.json";
@@ -251,6 +253,30 @@ export class FakeBackend implements Backend {
     if (this.need(src).kind === "dir" && (destDir === src || destDir.startsWith(`${src}/`))) {
       throw new BackendError(`대상이 원본 자신이거나 그 하위입니다: ${destDir}`);
     }
+  }
+
+  /** `writeTextFile`이 받은 쓰기 기록(경로·글자). 테스트가 저장 횟수와 내용을 확인한다. */
+  readonly writes: { path: string; text: string }[] = [];
+  private mtime = 1_000_000;
+
+  async writeTextFile(path: string, text: string, expected: ExpectedFileDto | null): Promise<WriteTextResultDto> {
+    const n = this.nodes.get(path);
+    if (!n || n.kind !== "file") throw new Error(`${path}: 파일이 없습니다`);
+    const size = n.content.length;
+    const modifiedMs = n.modifiedMs ?? 0;
+    if (expected && (expected.size !== size || expected.modifiedMs !== modifiedMs)) return { saved: false, size, modifiedMs };
+    n.content = text;
+    n.modifiedMs = ++this.mtime;
+    this.writes.push({ path, text });
+    return { saved: true, size: text.length, modifiedMs: n.modifiedMs };
+  }
+
+  /** 밖에서 파일이 바뀐 것을 흉내 낸다(내용과 수정 시각을 바꾼다). */
+  externalWrite(path: string, content: string): void {
+    const n = this.nodes.get(path);
+    if (!n || n.kind !== "file") throw new Error(`${path}: 파일이 없습니다`);
+    n.content = content;
+    n.modifiedMs = ++this.mtime;
   }
 
   async fileInfo(path: string): Promise<FileInfoDto> {

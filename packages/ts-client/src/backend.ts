@@ -1,4 +1,4 @@
-import type { ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, LoadedState, PreviewDto, QueueItemDto, SearchStartDto, SearchSummaryDto, Snapshot, UpdateInfoDto, UserDirsDto, VolumeDto } from "./generated/bindings";
+import type { ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, ExpectedFileDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, LoadedState, PreviewDto, QueueItemDto, SearchStartDto, SearchSummaryDto, Snapshot, UpdateInfoDto, UserDirsDto, VolumeDto, WriteTextResultDto } from "./generated/bindings";
 
 /** Look Up / Flatten / Disk Usage가 스트리밍으로 보내는 이벤트. 작업마다 마지막은 `done`이다. */
 export type SearchEvent =
@@ -38,6 +38,8 @@ export interface Backend {
   queueClearFinished(): Promise<void>;
   /** 파일 정보 대화상자용 상세 정보. */
   fileInfo(path: string): Promise<FileInfoDto>;
+  /** 텍스트 파일을 덮어쓴다(미리보기 편집 저장). `expected`와 지금 파일의 크기·수정 시각이 다르면 쓰지 않고 `saved: false`를 돌려준다. */
+  writeTextFile(path: string, text: string, expected: ExpectedFileDto | null): Promise<WriteTextResultDto>;
   /** 이 창이 마지막으로 저장한 상태 (PANE-05). 없거나 읽을 수 없으면 snapshot이 null이고 경고가 올 수 있다. */
   loadState(): Promise<LoadedState>;
   saveState(snapshot: Snapshot): Promise<void>;
