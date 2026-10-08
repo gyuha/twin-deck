@@ -12,6 +12,7 @@ import type {
   LoadedState,
   PreviewDto,
   QueueItemDto,
+  QuickLookDto,
   SearchStartDto,
   Snapshot,
   UserDirsDto,
@@ -358,6 +359,20 @@ export class FakeBackend implements Backend {
     if (n.content.includes("\u0000")) return { ...base, kind: "other" };
     const limit = 64 * 1024;
     return { ...base, kind: "text", text: n.content.slice(0, limit), truncated: n.content.length > limit };
+  }
+
+  /** `quickLookPreview` 호출 기록과 요청 순번. */
+  readonly quickLookCalls: string[] = [];
+  readonly quickLookSeqs: number[] = [];
+  /** Quick Look 응답을 바꾼다(지연·오류 흉내). 없으면 파일 내용을 그대로 Quick Look이 만든 HTML로 본다. */
+  quickLookResponder: ((path: string) => Promise<QuickLookDto>) | null = null;
+
+  async quickLookPreview(path: string, seq: number): Promise<QuickLookDto> {
+    this.quickLookCalls.push(path);
+    this.quickLookSeqs.push(seq);
+    const n = this.need(path);
+    if (this.quickLookResponder) return this.quickLookResponder(path);
+    return { html: n.content, dir: `/tmp/ql${path}.qlpreview`, sheets: [] };
   }
 
   async globFilter(pattern: string, names: string[]) {

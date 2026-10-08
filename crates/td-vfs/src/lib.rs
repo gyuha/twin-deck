@@ -14,7 +14,7 @@ pub use entry::{Entry, EntryKind, FileId, ListOptions};
 pub use error::{Result, VfsError};
 pub use glob::glob_match;
 pub use info::Info;
-pub use local::LocalFs;
+pub use local::{nfd_path, LocalFs};
 pub use names::{compare_names, matches_prefix, normalize_name, sort_entries};
 pub use path::VfsPath;
 pub use preview::{

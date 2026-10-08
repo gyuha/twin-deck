@@ -16,7 +16,9 @@ import { PdfView } from "./PdfView";
 import { ModelView } from "./ModelView";
 import { modelKindOf } from "../lib/model/kinds";
 import { OfficeView } from "./OfficeView";
-import { officeKindOf } from "../lib/office/kinds";
+import { officeKindOf, quickLookKindOf } from "../lib/office/kinds";
+import { QuickLookView } from "./QuickLookView";
+import { useUi } from "./uiContext";
 
 const isMarkdown = (name: string) => /\.(md|markdown)$/i.test(name);
 
@@ -49,6 +51,7 @@ export function Preview() {
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const saved = useApp((s) => s.previewRect);
   const { api } = useAppStore();
+  const { platform } = useUi();
   const edit = useApp((s) => s.previewEdit);
   const [copied, setCopied] = useState(false); // 복사 버튼이 잠깐 "복사됨"을 보이는 동안
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -100,14 +103,16 @@ export function Preview() {
   // 항목을 넘기는 동안 `data`는 이전 파일의 것이다. 크기·내용으로 파일을 읽는 뷰어(3D·Office)는 새 항목의 데이터가 온 뒤에만 띄운다.
   const fresh = p.status === "ready";
   const model = p.isDir || isArchivePath(p.path) ? null : modelKindOf(p.name); // 3D 모델이면 서비스가 돌려준 kind와 무관하게 3D 뷰어로 보여 준다(압축 파일 안은 asset 프로토콜로 읽을 수 없어 제외)
-  const officeKind = p.isDir || model ? null : officeKindOf(p.name);
+  // macOS는 Office 문서를 설정과 관계없이 Quick Look 미리보기로 보여 준다(ADR-0014). 압축 안은 실제 파일이 아니라 제외한다.
+  const ql = platform === "mac" && !p.isDir && !model && !isArchivePath(p.path) ? quickLookKindOf(p.name) : null;
+  const officeKind = p.isDir || model || ql ? null : officeKindOf(p.name);
   // Office 문서도 같은 방식으로 kind와 무관하게 보여 준다. 설정 `preview.office`가 꺼져 있으면(기본) 미리 볼 수 없는 형식으로 둔다.
   const office = previewConfig.office ? officeKind : null;
   const officeOff = !previewConfig.office && officeKind !== null;
   // 텍스트 본문. 3D 뷰어가 모델을 읽지 못하면 텍스트 형식은 이것으로 돌아간다.
   // 텍스트 계열(텍스트·코드·마크다운·JSON)이 3D·Office 뷰어 없이 그려질 때만 복사 버튼을 보인다.
-  const showCopy = fresh && d?.kind === "text" && !model && !office;
-  const editing = !!edit && edit.path === p.path && d?.kind === "text" && !model && !office;
+  const showCopy = fresh && d?.kind === "text" && !model && !office && !ql;
+  const editing = !!edit && edit.path === p.path && d?.kind === "text" && !model && !office && !ql;
   const textBody = d?.kind === "text" ? (
     <>
               {isMarkdown(p.name) ? (
@@ -187,7 +192,7 @@ export function Preview() {
           </button>
         </div>
         <div ref={bodyRef} data-preview-body className={`td-thin-scroll min-h-0 flex-1 select-text overflow-auto py-2 pl-3 pr-3 ${p.status === "loading" && d ? "opacity-60" : ""}`}>
-          {p.status === "loading" && (!d || model || office) && <p className="text-ink-faint">불러오는 중…</p>}
+          {p.status === "loading" && !ql && (!d || model || office) && <p className="text-ink-faint">불러오는 중…</p>}
           {p.status === "error" && (
             <p role="alert" className="text-status-error">
               {p.error}
@@ -195,7 +200,8 @@ export function Preview() {
           )}
           {d && model && fresh && <ModelView path={p.path} name={p.name} size={d.size} fallback={d.kind === "text" ? textBody : undefined} />}
           {d && office && fresh && <OfficeView path={p.path} kind={office} fileSize={d.size} sizeText={size(d.size)} />}
-          {d?.kind === "text" && !model && !office &&
+          {ql && <QuickLookView key={p.path} path={p.path} name={p.name} fit={ql === "document"} />}
+          {d?.kind === "text" && !model && !office && !ql &&
             (editing ? (
               <textarea
                 data-preview-edit
@@ -219,7 +225,7 @@ export function Preview() {
             ) : (
               <div onDoubleClick={() => void api.previewEditStart()}>{textBody}</div>
             ))}
-          {d?.kind === "image" && !model && !office &&
+          {d?.kind === "image" && !model && !office && !ql &&
             (d.dataUrl ? (
               <div className="flex h-full items-center justify-center">
                 <img src={d.dataUrl} alt={p.name} className="max-h-full max-w-full object-contain" />
@@ -240,7 +246,7 @@ export function Preview() {
             ) : (
               <p className="text-ink-faint">PDF가 너무 커서 미리 볼 수 없습니다 ({size(d.size)})</p>
             ))}
-          {(d?.kind === "directory" || (d?.kind === "other" && !model && !office)) && (
+          {(d?.kind === "directory" || (d?.kind === "other" && !model && !office && !ql)) && (
             <p className="text-ink-faint">
               {KIND_LABEL[d.kind]} — {officeOff ? "Office 문서 미리보기가 꺼져 있습니다 (설정의 미리보기에서 켤 수 있습니다)" : "미리 볼 수 없는 형식입니다"}
               {d.kind === "other" ? ` (${size(d.size)})` : ""}

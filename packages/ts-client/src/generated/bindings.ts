@@ -61,6 +61,18 @@ async previewFile(path: string) : Promise<Result<PreviewDto, string>> {
 }
 },
 /**
+ * macOS Quick Look으로 Office 문서의 HTML 미리보기를 만든다. 최대 10초 걸릴 수 있어 메인 스레드가 아닌 곳에서 돌린다.
+ * `seq`는 요청 순번(클수록 최근)이다. 명령이 보낸 순서와 다르게 들어와도 최근 요청이 이긴다.
+ */
+async quicklookPreview(path: string, seq: number) : Promise<Result<QuickLookDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("quicklook_preview", { path, seq }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * 텍스트 파일을 덮어쓴다(미리보기 편집 저장). `expected`가 있으면 쓰기 직전에 파일 상태를 비교한다.
  */
 async writeTextFile(path: string, text: string, expected: ExpectedFileDto | null) : Promise<Result<WriteTextResultDto, string>> {
@@ -671,6 +683,7 @@ video_autoplay: boolean;
 close_on_outside_click: boolean; 
 /**
  * Office 문서(docx·xlsx·pptx)의 데이터 미리보기를 보여 준다. 읽기가 느리고 실제 문서 화면과 달라 기본은 끈다.
+ * macOS는 이 값과 관계없이 Office 문서에 Quick Look 미리보기를 쓴다(ADR-0014).
  */
 office: boolean }
 /**
@@ -691,6 +704,15 @@ export type QueueItemDto = { src: string;
  * 복사/이동의 대상 폴더. 휴지통/삭제에서는 null.
  */
 destDir: string | null; policy: ConflictDto }
+/**
+ * Quick Look이 만든 미리보기. `html`은 `Preview.html` 원문이고, 그 안의 `AttachmentN.*` 참조는 `dir` 폴더에 있다.
+ * 여러 시트 xlsx면 `sheets`에 시트가 순서대로 들어 있고(둘 이상), 이때 `html`은 JS로 탭을 바꾸는 껍데기라 쓰지 않는다.
+ */
+export type QuickLookDto = { html: string; dir: string; sheets: QuickLookSheetDto[] }
+/**
+ * 여러 시트 xlsx의 시트 하나. `html`의 첨부 참조도 `QuickLookDto::dir` 폴더에 있다.
+ */
+export type QuickLookSheetDto = { name: string; html: string }
 export type QuickSelect = { match_only_prefix: boolean; activate_on_any_character: boolean }
 /**
  * Look Up / Flatten 결과가 더 도착했다.

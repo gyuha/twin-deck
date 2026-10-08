@@ -224,7 +224,7 @@ impl Vfs for LocalFs {
 /// 폴더를 읽어 목록을 캐시한 뒤에는 그 폴더 안에 파일도 못 만든다. NFD 경로로는 된다.
 /// APFS는 두 형태를 같은 이름으로 다루지만 형태를 그대로 저장하는 파일 시스템도 있어, NFC가 실패했을 때만 쓴다.
 #[cfg(target_os = "macos")]
-fn nfd_path(path: &std::path::Path) -> Option<PathBuf> {
+pub fn nfd_path(path: &std::path::Path) -> Option<PathBuf> {
     use unicode_normalization::UnicodeNormalization;
     let out: PathBuf = path
         .components()
@@ -234,7 +234,7 @@ fn nfd_path(path: &std::path::Path) -> Option<PathBuf> {
 }
 
 #[cfg(not(target_os = "macos"))]
-fn nfd_path(_path: &std::path::Path) -> Option<PathBuf> {
+pub fn nfd_path(_path: &std::path::Path) -> Option<PathBuf> {
     None
 }
 

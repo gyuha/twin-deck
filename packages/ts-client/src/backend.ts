@@ -1,4 +1,4 @@
-import type { ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, ExpectedFileDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, LoadedState, PreviewDto, QueueItemDto, SearchStartDto, SearchSummaryDto, Snapshot, UpdateInfoDto, UserDirsDto, VolumeDto, WriteTextResultDto } from "./generated/bindings";
+import type { ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, ExpectedFileDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, LoadedState, PreviewDto, QueueItemDto, QuickLookDto, SearchStartDto, SearchSummaryDto, Snapshot, UpdateInfoDto, UserDirsDto, VolumeDto, WriteTextResultDto } from "./generated/bindings";
 
 /** Look Up / Flatten / Disk Usage가 스트리밍으로 보내는 이벤트. 작업마다 마지막은 `done`이다. */
 export type SearchEvent =
@@ -59,6 +59,11 @@ export interface Backend {
   newWindow(): Promise<string>;
   /** 미리보기: 텍스트 앞부분, 이미지 data URL, 종류 판별. */
   preview(path: string): Promise<PreviewDto>;
+  /**
+   * macOS Quick Look이 만든 Office 문서의 HTML 미리보기(ADR-0014). `seq`는 요청 순번(클수록 최근)이다.
+   * 더 큰 순번의 요청이 오면 이전 요청은 취소 오류로 끝나고, 늦게 들어온 작은 순번의 요청은 바로 취소된다.
+   */
+  quickLookPreview(path: string, seq: number): Promise<QuickLookDto>;
   /** glob 패턴과 일치하는 이름의 인덱스 (Select Group). */
   globFilter(pattern: string, names: string[]): Promise<number[]>;
   /** 웹뷰가 파일을 직접 읽어 재생할 수 있는 주소(비디오처럼 큰 파일을 데이터로 싣지 않고 스트리밍한다). */

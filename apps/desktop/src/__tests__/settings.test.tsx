@@ -108,7 +108,7 @@ describe("설정 값 바꾸기", () => {
     await waitFor(async () => expect((await backend.getConfig()).config.behavior.theme).toBe("solarized-light"));
   });
 
-  it("Office 문서 미리보기 스위치: 기본은 꺼짐이고 설명에 데이터만 보는 기능이라 적혀 있으며, 켜면 저장된다", async () => {
+  it("Office 문서 미리보기 스위치: 기본은 꺼짐이고 설명에 데이터만 보는 기능이며 macOS는 Quick Look으로 보여 준다고 적혀 있고, 켜면 저장된다", async () => {
     const { user, backend } = await renderApp();
     await open(user);
     await dialog();
@@ -117,6 +117,7 @@ describe("설정 값 바꾸기", () => {
     expect(sw).toHaveAttribute("aria-checked", "false");
     const row = screen.getByRole("group", { name: "Office 문서 미리보기" });
     expect(row).toHaveTextContent("데이터만 보는 기능");
+    expect(row).toHaveTextContent("macOS는 이 설정과 관계없이 Office 문서를 Quick Look으로");
     await user.click(sw);
     await waitFor(async () => expect((await backend.getConfig()).config.preview.office).toBe(true));
   });

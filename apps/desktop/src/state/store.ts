@@ -310,6 +310,8 @@ export interface AppState {
   preview: PreviewState | null;
   /** 미리보기에서 편집 중인 텍스트. 편집 중이 아니면 null. */
   previewEdit: PreviewEdit | null;
+  /** Quick Look 미리보기(macOS xlsx)에서 보고 있는 시트. 시트가 둘 이상인 파일을 보고 있을 때만 있다. */
+  previewSheet: { path: string; index: number; count: number } | null;
   /** 진행 중인 드래그(행을 끌어 다른 폴더·패널에 놓기). 없으면 null. */
   drag: DragState | null;
   /** 탭을 끌고 있을 때 놓일 반대쪽 패널(그 패널의 탭 줄이 놓일 곳으로 표시된다). 없으면 null. */
@@ -513,6 +515,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     settingsOpen: false,
     settingsPane: "left",
     previewEdit: null,
+    previewSheet: null,
     helpOpen: false,
     find: null,
     lastFind: null,
@@ -1937,6 +1940,24 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     /** 웹뷰가 파일을 직접 읽어 재생할 수 있는 주소(비디오 미리보기). */
     fileUrl(path: string): string {
       return backend.fileUrl(path);
+    },
+    /** macOS Quick Look이 만든 Office 문서 미리보기(ADR-0014). `seq`는 요청 순번(클수록 최근)이다. */
+    quickLookPreview(path: string, seq: number) {
+      return backend.quickLookPreview(path, seq);
+    },
+    /** Quick Look 미리보기가 시트 `count`개짜리 파일을 열었다. 첫 시트부터 보인다. */
+    previewSheetsLoaded(path: string, count: number) {
+      set({ previewSheet: count > 1 ? { path, index: 0, count } : null });
+    },
+    /** 보고 있는 시트를 고른다. */
+    previewSheetSelect(index: number) {
+      set((s) => (s.previewSheet && index >= 0 && index < s.previewSheet.count ? { previewSheet: { ...s.previewSheet, index } } : {}));
+    },
+    /** 다음(1)·이전(-1) 시트로 간다. 끝에서는 처음으로 돌아간다. 지금 미리보기의 파일이 아니면 아무 일도 없다. */
+    previewSheetStep(delta: 1 | -1) {
+      const { previewSheet: ps, preview } = get();
+      if (!ps || ps.path !== preview?.path) return;
+      set({ previewSheet: { ...ps, index: (ps.index + delta + ps.count) % ps.count } });
     },
     isDragActive(): boolean {
       return get().drag !== null;

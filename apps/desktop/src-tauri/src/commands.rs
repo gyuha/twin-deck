@@ -10,6 +10,7 @@ use td_ops::SystemTrash;
 use td_state::{LoadedState, Snapshot, Spawner};
 use td_volumes::{SystemUnmounter, Volumes};
 
+use crate::quicklook::QuickLookDto;
 use crate::service::{
     edit, open_file, reveal, reveal_config, ConflictDto, EntryDto, ExpectedFileDto, FileInfoDto,
     FindSpecDto, JobDto, JobKindDto, PreviewDto, QueueItemDto, SearchStartDto, SearchSummaryDto,
@@ -256,6 +257,18 @@ pub fn write_text_file(
 #[specta::specta]
 pub fn preview_file(svc: State<'_, AppService>, path: String) -> ServiceResult<PreviewDto> {
     svc.preview(&path)
+}
+
+/// macOS Quick Look으로 Office 문서의 HTML 미리보기를 만든다. 최대 10초 걸릴 수 있어 메인 스레드가 아닌 곳에서 돌린다.
+/// `seq`는 요청 순번(클수록 최근)이다. 명령이 보낸 순서와 다르게 들어와도 최근 요청이 이긴다.
+#[tauri::command(async)]
+#[specta::specta]
+pub fn quicklook_preview(
+    svc: State<'_, AppService>,
+    path: String,
+    seq: f64,
+) -> ServiceResult<QuickLookDto> {
+    svc.quicklook_preview(&path, seq)
 }
 
 /// `pattern`과 일치하는 이름의 인덱스를 돌려준다 (Select Group).
@@ -658,6 +671,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             new_window,
             file_info,
             preview_file,
+            quicklook_preview,
             write_text_file,
             glob_filter,
             reveal_path,
