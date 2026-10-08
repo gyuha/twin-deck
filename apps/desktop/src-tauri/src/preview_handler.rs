@@ -1,10 +1,13 @@
 //! Windows 미리보기 처리기(탐색기 미리보기 창이 쓰는 `IPreviewHandler`)로 Office 문서를 앱 창 위에 겹쳐 보여 준다 (ADR-0015).
-//! 이 파일의 앞부분은 어느 OS에서나 컴파일되는 순수 함수(처리기 찾기, 좌표 변환)이고, 실제 창·COM은 `host`(Windows 전용)에 있다.
+//! 이 파일의 앞부분은 순수 함수(처리기 찾기, 좌표 변환)이고, 실제 창·COM은 `host`(Windows 전용)에 있다.
+//! 처리기 찾기·인터넷 출처 판정·실패 꼬리표는 `host`만 쓰므로 Windows 빌드와 테스트에서만 컴파일한다(다른 OS에서는 쓰이지 않는 코드가 되어 clippy `-D warnings`를 깨뜨린다).
 
 /// 미리보기 처리기 등록에 쓰는 인터페이스 ID(`IPreviewHandler`). `shellex` 아래 이 이름의 키가 처리기 CLSID를 가리킨다.
+#[cfg(any(windows, test))]
 pub const PREVIEW_HANDLER_IID: &str = "{8895b1c6-b41f-4c1c-a562-0d564250836f}";
 
 /// `{xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx}` 모양인가.
+#[cfg(any(windows, test))]
 fn is_clsid(s: &str) -> bool {
     let b = s.as_bytes();
     if b.len() != 38 || b[0] != b'{' || b[37] != b'}' {
@@ -19,6 +22,7 @@ fn is_clsid(s: &str) -> bool {
 /// 확장자(`docx` 또는 `.docx`)에 등록된 미리보기 처리기의 CLSID를 찾는다. 없으면 None.
 /// `lookup`은 `HKEY_CLASSES_ROOT` 아래 키 경로(`.docx\shellex\{…}`)의 기본값을 돌려준다.
 /// 찾는 순서: 확장자 키 → 확장자가 가리키는 ProgID 키 → `SystemFileAssociations`.
+#[cfg(any(windows, test))]
 pub fn find_handler_clsid(ext: &str, lookup: &dyn Fn(&str) -> Option<String>) -> Option<String> {
     let ext = ext.trim().trim_start_matches('.').to_ascii_lowercase();
     // 키 경로를 벗어나는 값(`..\x`)이나 빈 확장자는 찾지 않는다.
@@ -44,6 +48,7 @@ pub fn find_handler_clsid(ext: &str, lookup: &dyn Fn(&str) -> Option<String>) ->
 
 /// `Zone.Identifier`(인터넷 출처 표시, Mark of the Web) 내용에서 `ZoneId` 값을 읽는다. 없거나 숫자가 아니면 None.
 /// 0 내 컴퓨터, 1 인트라넷, 2 신뢰, 3 인터넷, 4 제한됨.
+#[cfg(any(windows, test))]
 pub fn parse_zone_id(text: &str) -> Option<u32> {
     text.lines().find_map(|line| {
         let (key, value) = line.split_once('=')?;
@@ -55,6 +60,7 @@ pub fn parse_zone_id(text: &str) -> Option<u32> {
 }
 
 /// 이 영역이면 Office 처리기가 미리보기를 막는다(인터넷·제한됨).
+#[cfg(any(windows, test))]
 pub fn zone_blocks_preview(zone_id: u32) -> bool {
     zone_id >= 3
 }
@@ -73,6 +79,7 @@ pub enum ShowOutcome {
 
 /// 처리기가 실패했을 때 오류 뒤에 붙일 진단 꼬리표: 어느 처리기를 어떤 영역으로 띄우다 실패했는지.
 /// 로그를 따로 받지 않아도 사용자가 화면의 오류 문구만 전해 주면 원인을 좁힐 수 있게 한다.
+#[cfg(any(windows, test))]
 pub fn failure_context(clsid: &str, rect: PxRect) -> String {
     format!(
         "처리기 {clsid}, 영역 {}×{} 위치 ({}, {})",
