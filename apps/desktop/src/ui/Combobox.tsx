@@ -1,3 +1,4 @@
+import { useT } from "../state/context";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { fuzzyScore } from "../lib/fuzzy";
 
@@ -30,6 +31,7 @@ const LIST_MAX = 256;
  * 입력으로 퍼지 필터링하고 ↑↓로 고르고 Enter로 확정, Esc는 이 목록만 닫는다(설정 화면은 닫히지 않는다).
  */
 export function Combobox({ value, options, onChange, onPreview, disabled, label, className, triggerText }: Props) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(0);
@@ -122,11 +124,11 @@ export function Combobox({ value, options, onChange, onPreview, disabled, label,
             <input
               ref={input}
               role="searchbox"
-              aria-label={`${label} 검색`}
+              aria-label={t("combo.search", { label })}
               aria-controls={listId}
               aria-activedescendant={shown.length > 0 ? `${listId}-${cursor}` : undefined}
               value={query}
-              placeholder="검색…"
+              placeholder={t("combo.placeholder")}
               onChange={(e) => {
                 touched.current = true;
                 setQuery(e.target.value);
@@ -166,7 +168,7 @@ export function Combobox({ value, options, onChange, onPreview, disabled, label,
                   {o.value === value && <span aria-hidden>✓</span>}
                 </li>
               ))}
-              {shown.length === 0 && <li className="px-2 py-3 text-center text-xs text-ink-faint">일치하는 항목이 없습니다</li>}
+              {shown.length === 0 && <li className="px-2 py-3 text-center text-xs text-ink-faint">{t("combo.none")}</li>}
             </ul>
           </div>
         </div>

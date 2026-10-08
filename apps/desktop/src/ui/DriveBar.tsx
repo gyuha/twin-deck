@@ -1,5 +1,5 @@
 import { volumeOf } from "../lib/volumes";
-import { useApp, useAppStore } from "../state/context";
+import { useApp, useAppStore, useT } from "../state/context";
 import { activeTab } from "../state/store";
 import type { PaneId } from "../state/store";
 
@@ -10,6 +10,7 @@ import type { PaneId } from "../state/store";
  * `behavior.layout.show_drive_bar`로 끈다(설정 화면, 메뉴바 View 메뉴, `core.view.drive_bar`).
  */
 export function DriveBar({ pane }: { pane: PaneId }) {
+  const t = useT();
   const { api } = useAppStore();
   const volumes = useApp((s) => s.volumes);
   const path = useApp((s) => activeTab(s, pane).path);
@@ -17,10 +18,10 @@ export function DriveBar({ pane }: { pane: PaneId }) {
   const show = useApp((s) => s.loaded.config.behavior.layout.show_drive_bar);
   if (!show || volumes.length === 0) return null;
   const current = virtual ? null : volumeOf(path, volumes);
-  const side = pane === "left" ? "왼쪽" : "오른쪽";
+  const side = pane === "left" ? t("common.left") : t("common.right");
   return (
     <div className="shrink-0 border-b border-app-line text-xs">
-      <div role="toolbar" aria-label={`드라이브 (${side} 패널)`} className="flex flex-wrap items-center gap-1 px-2 py-1">
+      <div role="toolbar" aria-label={t("drive.aria", { side })} className="flex flex-wrap items-center gap-1 px-2 py-1">
         {volumes.map((v) => {
           const on = current?.mountPoint === v.mountPoint;
           return (
@@ -37,9 +38,9 @@ export function DriveBar({ pane }: { pane: PaneId }) {
           );
         })}
         {current && current.mountPoint !== "/" && current.mountPoint !== volumes[0].mountPoint && (
-          <span role="group" aria-label={`현재 볼륨 (${side} 패널)`} className="ml-auto flex shrink-0 items-center gap-2">
-            <button type="button" aria-label="언마운트" className="rounded border border-app-line px-2 py-0.5 hover:bg-app-selected" onClick={() => void api.unmountVolume(pane)}>
-              ⏏ 언마운트
+          <span role="group" aria-label={t("drive.current_aria", { side })} className="ml-auto flex shrink-0 items-center gap-2">
+            <button type="button" aria-label={t("drive.unmount")} className="rounded border border-app-line px-2 py-0.5 hover:bg-app-selected" onClick={() => void api.unmountVolume(pane)}>
+              ⏏ {t("drive.unmount")}
             </button>
           </span>
         )}

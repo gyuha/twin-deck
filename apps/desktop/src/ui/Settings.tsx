@@ -6,7 +6,8 @@ import { defaultLoaded } from "@twin-deck/ts-client";
 import { APP_ACTIONS, APP_LAUNCH_ACTION, APP_OPEN_FOLDER_ACTION } from "../lib/fkeys";
 import { THEMES } from "../lib/themes.generated";
 import { parseThemeList } from "../lib/themeColors";
-import { useApp, useAppStore } from "../state/context";
+import { actionTitle, currentLanguage, LOCALES, t as translate } from "../i18n";
+import { useApp, useAppStore, useT } from "../state/context";
 import { Combobox } from "./Combobox";
 import type { ComboOption } from "./Combobox";
 import { Switch } from "./Switch";
@@ -18,7 +19,7 @@ type Control =
   | { type: "int" }
   | { type: "text" }
   | { type: "color" }
-  | { type: "select"; options: readonly string[] }
+  | { type: "select"; options: readonly string[]; labels?: Record<string, string> }
   /** 검색 입력이 있는 선택 상자(항목이 많을 때). */
   | { type: "combo"; options: readonly ComboOption[] }
   | { type: "tags"; options: readonly ComboOption[] }
@@ -31,16 +32,42 @@ interface Item {
   control: Control;
 }
 
+/** 긴 설명을 ⓘ 아이콘에 숨기고, 마우스를 올리거나 포커스하면 말풍선으로 보인다(글자는 DOM에 있어 보조 기기에도 읽힌다). */
+function InfoTip({ text }: { text: string }) {
+  return (
+    <span className="group relative inline-flex">
+      <span tabIndex={0} aria-label={text} className="flex size-4 cursor-help items-center justify-center rounded-full border border-app-line text-[10px] leading-none text-ink-dull outline-none hover:bg-app-selected focus:bg-app-selected">
+        i
+      </span>
+      <span role="tooltip" className="pointer-events-none absolute left-0 top-full z-30 mt-1 w-64 max-w-[70vw] whitespace-normal rounded border border-app-line bg-app-box p-2 text-xs font-normal text-ink opacity-0 shadow-lg group-hover:opacity-100 group-focus-within:opacity-100">
+        {text}
+      </span>
+    </span>
+  );
+}
+
+/** 지금 언어로 읽히는 항목 글자(getter라 화면을 그릴 때마다 사전을 다시 본다). */
+const langItem: Item = {
+  key: "behavior.language",
+  get title() {
+    return translate("settings.language.title");
+  },
+  get desc() {
+    return translate("settings.language.desc");
+  },
+  control: { type: "select", options: LOCALES.map((l) => l.code), labels: Object.fromEntries(LOCALES.map((l) => [l.code, l.name])) },
+};
+
 // system·light·dark 뒤에 apps/desktop/themes의 테마가 이어진다(td-config의 THEME_IDS와 같은 생성 원본). 112개라 검색 상자로 고른다.
 // 검색은 보이는 이름 말고 파일 이름(dracula-default)과 밝기 표시(어두움/밝음)로도 된다.
-const THEME_CHOICES: readonly ComboOption[] = [
-  { value: "system", label: "system · OS 설정을 따름" },
+const themeChoices = (): readonly ComboOption[] => [
+  { value: "system", label: translate("settings.theme.system") },
   { value: "light", label: "light · Catppuccin Latte" },
   { value: "dark", label: "dark · Catppuccin Mocha" },
-  ...THEMES.map((t) => ({ value: t.id, label: `${t.name} · ${t.dark ? "어두움" : "밝음"}`, keywords: t.id })),
+  ...THEMES.map((t) => ({ value: t.id, label: `${t.name} · ${t.dark ? translate("settings.theme.dark") : translate("settings.theme.light")}`, keywords: t.id })),
 ];
 // 랜덤 테마 후보는 system·light·dark 없이 테마 이름만 받는다.
-const THEME_TAG_CHOICES: readonly ComboOption[] = THEME_CHOICES.slice(3);
+const themeTagChoices = (): readonly ComboOption[] => themeChoices().slice(3);
 // size_format의 허용 값은 td-config의 검증 목록과 같아야 한다(crates/td-config/src/load.rs).
 const SIZE_FORMATS = ["adaptive", "adaptive_kibi", "bytes", "KB", "MB"] as const;
 // folder_style의 허용 값도 td-config의 검증 목록(ENUMS)과 같아야 한다.
@@ -50,67 +77,68 @@ const FOLDER_STYLES = ["none", "brackets", "parens", "slash"] as const;
 
 const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
   {
-    title: "모양",
+    get title() { return translate("settings.section.appearance.title"); },
     items: [
-      { key: "behavior.theme", title: "테마", desc: "system은 OS의 밝기 설정을 따라 Catppuccin Mocha(다크)/Latte(라이트)를 씁니다. light·dark도 같은 둘이고, 그 밖의 이름은 그 테마 하나를 씁니다", control: { type: "combo", options: THEME_CHOICES } },
-      { key: "behavior.random_theme", title: "랜덤 테마", desc: "켜면 위의 테마 설정은 쓰지 않고, 아래 목록의 테마 중 하나를 앱을 켤 때마다 무작위로 씁니다. 목록이 비어 있으면 위의 테마를 씁니다", control: { type: "switch" } },
-      { key: "behavior.random_themes", title: "랜덤 테마 목록", desc: "후보로 쓸 테마를 태그로 추가합니다. \"+ 테마 추가\"에서 이름·밝기로 검색하고, 목록을 움직이면 색이 미리 바뀝니다. ✕로 삭제", control: { type: "tags", options: THEME_TAG_CHOICES } },
-      { key: "behavior.ui_font", title: "UI 글꼴", desc: "앱 화면 전체의 글꼴. CSS font-family 값(예: Pretendard, sans-serif). 기본은 macOS Menlo·Windows Consolas. 비우면 앱 기본 고정폭", control: { type: "text" } },
-      { key: "behavior.preview_font", title: "미리보기 글꼴", desc: "텍스트·코드·JSON·Markdown 미리보기 본문의 글꼴. 비우면 기본 글꼴", control: { type: "text" } },
-      { key: "behavior.text_color", title: "글자 색", desc: "앱 기본 글자색. 색상환으로 고르거나 #rrggbb를 씁니다. 비우면 테마 그대로이고, 흐린 글자는 이 색을 배경 쪽으로 섞어 자동으로 만듭니다. 색은 테마와 무관하게 하나라서, 테마(특히 system)가 바뀌면 읽기 어려울 수 있으니 그때는 비우세요", control: { type: "color" } },
-      { key: "behavior.table.icon_size", title: "아이콘 크기", desc: "파일 목록 행의 아이콘(px)", control: { type: "int" } },
-      { key: "behavior.table.zebra_rows", title: "줄무늬 행", desc: "파일 목록의 행 배경을 번갈아 옅게 칠합니다", control: { type: "switch" } },
-      { key: "behavior.table.show_marks", title: "표시 칸", desc: "행 맨 앞의 선택(●)·폴더(▸) 표시 칸. 끄면 칸이 사라지고 선택은 굵은 강조색 글씨로만 보입니다", control: { type: "switch" } },
-      { key: "behavior.table.folder_style", title: "폴더 모양", desc: "폴더 이름을 꾸밉니다: none, brackets [이름], parens (이름), slash 이름/. 화면 표시만 바뀝니다", control: { type: "select", options: FOLDER_STYLES } },
-      { key: "behavior.table.cursor_fill", title: "커서 행 꽉 채움", desc: "활성 패널의 커서 행을 강조색으로 꽉 채웁니다", control: { type: "switch" } },
-      { key: "behavior.layout.pane_highlight", title: "패널 테두리 강조", desc: "활성 패널을 강조색 테두리로 둘러쌉니다. 끄면 커서 행으로만 구분됩니다", control: { type: "switch" } },
-      { key: "behavior.layout.tab_style", title: "탭 모양", desc: "underline은 글자 + 활성 탭 밑줄, segments는 탭이 폭을 똑같이 나누고 활성 탭은 배경으로 구분합니다", control: { type: "select", options: TAB_STYLES } },
-      { key: "behavior.layout.tab_close_button", title: "탭 닫기 버튼", desc: "마우스를 올린 탭의 오른쪽에 ✕를 보이고 누르면 닫습니다. 켜면 모든 탭의 좌우 여백이 넓어집니다. 탭이 하나뿐이면 보이지 않습니다", control: { type: "switch" } },
-      { key: "behavior.layout.show_action_bar", title: "Action Bar 표시", desc: "아래쪽 단축키 버튼 줄", control: { type: "switch" } },
-      { key: "behavior.layout.action_bar_by_modifier", title: "Action Bar 조합키는 누를 때만", desc: "Shift 등을 누르는 동안에만 그 조합 키의 버튼을 보인다. 끄면 전부 보인다", control: { type: "switch" } },
-      { key: "behavior.layout.recent_limit", title: "최근 위치 개수", desc: "최근 위치 메뉴에 기억하는 폴더 수(양쪽 패널 공용, 창을 닫아도 유지)", control: { type: "int" } },
-      { key: "behavior.layout.show_drive_bar", title: "드라이브 바 표시", desc: "패널 위의 볼륨 버튼과 언마운트 한 줄(용량은 이 줄과 별개로 경로 표시줄 오른쪽 끝에 보입니다)", control: { type: "switch" } },
+      langItem,
+      { key: "behavior.theme", get title() { return translate("settings.item.behavior.theme.title"); }, get desc() { return translate("settings.item.behavior.theme.desc"); }, get control() { return { type: "combo", options: themeChoices() } as const; } },
+      { key: "behavior.random_theme", get title() { return translate("settings.item.behavior.random_theme.title"); }, get desc() { return translate("settings.item.behavior.random_theme.desc"); }, control: { type: "switch" } },
+      { key: "behavior.random_themes", get title() { return translate("settings.item.behavior.random_themes.title"); }, get desc() { return translate("settings.item.behavior.random_themes.desc"); }, get control() { return { type: "tags", options: themeTagChoices() } as const; } },
+      { key: "behavior.ui_font", get title() { return translate("settings.item.behavior.ui_font.title"); }, get desc() { return translate("settings.item.behavior.ui_font.desc"); }, control: { type: "text" } },
+      { key: "behavior.preview_font", get title() { return translate("settings.item.behavior.preview_font.title"); }, get desc() { return translate("settings.item.behavior.preview_font.desc"); }, control: { type: "text" } },
+      { key: "behavior.text_color", get title() { return translate("settings.item.behavior.text_color.title"); }, get desc() { return translate("settings.item.behavior.text_color.desc"); }, control: { type: "color" } },
+      { key: "behavior.table.icon_size", get title() { return translate("settings.item.behavior.table.icon_size.title"); }, get desc() { return translate("settings.item.behavior.table.icon_size.desc"); }, control: { type: "int" } },
+      { key: "behavior.table.zebra_rows", get title() { return translate("settings.item.behavior.table.zebra_rows.title"); }, get desc() { return translate("settings.item.behavior.table.zebra_rows.desc"); }, control: { type: "switch" } },
+      { key: "behavior.table.show_marks", get title() { return translate("settings.item.behavior.table.show_marks.title"); }, get desc() { return translate("settings.item.behavior.table.show_marks.desc"); }, control: { type: "switch" } },
+      { key: "behavior.table.folder_style", get title() { return translate("settings.item.behavior.table.folder_style.title"); }, get desc() { return translate("settings.item.behavior.table.folder_style.desc"); }, control: { type: "select", options: FOLDER_STYLES } },
+      { key: "behavior.table.cursor_fill", get title() { return translate("settings.item.behavior.table.cursor_fill.title"); }, get desc() { return translate("settings.item.behavior.table.cursor_fill.desc"); }, control: { type: "switch" } },
+      { key: "behavior.layout.pane_highlight", get title() { return translate("settings.item.behavior.layout.pane_highlight.title"); }, get desc() { return translate("settings.item.behavior.layout.pane_highlight.desc"); }, control: { type: "switch" } },
+      { key: "behavior.layout.tab_style", get title() { return translate("settings.item.behavior.layout.tab_style.title"); }, get desc() { return translate("settings.item.behavior.layout.tab_style.desc"); }, control: { type: "select", options: TAB_STYLES } },
+      { key: "behavior.layout.tab_close_button", get title() { return translate("settings.item.behavior.layout.tab_close_button.title"); }, get desc() { return translate("settings.item.behavior.layout.tab_close_button.desc"); }, control: { type: "switch" } },
+      { key: "behavior.layout.show_action_bar", get title() { return translate("settings.item.behavior.layout.show_action_bar.title"); }, get desc() { return translate("settings.item.behavior.layout.show_action_bar.desc"); }, control: { type: "switch" } },
+      { key: "behavior.layout.action_bar_by_modifier", get title() { return translate("settings.item.behavior.layout.action_bar_by_modifier.title"); }, get desc() { return translate("settings.item.behavior.layout.action_bar_by_modifier.desc"); }, control: { type: "switch" } },
+      { key: "behavior.layout.recent_limit", get title() { return translate("settings.item.behavior.layout.recent_limit.title"); }, get desc() { return translate("settings.item.behavior.layout.recent_limit.desc"); }, control: { type: "int" } },
+      { key: "behavior.layout.show_drive_bar", get title() { return translate("settings.item.behavior.layout.show_drive_bar.title"); }, get desc() { return translate("settings.item.behavior.layout.show_drive_bar.desc"); }, control: { type: "switch" } },
     ],
   },
   {
-    title: "목록과 선택",
+    get title() { return translate("settings.section.list.title"); },
     items: [
-      { key: "behavior.table.circular_selection", title: "순환 선택", desc: "목록 끝에서 처음으로 넘어갑니다", control: { type: "switch" } },
-      { key: "behavior.table.right_click_select", title: "우클릭 선택", desc: "오른쪽 클릭으로 항목을 선택에 넣고 뺍니다", control: { type: "switch" } },
-      { key: "behavior.quick_select.match_only_prefix", title: "Quick Select 접두 일치", desc: "이름의 앞부분이 맞는 항목만 찾습니다", control: { type: "switch" } },
-      { key: "behavior.quick_select.activate_on_any_character", title: "아무 문자로 Quick Select 시작", desc: "글자를 치면 바로 찾기가 시작됩니다", control: { type: "switch" } },
+      { key: "behavior.table.circular_selection", get title() { return translate("settings.item.behavior.table.circular_selection.title"); }, get desc() { return translate("settings.item.behavior.table.circular_selection.desc"); }, control: { type: "switch" } },
+      { key: "behavior.table.right_click_select", get title() { return translate("settings.item.behavior.table.right_click_select.title"); }, get desc() { return translate("settings.item.behavior.table.right_click_select.desc"); }, control: { type: "switch" } },
+      { key: "behavior.quick_select.match_only_prefix", get title() { return translate("settings.item.behavior.quick_select.match_only_prefix.title"); }, get desc() { return translate("settings.item.behavior.quick_select.match_only_prefix.desc"); }, control: { type: "switch" } },
+      { key: "behavior.quick_select.activate_on_any_character", get title() { return translate("settings.item.behavior.quick_select.activate_on_any_character.title"); }, get desc() { return translate("settings.item.behavior.quick_select.activate_on_any_character.desc"); }, control: { type: "switch" } },
     ],
   },
   {
-    title: "표시 형식",
+    get title() { return translate("settings.section.format.title"); },
     items: [
-      { key: "display.relative_date", title: "상대 날짜", desc: "오늘, 어제처럼 보여 줍니다", control: { type: "switch" } },
-      { key: "display.date_format", title: "날짜 형식", desc: "strftime 형식", control: { type: "text" } },
-      { key: "display.time_format", title: "시간 형식", desc: "strftime 형식", control: { type: "text" } },
-      { key: "display.size_format", title: "크기 형식", control: { type: "select", options: SIZE_FORMATS } },
-      { key: "display.folder_size_on_select", title: "선택한 폴더 용량 계산", desc: "폴더를 선택하면 하위 파일의 총 용량을 계산해 크기 칸과 상태 줄에 보여 줍니다", control: { type: "switch" } },
+      { key: "display.relative_date", get title() { return translate("settings.item.display.relative_date.title"); }, get desc() { return translate("settings.item.display.relative_date.desc"); }, control: { type: "switch" } },
+      { key: "display.date_format", get title() { return translate("settings.item.display.date_format.title"); }, get desc() { return translate("settings.item.display.date_format.desc"); }, control: { type: "text" } },
+      { key: "display.time_format", get title() { return translate("settings.item.display.time_format.title"); }, get desc() { return translate("settings.item.display.time_format.desc"); }, control: { type: "text" } },
+      { key: "display.size_format", get title() { return translate("settings.item.display.size_format.title"); }, control: { type: "select", options: SIZE_FORMATS } },
+      { key: "display.folder_size_on_select", get title() { return translate("settings.item.display.folder_size_on_select.title"); }, get desc() { return translate("settings.item.display.folder_size_on_select.desc"); }, control: { type: "switch" } },
     ],
   },
   {
-    title: "미리보기",
-    desc: "사운드와 비디오 미리보기를 열었을 때 바로 재생할지 정합니다. 끄면 재생 UI만 보이고 재생 버튼을 눌러야 재생됩니다",
+    get title() { return translate("settings.section.preview.title"); },
+    get desc() { return translate("settings.section.preview.desc"); },
     items: [
-      { key: "preview.audio_autoplay", title: "사운드 자동 재생", desc: "mp3, wav, ogg 같은 사운드 파일의 미리보기를 열면 바로 재생합니다", control: { type: "switch" } },
-      { key: "preview.video_autoplay", title: "비디오 자동 재생", desc: "mp4, mov, webm 같은 비디오 파일의 미리보기를 열면 바로 재생합니다", control: { type: "switch" } },
-      { key: "preview.office", title: "Office 문서 미리보기", desc: "docx, xlsx, pptx 파일의 데이터 미리보기를 보여 줍니다. 실제 문서 화면이 아니라 데이터만 보는 기능이라 서식·배치·그림은 나오지 않고, 문서를 읽는 데 시간이 걸릴 수 있어 기본은 꺼 둡니다. macOS는 Quick Look, Windows의 docx는 설치된 Office의 미리보기 처리기로 이 설정과 관계없이 실제 문서 모습 그대로 보여 주고, 이 설정은 그 밖의 경우(Linux, Windows의 xlsx·pptx, Office가 없는 Windows)에만 쓰입니다", control: { type: "switch" } },
-      { key: "preview.close_on_outside_click", title: "바깥 클릭으로 닫기", desc: "미리보기 창 바깥을 클릭하면 미리보기를 닫습니다", control: { type: "switch" } },
+      { key: "preview.audio_autoplay", get title() { return translate("settings.item.preview.audio_autoplay.title"); }, get desc() { return translate("settings.item.preview.audio_autoplay.desc"); }, control: { type: "switch" } },
+      { key: "preview.video_autoplay", get title() { return translate("settings.item.preview.video_autoplay.title"); }, get desc() { return translate("settings.item.preview.video_autoplay.desc"); }, control: { type: "switch" } },
+      { key: "preview.office", get title() { return translate("settings.item.preview.office.title"); }, get desc() { return translate("settings.item.preview.office.desc"); }, control: { type: "switch" } },
+      { key: "preview.close_on_outside_click", get title() { return translate("settings.item.preview.close_on_outside_click.title"); }, get desc() { return translate("settings.item.preview.close_on_outside_click.desc"); }, control: { type: "switch" } },
     ],
   },
   {
-    title: "확인",
+    get title() { return translate("settings.section.confirm.title"); },
     items: [
-      { key: "core.confirm.delete", title: "영구 삭제 전에 확인", control: { type: "switch" } },
-      { key: "core.confirm.trash", title: "휴지통 전에 확인", control: { type: "switch" } },
+      { key: "core.confirm.delete", get title() { return translate("settings.item.core.confirm.delete.title"); }, control: { type: "switch" } },
+      { key: "core.confirm.trash", get title() { return translate("settings.item.core.confirm.trash.title"); }, control: { type: "switch" } },
     ],
   },
   {
-    title: "폴더 단축키",
-    desc: "Ctrl+숫자를 누르면 지정한 폴더로 이동합니다. 비우면 동작하지 않습니다 (~ 사용 가능)",
+    get title() { return translate("settings.section.folder_shortcuts.title"); },
+    get desc() { return translate("settings.section.folder_shortcuts.desc"); },
     items: Array.from({ length: 10 }, (_, n) => ({
       key: `shortcuts.${n}`,
       title: `Ctrl+${n}`,
@@ -118,13 +146,13 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
     })),
   },
   {
-    title: "F키",
-    desc: "F키마다 실행할 동작을 고릅니다. '기본값'은 내장 동작을 그대로 쓰고, 설정 폴더의 keybindings.toml에 같은 키가 있으면 그쪽이 우선합니다. 애플리케이션 항목에는 실행 파일 경로(예: /opt/homebrew/bin/code)나 앱 이름(macOS)을 적습니다. 옵션이 필요하면 뒤에 이어 적습니다(예: wt -d, wezterm start --cwd). 폴더 경로는 그 뒤에 붙습니다.",
+    get title() { return translate("settings.section.fkeys.title"); },
+    get desc() { return translate("settings.section.fkeys.desc"); },
     items: Array.from({ length: 12 }, (_, i) => ({ key: `fkeys.F${i + 1}`, title: `F${i + 1}`, control: { type: "fkey" } as const })),
   },
   {
-    title: "환경",
-    items: [{ key: "environment.text_editor", title: "텍스트 편집기", desc: "F4로 여는 프로그램. 비우면 기본 앱", control: { type: "text" } }],
+    get title() { return translate("settings.section.environment.title"); },
+    items: [{ key: "environment.text_editor", get title() { return translate("settings.item.environment.text_editor.title"); }, get desc() { return translate("settings.item.environment.text_editor.desc"); }, control: { type: "text" } }],
   },
 ];
 
@@ -159,6 +187,7 @@ function EditableControl({ item, value, disabled, onCommit }: { item: Item; valu
  * 색 한 칸: 현재 색 견본 버튼(누르면 색상환이 열림), `#rrggbb` 입력, 지우기(테마 그대로). 색상환을 끄는 동안에는 잠깐 쉬었다가 저장한다.
  */
 function ColorControl({ item, value, disabled, onCommit }: { item: Item; value: string; disabled: boolean; onCommit: (v: string) => void }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(value);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -179,7 +208,7 @@ function ColorControl({ item, value, disabled, onCommit }: { item: Item; value: 
     <div className="relative flex items-center gap-2">
       <button
         type="button"
-        aria-label={`${item.title} 선택`}
+        aria-label={t("settings.color.pick", { title: item.title })}
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
         className="h-6 w-6 rounded border border-app-line"
@@ -189,7 +218,7 @@ function ColorControl({ item, value, disabled, onCommit }: { item: Item; value: 
         aria-label={item.title}
         type="text"
         value={draft}
-        placeholder="테마 그대로"
+        placeholder={t("settings.color.placeholder")}
         disabled={disabled}
         size="sm"
         className="w-32"
@@ -199,8 +228,8 @@ function ColorControl({ item, value, disabled, onCommit }: { item: Item; value: 
           if (e.key === "Enter") commitText();
         }}
       />
-      <Button type="button" size="sm" disabled={disabled || value === ""} aria-label={`${item.title} 지우기`} onClick={() => onCommit("")}>
-        지우기
+      <Button type="button" size="sm" disabled={disabled || value === ""} aria-label={t("settings.color.clear_title", { title: item.title })} onClick={() => onCommit("")}>
+        {t("settings.color.clear")}
       </Button>
       {open && (
         <div data-testid="color-picker" className="absolute left-0 top-8 z-20 rounded border border-app-line bg-app-box p-2 shadow-lg">
@@ -216,34 +245,35 @@ function ColorControl({ item, value, disabled, onCommit }: { item: Item; value: 
  * Radix Select는 빈 문자열 값을 허용하지 않아서 저장값 ""(기본값)을 화면에서만 "default"로 쓴다.
  */
 function FKeyControl({ name, value, disabled }: { name: string; value: string; disabled: boolean }) {
+  const t = useT();
   const { registry, platform } = useUi();
   const { api } = useAppStore();
   const app = useApp((s) => s.loaded.config.fkey_apps[name] ?? "");
   const builtin = defaultBindingsFor(platform).find((b) => b.scope === "pane" && b.keys.includes(name));
-  const builtinTitle = builtin ? (registry.get(builtin.actionId)?.title ?? builtin.actionId) : "없음";
+  const builtinTitle = builtin ? actionTitle(builtin.actionId, registry.get(builtin.actionId)?.title ?? builtin.actionId) : t("settings.fkey.none");
   // 인수가 필요한 액션(정렬 기준, 폴더 경로 등)은 F키에 인수 없이 걸 수 없어서 뺀다. 앱 실행 두 가지만 전용 경로 입력이 있다.
   const actions = registry
     .list()
-    .filter((a) => a.scopes.includes("pane") && (APP_ACTIONS.includes(a.id) || !a.title.includes("(인수:")))
-    .map((a) => ({ id: a.id, label: a.id === APP_LAUNCH_ACTION ? "애플리케이션 실행" : a.id === APP_OPEN_FOLDER_ACTION ? "애플리케이션으로 폴더 열기" : a.title }))
-    .sort((a, b) => a.label.localeCompare(b.label, "ko"));
+    .filter((a) => a.scopes.includes("pane") && (APP_ACTIONS.includes(a.id) || !/\(\S+:/.test(a.title)))
+    .map((a) => ({ id: a.id, label: a.id === APP_LAUNCH_ACTION ? t("settings.fkey.launch") : a.id === APP_OPEN_FOLDER_ACTION ? t("settings.fkey.open_folder") : actionTitle(a.id, a.title) }))
+    .sort((a, b) => a.label.localeCompare(b.label, currentLanguage()));
   const choose = (v: string) => (v === "default" ? api.resetConfigValue(`fkeys.${name}`) : api.setConfigValue(`fkeys.${name}`, { kind: "str", value: v }));
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2">
       <Combobox
-        label={`${name} 동작`}
+        label={t("settings.fkey.action", { name })}
         value={value === "" ? "default" : value}
         disabled={disabled}
         onChange={(v) => void choose(v)}
         options={[
-          { value: "default", label: `기본값 (현재: ${builtinTitle})` },
-          { value: "none", label: "해제" },
+          { value: "default", label: t("settings.fkey.default", { current: builtinTitle }) },
+          { value: "none", label: t("settings.fkey.unbind") },
           ...actions.map((a) => ({ value: a.id, label: a.label, keywords: a.id })),
         ]}
       />
       {APP_ACTIONS.includes(value) && (
         <EditableControl
-          item={{ key: `fkey_apps.${name}`, title: `${name} 애플리케이션`, control: { type: "text" } }}
+          item={{ key: `fkey_apps.${name}`, title: t("settings.fkey.app", { name }), control: { type: "text" } }}
           value={app}
           disabled={disabled}
           onCommit={(v) => void api.setConfigValue(`fkey_apps.${name}`, { kind: "str", value: v })}
@@ -257,6 +287,7 @@ const MODIFIERS = ["Mod", "Ctrl", "Alt", "Shift"] as const;
 
 /** 조합키 F키 항목 추가: F키 + 수식키(Mod/Ctrl/Alt/Shift)를 골라 `fkeys`에 빈 항목으로 만든다. 같은 조합은 한 번만. */
 function FKeyAdder({ disabled }: { disabled: boolean }) {
+  const t = useT();
   const { api } = useAppStore();
   const existing = useApp((s) => s.loaded.config.fkeys);
   const [f, setF] = useState("F1");
@@ -264,8 +295,8 @@ function FKeyAdder({ disabled }: { disabled: boolean }) {
   const key = [...MODIFIERS.filter((m) => mods.includes(m)), f].join("+");
   const duplicate = key in existing;
   return (
-    <div role="group" aria-label="조합키 추가" className="flex flex-wrap items-center gap-3 py-2.5">
-      <select aria-label="F키" value={f} disabled={disabled} onChange={(e) => setF(e.target.value)} className="rounded border border-app-line bg-app-box px-2 py-1 text-sm">
+    <div role="group" aria-label={t("settings.fkey.add_combo")} className="flex flex-wrap items-center gap-3 py-2.5">
+      <select aria-label={t("settings.section.fkeys.title")} value={f} disabled={disabled} onChange={(e) => setF(e.target.value)} className="rounded border border-app-line bg-app-box px-2 py-1 text-sm">
         {Array.from({ length: 12 }, (_, i) => `F${i + 1}`).map((n) => (
           <option key={n} value={n}>
             {n}
@@ -285,15 +316,16 @@ function FKeyAdder({ disabled }: { disabled: boolean }) {
         </label>
       ))}
       <Button type="button" variant="gray" size="sm" disabled={disabled || mods.length === 0 || duplicate} onClick={() => void api.setConfigValue(`fkeys.${key}`, { kind: "str", value: "" })}>
-        추가
+        {t("settings.fkey.add")}
       </Button>
-      {duplicate && mods.length > 0 && <span className="text-xs text-status-error">이미 있는 조합입니다</span>}
+      {duplicate && mods.length > 0 && <span className="text-xs text-status-error">{t("settings.fkey.duplicate")}</span>}
     </div>
   );
 }
 
 /** 사용자 설정을 항목별 컨트롤로 바꾸는 화면(`Mod+,`). 바꾸는 즉시 저장한다. */
 export function Settings({ onThemePreview }: { onThemePreview?: (theme: string | null) => void }) {
+  const t = useT();
   const section = useApp((s) => s.settingsSection);
   const config = useApp((s) => s.loaded.config);
   // F키 탭은 고정 F1~F12 뒤에 설정 파일의 조합키 항목이 이어진다.
@@ -308,7 +340,7 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
         .filter((k) => /^((Mod|Ctrl|Alt|Shift)\+)+F\d+$/.test(k)),
     ]),
   ].sort();
-  const broken = useApp((s) => s.loaded.warnings.find((w) => w.message.startsWith("TOML 문법 오류")));
+  const broken = useApp((s) => s.loaded.warnings.find((w) => w.line != null));
   const error = useApp((s) => s.settingsError);
   const { api } = useAppStore();
   // 설정 화면이 닫히면(테마 목록을 연 채로 닫혀도) 임시 미리보기를 걷는다. 설정은 열려 있는 동안만 이 패널에 그려진다.
@@ -316,12 +348,12 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
   const defaults = defaultLoaded().config;
   const randomTheme = config.behavior.random_theme;
   const current = SECTIONS[section];
-  const items: Item[] = current.title === "F키" ? [...current.items, ...comboKeys.map((k): Item => ({ key: `fkeys.${k}`, title: k, control: { type: "fkey" } }))] : current.items;
+  const items: Item[] = current.title === t("settings.section.fkeys.title") ? [...current.items, ...comboKeys.map((k): Item => ({ key: `fkeys.${k}`, title: k, control: { type: "fkey" } }))] : current.items;
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-app text-ink">
-      <div role="dialog" aria-label="설정" className="flex min-h-0 flex-1 flex-col">
+      <div role="dialog" aria-label={t("settings.aria")} className="flex min-h-0 flex-1 flex-col">
         <header className="flex flex-wrap items-center justify-between gap-2 border-b border-app-line px-4 py-2">
-          <h2 className="text-base font-semibold">설정</h2>
+          <h2 className="text-base font-semibold">{t("settings.aria")}</h2>
           <div className="flex items-center gap-3">
             {/* 확인 창이 설정 화면에 가려지지 않게 설정을 닫고 확인한다. */}
             <Button
@@ -332,25 +364,25 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
                 void api.checkForUpdate();
               }}
             >
-              업데이트 확인
+              {t("settings.update")}
             </Button>
             <Button size="sm" variant="gray" onClick={() => void api.revealConfigDir()}>
-              설정 폴더 열기
+              {t("settings.open_config_dir")}
             </Button>
             <Button size="sm" variant="gray" onClick={() => api.closeSettings()}>
-              닫기 <span className="ml-1 text-ink-faint">Esc</span>
+              {t("settings.close")} <span className="ml-1 text-ink-faint">Esc</span>
             </Button>
           </div>
         </header>
         {(broken || error) && (
           <div role="alert" className="border-b border-app-line bg-status-error/15 px-4 py-2 text-sm text-status-error">
             {broken
-              ? `config.toml에 문법 오류가 있어 설정을 바꿀 수 없습니다${broken.line ? ` (${broken.line}번째 줄)` : ""}. 파일을 고친 뒤 다시 열어 주세요.`
+              ? t("settings.toml_broken", { line: broken.line ? t("settings.toml_broken_line", { line: broken.line }) : "" })
               : error}
           </div>
         )}
         <div className="flex min-h-0 flex-1 flex-col">
-          <nav role="tablist" aria-label="설정 섹션" aria-orientation="horizontal" className="td-thin-scroll flex shrink-0 gap-1 overflow-x-auto border-b border-app-line bg-sidebar p-2">
+          <nav role="tablist" aria-label={t("settings.sections")} aria-orientation="horizontal" className="td-thin-scroll flex shrink-0 gap-1 overflow-x-auto border-b border-app-line bg-sidebar p-2">
             {SECTIONS.map((s, i) => (
               <button
                 key={s.title}
@@ -379,8 +411,10 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
               return (
                 <div key={item.key} role="group" aria-label={item.title} className="flex items-center justify-between gap-4 border-b border-app-line py-2.5">
                   <div className={wide ? "w-48 shrink-0" : "min-w-0"}>
-                    <div className="text-sm">{item.title}</div>
-                    {item.desc && <div className="text-xs text-ink-faint">{item.desc}</div>}
+                    <div className="flex items-center gap-1.5 text-sm">
+                      {item.title}
+                      {item.desc && <InfoTip text={item.desc} />}
+                    </div>
                   </div>
                   <div className={"flex items-center gap-3 " + (wide ? "min-w-0 flex-1 justify-end" : "shrink-0")}>
                     {(combo || !isDefault) && !broken && (
@@ -395,7 +429,7 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
                           })()
                         }
                       >
-                        {combo ? "삭제" : "기본값으로"}
+                        {combo ? t("settings.delete") : t("settings.reset")}
                       </button>
                     )}
                     {item.control.type === "switch" && (
@@ -410,7 +444,7 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
                     {item.control.type === "fkey" && (
                       <label className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-xs text-ink-dull">
                         <Switch
-                          aria-label={`${item.title} Action Bar에 표시`}
+                          aria-label={t("settings.fkey.show_in_bar", { title: item.title })}
                           checked={config.fkey_bar[item.title] ?? false}
                           disabled={!!broken}
                           onCheckedChange={(v) => void api.setConfigValue(`fkey_bar.${item.title}`, { kind: "bool", value: v })}
@@ -420,11 +454,11 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
                     )}
                     {item.control.type === "select" && (
                       <Select value={String(value)} disabled={!!broken} onChange={(v) => void api.setConfigValue(item.key, { kind: "str", value: v })}>
-                        {item.control.options.map((o) => (
+                        {((ctl) => ctl.options.map((o) => (
                           <SelectOption key={o} value={o}>
-                            {o}
+                            {ctl.labels?.[o] ?? o}
                           </SelectOption>
-                        ))}
+                        )))(item.control)}
                       </Select>
                     )}
                     {item.control.type === "combo" && (
@@ -464,7 +498,7 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
                 </div>
               );
             })}
-            {current.title === "F키" && <FKeyAdder disabled={!!broken} />}
+            {current.title === t("settings.section.fkeys.title") && <FKeyAdder disabled={!!broken} />}
           </section>
         </div>
       </div>

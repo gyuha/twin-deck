@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useApp, useAppStore } from "../state/context";
+import { useApp, useAppStore, useT } from "../state/context";
 
 /** 보여 줄 HTML 한 장. 문서는 한 장, 여러 시트 xlsx는 시트마다 한 장이다. */
 type Page = { name: string; url: string };
@@ -55,6 +55,7 @@ export function layout(outer: HTMLElement, box: HTMLElement, f: HTMLIFrameElemen
  *   문서 크기만큼 늘려 미리보기 본문이 스크롤한다. 대신 문서 안 글자는 선택할 수 없다.
  */
 export function QuickLookView({ path, name, fit }: { path: string; name: string; fit: boolean }) {
+  const t = useT();
   const { api } = useAppStore();
   const [state, setState] = useState<State>({ status: "loading" });
   const sheet = useApp((s) => (s.previewSheet?.path === path ? s.previewSheet.index : 0));
@@ -88,7 +89,7 @@ export function QuickLookView({ path, name, fit }: { path: string; name: string;
     ro.observe(o);
     return () => ro.disconnect();
   }, [state.status, fit]);
-  if (state.status === "loading") return <p className="text-ink-faint">불러오는 중…</p>;
+  if (state.status === "loading") return <p className="text-ink-faint">{t("common.loading")}</p>;
   if (state.status === "error")
     return (
       <p role="alert" className="text-ink-faint">
@@ -100,7 +101,7 @@ export function QuickLookView({ path, name, fit }: { path: string; name: string;
   return (
     <div ref={outer} className="w-full">
       {pages.length > 1 && (
-        <div role="tablist" aria-label="시트" className="sticky left-0 top-0 z-10 mb-1 flex flex-wrap gap-1 bg-app-box pb-1 text-xs">
+        <div role="tablist" aria-label={t("quicklook.sheets")} className="sticky left-0 top-0 z-10 mb-1 flex flex-wrap gap-1 bg-app-box pb-1 text-xs">
           {pages.map((p, i) => (
             <button
               key={i}
@@ -119,7 +120,7 @@ export function QuickLookView({ path, name, fit }: { path: string; name: string;
       <div ref={box} className="overflow-hidden">
         <iframe
           ref={frame}
-          title={`Quick Look 미리보기: ${name}`}
+          title={t("quicklook.title", { name })}
           data-quicklook=""
           sandbox="allow-same-origin"
           src={page.url}

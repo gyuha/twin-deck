@@ -1,3 +1,4 @@
+import { useT } from "../state/context";
 import { useMemo } from "react";
 import { Combobox } from "./Combobox";
 import type { ComboOption } from "./Combobox";
@@ -19,6 +20,7 @@ interface Props {
  * 검색 입력으로 후보를 거르고 ↑↓로 고르며 Enter로 추가한다. 이미 고른 항목은 후보에서 뺀다.
  */
 export function TagInput({ value, options, onChange, onPreview, label, disabled }: Props) {
+  const t = useT();
   const free = useMemo(() => options.filter((o) => !value.includes(o.value)), [options, value]);
   const labelOf = (v: string) => options.find((o) => o.value === v)?.label ?? v;
   return (
@@ -26,12 +28,12 @@ export function TagInput({ value, options, onChange, onPreview, label, disabled 
       {value.map((v) => (
         <span key={v} className="flex items-center gap-1 rounded bg-sidebar-selected px-1.5 py-0.5 text-sidebar-ink">
           {labelOf(v)}
-          <button type="button" aria-label={`${labelOf(v)} 삭제`} disabled={disabled} className="text-ink-faint hover:text-ink" onClick={() => onChange(value.filter((x) => x !== v))}>
+          <button type="button" aria-label={t("tags.remove", { name: labelOf(v) })} disabled={disabled} className="text-ink-faint hover:text-ink" onClick={() => onChange(value.filter((x) => x !== v))}>
             ✕
           </button>
         </span>
       ))}
-      <Combobox label={label} triggerText="+ 테마 추가" value="" options={free} disabled={disabled} className="w-36" onChange={(v) => onChange([...value, v])} onPreview={onPreview} />
+      <Combobox label={label} triggerText={t("tags.add_theme")} value="" options={free} disabled={disabled} className="w-36" onChange={(v) => onChange([...value, v])} onPreview={onPreview} />
     </div>
   );
 }

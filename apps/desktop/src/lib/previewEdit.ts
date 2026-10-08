@@ -1,3 +1,4 @@
+import { t as translate } from "../i18n";
 import { isArchivePath } from "@twin-deck/ts-client";
 
 export type Eol = "lf" | "crlf";
@@ -30,9 +31,9 @@ export interface EditCandidate {
 
 /** 편집을 시작할 수 없는 이유(없으면 null). 파일을 덮어쓰는 기능이라 손실이 생길 수 있는 경우를 모두 거절한다. */
 export function editBlockReason(c: EditCandidate): string | null {
-  if (c.kind !== "text" || c.text === null || c.text === undefined) return "텍스트 파일이 아니라 편집할 수 없습니다";
-  if (isArchivePath(c.path)) return "압축 파일 안의 파일은 편집할 수 없습니다";
-  if (c.truncated) return "파일이 커서(64KB 초과) 일부만 보여 편집할 수 없습니다";
-  if (detectEol(c.text) === "mixed") return "줄바꿈이 섞여 있어 편집할 수 없습니다";
+  if (c.kind !== "text" || c.text === null || c.text === undefined) return translate("edit.block.not_text");
+  if (isArchivePath(c.path)) return translate("edit.block.archive");
+  if (c.truncated) return translate("edit.block.truncated");
+  if (detectEol(c.text) === "mixed") return translate("edit.block.mixed_eol");
   return null;
 }

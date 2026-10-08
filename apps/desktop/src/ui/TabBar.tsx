@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { baseName } from "@twin-deck/ts-client";
-import { useApp, useAppStore } from "../state/context";
+import { useApp, useAppStore, useT } from "../state/context";
 import type { PaneId } from "../state/store";
 
 /** 이 거리(px)보다 적게 움직이면 끌기가 아니라 클릭이다. */
@@ -8,6 +8,7 @@ const DRAG_THRESHOLD = 4;
 
 /** 탭을 눌러 끌어 같은 패널 안에서 순서를 바꾼다(마우스 이벤트로 직접 처리 — 파일 끌기와 같은 방식). */
 export function TabBar({ pane }: { pane: PaneId }) {
+  const tr = useT();
   const { tabs, active } = useApp((s) => s.panes[pane]);
   const segments = useApp((s) => s.loaded.config.behavior.layout.tab_style === "segments");
   const { api } = useAppStore();
@@ -124,7 +125,7 @@ export function TabBar({ pane }: { pane: PaneId }) {
     return { transform: between ? `translateX(${dir * drag.shift}px)` : undefined, transition: "transform 120ms" };
   };
   return (
-    <div role="tablist" aria-label="탭" data-pane={pane} data-drop-target={dropTarget ? "true" : undefined} className={segments ? "flex border-b border-app-line text-sm" : "flex gap-1 border-b border-app-line px-1 text-sm"}>
+    <div role="tablist" aria-label={tr("tabs.aria")} data-pane={pane} data-drop-target={dropTarget ? "true" : undefined} className={segments ? "flex border-b border-app-line text-sm" : "flex gap-1 border-b border-app-line px-1 text-sm"}>
       {tabs.map((t, i) => {
         const name = t.virtual ? t.virtual.title : baseName(t.path) || t.path;
         const pad = closeable ? "px-6" : "px-2";
@@ -182,7 +183,7 @@ export function TabBar({ pane }: { pane: PaneId }) {
               <button
                 type="button"
                 tabIndex={-1}
-                aria-label={`탭 닫기: ${name}`}
+                aria-label={tr("tabs.close", { name })}
                 // 가운데 클릭처럼 끌기를 시작하지 않고 패널 활성화도 하지 않는다(다른 패널의 탭을 닫아도 활성 패널은 그대로).
                 onMouseDown={(e) => {
                   e.preventDefault();

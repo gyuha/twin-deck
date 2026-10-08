@@ -1,7 +1,8 @@
-import { useApp, useAppStore } from "../state/context";
+import { useApp, useAppStore, useT } from "../state/context";
 
 /** Volumes/Favorites/Recent/Hierarchy 팝업. 키 조작은 `panel` 스코프가 처리한다. */
 export function PopupMenu() {
+  const t = useT();
   const menu = useApp((s) => s.menu);
   const { api } = useAppStore();
   if (!menu) return null;
@@ -13,17 +14,17 @@ export function PopupMenu() {
         {(menu.kind === "recent" || menu.kind === "favorites") && (
           <input
             autoFocus
-            aria-label="필터"
-            placeholder="입력해서 거르기"
+            aria-label={t("popup.filter")}
+            placeholder={t("popup.filter_placeholder")}
             value={menu.filter ?? ""}
             onChange={(e) => api.menuSetFilter(e.target.value)}
             className="mb-2 w-full rounded border border-app-line bg-app-dark-box px-2 py-1 text-sm outline-none"
           />
         )}
         {menu.items.length === 0 ? (
-          <p className="text-ink-faint">{menu.filter ? "일치하는 항목 없음" : "항목 없음"}</p>
+          <p className="text-ink-faint">{menu.filter ? t("popup.no_match") : t("popup.empty")}</p>
         ) : (
-          <div role="listbox" aria-label={`${menu.title} 목록`}>
+          <div role="listbox" aria-label={t("popup.list_aria", { title: menu.title })}>
             {menu.items.map((it, i) => {
               if (it.separator) return <hr key={i} role="separator" className="my-1 border-app-line" />;
               if (it.path === undefined) {
@@ -50,7 +51,7 @@ export function PopupMenu() {
           </div>
         )}
         <p className="mt-2 text-xs text-ink-faint">
-          {menu.kind === "recent" || menu.kind === "favorites" ? `↑↓ 이동 · 입력 필터 · Alt+숫자/Return 선택${menu.kind === "recent" ? " · Ctrl+Backspace 비우기" : " · Ctrl+= 현재 폴더 추가 · Ctrl+- 선택 항목 삭제"} · Esc 닫기` : `↑↓ 이동 · 숫자/Return 선택 · Esc 닫기${menu.kind === "volumes" ? " · U 언마운트 · E 추출" : ""}`}
+          {menu.kind === "recent" || menu.kind === "favorites" ? t("popup.hint_list", { extra: menu.kind === "recent" ? t("popup.hint_recent") : t("popup.hint_favorites") }) : t("popup.hint_menu", { extra: menu.kind === "volumes" ? t("popup.hint_volumes") : "" })}
         </p>
       </div>
     </div>

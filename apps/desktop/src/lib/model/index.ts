@@ -1,3 +1,4 @@
+import { t as translate } from "../../i18n";
 import type { Group, Object3D } from "three";
 import { modelKindOf } from "./kinds";
 import type { ModelFormat } from "./kinds";
@@ -55,7 +56,7 @@ function getOcct(options?: Record<string, unknown>) {
 /** 파일 바이트를 three.js 객체로 읽는다. 로더는 형식마다 동적으로 불러와 메인 번들에 들어가지 않는다. 지원하지 않는 이름이면 오류. */
 export async function loadModel(name: string, data: ArrayBuffer, opts: LoadOptions = {}): Promise<Object3D> {
   const format = modelKindOf(name);
-  if (!format) throw new Error(`지원하지 않는 3D 형식입니다: ${name}`);
+  if (!format) throw new Error(translate("model.unsupported", { name }));
   const THREE = await import("three");
   const text = () => new TextDecoder().decode(data);
   switch (format satisfies ModelFormat) {
@@ -111,7 +112,7 @@ export async function loadModel(name: string, data: ArrayBuffer, opts: LoadOptio
       const occt = await getOcct(opts.occt);
       const bytes = new Uint8Array(data);
       const res = format === "step" ? occt.ReadStepFile(bytes, null) : occt.ReadIgesFile(bytes, null);
-      if (!res.success) throw new Error("CAD 파일을 읽지 못했습니다");
+      if (!res.success) throw new Error(translate("model.cad_failed"));
       const group = new THREE.Group();
       for (const m of res.meshes) {
         const g = new THREE.BufferGeometry();

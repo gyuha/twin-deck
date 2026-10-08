@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
+import { actionShortTitle } from "../i18n";
 import { defaultBindingsFor } from "@twin-deck/actions";
 import { formatKey } from "@twin-deck/keybinds";
 import type { ActionContext } from "@twin-deck/actions";
 import { parentPath } from "@twin-deck/ts-client";
 import { fkeyBarItems } from "../lib/fkeys";
-import { useApp } from "../state/context";
+import { useApp, useT } from "../state/context";
 import { actionContext, activeTab, cursorEntry } from "../state/store";
 import { useUi } from "./uiContext";
 
 /** 현재 화면 상태를 요약한 액션 컨텍스트. 원시 값만 선택해서 불필요한 재렌더를 피한다. */
 export function useActionContext(): ActionContext {
+  useT(); // 언어가 바뀌면 버튼 이름을 다시 그린다
   const hasCursorItem = useApp((s) => !!cursorEntry(activeTab(s)));
   const selectedCount = useApp((s) => activeTab(s).selection.size);
   const tabCount = useApp((s) => s.panes[s.activePane].tabs.length);
@@ -89,6 +91,7 @@ const modsOf = (key: string | undefined) =>
 
 /** Action Bar (PANE-07): 액션과 현재 키를 한 줄로 보여 주는 하단 버튼. `behavior.layout.show_action_bar`로 끈다. */
 export function ActionBar() {
+  const t = useT();
   const show = useApp((s) => s.loaded.config.behavior.layout.show_action_bar);
   const { known } = useBarIds();
   const extra = useFKeyBarItems(known);
@@ -103,7 +106,7 @@ export function ActionBar() {
   // 옵션이 켜져 있으면 누르고 있는 수식키와 같은 조합의 버튼만 보인다(안 누르면 수식키 없는 버튼).
   const visible = (key: string | undefined) => !byModifier || modsOf(key) === held;
   return (
-    <div role="toolbar" aria-label="액션 바" className="flex gap-1 border-t border-app-line bg-app-dark-box px-1 py-0.5 text-xs">
+    <div role="toolbar" aria-label={t("actionbar.aria")} className="flex gap-1 border-t border-app-line bg-app-dark-box px-1 py-0.5 text-xs">
       {known.map((id) => {
         const action = registry.get(id)!;
         const key = keymap.keysFor(id)[0];
@@ -122,7 +125,7 @@ export function ActionBar() {
             className={"flex items-center gap-1 rounded border border-app-line px-2 py-0.5 " + (enabled ? "" : "opacity-40")}
           >
             {key && <kbd className="font-mono text-ink-dull">{formatKey(key, platform)}</kbd>}
-            <span>{action.shortTitle ?? action.title}</span>
+            <span>{actionShortTitle(id, action.shortTitle ?? action.title)}</span>
           </button>
         );
       })}
@@ -143,7 +146,7 @@ export function ActionBar() {
             className={"flex items-center gap-1 rounded border border-app-line px-2 py-0.5 " + (enabled ? "" : "opacity-40")}
           >
             <kbd className="font-mono text-ink-dull">{formatKey(it.key, platform)}</kbd>
-            <span>{action.shortTitle ?? action.title}</span>
+            <span>{actionShortTitle(it.action, action.shortTitle ?? action.title)}</span>
           </button>
         );
       })}

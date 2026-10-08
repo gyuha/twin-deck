@@ -1,3 +1,4 @@
+import { useT } from "../state/context";
 import type { ReactNode } from "react";
 import { usePreviewFont } from "./fonts";
 
@@ -5,6 +6,7 @@ const TOKEN = /("(?:\\.|[^"\\])*"|"(?:\\.|[^"\\])*$)(\s*:)?|-?\d+(?:\.\d+)?(?:[e
 
 /** JSON 미리보기. 잘린 JSON도 칠하도록 파싱하지 않고 토큰만 색칠한다. */
 export function JsonView({ text }: { text: string }) {
+  const t = useT();
   const previewFont = usePreviewFont();
   const parts: ReactNode[] = [];
   let last = 0;
@@ -31,7 +33,7 @@ export function JsonView({ text }: { text: string }) {
   }
   parts.push(text.slice(last));
   return (
-    <pre aria-label="JSON 미리보기" style={previewFont} className="whitespace-pre-wrap break-words font-mono text-xs">
+    <pre aria-label={t("preview.json_aria")} style={previewFont} className="whitespace-pre-wrap break-words font-mono text-xs">
       {parts}
     </pre>
   );

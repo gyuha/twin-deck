@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { joinPath } from "@twin-deck/ts-client";
 import { formatSpace } from "../lib/format";
-import { useApp, useAppStore } from "../state/context";
+import { useApp, useAppStore, useT } from "../state/context";
 import type { PaneId } from "../state/store";
 
 /**
@@ -11,6 +11,7 @@ import type { PaneId } from "../state/store";
  * 오른쪽 끝에 이 패널 폴더가 있는 볼륨의 남은 용량을 보인다(드라이브 바를 꺼도 보이고, 용량을 모르면 없다).
  */
 export function Breadcrumb({ pane, path }: { pane: PaneId; path: string }) {
+  const t = useT();
   const { api } = useAppStore();
   const space = useApp((s) => s.diskSpace[pane]);
   const sizeFormat = useApp((s) => s.loaded.config.display.size_format);
@@ -42,11 +43,11 @@ export function Breadcrumb({ pane, path }: { pane: PaneId; path: string }) {
   };
   if (editing) {
     return (
-      <nav aria-label="경로" className="px-2 py-1 text-sm" onContextMenu={(e) => e.preventDefault()}>
+      <nav aria-label={t("breadcrumb.aria")} className="px-2 py-1 text-sm" onContextMenu={(e) => e.preventDefault()}>
         <input
           ref={input}
           data-path-edit
-          aria-label="경로 입력"
+          aria-label={t("breadcrumb.input_aria")}
           autoFocus
           spellCheck={false}
           value={value}
@@ -69,7 +70,7 @@ export function Breadcrumb({ pane, path }: { pane: PaneId; path: string }) {
   }
   return (
     <nav
-      aria-label="경로"
+      aria-label={t("breadcrumb.aria")}
       onContextMenu={(e) => {
         e.preventDefault();
         startEdit();
@@ -91,7 +92,7 @@ export function Breadcrumb({ pane, path }: { pane: PaneId; path: string }) {
               {isArchive ? seg.label.slice(0, -1) : seg.label}
             </button>
             {isArchive && (
-              <span role="img" aria-label="아카이브 경계" title="아카이브 경계" className="font-bold text-accent">
+              <span role="img" aria-label={t("breadcrumb.archive_edge")} title={t("breadcrumb.archive_edge")} className="font-bold text-accent">
                 !
               </span>
             )}
@@ -99,8 +100,8 @@ export function Breadcrumb({ pane, path }: { pane: PaneId; path: string }) {
         );
       })}
       {space && (
-        <span className="ml-auto shrink-0 pl-2 text-xs text-ink-dull" title={`전체 ${formatSpace(space.total, sizeFormat)}`}>
-          {formatSpace(space.free, sizeFormat)} 남음
+        <span className="ml-auto shrink-0 pl-2 text-xs text-ink-dull" title={t("breadcrumb.total", { size: formatSpace(space.total, sizeFormat) })}>
+          {t("breadcrumb.free", { size: formatSpace(space.free, sizeFormat) })}
         </span>
       )}
     </nav>

@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { homeDir } from "@tauri-apps/api/path";
@@ -38,7 +39,7 @@ export async function start(rootEl: HTMLElement, deps: BootDeps = defaultDeps())
   } catch (e) {
     root.render(
       <pre role="alert" className="p-4 text-status-error">
-        시작 실패: {String(e)}
+        {t("bootstrap.failed", { error: String(e) })}
       </pre>,
     );
   }

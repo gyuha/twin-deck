@@ -1,9 +1,10 @@
 import { useRef } from "react";
-import { useApp, useAppStore } from "../state/context";
+import { useApp, useAppStore, useT } from "../state/context";
 import { Pane } from "./Pane";
 
 /** 왼쪽·오른쪽 패널과 그 사이의 구분선. 구분선을 끌어 너비 비율을 바꾸고, 더블클릭하면 반반으로 되돌린다. */
 export function PaneSplit({ onThemePreview }: { onThemePreview?: (theme: string | null) => void }) {
+  const t = useT();
   const split = useApp((s) => s.split);
   const { api } = useAppStore();
   const box = useRef<HTMLDivElement>(null);
@@ -19,7 +20,7 @@ export function PaneSplit({ onThemePreview }: { onThemePreview?: (theme: string 
       <div
         role="separator"
         aria-orientation="vertical"
-        aria-label="패널 너비 조절"
+        aria-label={t("pane.resize")}
         aria-valuemin={15}
         aria-valuemax={85}
         aria-valuenow={Math.round(split * 100)}

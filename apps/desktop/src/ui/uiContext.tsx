@@ -1,3 +1,4 @@
+import { t as translate } from "../i18n";
 import { createContext, useContext } from "react";
 import type { ActionContext, ActionRegistry } from "@twin-deck/actions";
 import type { Keymap, Platform } from "@twin-deck/keybinds";
@@ -13,6 +14,6 @@ export const UiContext = createContext<UiContextValue | null>(null);
 
 export function useUi(): UiContextValue {
   const v = useContext(UiContext);
-  if (!v) throw new Error("UiContext 밖에서 사용할 수 없습니다");
+  if (!v) throw new Error(translate("error.no_ui_context"));
   return v;
 }

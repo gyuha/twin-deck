@@ -1,8 +1,9 @@
 import { useEffect, useRef } from "react";
-import { useApp, useAppStore } from "../state/context";
+import { useApp, useAppStore, useT } from "../state/context";
 
 /** Actions Panel (ACT-01): 액션 이름을 퍼지 검색해서 실행한다. Alt를 누르고 있으면 액션 ID를 보여 준다. */
 export function ActionsPalette() {
+  const t = useT();
   const palette = useApp((s) => s.palette);
   const { api } = useAppStore();
   const input = useRef<HTMLInputElement>(null);
@@ -25,16 +26,16 @@ export function ActionsPalette() {
       <div role="dialog" aria-label="Actions Panel" className="w-[34rem] max-w-full rounded border border-app-line bg-app-box p-3 text-sm shadow-lg">
         <input
           ref={input}
-          aria-label="액션 검색"
+          aria-label={t("palette.search_aria")}
           value={palette.query}
           onChange={(e) => api.paletteSetQuery(e.target.value)}
-          placeholder="액션 이름 또는 ID"
+          placeholder={t("palette.placeholder")}
           className="mb-2 w-full border border-app-line px-1 py-0.5"
         />
         {items.length === 0 ? (
-          <p className="text-ink-faint">일치하는 액션 없음</p>
+          <p className="text-ink-faint">{t("palette.none")}</p>
         ) : (
-          <div role="listbox" aria-label="액션 목록" className="max-h-80 overflow-auto">
+          <div role="listbox" aria-label={t("palette.list_aria")} className="max-h-80 overflow-auto">
             {items.slice(0, 50).map((it, i) => (
               <div
                 key={it.id}
@@ -53,7 +54,7 @@ export function ActionsPalette() {
             ))}
           </div>
         )}
-        <p className="mt-2 text-xs text-ink-faint">↑↓ 이동 · Enter 실행 · Alt 누르는 동안 ID · Esc 닫기</p>
+        <p className="mt-2 text-xs text-ink-faint">{t("palette.hint")}</p>
       </div>
     </div>
   );

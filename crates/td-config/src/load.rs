@@ -91,7 +91,9 @@ fn syntax_warning(file: &str, src: &str, e: &toml::de::Error) -> Warning {
     }
 }
 
-const ENUMS: [(&str, &str, &[&str]); 5] = [
+const ENUMS: [(&str, &str, &[&str]); 6] = [
+    // 화면 언어. 새 언어를 더하면 앱의 i18n/locales.ts에도 같은 코드를 등록한다.
+    ("behavior", "language", &["ko", "en"]),
     (
         "behavior",
         "theme",

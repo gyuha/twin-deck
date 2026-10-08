@@ -48,6 +48,7 @@ Marta에서 확인된 옵션 이름을 그대로 옮길 수 있는 곳은 옮기
 ```toml
 [behavior]
 theme = "system"                  # system·light·dark 또는 테마 이름(예: dracula-default)
+language = "ko"                   # 화면 언어: ko(한국어), en(English)
 
 [behavior.table]
 icon_size = 16
@@ -194,6 +195,15 @@ working_directory = "${active.folder.path}"
 | `${user.home}` | 홈 폴더 | 단일 값 |
 
 `application` 유형에서 "앱 이름"으로 실행하는 방식은 macOS의 `.app` 개념에 기대므로 Windows/Linux에서는 실행 파일 경로 또는 `.desktop` 이름으로 해석한다([09](09-platform-support.md)). 보안상 Gadget은 셸을 거치지 않고 인수 배열로 직접 실행한다. 선택 항목 이름에 공백이나 메타문자가 있어도 인수 하나로 전달된다.
+
+## 6.9 화면 언어 (`behavior.language`)
+
+구현됨(2026-10-09, 이슈 #32). `behavior.language`는 `ko`(한국어, 기본값) 또는 `en`(English)이다. 설정 화면의 모양 섹션 "언어"에서 바꾸면 바로 적용되고 `config.toml`에 저장된다. 앱 화면 문구, 네이티브 메뉴(File·View 항목, 설정…, 단축키 목록), 액션 제목이 바뀐다. README·`docs/`·CHANGELOG는 한국어다.
+
+- 문구는 `apps/desktop/src/i18n/`의 사전(`ko.ts` 원본, `en.ts`)에 있고 `t(키, {매개변수})`로 꺼낸다. 영어 사전은 한국어 사전과 키가 같아야 하고(타입과 `i18n-keys.test.ts`가 확인) 값에 한글을 쓰지 않는다.
+- 언어를 더하려면 사전 파일(예: `ja.ts`)을 만들고 `i18n/locales.ts`와 `td-config`의 `behavior.language` 허용 값(`load.rs`의 `ENUMS`)에 코드를 등록한다. 키가 빠지면 테스트가 알려 준다.
+- Rust가 한국어 문자열로 돌려주는 오류·경고 문구는 `i18n/rust.ts`의 대응표로 영어로 바꾼다. Rust 소스에 새 한국어 문구를 넣으면 `i18n-rust-messages.test.ts`가 대응표 항목을 요구한다. 대응표에 없는 문구는 한국어로 보인다.
+- 화면 소스(테스트 제외)에 사전 밖 한글 문자열이 없는지 `i18n-no-hardcoded.test.ts`가 확인하고, 영어에서 대표 화면에 한글이 없는지 `i18n-english-screens.test.tsx`가 확인한다.
 
 ## 7. 테마
 

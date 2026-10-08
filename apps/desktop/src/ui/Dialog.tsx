@@ -1,12 +1,13 @@
 import { useEffect, useRef } from "react";
-import { useApp, useAppStore } from "../state/context";
+import { rustText, t as translate } from "../i18n";
+import { useApp, useAppStore, useT } from "../state/context";
 import { CONFLICT_CHOICES, isActiveJob } from "../state/store";
 import type { DialogState } from "../state/store";
 import { buildNewNames, validateNames } from "../lib/multiRename";
 import { MultiRename } from "./MultiRename";
 import { formatSpace } from "../lib/format";
 
-const CHOICE_LABEL = { overwrite: "덮어쓰기 (O)", skip: "건너뛰기 (S)", rename: "이름 바꿔 복사 (R)" } as const;
+const choiceLabel = (c: "overwrite" | "skip" | "rename") => translate(`dialog.choice.${c}` as const);
 
 /** 다중 이름 바꾸기: 오류가 없고 바뀌는 이름이 하나라도 있을 때만 실행할 수 있다. */
 function canMultiRename(d: Extract<DialogState, { kind: "multirename" }>): boolean {
@@ -16,6 +17,7 @@ function canMultiRename(d: Extract<DialogState, { kind: "multirename" }>): boole
 
 /** 모달 다이얼로그. Return 확인, Escape 취소는 키 라우터(dialog 스코프)가 처리한다. */
 export function Dialog() {
+  const t = useT();
   const dialog = useApp((s) => s.dialog);
   const { api } = useAppStore();
   const input = useRef<HTMLInputElement>(null);
@@ -53,7 +55,7 @@ export function Dialog() {
           <>
             <input
               ref={input}
-              aria-label={dialog.label ?? "이름"}
+              aria-label={dialog.label ?? t("dialog.name")}
               value={dialog.value}
               onChange={(e) => api.dialogSetValue(e.target.value)}
               className="w-full border border-app-line px-1 py-0.5"
@@ -85,7 +87,7 @@ export function Dialog() {
           <>
             <div
               role="progressbar"
-              aria-label="전송 진행"
+              aria-label={t("dialog.progress_aria")}
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={byBytes || job.filesTotal ? Math.round(ratio * 100) : undefined}
@@ -102,16 +104,16 @@ export function Dialog() {
               {byBytes
                 ? `${formatSpace(job.bytesDone, sizeFormat)} / ${formatSpace(job.bytesTotal!, sizeFormat)}`
                 : job.filesTotal === null
-                  ? "집계 중…"
-                  : `${job.filesDone}/${job.filesTotal}개`}
+                  ? t("dialog.counting")
+                  : t("dialog.files_progress", { done: job.filesDone, total: job.filesTotal })}
             </p>
             {job.current && isActiveJob(job) && <p className="truncate text-xs text-ink-dull">{job.current}</p>}
             {job.errors.length > 0 && (
               <div className="mt-1 max-h-40 overflow-auto">
-                <p className="text-xs text-ink-dull">{job.errors.length}개 항목에 실패했습니다</p>
+                <p className="text-xs text-ink-dull">{t("dialog.errors", { count: job.errors.length })}</p>
                 {job.errors.map((e) => (
                   <p key={e.path} role="alert" className="break-all text-xs text-status-error">
-                    {e.path}: {e.message}
+                    {e.path}: {rustText(e.message)}
                   </p>
                 ))}
               </div>
@@ -121,15 +123,15 @@ export function Dialog() {
                 <>
                   {/* 창만 닫고 작업은 큐에서 계속 돈다. 그동안 큐 팝업(=)을 열거나 다른 복사를 걸 수 있다. */}
                   <button type="button" className="rounded border border-app-line px-3 py-0.5" onClick={() => api.dialogConfirm()}>
-                    백그라운드
+                    {t("dialog.background")}
                   </button>
                   <button type="button" className="rounded border border-app-line px-3 py-0.5" onClick={() => api.dialogCancel()}>
-                    중단
+                    {t("dialog.abort")}
                   </button>
                 </>
               ) : (
                 <button type="button" className="rounded border border-app-line px-3 py-0.5" onClick={() => api.dialogConfirm()}>
-                  닫기
+                  {t("common.close")}
                 </button>
               )}
             </div>
@@ -163,7 +165,7 @@ export function Dialog() {
         {dialog.kind === "conflict" && (
           <>
             <p className="mb-2 break-all">{dialog.existing}</p>
-            <div role="radiogroup" aria-label="충돌 처리" className="flex flex-col gap-1">
+            <div role="radiogroup" aria-label={t("dialog.conflict_aria")} className="flex flex-col gap-1">
               {CONFLICT_CHOICES.map((c, i) => (
                 <div
                   key={c}
@@ -173,14 +175,14 @@ export function Dialog() {
                   onClick={() => api.dialogSetChoice(i)}
                 >
                   {i === dialog.selected ? "▶ " : "  "}
-                  {CHOICE_LABEL[c]}
+                  {choiceLabel(c)}
                 </div>
               ))}
             </div>
             {dialog.remaining > 1 && (
               <label className="mt-2 flex items-center gap-2">
                 <input type="checkbox" checked={dialog.all} onChange={(e) => api.dialogSetApplyAll(e.target.checked)} />
-                남은 {dialog.remaining - 1}개 항목에도 같은 선택 적용 (A)
+                {t("dialog.apply_all", { count: dialog.remaining - 1 })}
               </label>
             )}
           </>
@@ -189,12 +191,12 @@ export function Dialog() {
           <div className="mt-3 flex justify-end gap-2">
             {dialog.kind === "multirename" && (
               <button type="button" className="mr-auto rounded border border-app-line px-3 py-0.5" onClick={() => api.dialogMultiRenameReset()}>
-                모두 재설정
+                {t("dialog.reset_all")}
               </button>
             )}
             {dialog.kind !== "info" && (
               <button type="button" className="rounded border border-app-line px-3 py-0.5" onClick={() => api.dialogCancel()}>
-                {dialog.kind === "multirename" ? "닫기" : "취소"}
+                {dialog.kind === "multirename" ? t("common.close") : t("common.cancel")}
               </button>
             )}
             <button
@@ -203,16 +205,16 @@ export function Dialog() {
               className="rounded bg-accent px-3 py-0.5 text-accent-ink disabled:opacity-40"
               onClick={() => api.dialogConfirm()}
             >
-              {(dialog.kind === "name" || dialog.kind === "confirm") && dialog.confirmLabel ? dialog.confirmLabel : dialog.kind === "multirename" ? "이름 바꾸기" : "확인"}
+              {(dialog.kind === "name" || dialog.kind === "confirm") && dialog.confirmLabel ? dialog.confirmLabel : dialog.kind === "multirename" ? t("dialog.rename") : t("common.ok")}
             </button>
           </div>
         )}
         <p className="mt-3 text-xs text-ink-faint">
           {dialog.kind === "progress"
             ? job && isActiveJob(job)
-              ? "Return 백그라운드 · Esc 중단"
-              : "Return 닫기"
-            : `Return 확인 · Esc 취소${dialog.kind === "name" && dialog.goto ? " · Tab 완성" : ""}`}
+              ? t("dialog.hint_active")
+              : t("dialog.hint_done")
+            : t("dialog.hint", { tab: dialog.kind === "name" && dialog.goto ? t("dialog.hint_tab") : "" })}
         </p>
       </div>
     </div>

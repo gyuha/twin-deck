@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { formatSize } from "../lib/format";
 import { groupSmall, layoutTreemap, OTHER } from "../lib/treemap";
 import type { Tile } from "../lib/treemap";
-import { useApp, useAppStore } from "../state/context";
+import { useApp, useAppStore, useT } from "../state/context";
 import { activeTab, publishUsageTiles } from "../state/store";
 import type { PaneId } from "../state/store";
 
@@ -18,6 +18,7 @@ const LABEL_MIN = { w: 64, h: 34 };
  * 더블클릭·Shift+→·Mod+Enter는 그 폴더로 내려가며, Backspace는 한 단계 위로 올라간다.
  */
 export function UsageTreemap({ pane }: { pane: PaneId }) {
+  const tr = useT();
   const { api } = useAppStore();
   const tab = useApp((s) => activeTab(s, pane));
   const style = useApp((s) => s.loaded.config.display.size_format);
@@ -67,11 +68,11 @@ export function UsageTreemap({ pane }: { pane: PaneId }) {
 
   return (
     <div className="relative min-h-0 flex-1 overflow-hidden p-1">
-      <div ref={box} role="img" aria-label="용량 treemap" className="relative h-full w-full">
+      <div ref={box} role="img" aria-label={tr("treemap.aria")} className="relative h-full w-full">
         {tiles.map((t, n) => {
           const isOther = t.id === OTHER;
           const e = isOther ? undefined : entries[byId.get(t.id) ?? -1];
-          const name = isOther ? `기타 ${other?.count}개` : (e?.name ?? "");
+          const name = isOther ? tr("treemap.other", { count: other?.count ?? 0 }) : (e?.name ?? "");
           const bytes = isOther ? (other?.value ?? 0) : (e?.size ?? 0);
           const isDir = e?.kind === "dir";
           const roomy = t.w >= LABEL_MIN.w && t.h >= LABEL_MIN.h;

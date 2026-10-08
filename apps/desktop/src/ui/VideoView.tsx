@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { useAppStore } from "../state/context";
+import { useAppStore, useT } from "../state/context";
 
 /**
  * 비디오 파일 미리보기. 파일을 데이터로 싣지 않고 앱이 여는 주소(`backend.fileUrl`)로 스트리밍한다(큰 파일, 탐색).
  * 열어도 바로 재생하지 않고 재생 UI만 띄운다(설정 `preview.video_autoplay`를 켜면 바로 재생한다).
  */
 export function VideoView({ path, name, autoplay = false }: { path: string; name: string; autoplay?: boolean }) {
+  const t = useT();
   const { api } = useAppStore();
   const [failed, setFailed] = useState(false);
   const ref = useRef<HTMLVideoElement | null>(null);
@@ -24,13 +25,13 @@ export function VideoView({ path, name, autoplay = false }: { path: string; name
       }
     };
   }, [src, failed]);
-  if (failed) return <p className="text-ink-faint">이 형식은 이 시스템에서 재생할 수 없습니다 ({name})</p>;
+  if (failed) return <p className="text-ink-faint">{t("media.unplayable", { name })}</p>;
   return (
     <div className="flex h-full items-center justify-center">
       <video
         ref={ref}
         key={src}
-        aria-label={`비디오 미리보기: ${name}`}
+        aria-label={t("media.video_aria", { name })}
         controls
         preload="metadata"
         autoPlay={autoplay}

@@ -1,3 +1,4 @@
+import { t as translate } from "../i18n";
 import type { Config, EntryDto } from "@twin-deck/ts-client";
 import type { ColumnName } from "./columns";
 import { extensionOf } from "./sort";
@@ -104,8 +105,8 @@ export function formatDate(ms: number | null, display: Display, now = Date.now()
   if (display.relative_date) {
     const dayStart = (t: number) => new Date(t).setHours(0, 0, 0, 0);
     const diffDays = Math.round((dayStart(now) - dayStart(ms)) / 86_400_000);
-    if (diffDays === 0) return `오늘 ${strftime(display.time_format, d)}`;
-    if (diffDays === 1) return `어제 ${strftime(display.time_format, d)}`;
+    if (diffDays === 0) return translate("format.today", { time: strftime(display.time_format, d) });
+    if (diffDays === 1) return translate("format.yesterday", { time: strftime(display.time_format, d) });
   }
   return strftime(display.date_format, d);
 }
@@ -127,14 +128,14 @@ export function formatOctal(mode: number | null): string {
 }
 
 export const COLUMN_TITLES: Record<ColumnName, string> = {
-  name: "이름",
-  size: "크기",
-  created: "생성",
-  modified: "수정",
-  added: "추가",
-  extension: "확장자",
-  permissions: "권한",
-  permissions_octal: "권한(8진)",
+  get name() { return translate("column.name"); },
+  get size() { return translate("column.size"); },
+  get created() { return translate("column.created"); },
+  get modified() { return translate("column.modified"); },
+  get added() { return translate("column.added"); },
+  get extension() { return translate("column.extension"); },
+  get permissions() { return translate("column.permissions"); },
+  get permissions_octal() { return translate("column.permissions_octal"); },
 };
 
 /** 한 셀의 표시 문자열. */

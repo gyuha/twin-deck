@@ -9,7 +9,7 @@ import { quickMatchRange } from "../lib/names";
 import { SORT_KEYS } from "../lib/sort";
 import { FileIcon } from "./FileIcon";
 import type { SortKey } from "../lib/sort";
-import { useApp, useAppStore } from "../state/context";
+import { useApp, useAppStore, useT } from "../state/context";
 import { activeTab, effectiveSort, isFolderEntry } from "../state/store";
 import type { PaneId } from "../state/store";
 
@@ -75,6 +75,7 @@ function useRows(count: number, ref: React.RefObject<HTMLDivElement | null>): Vi
 
 /** 빠른 선택으로 일치한 부분을 색으로 칠한 이름. 일치하지 않으면 이름 그대로다. */
 function QuickHighlight({ name, input, prefixOnly }: { name: string; input: string; prefixOnly: boolean }) {
+  const t = useT();
   const range = quickMatchRange(name, input, prefixOnly);
   if (!range) return <>{name}</>;
   const shown = name.normalize("NFC");
@@ -90,6 +91,7 @@ function QuickHighlight({ name, input, prefixOnly }: { name: string; input: stri
 }
 
 export function FileTable({ pane }: { pane: PaneId }) {
+  const t = useT();
   const { api } = useAppStore();
   const tab = useApp((s) => activeTab(s, pane));
   const isActive = useApp((s) => s.activePane === pane);
@@ -214,7 +216,7 @@ export function FileTable({ pane }: { pane: PaneId }) {
       {!multi && (
         <div
           role="row"
-          aria-label="컬럼 머리글"
+          aria-label={t("table.header_aria")}
           style={{ gridTemplateColumns: gridTemplate(columns, iconSize, showMarks) }}
           className="grid border-b border-l-[3px] border-app-line border-l-transparent px-2 text-xs text-ink-dull"
         >
@@ -248,12 +250,12 @@ export function FileTable({ pane }: { pane: PaneId }) {
         </div>
       )}
       {!tab.error && tab.entries.length === 0 && (
-        <div className="px-2 py-1 text-ink-faint">{tab.virtual?.running ? "찾는 중…" : "항목 없음"}</div>
+        <div className="px-2 py-1 text-ink-faint">{tab.virtual?.running ? t("table.searching") : t("table.empty")}</div>
       )}
       <div
         ref={listRef}
         role="listbox"
-        aria-label={`${pane === "left" ? "왼쪽" : "오른쪽"} 파일 목록`}
+        aria-label={t("table.list_aria", { side: pane === "left" ? t("common.left") : t("common.right") })}
         aria-multiselectable="true"
         aria-activedescendant={tab.entries.length ? rowId(tab.cursor) : undefined}
         aria-rowcount={tab.entries.length}
@@ -286,8 +288,8 @@ export function FileTable({ pane }: { pane: PaneId }) {
         </div>
       </div>
       {tab.quick !== null && (
-        <div role="status" aria-label="빠른 선택" className="border-t border-app-line bg-status-warning/15 px-2 py-0.5">
-          빠른 선택: <span>{tab.quick}</span>
+        <div role="status" aria-label={t("table.quick_aria")} className="border-t border-app-line bg-status-warning/15 px-2 py-0.5">
+          {t("table.quick_label")} <span>{tab.quick}</span>
         </div>
       )}
     </div>

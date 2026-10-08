@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useAppStore } from "../state/context";
+import { useAppStore, useT } from "../state/context";
 import { MAX_BYTES, readOffice, type OfficeContent } from "../lib/office";
 import type { OfficeFormat } from "../lib/office/kinds";
 
@@ -10,11 +10,12 @@ type State = { status: "loading" } | { status: "ready"; content: OfficeContent }
  * 라이브러리는 이 파일을 열 때 동적으로 불러온다. 실제 문서 화면이 아니라 데이터 미리보기라는 안내를 맨 위 가운데에 항상 눈에 띄게 붙인다(스크롤해도 따라온다).
  */
 export function OfficeView({ path, kind, fileSize, sizeText }: { path: string; kind: OfficeFormat; fileSize: number; sizeText: string }) {
+  const t = useT();
   const { api } = useAppStore();
   const [state, setState] = useState<State>({ status: "loading" });
   useEffect(() => {
     if (fileSize > MAX_BYTES) {
-      setState({ status: "error", message: `문서가 너무 커서 미리 볼 수 없습니다 (${sizeText})` });
+      setState({ status: "error", message: t("office.too_big", { size: sizeText }) });
       return;
     }
     setState({ status: "loading" });
@@ -23,7 +24,7 @@ export function OfficeView({ path, kind, fileSize, sizeText }: { path: string; k
     void (async () => {
       try {
         const res = await fetch(api.fileUrl(path), { signal: abort.signal });
-        if (!res.ok) throw new Error(`파일을 읽지 못했습니다 (${res.status})`);
+        if (!res.ok) throw new Error(t("common.read_failed", { status: res.status }));
         const content = await readOffice(kind, await res.arrayBuffer());
         if (!disposed) setState({ status: "ready", content });
       } catch (e) {
@@ -35,7 +36,7 @@ export function OfficeView({ path, kind, fileSize, sizeText }: { path: string; k
       abort.abort(); // 다른 파일로 넘어가면 읽던 것을 멈춘다
     };
   }, [api, path, kind, fileSize, sizeText]);
-  if (state.status === "loading") return <p className="text-ink-faint">불러오는 중…</p>;
+  if (state.status === "loading") return <p className="text-ink-faint">{t("common.loading")}</p>;
   if (state.status === "error")
     return (
       <p role="alert" className="text-ink-faint">
@@ -45,15 +46,15 @@ export function OfficeView({ path, kind, fileSize, sizeText }: { path: string; k
   const c = state.content;
   const truncated = (c.kind === "docx" || c.kind === "xlsx") && c.truncated;
   return (
-    <div aria-label="Office 문서 미리보기">
+    <div aria-label={t("office.aria")}>
       <p role="note" className="sticky top-0 z-10 mb-2 rounded border border-status-warning/55 bg-status-warning/15 px-2 py-1 text-center text-sm font-semibold text-status-warning">
-        데이터 미리보기이며 실제 문서 화면과 다릅니다
+        {t("office.note")}
       </p>
-      {c.kind === "docx" && <div aria-label="문서 본문" className="space-y-2 break-words [&_table]:border-collapse [&_td]:border [&_td]:border-app-line [&_td]:px-1" dangerouslySetInnerHTML={{ __html: c.html }} />}
+      {c.kind === "docx" && <div aria-label={t("office.docx_aria")} className="space-y-2 break-words [&_table]:border-collapse [&_td]:border [&_td]:border-app-line [&_td]:px-1" dangerouslySetInnerHTML={{ __html: c.html }} />}
       {c.kind === "xlsx" && (
         <>
-          <p className="mb-1 text-xs text-ink-faint">시트: {c.sheet}</p>
-          <table aria-label="시트 본문" className="border-collapse text-xs">
+          <p className="mb-1 text-xs text-ink-faint">{t("office.sheet", { name: c.sheet })}</p>
+          <table aria-label={t("office.sheet_aria")} className="border-collapse text-xs">
             <tbody>
               {c.rows.map((r, i) => (
                 <tr key={i}>
@@ -69,11 +70,11 @@ export function OfficeView({ path, kind, fileSize, sizeText }: { path: string; k
         </>
       )}
       {c.kind === "pptx" && (
-        <div aria-label="슬라이드 본문" className="space-y-1">
-          {c.paragraphs.length ? c.paragraphs.map((t, i) => <p key={i}>{t}</p>) : <p className="text-ink-faint">첫 슬라이드에 텍스트가 없습니다</p>}
+        <div aria-label={t("office.slide_aria")} className="space-y-1">
+          {c.paragraphs.length ? c.paragraphs.map((t, i) => <p key={i}>{t}</p>) : <p className="text-ink-faint">{t("office.slide_empty")}</p>}
         </div>
       )}
-      {truncated && <p className="mt-2 text-xs text-ink-faint">첫 부분만 표시합니다</p>}
+      {truncated && <p className="mt-2 text-xs text-ink-faint">{t("office.truncated")}</p>}
     </div>
   );
 }

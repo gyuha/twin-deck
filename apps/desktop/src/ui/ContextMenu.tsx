@@ -1,5 +1,5 @@
 import { formatKey } from "@twin-deck/keybinds";
-import { useApp, useAppStore } from "../state/context";
+import { useApp, useAppStore, useT } from "../state/context";
 import { CONTEXT_MENU } from "../state/store";
 import type { CtxItem } from "../state/store";
 import { useActionContext } from "./ActionBar";
@@ -10,6 +10,7 @@ const ROW_HEIGHT = 24;
 
 /** 파일 행 컨텍스트 메뉴. 마우스 위치에 열리고, 키 조작은 `panel` 스코프가 처리한다. */
 export function ContextMenu() {
+  const t = useT();
   const m = useApp((s) => s.ctxMenu);
   const { api } = useAppStore();
   const ctx = useActionContext();
@@ -64,10 +65,10 @@ export function ContextMenu() {
       }}
     >
       <div className="absolute" style={{ left, top }} onMouseDown={(e) => e.stopPropagation()} onContextMenu={(e) => e.preventDefault()}>
-        {renderItems(CONTEXT_MENU, "컨텍스트 메뉴", subItems ? null : m.cursor, (i) => api.ctxHover(i, null))}
+        {renderItems(CONTEXT_MENU, t("ctx.aria"), subItems ? null : m.cursor, (i) => api.ctxHover(i, null))}
         {subItems && (
           <div className="absolute" style={{ left: subLeft, top: m.cursor * ROW_HEIGHT }}>
-            {renderItems(subItems, "다음으로 열기", m.subCursor, (i) => api.ctxHover(m.cursor, i))}
+            {renderItems(subItems, t("ctx.open_with"), m.subCursor, (i) => api.ctxHover(m.cursor, i))}
           </div>
         )}
       </div>

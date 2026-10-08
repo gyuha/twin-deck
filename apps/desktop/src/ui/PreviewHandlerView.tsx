@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { PreviewRectDto } from "@twin-deck/ts-client";
-import { useApp, useAppStore } from "../state/context";
+import { useApp, useAppStore, useT } from "../state/context";
 import type { AppState } from "../state/store";
 
 /** 화면 위에 뭔가 떠 있나. 그동안 네이티브 처리기 창은 웹 화면 위에 그려지므로 숨겨야 한다. */
@@ -20,6 +20,7 @@ const SETTLE_MS = 150;
 export type HandlerUnavailable = { blocked?: boolean; reason?: string };
 
 export function PreviewHandlerView({ path, suspended, onUnavailable }: { path: string; suspended: boolean; onUnavailable: (why: HandlerUnavailable) => void }) {
+  const t = useT();
   const { api } = useAppStore();
   const box = useRef<HTMLDivElement>(null);
   const sent = useRef("");
@@ -84,5 +85,5 @@ export function PreviewHandlerView({ path, suspended, onUnavailable }: { path: s
     if (ready) void api.previewHandlerSetVisible(!hidden);
   }, [api, ready, hidden]);
 
-  return <div ref={box} data-preview-handler aria-label="문서 미리보기" className="h-full min-h-[240px] w-full" />;
+  return <div ref={box} data-preview-handler aria-label={t("handler.aria")} className="h-full min-h-[240px] w-full" />;
 }

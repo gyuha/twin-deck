@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { actionTitle, t as translate } from "./i18n";
 import { useStore } from "zustand";
 import { createDefaultRegistry, defaultBindingsFor, mergeUserBindings } from "@twin-deck/actions";
 import { formatKey } from "@twin-deck/keybinds";
@@ -10,7 +11,7 @@ import type { Backend, Snapshot } from "@twin-deck/ts-client";
 import { isTauri } from "@tauri-apps/api/core";
 import { allHandlers } from "./actions";
 import { installFileMenuForWindow } from "./appMenu";
-import { StoreContext, useApp, useAppStore } from "./state/context";
+import { StoreContext, useApp, useAppStore, useT } from "./state/context";
 import { actionContext, activeTab, createAppStore, scopeStack } from "./state/store";
 import { ActionBar, useBarIds } from "./ui/ActionBar";
 import { useTextColor, useUiFont } from "./ui/fonts";
@@ -84,6 +85,7 @@ function useRandomTheme(b: { random_theme: boolean; random_themes: string }): st
 }
 
 function StatusBar() {
+  const t = useT();
   const entries = useApp((s) => activeTab(s).entries);
   const selection = useApp((s) => activeTab(s).selection);
   const sizeFormat = useApp((s) => s.loaded.config.display.size_format);
@@ -117,21 +119,21 @@ function StatusBar() {
     );
   };
   // 메뉴바가 없는 Windows·Linux에서 설정 화면과 단축키 목록을 여는 버튼(이슈 #40). 현재 키는 title에 보인다.
-  const entryButton = (label: string, actionId: string, open: () => void) => {
+  const entryButton = (label: string, text: string, actionId: string, open: () => void) => {
     const key = keymap.keysFor(actionId)[0];
     return (
       <button type="button" tabIndex={-1} aria-label={label} title={key ? `${label} (${formatKey(key, platform)})` : label} onClick={open} className="rounded border border-app-line px-1.5 hover:bg-app-selected">
-        {label === "설정" ? label : "단축키"}
+        {text}
       </button>
     );
   };
   return (
-    <footer role="status" aria-label="상태 표시줄" className="flex items-center border-t border-app-line px-2 py-0.5 text-xs">
-      선택: {summary.bytes.selected === 0 ? "0" : formatSpace(summary.bytes.selected, sizeFormat)} / {formatSpace(summary.bytes.total, sizeFormat)}, 파일: {summary.files.selected}/{summary.files.total}, 폴더: {summary.dirs.selected}/{summary.dirs.total}
+    <footer role="status" aria-label={t("status.aria")} className="flex items-center border-t border-app-line px-2 py-0.5 text-xs">
+      {t("status.summary", { selected: summary.bytes.selected === 0 ? "0" : formatSpace(summary.bytes.selected, sizeFormat), total: formatSpace(summary.bytes.total, sizeFormat), filesSelected: summary.files.selected, filesTotal: summary.files.total, dirsSelected: summary.dirs.selected, dirsTotal: summary.dirs.total })}
       {flash && <span className="ml-4 text-status-success">{flash}</span>}
       {warnings > 0 && (
         <button type="button" tabIndex={-1} onClick={() => void api.showConfigWarnings()} className="ml-4 text-status-warning">
-          ⚠ 설정 경고 {warnings}개
+          {t("status.warnings", { count: warnings })}
         </button>
       )}
       {notice && (
@@ -140,11 +142,11 @@ function StatusBar() {
         </span>
       )}
       <span className="ml-auto flex gap-1">
-        {entryButton("설정", "core.settings.open", () => api.openSettings())}
-        {entryButton("단축키 목록", "core.help", () => api.openHelp())}
-        {viewToggle("숨김 파일 표시", "숨김 파일", showHidden, () => api.toggleHidden(), "core.view.hidden")}
-        {viewToggle("드라이브 바 표시", "Drive Bar", showDriveBar, () => api.toggleLayoutFlag("show_drive_bar"), "core.view.drive_bar")}
-        {viewToggle("Action Bar 표시", "Action Bar", showActionBar, () => api.toggleLayoutFlag("show_action_bar"), "core.view.action_bar")}
+        {entryButton(t("settings.aria"), t("settings.aria"), "core.settings.open", () => api.openSettings())}
+        {entryButton(t("menu.help_shortcuts"), t("status.shortcuts"), "core.help", () => api.openHelp())}
+        {viewToggle(t("status.hidden_aria"), t("status.hidden"), showHidden, () => api.toggleHidden(), "core.view.hidden")}
+        {viewToggle(t("menu.view.drive_bar"), "Drive Bar", showDriveBar, () => api.toggleLayoutFlag("show_drive_bar"), "core.view.drive_bar")}
+        {viewToggle(t("menu.view.action_bar"), "Action Bar", showActionBar, () => api.toggleLayoutFlag("show_action_bar"), "core.view.action_bar")}
       </span>
     </footer>
   );
@@ -155,7 +157,7 @@ function BarWarnings({ base }: { base: string[] }) {
   const { unknown } = useBarIds();
   const { api } = useAppStore();
   useEffect(() => {
-    const extra = unknown.length ? [`config.toml: layout.action_bar의 알 수 없는 액션 ID를 무시합니다: ${unknown.join(", ")}`] : [];
+    const extra = unknown.length ? [translate("app.warn.action_bar_unknown", { ids: unknown.join(", ") })] : [];
     api.setKeymapWarnings([...base, ...extra]);
   }, [api, base, unknown]);
   return null;
@@ -176,7 +178,7 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
     const km = new Keymap(platform, merged.bindings);
     const extra =
       loaded.config.behavior.selection.shift_mode === "extend"
-        ? ["config.toml: behavior.selection.shift_mode = \"extend\"는 아직 지원하지 않아 invert로 동작합니다"]
+        ? [translate("app.warn.shift_mode")]
         : [];
     return { keymap: km, warnings: [...merged.warnings, ...km.warnings, ...extra] };
   }, [platform, loaded, registry]);
@@ -209,7 +211,7 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
           .map((a) => {
             return {
               id: a.id,
-              title: a.title,
+              title: actionTitle(a.id, a.title),
               category: a.category,
               keys: keymap.keysFor(a.id).map((k) => formatKey(k, platform)).join(" · "),
               applicable: registry.isApplicable(a.id, ctx),
@@ -224,6 +226,7 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
   // 열려 있는 창·메뉴 위에서는 실행하지 않는다. 화면 요소 설정이 바뀌면 체크 표시를 맞추려고 메뉴를 다시 만든다.
   const driveBar = loaded.config.behavior.layout.show_drive_bar;
   const actionBar = loaded.config.behavior.layout.show_action_bar;
+  const language = loaded.config.behavior.language; // 바뀌면 메뉴 글자를 다시 만든다
   useEffect(() => {
     if (platform !== "mac" || !isTauri()) return;
     let off: (() => void) | undefined;
@@ -237,12 +240,12 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
       return key ? formatKey(key, platform) : undefined;
     })
       .then((unlisten) => (gone ? unlisten() : (off = unlisten)))
-      .catch((e) => console.warn("[twin-deck] 메뉴바를 설정하지 못했습니다", e));
+      .catch((e) => console.warn(translate("app.log.menu_failed"), e));
     return () => {
       gone = true;
       off?.();
     };
-  }, [app, registry, keymap, platform, driveBar, actionBar]);
+  }, [app, registry, keymap, platform, driveBar, actionBar, language]);
 
   useEffect(() => {
     void app.api.init().then(() => {

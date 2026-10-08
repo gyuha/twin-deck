@@ -1,3 +1,4 @@
+import { t as translate } from "../i18n";
 /** 다중 이름 바꾸기: 새 이름 만들기, 충돌 검사, 실행 순서. 화면과 저장소가 같은 함수를 쓴다. */
 
 export type CaseMode = "none" | "upper" | "lower" | "title";
@@ -48,22 +49,22 @@ export interface RenameItem {
 
 /** 마스크 토큰 도움말(화면의 도움말 표). 위치 x, y는 1부터 센다. */
 export const MASK_HELP: { token: string; description: string; example: string }[] = [
-  { token: "[N]", description: "원래 파일 이름(확장자 제외)", example: "photo.jpg → photo" },
-  { token: "[Nx]", description: "이름의 x번째 문자", example: "[N2] : photo → h" },
-  { token: "[Nx:y]", description: "이름의 x번째부터 y번째까지의 문자", example: "[N1:3] : photo → pho" },
-  { token: "[E]", description: "원래 확장자(점 제외)", example: "photo.jpg → jpg" },
-  { token: "[Ex]", description: "확장자의 x번째 문자", example: "[E1] : jpg → j" },
-  { token: "[Ex:y]", description: "확장자의 x번째부터 y번째까지의 문자", example: "[E1:2] : jpg → jp" },
-  { token: "[A]", description: "경로와 확장자가 있는 완전한 파일 이름", example: "/home/a/photo.jpg" },
-  { token: "[Ax:y]", description: "완전한 파일 이름의 x번째부터 y번째까지의 문자", example: "[A9:13] : /home/a/photo.jpg → photo" },
-  { token: "[P]", description: "상위 폴더 이름", example: "/home/a/photo.jpg → a" },
-  { token: "[C]", description: "카운터(시작 번호·간격·너비 설정)", example: "너비 3 : 001, 002, …" },
-  { token: "[Y]", description: "수정 연도(4자리)", example: "2024" },
-  { token: "[M]", description: "수정 월(2자리)", example: "05" },
-  { token: "[D]", description: "수정 일(2자리)", example: "06" },
-  { token: "[h]", description: "수정 시(2자리)", example: "07" },
-  { token: "[m]", description: "수정 분(2자리)", example: "08" },
-  { token: "[s]", description: "수정 초(2자리)", example: "09" },
+  { token: "[N]", get description() { return translate("rename.mask.0"); }, example: "photo.jpg → photo" },
+  { token: "[Nx]", get description() { return translate("rename.mask.1"); }, example: "[N2] : photo → h" },
+  { token: "[Nx:y]", get description() { return translate("rename.mask.2"); }, example: "[N1:3] : photo → pho" },
+  { token: "[E]", get description() { return translate("rename.mask.3"); }, example: "photo.jpg → jpg" },
+  { token: "[Ex]", get description() { return translate("rename.mask.4"); }, example: "[E1] : jpg → j" },
+  { token: "[Ex:y]", get description() { return translate("rename.mask.5"); }, example: "[E1:2] : jpg → jp" },
+  { token: "[A]", get description() { return translate("rename.mask.6"); }, example: "/home/a/photo.jpg" },
+  { token: "[Ax:y]", get description() { return translate("rename.mask.7"); }, example: "[A9:13] : /home/a/photo.jpg → photo" },
+  { token: "[P]", get description() { return translate("rename.mask.8"); }, example: "/home/a/photo.jpg → a" },
+  { token: "[C]", get description() { return translate("rename.mask.9"); }, get example() { return translate("rename.mask.example_width"); } },
+  { token: "[Y]", get description() { return translate("rename.mask.10"); }, example: "2024" },
+  { token: "[M]", get description() { return translate("rename.mask.11"); }, example: "05" },
+  { token: "[D]", get description() { return translate("rename.mask.12"); }, example: "06" },
+  { token: "[h]", get description() { return translate("rename.mask.13"); }, example: "07" },
+  { token: "[m]", get description() { return translate("rename.mask.14"); }, example: "08" },
+  { token: "[s]", get description() { return translate("rename.mask.15"); }, example: "09" },
 ];
 
 /** 이름을 확장자 앞뒤로 나눈다. 맨 앞의 점은 확장자가 아니다(`.gitignore`는 이름 전체). */
@@ -155,12 +156,12 @@ export function validateNames(items: readonly RenameItem[], newNames: readonly s
   for (const n of newNames) count.set(nfc(n), (count.get(nfc(n)) ?? 0) + 1);
   return newNames.map((n, i) => {
     if (!changed[i]) return null;
-    if (n.trim() === "") return "이름이 비었습니다";
-    if (n === "." || n === "..") return "사용할 수 없는 이름입니다";
-    if (/[/\0]/.test(n)) return "이름에 사용할 수 없는 문자가 있습니다";
-    if ((count.get(nfc(n)) ?? 0) > 1) return "새 이름이 겹칩니다";
+    if (n.trim() === "") return translate("rename.err.empty");
+    if (n === "." || n === "..") return translate("rename.err.invalid");
+    if (/[/\0]/.test(n)) return translate("rename.err.chars");
+    if ((count.get(nfc(n)) ?? 0) > 1) return translate("rename.err.dup");
     // 폴더에 이미 있어도, 그 파일이 이번에 이름이 바뀌어 비워지면 괜찮다(맞바꾸기·연쇄 변경).
-    if (taken.has(nfc(n)) && !originals.has(nfc(n))) return "같은 이름의 파일이 이미 있습니다";
+    if (taken.has(nfc(n)) && !originals.has(nfc(n))) return translate("rename.err.exists");
     return null;
   });
 }

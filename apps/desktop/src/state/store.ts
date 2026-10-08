@@ -1,3 +1,4 @@
+import { rustText, setLanguage, t as tr } from "../i18n";
 import { detectEol, editBlockReason, toDisk, toEditor } from "../lib/previewEdit";
 import type { Eol } from "../lib/previewEdit";
 import { buildNewNames, DEFAULT_RENAME_OPTIONS, needsTempStep, validateNames } from "../lib/multiRename";
@@ -14,6 +15,7 @@ import {
   isDriveRoot,
   joinPath,
   parentPath,
+  setBackendErrorTranslator,
   trimTrailingSep,
 } from "@twin-deck/ts-client";
 import type {
@@ -216,25 +218,25 @@ export interface CtxItem {
 
 /** 파일 행 컨텍스트 메뉴의 구성 (Finder 스타일). 단축키 힌트와 실행 가능 여부는 액션 ID로 구한다. */
 export const CONTEXT_MENU: readonly CtxItem[] = [
-  { label: "열기", actionId: "core.open" },
+  { get label() { return tr("ctx.open"); }, actionId: "core.open" },
   {
-    label: "다음으로 열기",
+    get label() { return tr("ctx.open_with"); },
     sub: [
-      { label: "편집기로 열기", actionId: "core.edit" },
-      { label: "아카이브로 열기…", actionId: "core.open.as_archive" },
-      { label: "파일 관리자에서 보기", actionId: "core.reveal" },
+      { get label() { return tr("ctx.open_editor"); }, actionId: "core.edit" },
+      { get label() { return tr("ctx.open_archive"); }, actionId: "core.open.as_archive" },
+      { get label() { return tr("ctx.reveal"); }, actionId: "core.reveal" },
     ],
   },
   {},
-  { label: "여기에 압축…", actionId: "core.compress" },
-  { label: "압축 풀기", actionId: "core.extract", archiveOnly: true },
+  { get label() { return tr("ctx.compress_here"); }, actionId: "core.compress" },
+  { get label() { return tr("ctx.extract"); }, actionId: "core.extract", archiveOnly: true },
   {},
-  { label: "이동", actionId: "core.move" },
-  { label: "복사", actionId: "core.copy" },
-  { label: "삭제", actionId: "core.trash" },
-  { label: "이름 바꾸기", actionId: "core.rename" },
+  { get label() { return tr("ctx.move"); }, actionId: "core.move" },
+  { get label() { return tr("ctx.copy"); }, actionId: "core.copy" },
+  { get label() { return tr("ctx.delete"); }, actionId: "core.trash" },
+  { get label() { return tr("ctx.rename"); }, actionId: "core.rename" },
   {},
-  { label: "파일 속성 표시", actionId: "core.file.info" },
+  { get label() { return tr("ctx.info"); }, actionId: "core.file.info" },
 ];
 
 export interface CtxMenuState {
@@ -357,14 +359,14 @@ export interface AppState {
 }
 
 export const PAGE_SIZE = 10;
-const VIRTUAL_NO_CREATE = "검색/분석 결과 탭에서는 새로 만들 수 없습니다. 폴더 탭에서 시도하세요";
+const VIRTUAL_NO_CREATE = () => tr("store.virtual.no_create");
 /** 삭제·휴지통·압축은 이 시간을 넘겨 계속 실행 중일 때만 진행 창을 띄운다(자주 쓰는 작업이라 깜빡이지 않게). */
 const TRANSFER_PROGRESS_DELAY_MS = 300;
 /** 확인 창을 거친 복사·이동은 기다리지 않는다: 첫 조회에서 아직 진행 중이면 바로 진행 창을 띄운다. */
 const TRANSFER_PROGRESS_DELAY_COPY_MS = 0;
 /** 전송이 끝날 때까지 큐를 직접 조회하는 간격. */
 const TRANSFER_POLL_MS = 100;
-const VIRTUAL_NO_DEST = "검색/분석 결과 탭은 복사·이동의 대상이 될 수 없습니다. 반대편 패널을 폴더로 바꾸세요";
+const VIRTUAL_NO_DEST = () => tr("store.virtual.no_dest");
 /** 상태 저장을 미루는 시간(디바운스). */
 export const SAVE_DELAY_MS = 400;
 /** 저장하는 선택 항목 수의 상한. 폴더 전체 선택(수만 개)이 스냅샷을 키우지 않게 한다. */
@@ -910,7 +912,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
   subscribe(() => backend.onQueueChanged((jobs) => {
     if (!sawQueueEvent) {
       sawQueueEvent = true;
-      console.info("[twin-deck] 큐 이벤트를 처음 받았습니다");
+      console.info(tr("store.log.first_queue_event"));
     }
     applyQueue(jobs);
   }));
@@ -984,7 +986,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       await backend.saveState(snap);
     } catch (e) {
       lastSaved = ""; // 다음 변경 때 다시 시도한다
-      fail(`상태를 저장하지 못했습니다: ${e instanceof Error ? e.message : e}`);
+      fail(tr("store.save_state_failed", { error: e instanceof Error ? e.message : String(e) }));
     }
   }
   subscribe(() => store.subscribe(() => {
@@ -1038,7 +1040,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
   /** 경로 문자열(`~`, `${user.*}` 포함)로 이동한다. 없는 경로는 알리고 이동하지 않는다. */
   async function navigateToPath(raw: string) {
     const dest = expandPath(raw.trim(), get().userDirs);
-    if (dest === null) return fail("사용자 폴더를 알 수 없어 경로를 확장하지 못했습니다");
+    if (dest === null) return fail(tr("store.user_dirs_unknown"));
     const clean = trimTrailingSep(dest);
     set({ notice: null });
     try {
@@ -1074,7 +1076,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       }
       if (!shownOnce && !get().dialog && Date.now() - started >= delayMs) {
         shownOnce = true;
-        set({ dialog: { kind: "progress", title: `${verb} 중`, jobId } });
+        set({ dialog: { kind: "progress", title: tr("store.progress.title", { verb }), jobId } });
       }
     }
   }
@@ -1083,7 +1085,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
   async function transferDestError(dest: string, targets: Pick<EntryDto, "path" | "kind">[]): Promise<string | null> {
     const clean = trimTrailingSep(dest);
     if (targets.some((t) => t.kind === "dir" && (clean === t.path || (clean.startsWith(t.path) && /[\\/]/.test(clean.charAt(t.path.length)))))) {
-      return "원본 폴더 안으로는 보낼 수 없습니다";
+      return tr("store.dest.inside_source");
     }
     try {
       await backend.listDir(clean, true);
@@ -1103,7 +1105,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
 
   /** 겹치는 이름은 항목마다(또는 "남은 항목에도 적용"으로) 정한 뒤 작업 큐에 넣는다. 복사/이동의 공통 부분. */
   async function runTransfer(kind: "copy" | "move", targets: { path: string }[], destDir: string, progressDelayMs: number, clearSelection: boolean) {
-    const verb = kind === "copy" ? "복사" : "이동";
+    const verb = kind === "copy" ? tr("store.verb.copy") : tr("store.verb.move");
     const items: QueueItemDto[] = [];
     let sticky: ConflictDto | null = null; // "남은 항목에도 같은 선택 적용"으로 정해진 처리
     for (const [i, t] of targets.entries()) {
@@ -1115,7 +1117,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
           else {
             const answer = await ask<{ choice: ConflictDto; all: boolean }>({
               kind: "conflict",
-              title: `${verb}: 이름이 겹칩니다`,
+              title: tr("store.conflict.title", { verb }),
               existing,
               selected: CONFLICT_CHOICES.indexOf("rename"),
               remaining: targets.length - i,
@@ -1145,7 +1147,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
   async function writeClipboard(mode: "copy" | "cut") {
     const targets = targetsOf(activeTab(get()));
     if (targets.length === 0) return;
-    if (targets.some((t) => isArchivePath(t.path))) return fail("아카이브 안의 항목은 클립보드로 복사할 수 없습니다");
+    if (targets.some((t) => isArchivePath(t.path))) return fail(tr("store.clip.archive"));
     set({ notice: null });
     const paths = targets.map((t) => t.path);
     try {
@@ -1154,7 +1156,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       return fail(e);
     }
     cutPaths = mode === "cut" ? paths : [];
-    flash(mode === "cut" ? `${paths.length}개 항목을 잘라냈습니다. 붙여 넣으면 이동합니다` : `${paths.length}개 항목을 클립보드에 복사했습니다`);
+    flash(mode === "cut" ? tr("store.clip.cut", { count: paths.length }) : tr("store.clip.copied", { count: paths.length }));
   }
 
   /** 커서 아래 요소에서 드롭 대상을 정한다: 폴더 행이면 그 폴더 안으로, 아니면 그 패널의 현재 폴더(같은 패널·가상 탭은 받지 않는다). */
@@ -1183,7 +1185,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       await syncWatches();
       void api.refreshVolumes();
       applyQueue(await backend.queueJobs());
-      if (moved > 0) fail(`저장된 폴더 ${moved}개가 없어져 가장 가까운 상위 폴더로 옮겼습니다`);
+      if (moved > 0) fail(tr("store.state.folders_moved", { count: moved }));
       // 복원이 끝난 상태를 기준으로 삼아, 그 뒤에 달라진 것만 저장한다.
       lastSaved = JSON.stringify(toSnapshot());
       saveEnabled = true;
@@ -1198,8 +1200,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     async resetState() {
       const ok = await ask<boolean>({
         kind: "confirm",
-        title: "저장된 상태를 모두 지우고 앱을 종료할까요?",
-        lines: ["열려 있던 탭, 폴더, 선택 항목, Actions Panel 검색어가 지워집니다. 설정 파일은 그대로입니다."],
+        title: tr("store.reset.title"),
+        lines: [tr("store.reset.line")],
       });
       if (!ok) return;
       // 종료 직전에 다시 저장해서 방금 지운 상태가 되살아나지 않게 한다.
@@ -1217,7 +1219,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     async newWindow() {
       set({ notice: null });
       try {
-        flash(`새 창을 열었습니다 (${await backend.newWindow()})`);
+        flash(tr("store.window.opened", { label: await backend.newWindow() }));
       } catch (e) {
         fail(e);
       }
@@ -1275,7 +1277,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     },
     async paneSend(args?: Record<string, unknown>) {
       const to = args?.to;
-      if (to !== "left" && to !== "right") return fail("core.pane.send에는 인수 to(left|right)가 필요합니다");
+      if (to !== "left" && to !== "right") return fail(tr("store.pane_send.arg"));
       const s = get();
       if (s.activePane === to) return to === "right" ? api.goForward() : api.goBack();
       const tab = activeTab(s);
@@ -1325,7 +1327,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const c = cursorEntry(activeTab(get()));
       if (!c) return;
       if (c.kind !== "file") {
-        fail("파일만 아카이브로 열 수 있습니다");
+        fail(tr("store.open_archive.files_only"));
         return;
       }
       set({ notice: null });
@@ -1389,7 +1391,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const tab = activeTab(s);
       const current = effectiveSort(tab, cfg().view.table.columns);
       const by = typeof args?.by === "string" ? args.by : current.key;
-      if (!(SORT_KEYS as readonly string[]).includes(by)) return fail(`알 수 없는 정렬 기준: ${by}`);
+      if (!(SORT_KEYS as readonly string[]).includes(by)) return fail(tr("store.sort.unknown", { by }));
       const key = by as SortKey;
       const asked = args?.dir;
       const dir =
@@ -1414,7 +1416,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
           : asked === "columns-1" || asked === "columns-2" || asked === "columns-3"
             ? { mode: "columns", count: Number(asked.slice(-1)) as 1 | 2 | 3 }
             : null;
-      if (!view) return fail(`알 수 없는 표시 모드: ${asked}`);
+      if (!view) return fail(tr("store.mode.unknown", { mode: asked }));
       patchActive({ view });
     },
     cursorHome() {
@@ -1502,7 +1504,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     async selectGroup(select: boolean) {
       const pattern = await ask<string>({
         kind: "name",
-        title: select ? "패턴으로 선택" : "패턴으로 선택 해제",
+        title: select ? tr("store.select_group.select") : tr("store.select_group.deselect"),
         value: "*",
         error: null,
         selectStem: false,
@@ -1516,7 +1518,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       } catch (e) {
         return fail(e);
       }
-      if (hits.length === 0) return fail(`'${pattern.trim()}'와 일치하는 항목이 없습니다`);
+      if (hits.length === 0) return fail(tr("store.select_group.none", { pattern: pattern.trim() }));
       patchTab(get().activePane, tab.id, (t) => {
         const sel = new Set(t.selection);
         for (const i of hits) {
@@ -1705,7 +1707,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         result = { items: d.items, newNames };
       } else if (d.kind === "name") {
         if (d.value.trim() === "") {
-          set({ dialog: { ...d, error: "이름을 입력하세요" } });
+          set({ dialog: { ...d, error: tr("store.name.required") } });
           return;
         }
         result = d.option ? { value: d.value, checked: d.option.checked } : d.value;
@@ -1734,8 +1736,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     /** 새 폴더 (OP-01). 중첩 경로(`a/b/c`)를 허용한다. */
     async newFolder() {
       const tab = activeTab(get());
-      if (tab.virtual) return fail(VIRTUAL_NO_CREATE);
-      const name = await ask<string>({ kind: "name", title: "새 폴더", value: "", error: null, selectStem: false });
+      if (tab.virtual) return fail(VIRTUAL_NO_CREATE());
+      const name = await ask<string>({ kind: "name", title: tr("store.new_folder"), value: "", error: null, selectStem: false });
       if (name === null) return;
       set({ notice: null });
       try {
@@ -1750,8 +1752,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     /** 새 파일 (OP-02). */
     async newFile() {
       const tab = activeTab(get());
-      if (tab.virtual) return fail(VIRTUAL_NO_CREATE);
-      const name = await ask<string>({ kind: "name", title: "새 파일", value: "", error: null, selectStem: false });
+      if (tab.virtual) return fail(VIRTUAL_NO_CREATE());
+      const name = await ask<string>({ kind: "name", title: tr("store.new_file"), value: "", error: null, selectStem: false });
       if (name === null) return;
       set({ notice: null });
       try {
@@ -1771,7 +1773,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (tab.selection.size >= 2) return api.multiRename();
       const entry = cursorEntry(tab);
       if (!entry) return;
-      const name = await ask<string>({ kind: "name", title: "이름 변경", value: entry.name, error: null, selectStem: true });
+      const name = await ask<string>({ kind: "name", title: tr("store.rename"), value: entry.name, error: null, selectStem: true });
       if (name === null || name === entry.name) return;
       set({ notice: null });
       try {
@@ -1796,13 +1798,13 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const pane = s.activePane;
       const tab = activeTab(s);
       const targets = targetsOf(tab);
-      if (targets.length < 2) return fail("이름을 바꿀 항목을 2개 이상 선택하세요");
-      if (tab.virtual) return fail("검색/분석 결과 탭에서는 여러 항목의 이름을 한꺼번에 바꿀 수 없습니다. 폴더 탭에서 선택하세요");
-      if (targets.some((t) => isArchivePath(t.path))) return fail("아카이브 안의 항목은 이름을 바꿀 수 없습니다");
+      if (targets.length < 2) return fail(tr("store.multi_rename.need_two"));
+      if (tab.virtual) return fail(tr("store.multi_rename.virtual"));
+      if (targets.some((t) => isArchivePath(t.path))) return fail(tr("store.multi_rename.archive"));
       const items = targets.map((t) => ({ path: t.path, name: t.name, isDir: t.kind === "dir", modifiedMs: t.modifiedMs }));
       const plan = await ask<{ items: typeof items; newNames: string[] }>({
         kind: "multirename",
-        title: "다중 이름 바꾸기 도구",
+        title: tr("store.multi_rename.title"),
         items,
         existing: tab.entries.map((e) => e.name),
         options: { ...DEFAULT_RENAME_OPTIONS },
@@ -1831,7 +1833,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         for (const st of staged) {
           const dest = await run(st.tmp, st.to, st.name);
           if (dest) done.push(dest);
-          else failed.push(`${st.name}: 임시 이름(${baseName(st.tmp)})으로 남아 있습니다`);
+          else failed.push(tr("store.multi_rename.temp_left", { name: st.name, temp: baseName(st.tmp) }));
         }
       } else {
         for (const r of rows) {
@@ -1841,8 +1843,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       }
       patchTab(pane, tab.id, { selection: new Set(done) });
       await reloadAll();
-      if (failed.length > 0) fail(`${done.length}개 변경, ${failed.length}개 실패 — ${failed.join(" / ")}`);
-      else flash(`${done.length}개의 이름을 바꿨습니다`);
+      if (failed.length > 0) fail(tr("store.multi_rename.partial", { done: done.length, failed: failed.length, details: failed.join(" / ") }));
+      else flash(tr("store.multi_rename.done", { count: done.length }));
     },
     /** 비활성 패널로 복사/이동 (OP-03, OP-04). 이름이 겹치면 항목마다 물어본 뒤 작업 큐에 넣는다. */
     async copyOrMove(kind: "copy" | "move", confirm = true) {
@@ -1850,17 +1852,17 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const targets = targetsOf(activeTab(s));
       if (targets.length === 0) return;
       const inactive = activeTab(s, other(s.activePane));
-      if (inactive.virtual) return fail(VIRTUAL_NO_DEST);
-      const verb = kind === "copy" ? "복사" : "이동";
+      if (inactive.virtual) return fail(VIRTUAL_NO_DEST());
+      const verb = kind === "copy" ? tr("store.verb.copy") : tr("store.verb.move");
       set({ notice: null });
       const title =
         targets.length === 1
-          ? `"${targets[0].name}" 항목을 ${verb}하시겠습니까?`
-          : `선택한 ${targets.length}개 항목을 ${verb}하시겠습니까?`;
+          ? tr("store.transfer.ask_one", { name: targets[0].name, verb })
+          : tr("store.transfer.ask_many", { count: targets.length, verb });
       let destDir = inactive.path;
       let error: string | null = null;
       while (confirm) {
-        const value = await ask<string>({ kind: "name", title, label: "대상 폴더", value: destDir, error, selectStem: false, confirmLabel: "시작" });
+        const value = await ask<string>({ kind: "name", title, label: tr("store.transfer.dest_label"), value: destDir, error, selectStem: false, confirmLabel: tr("store.transfer.start") });
         if (value === null) return;
         destDir = value.trim();
         if (destDir.length > 1) destDir = destDir.replace(/\/+$/, "");
@@ -1922,17 +1924,17 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (!target) {
         // 가상 탭(검색 결과 등)에는 놓을 수 없다고 알린다. 패널 밖에 놓은 것은 조용히 무시한다.
         const pane = el?.closest<HTMLElement>("section[data-pane]")?.dataset.pane as PaneId | undefined;
-        if (pane && activeTab(get(), pane).virtual) fail("검색 결과 같은 가상 탭에는 파일을 놓을 수 없습니다");
+        if (pane && activeTab(get(), pane).virtual) fail(tr("store.drop.virtual"));
         return;
       }
       // 이미 그 폴더 안에 있는 항목은 건너뛴다(같은 폴더로 복사해 봐야 복제본만 생긴다).
       const srcs = paths.filter((p) => parentPath(p) !== target.dir);
-      if (srcs.length === 0) return flash("이미 이 폴더에 있는 항목입니다");
+      if (srcs.length === 0) return flash(tr("store.drop.already_here"));
       void api.dropTransfer(srcs, target.dir, false);
     },
     /** 끌던 파일을 운영체제 드래그로 넘긴다(창 밖으로 나갔을 때). 아카이브 안의 항목은 실제 파일이 아니라 보낼 수 없다. */
     async dragOutOfWindow(paths: string[]) {
-      if (paths.some((p) => isArchivePath(p))) return fail("아카이브 안의 항목은 다른 앱으로 끌어 갈 수 없습니다");
+      if (paths.some((p) => isArchivePath(p))) return fail(tr("store.drag.archive"));
       try {
         await backend.startNativeDrag(paths);
       } catch (e) {
@@ -2036,7 +2038,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     /** 붙여넣기 (Mod+V): 클립보드의 파일을 활성 패널의 현재 폴더로 복사한다. 잘라낸 것이면 이동한다. */
     async clipboardPaste() {
       const tab = activeTab(get());
-      if (tab.virtual) return fail(VIRTUAL_NO_DEST);
+      if (tab.virtual) return fail(VIRTUAL_NO_DEST());
       set({ notice: null });
       let paths: string[];
       try {
@@ -2044,7 +2046,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       } catch (e) {
         return fail(e);
       }
-      if (paths.length === 0) return flash("클립보드에 붙여 넣을 파일이 없습니다");
+      if (paths.length === 0) return flash(tr("store.paste.none"));
       const destDir = tab.path;
       const cut = paths.length === cutPaths.length && paths.every((p) => cutPaths.includes(p));
       const kind = cut ? "move" : "copy";
@@ -2070,15 +2072,15 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const targets = targetsOf(activeTab(get()));
       if (targets.length === 0) return;
       if (targets.some((t) => isArchivePath(t.path))) {
-        fail("아카이브 안에서는 휴지통을 쓸 수 없습니다. 영구 삭제(Shift+F8)를 사용하세요");
+        fail(tr("store.trash.archive"));
         return;
       }
-      if (cfg().core.confirm.trash && !(await api.confirmTargets(`${targets.length}개 항목을 휴지통으로 보낼까요?`, targets))) return;
+      if (cfg().core.confirm.trash && !(await api.confirmTargets(tr("store.trash.confirm", { count: targets.length }), targets))) return;
       set({ notice: null });
       patchActive({ selection: new Set() });
       api.recheckVirtual(targets.map((t) => t.path));
       const jobId = await backend.enqueue("trash", targets.map((t) => ({ src: t.path, destDir: null, policy: "skip" })));
-      void trackTransfer(jobId, "휴지통으로 이동");
+      void trackTransfer(jobId, tr("store.trash.progress"));
       await reloadAll();
     },
     /** 압축 (OP-11, `core.compress`): 대상 항목을 이 폴더의 ZIP 하나로 묶는다. 원본은 그대로 둔다. */
@@ -2086,8 +2088,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const tab = activeTab(get());
       const targets = targetsOf(tab);
       if (targets.length === 0) return;
-      if (tab.virtual) return fail("검색/분석 결과 탭에서는 압축할 수 없습니다. 폴더 탭에서 항목을 선택하세요");
-      if (targets.some((t) => isArchivePath(t.path))) return fail("아카이브 안의 항목은 압축할 수 없습니다. 먼저 밖으로 복사하세요");
+      if (tab.virtual) return fail(tr("store.compress.virtual"));
+      if (targets.some((t) => isArchivePath(t.path))) return fail(tr("store.compress.archive"));
       // 여러 항목은 압축 파일 이름을 물어본다(기본: 이 폴더 이름). 하나면 그 항목 이름을 쓴다.
       let name: string | undefined;
       const pane = get().activePane;
@@ -2099,11 +2101,11 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         const canOther = !inactive.virtual && !isArchivePath(inactive.path);
         const asked = await ask<{ value: string; checked: boolean }>({
           kind: "name",
-          title: "압축 파일 이름",
+          title: tr("store.compress.name"),
           value: `${baseName(tab.path) || "archive"}.zip`,
           error: null,
           selectStem: true,
-          option: canOther ? { label: "반대 패널에 압축 파일 놓기", checked: false } : undefined,
+          option: canOther ? { label: tr("store.compress.other_pane"), checked: false } : undefined,
         });
         if (asked === null) return;
         const trimmed = asked.value.trim();
@@ -2117,7 +2119,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const before = new Set(destTab.entries.map((e) => e.name));
       try {
         const jobId = await backend.enqueueCompress(targets.map((t) => t.path), destTab.path, name);
-        await trackTransfer(jobId, "압축");
+        await trackTransfer(jobId, tr("store.compress.progress"));
       } catch (e) {
         fail(e);
       }
@@ -2133,13 +2135,13 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const targets = targetsOf(activeTab(s)).filter(
         (t) => t.kind === "file" && isArchiveName(t.name, cfg().file_systems.zip.additional_extensions),
       );
-      if (targets.length === 0) return fail("압축 파일(아카이브)을 선택하세요");
-      if (targets.some((t) => isArchivePath(t.path))) return fail("아카이브 안의 아카이브는 먼저 밖으로 꺼낸 뒤 추출하세요");
+      if (targets.length === 0) return fail(tr("store.extract.select"));
+      if (targets.some((t) => isArchivePath(t.path))) return fail(tr("store.extract.nested"));
       let fixed: string | null = null;
       if (toInactive) {
         const inactive = activeTab(s, other(s.activePane));
-        if (inactive.virtual) return fail(VIRTUAL_NO_DEST);
-        if (isArchivePath(inactive.path)) return fail("아카이브 안에는 추출할 수 없습니다");
+        if (inactive.virtual) return fail(VIRTUAL_NO_DEST());
+        if (isArchivePath(inactive.path)) return fail(tr("store.extract.into_archive"));
         fixed = inactive.path;
       }
       set({ notice: null });
@@ -2147,7 +2149,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       for (const t of targets) {
         try {
           const jobId = await backend.enqueueExtract(t.path, fixed ?? parentPath(t.path) ?? "/");
-          void trackTransfer(jobId, "압축 풀기");
+          void trackTransfer(jobId, tr("store.extract.progress"));
         } catch (e) {
           fail(e);
           break;
@@ -2161,8 +2163,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const entry = cursorEntry(activeTab(s));
       if (!entry) return;
       const inactive = activeTab(s, other(s.activePane));
-      if (inactive.virtual) return fail(VIRTUAL_NO_DEST);
-      if (isArchivePath(inactive.path) || isArchivePath(entry.path)) return fail("아카이브 안에서는 심볼릭 링크를 만들 수 없습니다");
+      if (inactive.virtual) return fail(VIRTUAL_NO_DEST());
+      if (isArchivePath(inactive.path) || isArchivePath(entry.path)) return fail(tr("store.symlink.archive"));
       set({ notice: null });
       try {
         let policy: ConflictDto = "skip";
@@ -2170,7 +2172,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         if (existing !== null) {
           const answer = await ask<{ choice: ConflictDto; all: boolean }>({
             kind: "conflict",
-            title: "링크: 이름이 겹칩니다",
+            title: tr("store.symlink.conflict"),
             existing,
             selected: CONFLICT_CHOICES.indexOf("rename"),
             remaining: 1,
@@ -2180,7 +2182,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
           policy = answer.choice;
         }
         const made = await backend.createSymlink(entry.path, inactive.path, policy);
-        if (made) flash(`링크를 만들었습니다: ${made}`);
+        if (made) flash(tr("store.symlink.made", { path: made }));
         await reloadAll();
       } catch (e) {
         fail(e);
@@ -2207,21 +2209,21 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         return fail(e);
       }
       const display = cfg().display;
-      const kind = { file: "파일", dir: "폴더", symlink: "심볼릭 링크" }[info.kind];
+      const kind = { file: tr("store.info.kind.file"), dir: tr("store.info.kind.dir"), symlink: tr("store.info.kind.symlink") }[info.kind];
       const lines = [
-        `이름: ${info.name}`,
-        `경로: ${info.path}`,
-        `종류: ${kind}`,
+        tr("store.info.name", { value: info.name }),
+        tr("store.info.path", { value: info.path }),
+        tr("store.info.kind", { value: kind }),
         info.kind === "dir"
-          ? `항목 수: ${info.childCount ?? "알 수 없음"}`
-          : `크기: ${formatSize(info.size, display.size_format)} (${info.size} B)`,
-        `생성: ${formatDateTime(info.createdMs, display)}`,
-        `수정: ${formatDateTime(info.modifiedMs, display)}`,
-        `접근: ${formatDateTime(info.accessedMs, display)}`,
-        ...(info.mode === null ? [] : [`권한: ${formatPermissions(info.mode)} (${formatOctal(info.mode)})`]),
-        ...(info.linkTarget ? [`링크 대상: ${info.linkTarget}`] : []),
+          ? tr("store.info.children", { value: info.childCount ?? tr("store.info.unknown") })
+          : tr("store.info.size", { value: formatSize(info.size, display.size_format), bytes: info.size }),
+        tr("store.info.created", { value: formatDateTime(info.createdMs, display) }),
+        tr("store.info.modified", { value: formatDateTime(info.modifiedMs, display) }),
+        tr("store.info.accessed", { value: formatDateTime(info.accessedMs, display) }),
+        ...(info.mode === null ? [] : [tr("store.info.mode", { value: formatPermissions(info.mode), octal: formatOctal(info.mode) })]),
+        ...(info.linkTarget ? [tr("store.info.link", { value: info.linkTarget })] : []),
       ];
-      await ask<boolean>({ kind: "info", title: `정보: ${info.name}`, lines });
+      await ask<boolean>({ kind: "info", title: tr("store.info.title", { name: info.name }), lines });
     },
     /** 미리보기 중인 텍스트의 원문(보이는 부분)을 클립보드로 복사한다. 아직 읽는 중이거나 텍스트가 아니면 아무것도 하지 않는다. */
     async previewCopyText() {
@@ -2240,7 +2242,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const path = hereOf(activeTab(get()));
       try {
         await backend.copyText(path);
-        flash(`폴더 경로를 복사했습니다: ${path}`);
+        flash(tr("store.path.folder_copied", { path }));
       } catch (e) {
         fail(e);
       }
@@ -2251,7 +2253,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (targets.length === 0) return;
       try {
         await backend.copyText(targets.map((t) => t.path).join("\n"));
-        flash(`${targets.length}개 경로를 복사했습니다`);
+        flash(tr("store.path.files_copied", { count: targets.length }));
       } catch (e) {
         fail(e);
       }
@@ -2292,7 +2294,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const ok = await ask<boolean>({
         kind: "confirm",
         title,
-        lines: targets.slice(0, 5).map((t) => t.name).concat(targets.length > 5 ? [`… 외 ${targets.length - 5}개`] : []),
+        lines: targets.slice(0, 5).map((t) => t.name).concat(targets.length > 5 ? [tr("store.more_items", { count: targets.length - 5 })] : []),
       });
       return ok === true;
     },
@@ -2300,12 +2302,12 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     async deleteTargets() {
       const targets = targetsOf(activeTab(get()));
       if (targets.length === 0) return;
-      if (cfg().core.confirm.delete && !(await api.confirmTargets(`${targets.length}개 항목을 영구 삭제할까요?`, targets))) return;
+      if (cfg().core.confirm.delete && !(await api.confirmTargets(tr("store.delete.confirm", { count: targets.length }), targets))) return;
       set({ notice: null });
       patchActive({ selection: new Set() });
       api.recheckVirtual(targets.map((t) => t.path));
       const jobId = await backend.enqueue("delete", targets.map((t) => ({ src: t.path, destDir: null, policy: "skip" })));
-      void trackTransfer(jobId, "삭제");
+      void trackTransfer(jobId, tr("store.delete.progress"));
       await reloadAll();
     },
 
@@ -2327,9 +2329,9 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     async showConfigWarnings() {
       const s = get();
       const lines = s.loaded.warnings
-        .map((w) => `${w.file}${w.line ? `:${w.line}` : ""}: ${w.message}`)
+        .map((w) => `${w.file}${w.line ? `:${w.line}` : ""}: ${rustText(w.message)}`)
         .concat(s.keymapWarnings);
-      await ask<boolean>({ kind: "info", title: lines.length ? `설정 경고 ${lines.length}개` : "설정 경고 없음", lines });
+      await ask<boolean>({ kind: "info", title: lines.length ? tr("store.warnings.title", { count: lines.length }) : tr("store.warnings.none"), lines });
     },
 
     /** Volumes/Favorites/Recent/Hierarchy 메뉴를 연다 (NAV-07~10). */
@@ -2341,13 +2343,13 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       set({ notice: null });
       try {
         if (kind === "volumes") {
-          title = "볼륨";
+          title = tr("store.menu.volumes");
           items = (await backend.listVolumes()).map((v) => ({
             label: v.name === v.mountPoint ? v.name : `${v.name} — ${v.mountPoint}`,
             path: v.mountPoint,
           }));
         } else if (kind === "favorites") {
-          title = "즐겨찾기";
+          title = tr("store.menu.favorites");
           const dirs = s.userDirs;
           const resolve = (name: string, path: string, indent = ""): MenuItem[] => {
             const real = expandPath(path, dirs);
@@ -2361,7 +2363,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
             } else items.push(...resolve(f.name ?? f.path ?? "", f.path ?? ""));
           }
         } else if (kind === "recent") {
-          title = "최근 위치";
+          title = tr("store.menu.recent");
           const seen = new Set<string>([tab.path]);
           for (const p of [...s.recent].reverse()) {
             if (seen.has(p)) continue;
@@ -2370,7 +2372,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
             if (items.length >= recentLimit(s.loaded.config)) break;
           }
         } else {
-          title = "상위 폴더";
+          title = tr("store.menu.hierarchy");
           for (let p: string | null = hereOf(tab); p !== null; p = parentPath(p)) {
             items.push({ label: p, path: p });
           }
@@ -2598,7 +2600,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const here = hereOf(activeTab(get()));
       const value = await ask<string>({
         kind: "name",
-        title: "경로로 이동",
+        title: tr("store.goto.title"),
         value: here.endsWith("/") ? here : `${here}/`,
         error: null,
         selectStem: false,
@@ -2614,14 +2616,14 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     /** `core.open.directory` (ACT-03): 인수 `src`의 폴더로 이동한다. `~`와 `${user.*}`를 확장한다. */
     async openDirectory(args?: Record<string, unknown>) {
       const src = args?.src;
-      if (typeof src !== "string" || src.trim() === "") return fail("core.open.directory에는 문자열 인수 src가 필요합니다");
+      if (typeof src !== "string" || src.trim() === "") return fail(tr("store.open_dir.arg"));
       await navigateToPath(src);
     },
     /** 폴더 단축키(`shortcuts.N`)에 지정된 폴더로 간다. 비어 있으면 알리고 이동하지 않는다. */
     async openShortcut(args?: Record<string, unknown>) {
       const n = String(args?.n ?? "");
       const path = get().loaded.config.shortcuts[n]?.trim();
-      if (!path) return fail(`Ctrl+${n}에 지정된 폴더가 없습니다 (설정 > 폴더 단축키)`);
+      if (!path) return fail(tr("store.shortcut.none", { n }));
       await navigateToPath(path);
     },
     async gotoComplete() {
@@ -2699,7 +2701,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     async previewEditStart() {
       const pv = get().preview;
       if (!pv || get().previewEdit) return;
-      const reason = pv.status !== "ready" ? "아직 읽는 중입니다" : editBlockReason({ path: pv.path, kind: pv.data?.kind, truncated: !!pv.data?.truncated, text: pv.data?.text });
+      const reason = pv.status !== "ready" ? tr("store.edit.reading") : editBlockReason({ path: pv.path, kind: pv.data?.kind, truncated: !!pv.data?.truncated, text: pv.data?.text });
       if (reason) return flash(reason);
       const raw = pv.data?.text as string;
       let info;
@@ -2709,7 +2711,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         return fail(e);
       }
       // 미리보기를 읽은 뒤 파일이 바뀌었으면(크기가 다르면) 낡은 내용을 편집하게 하지 않는다.
-      if (info.size !== pv.data?.size) return flash("편집할 수 없습니다: 미리보기를 연 뒤 파일이 바뀌었습니다. 미리보기를 다시 열어 주세요");
+      if (info.size !== pv.data?.size) return flash(tr("store.edit.changed"));
       if (get().preview?.path !== pv.path || get().previewEdit) return; // 그 사이 다른 파일로 넘어갔다
       const text = toEditor(raw);
       set({ previewEdit: { path: pv.path, text, base: text, eol: detectEol(raw) as Eol, expected: { size: info.size, modifiedMs: info.modifiedMs }, saved: false } });
@@ -2735,9 +2737,9 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (!r.saved) {
         const overwrite = await ask<boolean>({
           kind: "confirm",
-          title: "파일이 밖에서 바뀌었습니다",
-          lines: ["편집을 시작한 뒤 다른 곳에서 이 파일이 바뀌었습니다.", "덮어쓰면 그 변경이 사라집니다."],
-          confirmLabel: "덮어쓰기",
+          title: tr("store.edit.external.title"),
+          lines: [tr("store.edit.external.l1"), tr("store.edit.external.l2")],
+          confirmLabel: tr("store.edit.overwrite"),
         });
         return overwrite ? api.previewEditSave(true) : false;
       }
@@ -2761,9 +2763,9 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (e.text !== e.base) {
         const choice = await ask<number>({
           kind: "choice",
-          title: "저장하지 않은 변경",
-          lines: ["편집한 내용을 저장하지 않고 끝내면 사라집니다."],
-          choices: ["저장", "버리기"],
+          title: tr("store.edit.unsaved.title"),
+          lines: [tr("store.edit.unsaved.line")],
+          choices: [tr("store.edit.save"), tr("store.edit.discard")],
           selected: 0,
         });
         if (choice === null) return false;
@@ -2785,14 +2787,14 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const idx = tab.entries.findIndex((e) => e.path === p.path);
       const entry = tab.entries[idx];
       if (!entry) return;
-      if (cfg().core.confirm.delete && !(await api.confirmTargets("이 항목을 영구 삭제할까요?", [entry]))) return;
+      if (cfg().core.confirm.delete && !(await api.confirmTargets(tr("store.delete.confirm_one"), [entry]))) return;
       // 삭제는 큐에서 비동기로 끝나므로, 지금 목록에서 다음(없으면 이전) 항목을 미리 정해 그 쪽으로 옮긴다.
       const next = tab.entries[idx + 1] ?? tab.entries[idx - 1];
       set({ notice: null });
       patchActive({ selection: new Set() });
       api.recheckVirtual([entry.path]);
       const jobId = await backend.enqueue("delete", [{ src: entry.path, destDir: null, policy: "skip" }]);
-      void trackTransfer(jobId, "삭제");
+      void trackTransfer(jobId, tr("store.delete.progress"));
       if (next) {
         api.setCursor(tab.entries.indexOf(next));
         await loadPreview(next);
@@ -2859,19 +2861,19 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       updateBusy = true;
       set({ notice: null });
       try {
-        flash("업데이트를 확인하는 중…");
+        flash(tr("store.update.checking"));
         const info = await backend.checkUpdate();
         if (!info) {
-          flash("최신 버전입니다");
+          flash(tr("store.update.latest"));
           return;
         }
         const ok = await ask<boolean>({
           kind: "confirm",
-          title: `새 버전 ${info.version}이 있습니다. 설치하고 다시 시작할까요?`,
+          title: tr("store.update.available", { version: info.version }),
           lines: (info.notes ?? "").split("\n").filter((l) => l.trim()).slice(0, 8),
         });
         if (ok !== true) return;
-        flash("업데이트를 설치하는 중… 끝나면 앱이 다시 시작됩니다");
+        flash(tr("store.update.installing"));
         await backend.installUpdate();
       } catch (e) {
         set({ flash: null });
@@ -2882,14 +2884,14 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     },
     async launchApp(args?: Record<string, unknown>, target: "items" | "folder" = "items") {
       const app = typeof args?.app === "string" ? args.app.trim() : "";
-      const key = typeof args?.key === "string" ? args.key : "이 키";
-      if (!app) return fail(`${key}에 지정된 애플리케이션이 없습니다 (설정 > F키)`);
+      const key = typeof args?.key === "string" ? args.key : tr("store.key.this");
+      if (!app) return fail(tr("store.app.none", { key }));
       const tab = activeTab(get());
       const selected = tab.entries.filter((e) => tab.selection.has(e.path)).map((e) => e.path);
       const cursor = cursorEntry(tab);
       const paths =
         target === "folder" ? (tab.virtual ? [] : [tab.path]) : selected.length > 0 ? selected : cursor ? [cursor.path] : tab.virtual ? [] : [tab.path];
-      if (paths.length === 0) return fail(target === "folder" ? "검색 결과 탭에는 열 현재 폴더가 없습니다" : "애플리케이션에 전달할 항목이 없습니다");
+      if (paths.length === 0) return fail(target === "folder" ? tr("store.app.no_folder") : tr("store.app.no_items"));
       set({ notice: null });
       try {
         await backend.launchApp(app, paths);
@@ -3026,12 +3028,12 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         roots = [...new Set((["left", "right"] as const).flatMap((p) => s.panes[p].tabs.filter((t) => !t.virtual).map((t) => t.path)))];
       } else {
         const start = expandPath(form.start.trim(), s.userDirs);
-        if (!start) return reject("시작 디렉터리를 입력하세요");
+        if (!start) return reject(tr("store.find.start_required"));
         roots = [start];
       }
       const selected = tab.entries.filter((e) => tab.selection.has(e.path)).map((e) => e.path);
-      if (form.selectedOnly && selected.length === 0) return reject("선택한 디렉터리나 파일이 없습니다");
-      if (form.textOn && form.text === "") return reject("찾을 텍스트를 입력하세요");
+      if (form.selectedOnly && selected.length === 0) return reject(tr("store.find.no_selection"));
+      if (form.textOn && form.text === "") return reject(tr("store.find.text_required"));
       const spec: FindSpecDto = {
         roots,
         onlyItems: form.selectedOnly ? selected : null,
@@ -3066,8 +3068,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const base = scope === "global" ? (s.userDirs.home ?? "/") : hereOf(activeTab(s));
       const query = await ask<string>({
         kind: "name",
-        title: scope === "global" ? "Look Up (전역: 홈 아래)" : "Look Up (현재 폴더 아래)",
-        label: "질의",
+        title: scope === "global" ? tr("store.lookup.global") : tr("store.lookup.folder"),
+        label: tr("store.lookup.label"),
         value: "",
         error: null,
         selectStem: false,
@@ -3087,7 +3089,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     async diskUsage(args?: Record<string, unknown>, view: "list" | "treemap" = "list") {
       const raw = typeof args?.src === "string" ? args.src : null;
       const src = raw === null ? hereOf(activeTab(get())) : expandPath(raw, get().userDirs);
-      if (src === null) return fail("사용자 폴더를 알 수 없어 경로를 확장하지 못했습니다");
+      if (src === null) return fail(tr("store.user_dirs_unknown"));
       await api.openVirtual("usage", `Disk Usage: ${baseName(src) || src}`, src, async () => ({ id: await backend.startDiskUsage(src), warnings: [] }), view);
     },
     /** 같은 Disk Usage를 처음부터 treemap 보기로 연다(`core.disk_usage.treemap`). */
@@ -3197,6 +3199,10 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     childPath: joinPath,
   };
 
+  // 비-컴포넌트 코드(알림 문구 등)가 쓰는 `t`가 화면 언어를 따르게 한다.
+  setBackendErrorTranslator(rustText); // 한국어 Rust 오류 문구를 영어로
+  setLanguage(store.getState().loaded.config.behavior.language);
+  store.subscribe((s) => setLanguage(s.loaded.config.behavior.language));
   return { store, api };
 }
 

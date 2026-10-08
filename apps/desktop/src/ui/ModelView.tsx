@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { parentPath } from "@twin-deck/ts-client";
 import { MODEL_MAX_BYTES } from "../lib/model";
 import { resolveModelUri } from "../lib/model/uri";
-import { useAppStore } from "../state/context";
+import { useAppStore, useT } from "../state/context";
 
 /** `soft` 오류(파일 읽기·해석 실패, 크기 초과)는 대체 표시(`fallback`)로 돌아갈 수 있다. WebGL을 못 쓰는 경우는 안내만 보인다. */
 type State = { status: "loading" } | { status: "ready" } | { status: "error"; message: string; soft: boolean };
@@ -22,6 +22,7 @@ function release(renderer: import("three").WebGLRenderer | undefined) {
  * `size`가 상한(`MODEL_MAX_BYTES`)을 넘으면 읽지 않는다. 읽기·해석에 실패했을 때 `fallback`이 있으면(텍스트 형식) 그것을 대신 보인다.
  */
 export function ModelView({ path, name, size, fallback }: { path: string; name: string; size: number; fallback?: ReactNode }) {
+  const t = useT();
   const { api } = useAppStore();
   const host = useRef<HTMLDivElement | null>(null);
   const [state, setState] = useState<State>({ status: "loading" });
@@ -30,7 +31,7 @@ export function ModelView({ path, name, size, fallback }: { path: string; name: 
     if (!el) return;
     setState({ status: "loading" });
     if (size > MODEL_MAX_BYTES) {
-      setState({ status: "error", soft: true, message: `파일이 너무 커서 3D로 미리 볼 수 없습니다 (${(size / 1024 / 1024).toFixed(0)} MB)` });
+      setState({ status: "error", soft: true, message: t("model.too_big", { mb: (size / 1024 / 1024).toFixed(0) }) });
       return;
     }
     let disposed = false;
@@ -43,18 +44,18 @@ export function ModelView({ path, name, size, fallback }: { path: string; name: 
         try {
           gl = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         } catch {
-          throw new NoWebGL("3D 미리보기를 쓸 수 없습니다 (이 화면에서 WebGL을 켤 수 없습니다)");
+          throw new NoWebGL(t("model.no_webgl"));
         }
         renderer = gl;
         const [{ OrbitControls }, { loadModel, normalize }] = await Promise.all([import("three/addons/controls/OrbitControls.js"), import("../lib/model")]);
         const res = await fetch(api.fileUrl(path));
-        if (!res.ok) throw new Error(`파일을 읽지 못했습니다 (${res.status})`);
+        if (!res.ok) throw new Error(t("common.read_failed", { status: res.status }));
         const dir = parentPath(path) ?? "";
         const model = await loadModel(name, await res.arrayBuffer(), {
           resolve: (uri) => resolveModelUri(uri, dir, api.fileUrl),
         });
         const norm = await normalize(model);
-        if (!norm) throw new Error("그릴 수 있는 모양이 없는 파일입니다");
+        if (!norm) throw new Error(t("model.empty"));
         if (disposed) {
           release(renderer);
           return;
@@ -117,8 +118,8 @@ export function ModelView({ path, name, size, fallback }: { path: string; name: 
   if (state.status === "error" && state.soft && fallback) return <>{fallback}</>;
   return (
     <div className="relative h-full min-h-48 w-full">
-      <div ref={host} role="img" aria-label="3D 모델 미리보기" className="h-full w-full" />
-      {state.status === "loading" && <p className="absolute inset-0 flex items-center justify-center text-ink-faint">불러오는 중…</p>}
+      <div ref={host} role="img" aria-label={t("model.aria")} className="h-full w-full" />
+      {state.status === "loading" && <p className="absolute inset-0 flex items-center justify-center text-ink-faint">{t("common.loading")}</p>}
       {state.status === "error" && (
         <p role="alert" className="absolute inset-0 flex items-center justify-center px-3 text-center text-ink-faint">
           {state.message}

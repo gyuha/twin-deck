@@ -1,12 +1,14 @@
+import { useT } from "../state/context";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { usePreviewFont } from "./fonts";
 
 /** 마크다운 미리보기. 원시 HTML은 렌더링하지 않고, 링크는 이동하지 않으며, 이미지는 대체 텍스트만 보여 준다. */
 export function MarkdownView({ text }: { text: string }) {
+  const t = useT();
   const previewFont = usePreviewFont();
   return (
-    <div aria-label="마크다운 미리보기" style={previewFont} className="markdown-preview text-sm leading-relaxed">
+    <div aria-label={t("preview.markdown_aria")} style={previewFont} className="markdown-preview text-sm leading-relaxed">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{

@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useApp, useAppStore } from "../state/context";
+import { useApp, useAppStore, useT } from "../state/context";
 import { baseName } from "@twin-deck/ts-client";
 
 /**
@@ -7,6 +7,7 @@ import { baseName } from "@twin-deck/ts-client";
  * 브라우저 드래그는 운영체제가 커서의 +를 정해서 Ctrl 상태를 앱이 보여 줄 수 없어서 쓰지 않는다.
  */
 export function DragLayer() {
+  const t = useT();
   const { api } = useAppStore();
   const drag = useApp((s) => s.drag);
 
@@ -46,7 +47,7 @@ export function DragLayer() {
   }, [api]);
 
   if (!drag || drag.external) return null; // 다른 앱에서 끌어 오는 중에는 OS가 끌기 그림을 그린다
-  const label = drag.paths.length === 1 ? baseName(drag.paths[0]) : `${drag.paths.length}개 항목`;
+  const label = drag.paths.length === 1 ? baseName(drag.paths[0]) : t("drag.items", { count: drag.paths.length });
   return (
     <div
       aria-hidden

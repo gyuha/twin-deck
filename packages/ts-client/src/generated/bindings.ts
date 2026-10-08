@@ -508,6 +508,10 @@ usageUpdate: "usage-update"
 
 export type Behavior = { theme: string; 
 /**
+ * 화면 언어(`ko`, `en`). 기본은 한국어다.
+ */
+language: string; 
+/**
  * 켜면 `theme` 대신 `random_themes` 중 하나를 앱을 켤 때마다 무작위로 쓴다.
  */
 random_theme: boolean; 

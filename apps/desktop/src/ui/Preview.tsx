@@ -5,7 +5,8 @@ import { languageFor } from "../lib/highlight";
 import { isArchiveName, isArchivePath } from "@twin-deck/ts-client";
 import { clampRect, defaultRect, moveRect, resizeRect } from "../lib/previewRect";
 import type { Edge } from "../lib/previewRect";
-import { useApp, useAppStore } from "../state/context";
+import { rustText, t as translate } from "../i18n";
+import { useApp, useAppStore, useT } from "../state/context";
 import { CodeView } from "./CodeView";
 import { usePreviewFont } from "./fonts";
 import { JsonView } from "./JsonView";
@@ -26,7 +27,8 @@ const isMarkdown = (name: string) => /\.(md|markdown)$/i.test(name);
 
 const isJson = (name: string) => /\.json$/i.test(name);
 
-const KIND_LABEL = { text: "텍스트", image: "이미지", pdf: "PDF", directory: "폴더", other: "기타" } as const;
+const kindLabel = (kind: "text" | "image" | "pdf" | "directory" | "other" | "audio" | "video") =>
+  ({ text: translate("preview.kind.text"), image: translate("preview.kind.image"), pdf: "PDF", directory: translate("preview.kind.directory"), other: translate("preview.kind.other"), audio: translate("preview.kind.audio"), video: translate("preview.kind.video") })[kind];
 
 /** 크기 조절 손잡이: 가장자리 4개와 모서리 4개. 창 테두리 바깥쪽 반을 덮는다. */
 const HANDLES: { edge: Edge; className: string }[] = [
@@ -46,6 +48,7 @@ function size(n: number): string {
 
 /** 미리보기 (VIEW-01): 텍스트는 앞부분, 이미지는 그림, 그 밖은 종류와 크기. 키 조작은 `preview` 스코프가 처리한다. */
 export function Preview() {
+  const t = useT();
   const p = useApp((s) => s.preview);
   const previewConfig = useApp((s) => s.loaded.config.preview);
   const zipExts = useApp((s) => s.loaded.config.file_systems.zip.additional_extensions);
@@ -130,11 +133,11 @@ export function Preview() {
               ) : languageFor(p.name) ? (
                 <CodeView name={p.name} text={d.text ?? ""} />
               ) : (
-                <pre aria-label="텍스트 미리보기" style={previewFont} className="whitespace-pre-wrap break-words font-mono text-xs">
-                  {d.text}
+                <pre aria-label={t("preview.text_aria")} style={previewFont} className="whitespace-pre-wrap break-words font-mono text-xs">
+                  {p.isDir ? rustText(d.text ?? "") : d.text}
                 </pre>
               )}
-              {d.truncated && <p className="mt-1 text-xs text-ink-faint">앞부분만 표시합니다 (전체 {size(d.size)})</p>}
+              {d.truncated && <p className="mt-1 text-xs text-ink-faint">{t("preview.truncated", { size: size(d.size) })}</p>}
             </>
   ) : null;
   return (
@@ -146,7 +149,7 @@ export function Preview() {
     >
       <div
         role="dialog"
-        aria-label={`미리보기: ${p.name}`}
+        aria-label={t("preview.aria", { name: p.name })}
         style={rect ? { position: "absolute", left: rect.x, top: rect.y, width: rect.w, height: rect.h } : undefined}
         className={["relative flex flex-col overflow-hidden rounded border border-app-line bg-app-box text-sm shadow-lg", rect ? "" : "h-[80vh] w-[44rem] max-w-full"].join(" ")}
       >
@@ -156,7 +159,7 @@ export function Preview() {
         <div className="flex shrink-0 items-center border-b border-app-line bg-app-dark-box">
           <h2
           data-preview-title
-          title="끌어서 옮기고, 더블클릭하면 기본 크기로 돌아갑니다"
+          title={t("preview.drag_hint")}
           onMouseDown={(e) => startDrag(e, null)}
           onDoubleClick={() => api.setPreviewRect(null)}
           className="min-w-0 flex-1 shrink-0 cursor-move select-none break-all py-2 pl-3 font-semibold"
@@ -165,14 +168,14 @@ export function Preview() {
         </h2>
           {editing && (
             <span data-preview-edit-state className="mr-2 shrink-0 text-xs text-ink-dull">
-              {edit.saved ? "저장됨" : edit.text !== edit.base ? "편집 중 ●" : "편집 중"}
+              {edit.saved ? t("preview.saved") : edit.text !== edit.base ? t("preview.editing_dirty") : t("preview.editing")}
             </span>
           )}
           {showCopy && (
             <button
               type="button"
-              aria-label="텍스트 복사"
-              title={d?.truncated ? `텍스트 복사 (앞부분만 복사됩니다 — 전체 ${size(d.size)})` : "텍스트 복사"}
+              aria-label={t("preview.copy")}
+              title={d?.truncated ? t("preview.copy_truncated", { size: size(d.size) }) : t("preview.copy")}
               onClick={() => {
                 void api.previewCopyText();
                 setCopied(true);
@@ -195,14 +198,14 @@ export function Preview() {
               </svg>
             </button>
           )}
-          <button type="button" aria-label="닫기" title="닫기 (Esc)" onClick={() => api.previewClose()} className="mx-2 flex size-6 shrink-0 items-center justify-center rounded text-ink-dull hover:bg-app-selected hover:text-ink">
+          <button type="button" aria-label={t("common.close")} title={t("preview.close_title")} onClick={() => api.previewClose()} className="mx-2 flex size-6 shrink-0 items-center justify-center rounded text-ink-dull hover:bg-app-selected hover:text-ink">
             ✕
           </button>
         </div>
         <div ref={bodyRef} data-preview-body className={`td-thin-scroll min-h-0 flex-1 select-text overflow-auto py-2 pl-3 pr-3 ${p.status === "loading" && d ? "opacity-60" : ""}`}>
           {handlerFailed?.path === p.path && handlerFailed.blocked && (
             <p data-preview-handler-blocked className="mb-1 flex flex-wrap items-center gap-2 text-xs text-ink-faint">
-              인터넷에서 받은 파일이라 Office가 미리보기를 막습니다.
+              {t("preview.blocked")}
               <button
                 type="button"
                 tabIndex={-1}
@@ -216,16 +219,16 @@ export function Preview() {
                 }}
                 className="rounded border border-app-line px-2 py-0.5 text-ink hover:bg-app-selected"
               >
-                차단 해제하고 보기
+                {t("preview.unblock")}
               </button>
             </p>
           )}
           {handlerFailed?.path === p.path && handlerFailed.reason && (
             <p data-preview-handler-error className="mb-1 text-xs text-ink-faint">
-              미리보기 처리기를 쓰지 못했습니다: {handlerFailed.reason}
+              {t("preview.handler_failed", { reason: handlerFailed.reason })}
             </p>
           )}
-          {p.status === "loading" && !native && (!d || model || office) && <p className="text-ink-faint">불러오는 중…</p>}
+          {p.status === "loading" && !native && (!d || model || office) && <p className="text-ink-faint">{t("common.loading")}</p>}
           {p.status === "error" && (
             <p role="alert" className="text-status-error">
               {p.error}
@@ -239,7 +242,7 @@ export function Preview() {
             (editing ? (
               <textarea
                 data-preview-edit
-                aria-label="텍스트 편집"
+                aria-label={t("preview.edit_aria")}
                 // eslint-disable-next-line jsx-a11y/no-autofocus
                 autoFocus
                 spellCheck={false}
@@ -265,30 +268,30 @@ export function Preview() {
                 <img src={d.dataUrl} alt={p.name} className="max-h-full max-w-full object-contain" />
               </div>
             ) : (
-              <p className="text-ink-faint">이미지가 너무 커서 미리 볼 수 없습니다 ({size(d.size)})</p>
+              <p className="text-ink-faint">{t("preview.image_too_big", { size: size(d.size) })}</p>
             ))}
           {d?.kind === "audio" &&
             (d.dataUrl ? (
               <AudioView dataUrl={d.dataUrl} name={p.name} autoplay={previewConfig.audio_autoplay} />
             ) : (
-              <p className="text-ink-faint">사운드 파일이 너무 커서 미리 들을 수 없습니다 ({size(d.size)})</p>
+              <p className="text-ink-faint">{t("preview.sound_too_big", { size: size(d.size) })}</p>
             ))}
           {d?.kind === "video" && <VideoView path={p.path} name={p.name} autoplay={previewConfig.video_autoplay} />}
           {d?.kind === "pdf" &&
             (d.dataUrl ? (
               <PdfView dataUrl={d.dataUrl} name={p.name} />
             ) : (
-              <p className="text-ink-faint">PDF가 너무 커서 미리 볼 수 없습니다 ({size(d.size)})</p>
+              <p className="text-ink-faint">{t("preview.pdf_too_big", { size: size(d.size) })}</p>
             ))}
           {(d?.kind === "directory" || (d?.kind === "other" && !model && !office && !native)) && (
             <p className="text-ink-faint">
-              {KIND_LABEL[d.kind]} — {officeOff ? "Office 문서 미리보기가 꺼져 있습니다 (설정의 미리보기에서 켤 수 있습니다)" : "미리 볼 수 없는 형식입니다"}
+              {kindLabel(d.kind)} — {officeOff ? t("preview.office_off") : t("preview.unsupported")}
               {d.kind === "other" ? ` (${size(d.size)})` : ""}
             </p>
           )}
         </div>
         <p className="shrink-0 border-t border-app-line bg-app-dark-box px-3 py-2 text-xs text-ink-faint">
-          {editing ? "Mod+S 저장 · Esc 편집 종료" : `↑↓ 이전/다음 항목 · PageUp/PageDown 스크롤 · Enter ${isArchiveName(p.name, zipExts) ? "압축 풀기" : "열기"} · Delete 삭제 · Space/Esc 닫기 · 본문 더블클릭 편집`}
+          {editing ? t("preview.hint_editing") : t("preview.hint", { enter: isArchiveName(p.name, zipExts) ? t("preview.hint_extract") : t("preview.hint_open") })}
         </p>
       </div>
     </div>

@@ -1,3 +1,4 @@
+import { useT } from "../state/context";
 import { useEffect, useState } from "react";
 
 /** Blob의 내용을 문자열로 읽는다(jsdom의 Blob에는 text()가 없어 FileReader를 쓴다). */
@@ -12,6 +13,7 @@ function readText(b: Blob): Promise<string> {
 
 /** PDF 미리보기. data URL을 Blob URL로 바꿔 웹뷰의 PDF 뷰어(iframe)에 맡긴다. */
 export function PdfView({ dataUrl, name }: { dataUrl: string; name: string }) {
+  const t = useT();
   const [src, setSrc] = useState<string | null>(null);
   const [pages, setPages] = useState(0);
   useEffect(() => {
@@ -31,6 +33,6 @@ export function PdfView({ dataUrl, name }: { dataUrl: string; name: string }) {
       if (url) URL.revokeObjectURL(url);
     };
   }, [dataUrl]);
-  if (!src) return <p className="text-ink-faint">PDF를 여는 중…</p>;
-  return <iframe title={`PDF 미리보기: ${name}`} src={src} data-page-count={pages || undefined} className="block h-full w-full border-0" />;
+  if (!src) return <p className="text-ink-faint">{t("media.pdf_opening")}</p>;
+  return <iframe title={t("media.pdf_title", { name })} src={src} data-page-count={pages || undefined} className="block h-full w-full border-0" />;
 }

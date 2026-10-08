@@ -1,4 +1,4 @@
-import { useApp, useAppStore } from "../state/context";
+import { useApp, useAppStore, useT } from "../state/context";
 import { activeTab } from "../state/store";
 import type { PaneId } from "../state/store";
 import { Breadcrumb } from "./Breadcrumb";
@@ -15,6 +15,7 @@ const swallow = (e: { stopPropagation(): void; preventDefault(): void }) => {
 };
 
 export function Pane({ pane, onThemePreview }: { pane: PaneId; onThemePreview?: (theme: string | null) => void }) {
+  const t = useT();
   const { api } = useAppStore();
   const isActive = useApp((s) => s.activePane === pane);
   const path = useApp((s) => activeTab(s, pane).path);
@@ -32,7 +33,7 @@ export function Pane({ pane, onThemePreview }: { pane: PaneId; onThemePreview?: 
   return (
     <section
       {...block}
-      aria-label={pane === "left" ? "왼쪽 패널" : "오른쪽 패널"}
+      aria-label={pane === "left" ? t("pane.left") : t("pane.right")}
       data-active={isActive}
       data-pane={pane}
       data-drop-target={dropHere ? "true" : undefined}

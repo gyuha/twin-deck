@@ -90,6 +90,8 @@ vi.mock("@tauri-apps/api/menu", () => ({
 }));
 
 const { FILE_MENU, installFileMenu, installFileMenuForWindow, appItemLabel } = await import("../appMenu");
+const { t, setLanguage } = await import("../i18n");
+const fileTexts = () => FILE_MENU.flatMap((e) => (e ? [t(e.key)] : []));
 
 beforeEach(() => {
   calls.length = 0;
@@ -108,12 +110,12 @@ describe("상단 메뉴바 File 메뉴", () => {
   it("기본 메뉴의 File 맨 앞에 항목을 끼워 넣고 앱 메뉴로 지정한다", async () => {
     await installFileMenu(() => {});
     expect(calls).toEqual([`prepend:File:${FILE_MENU.length}`, "setAsAppMenu"]);
-    expect(created.filter((c) => FILE_MENU.some((e) => e?.actionId === c.id)).map((c) => c.text)).toEqual(FILE_MENU.flatMap((e) => (e ? [e.text] : [])));
+    expect(created.filter((c) => FILE_MENU.some((e) => e?.actionId === c.id)).map((c) => c.text)).toEqual(fileTexts());
     expect(prepended).toHaveLength(FILE_MENU.length);
   });
 
   it("다중 이름 바꾸기와 자주 쓰는 파일 메뉴가 들어 있다", () => {
-    const texts = FILE_MENU.flatMap((e) => (e ? [e.text] : []));
+    const texts = fileTexts();
     expect(texts).toEqual([
       "새 폴더",
       "새 파일",
@@ -269,5 +271,23 @@ describe("설정·단축키 목록 메뉴 항목 (이슈 #40)", () => {
     find("core.help")!.action!();
     expect(run.mock.calls).toEqual([["core.settings.open"], ["core.help"]]);
     for (const id of ["core.settings.open", "core.help"]) expect(find(id)).not.toHaveProperty("accelerator");
+  });
+});
+
+describe("영어 메뉴 (이슈 #32)", () => {
+  it("언어가 en이면 파일 메뉴·보기 토글·설정·단축키 목록 항목이 영어다", async () => {
+    setLanguage("en");
+    try {
+      await installFileMenu(() => {}, undefined, (id) => (id === "core.settings.open" ? "Cmd+," : undefined));
+      const texts = created.map((c) => c.text);
+      expect(texts).toContain("New Folder");
+      expect(texts).toContain("Move to Trash");
+      expect(texts).toContain("Settings… (Cmd+,)");
+      expect(texts).toContain("Keyboard Shortcuts");
+      expect(checks.map((c) => c.text)).toEqual(["Show Drive Bar", "Show Action Bar"]);
+      for (const x of [...texts, ...checks.map((c) => c.text)]) expect(/[가-힣]/.test(x ?? ""), String(x)).toBe(false);
+    } finally {
+      setLanguage("ko");
+    }
   });
 });

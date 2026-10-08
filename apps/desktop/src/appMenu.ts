@@ -1,5 +1,7 @@
 import { CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu } from "@tauri-apps/api/menu";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { t as translate } from "./i18n";
+import type { Key } from "./i18n";
 
 export const APP_NAME = "Twin Deck";
 
@@ -32,7 +34,7 @@ async function addViewToggles(menu: Menu, run: (actionId: string) => void, flags
   }
   await view.append(await PredefinedMenuItem.new({ item: "Separator" }));
   for (const t of VIEW_TOGGLES) {
-    await view.append(await CheckMenuItem.new({ id: t.actionId, text: withKey(t.text, keyOf?.(t.actionId)), checked: flags[t.flag], action: () => run(t.actionId) }));
+    await view.append(await CheckMenuItem.new({ id: t.actionId, text: withKey(translate(t.key), keyOf?.(t.actionId)), checked: flags[t.flag], action: () => run(t.actionId) }));
   }
 }
 
@@ -43,7 +45,7 @@ async function addEntryItems(menu: Menu, run: (actionId: string) => void, keyOf?
   const app = items[0];
   if (app instanceof Submenu) {
     // 기본 앱 메뉴는 `About, 구분선, Services…` 순서라, 첫 구분선 뒤에 항목과 구분선을 끼운다.
-    await app.insert(await item("설정…", "core.settings.open"), 2);
+    await app.insert(await item(translate("menu.settings"), "core.settings.open"), 2);
     await app.insert(await PredefinedMenuItem.new({ item: "Separator" }), 3);
   }
   let help: Submenu | null = null;
@@ -54,7 +56,7 @@ async function addEntryItems(menu: Menu, run: (actionId: string) => void, keyOf?
     help = await Submenu.new({ text: "Help", items: [] });
     await menu.append(help);
   }
-  await help.append(await item("단축키 목록", "core.help"));
+  await help.append(await item(translate("menu.help_shortcuts"), "core.help"));
 }
 
 /** 첫 번째 메뉴(앱 메뉴)의 제목과 About/Hide/Quit 항목 이름을 `Twin Deck`으로 맞춘다. */
@@ -69,32 +71,32 @@ async function renameAppMenu(menu: Menu): Promise<void> {
 }
 
 /** 상단 메뉴바 File 메뉴에 넣는 항목. `null`은 구분선이다. 앱 안의 액션 ID로 실행한다. */
-export const FILE_MENU: ({ text: string; actionId: string } | null)[] = [
-  { text: "새 폴더", actionId: "core.file.new_folder" },
-  { text: "새 파일", actionId: "core.file.new_file" },
+export const FILE_MENU: ({ key: Key; actionId: string } | null)[] = [
+  { key: "menu.file.new_folder", actionId: "core.file.new_folder" },
+  { key: "menu.file.new_file", actionId: "core.file.new_file" },
   null,
-  { text: "열기", actionId: "core.open" },
-  { text: "편집", actionId: "core.edit" },
-  { text: "파일 관리자에서 보기", actionId: "core.reveal" },
+  { key: "menu.file.open", actionId: "core.open" },
+  { key: "menu.file.edit", actionId: "core.edit" },
+  { key: "menu.file.reveal", actionId: "core.reveal" },
   null,
-  { text: "복사", actionId: "core.copy" },
-  { text: "이동", actionId: "core.move" },
-  { text: "이름 변경", actionId: "core.rename" },
-  { text: "다중 이름 바꾸기", actionId: "core.rename.multi" },
-  { text: "압축", actionId: "core.compress" },
-  { text: "압축 풀기", actionId: "core.extract" },
+  { key: "menu.file.copy", actionId: "core.copy" },
+  { key: "menu.file.move", actionId: "core.move" },
+  { key: "menu.file.rename", actionId: "core.rename" },
+  { key: "menu.file.rename_multi", actionId: "core.rename.multi" },
+  { key: "menu.file.compress", actionId: "core.compress" },
+  { key: "menu.file.extract", actionId: "core.extract" },
   null,
-  { text: "휴지통으로 이동", actionId: "core.trash" },
-  { text: "영구 삭제", actionId: "core.delete" },
+  { key: "menu.file.trash", actionId: "core.trash" },
+  { key: "menu.file.delete", actionId: "core.delete" },
   null,
-  { text: "파일 정보", actionId: "core.file.info" },
+  { key: "menu.file.info", actionId: "core.file.info" },
   null,
 ];
 
 /** View 메뉴에 넣는 켜고 끄는 항목. `flag`는 `LayoutFlags`의 키다. */
 export const VIEW_TOGGLES = [
-  { text: "드라이브 바 표시", actionId: "core.view.drive_bar", flag: "driveBar" },
-  { text: "Action Bar 표시", actionId: "core.view.action_bar", flag: "actionBar" },
+  { key: "menu.view.drive_bar", actionId: "core.view.drive_bar", flag: "driveBar" },
+  { key: "menu.view.action_bar", actionId: "core.view.action_bar", flag: "actionBar" },
 ] as const;
 
 /** 지금 화면 요소가 켜져 있는지. View 메뉴의 체크 표시가 이 값을 따른다. */
@@ -124,7 +126,7 @@ export async function installFileMenu(
   }
   const entries = await Promise.all(
     FILE_MENU.map((e) =>
-      e ? MenuItem.new({ id: e.actionId, text: withKey(e.text, keyOf?.(e.actionId)), action: () => run(e.actionId) }) : PredefinedMenuItem.new({ item: "Separator" }),
+      e ? MenuItem.new({ id: e.actionId, text: withKey(translate(e.key), keyOf?.(e.actionId)), action: () => run(e.actionId) }) : PredefinedMenuItem.new({ item: "Separator" }),
     ),
   );
   await file.prepend(entries);

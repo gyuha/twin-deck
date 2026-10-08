@@ -1,3 +1,4 @@
+import { t as translate } from "../../i18n";
 import DOMPurify from "dompurify";
 import type { OfficeFormat } from "./kinds";
 
@@ -61,7 +62,7 @@ async function readPptx(data: ArrayBuffer): Promise<OfficeContent> {
   const { default: JSZip } = await import("jszip");
   const zip = await JSZip.loadAsync(data);
   const xml = await zip.file("ppt/slides/slide1.xml")?.async("string");
-  if (xml === undefined) throw new Error("첫 슬라이드를 찾지 못했습니다");
+  if (xml === undefined) throw new Error(translate("office.no_slide"));
   const doc = new DOMParser().parseFromString(xml, "application/xml");
   const paragraphs: string[] = [];
   for (const p of Array.from(doc.getElementsByTagName("a:p"))) {

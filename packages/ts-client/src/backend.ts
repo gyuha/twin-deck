@@ -8,7 +8,17 @@ export type SearchEvent =
   | { type: "done"; id: number; summary: SearchSummaryDto };
 
 /** Rust 쪽이 돌려준 오류 문자열을 감싼 예외. */
-export class BackendError extends Error {}
+let translateError: (message: string) => string = (m) => m;
+/** 백엔드 오류 문구를 화면 언어로 바꾸는 함수를 정한다(Rust가 한국어 문자열로 돌려주는 오류를 영어로 보이게 한다). */
+export function setBackendErrorTranslator(fn: (message: string) => string): void {
+  translateError = fn;
+}
+
+export class BackendError extends Error {
+  constructor(message?: string) {
+    super(message === undefined ? message : translateError(message));
+  }
+}
 
 /**
  * UI가 파일시스템에 접근하는 유일한 통로.

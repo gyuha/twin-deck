@@ -2,6 +2,7 @@
   "config": {
     "behavior": {
       "theme": "system",
+      "language": "ko",
       "random_theme": false,
       "random_themes": "",
       "ui_font": "",
