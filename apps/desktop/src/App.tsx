@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "zustand";
 import { createDefaultRegistry, defaultBindingsFor, mergeUserBindings } from "@twin-deck/actions";
 import { formatKey } from "@twin-deck/keybinds";
@@ -19,7 +19,7 @@ import { Dialog } from "./ui/Dialog";
 import { DragLayer } from "./ui/DragLayer";
 import { Preview } from "./ui/Preview";
 import { fkeyBindings } from "./lib/fkeys";
-import { resolveTheme, themeVars } from "./lib/themeColors";
+import { parseThemeList, resolveTheme, themeVars } from "./lib/themeColors";
 import { FindDialog } from "./ui/FindDialog";
 import { Help } from "./ui/Help";
 import { PaneSplit } from "./ui/PaneSplit";
@@ -68,6 +68,19 @@ function useTheme(setting: string) {
     media.addEventListener("change", apply);
     return () => media.removeEventListener("change", apply);
   }, [setting]);
+}
+
+/**
+ * 랜덤 테마(`behavior.random_theme`)가 켜져 있으면 후보(`random_themes`)에서 앱을 켤 때 한 번 고른 테마를 돌려준다.
+ * 설정을 고치는 중에 테마가 계속 바뀌지 않게 고른 값은 후보에 남아 있는 한 유지하고, 후보에서 빠지면 다시 고른다.
+ * 꺼져 있거나 후보가 비었으면 null이라 일반 테마(`theme`)를 쓴다.
+ */
+function useRandomTheme(b: { random_theme: boolean; random_themes: string }): string | null {
+  const picked = useRef<string | null>(null);
+  const list = b.random_theme ? parseThemeList(b.random_themes) : [];
+  if (list.length === 0) return null;
+  if (picked.current === null || !list.includes(picked.current)) picked.current = list[Math.floor(Math.random() * list.length)];
+  return picked.current;
 }
 
 function StatusBar() {
@@ -160,7 +173,8 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
   // 설정의 테마 목록에서 이동 중인 테마(저장 전 임시 미리보기). 설정값이 바뀌면 걷는다.
   const [themePreview, setThemePreview] = useState<string | null>(null);
   useEffect(() => setThemePreview(null), [loaded.config.behavior.theme]);
-  useTheme(themePreview ?? loaded.config.behavior.theme);
+  const randomTheme = useRandomTheme(loaded.config.behavior);
+  useTheme(themePreview ?? randomTheme ?? loaded.config.behavior.theme);
   useUiFont(loaded.config.behavior.ui_font);
   useTextColor(loaded.config.behavior.text_color);
 

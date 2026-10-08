@@ -114,3 +114,8 @@ export function resolveTheme(setting: string, osDark: boolean): WarpTheme {
   const id = setting === "light" ? DEFAULT_LIGHT : setting === "dark" ? DEFAULT_DARK : THEME_BY_ID.has(setting) ? setting : osDark ? DEFAULT_DARK : DEFAULT_LIGHT;
   return THEME_BY_ID.get(id)!;
 }
+
+/** `behavior.random_themes`(쉼표로 이은 문자열)에서 실제로 있는 테마 이름만 순서대로, 중복 없이 뽑는다. */
+export function parseThemeList(value: string): string[] {
+  return [...new Set(value.split(",").map((s) => s.trim()).filter((s) => THEME_BY_ID.has(s)))];
+}

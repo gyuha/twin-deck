@@ -5,10 +5,12 @@ import { defaultBindingsFor } from "@twin-deck/actions";
 import { defaultLoaded } from "@twin-deck/ts-client";
 import { APP_ACTIONS, APP_LAUNCH_ACTION, APP_OPEN_FOLDER_ACTION } from "../lib/fkeys";
 import { THEMES } from "../lib/themes.generated";
+import { parseThemeList } from "../lib/themeColors";
 import { useApp, useAppStore } from "../state/context";
 import { Combobox } from "./Combobox";
 import type { ComboOption } from "./Combobox";
 import { Switch } from "./Switch";
+import { TagInput } from "./TagInput";
 import { useUi } from "./uiContext";
 
 type Control =
@@ -19,6 +21,7 @@ type Control =
   | { type: "select"; options: readonly string[] }
   /** 검색 입력이 있는 선택 상자(항목이 많을 때). */
   | { type: "combo"; options: readonly ComboOption[] }
+  | { type: "tags"; options: readonly ComboOption[] }
   | { type: "fkey" };
 
 interface Item {
@@ -36,6 +39,8 @@ const THEME_CHOICES: readonly ComboOption[] = [
   { value: "dark", label: "dark · Catppuccin Mocha" },
   ...THEMES.map((t) => ({ value: t.id, label: `${t.name} · ${t.dark ? "어두움" : "밝음"}`, keywords: t.id })),
 ];
+// 랜덤 테마 후보는 system·light·dark 없이 테마 이름만 받는다.
+const THEME_TAG_CHOICES: readonly ComboOption[] = THEME_CHOICES.slice(3);
 // size_format의 허용 값은 td-config의 검증 목록과 같아야 한다(crates/td-config/src/load.rs).
 const SIZE_FORMATS = ["adaptive", "adaptive_kibi", "bytes", "KB", "MB"] as const;
 // folder_style의 허용 값도 td-config의 검증 목록(ENUMS)과 같아야 한다.
@@ -48,6 +53,8 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
     title: "모양",
     items: [
       { key: "behavior.theme", title: "테마", desc: "system은 OS의 밝기 설정을 따라 Catppuccin Mocha(다크)/Latte(라이트)를 씁니다. light·dark도 같은 둘이고, 그 밖의 이름은 그 테마 하나를 씁니다", control: { type: "combo", options: THEME_CHOICES } },
+      { key: "behavior.random_theme", title: "랜덤 테마", desc: "켜면 위의 테마 설정은 쓰지 않고, 아래 목록의 테마 중 하나를 앱을 켤 때마다 무작위로 씁니다. 목록이 비어 있으면 위의 테마를 씁니다", control: { type: "switch" } },
+      { key: "behavior.random_themes", title: "랜덤 테마 목록", desc: "후보로 쓸 테마를 태그로 추가합니다. \"+ 테마 추가\"에서 이름·밝기로 검색하고, 목록을 움직이면 색이 미리 바뀝니다. ✕로 삭제", control: { type: "tags", options: THEME_TAG_CHOICES } },
       { key: "behavior.ui_font", title: "UI 글꼴", desc: "앱 화면 전체의 글꼴. CSS font-family 값(예: Pretendard, sans-serif). 기본은 macOS Menlo·Windows Consolas. 비우면 앱 기본 고정폭", control: { type: "text" } },
       { key: "behavior.preview_font", title: "미리보기 글꼴", desc: "텍스트·코드·JSON·Markdown 미리보기 본문의 글꼴. 비우면 기본 글꼴", control: { type: "text" } },
       { key: "behavior.text_color", title: "글자 색", desc: "앱 기본 글자색. 색상환으로 고르거나 #rrggbb를 씁니다. 비우면 테마 그대로이고, 흐린 글자는 이 색을 배경 쪽으로 섞어 자동으로 만듭니다. 색은 테마와 무관하게 하나라서, 테마(특히 system)가 바뀌면 읽기 어려울 수 있으니 그때는 비우세요", control: { type: "color" } },
@@ -307,6 +314,7 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
   // 설정 화면이 닫히면(테마 목록을 연 채로 닫혀도) 임시 미리보기를 걷는다. 설정은 열려 있는 동안만 이 패널에 그려진다.
   useEffect(() => () => onThemePreview?.(null), [onThemePreview]);
   const defaults = defaultLoaded().config;
+  const randomTheme = config.behavior.random_theme;
   const current = SECTIONS[section];
   const items: Item[] = current.title === "F키" ? [...current.items, ...comboKeys.map((k): Item => ({ key: `fkeys.${k}`, title: k, control: { type: "fkey" } }))] : current.items;
   return (
@@ -367,7 +375,7 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
               // 설정 파일에 없는 내장 조합키는 값이 없다 → 기본값("")으로 본다.
               const value = (valueAt(config, item.key) ?? (item.control.type === "fkey" ? "" : undefined)) as string | number | boolean;
               const isDefault = value === (valueAt(defaults, item.key) ?? (item.control.type === "fkey" ? "" : undefined));
-              const wide = item.control.type === "text" || item.control.type === "fkey";
+              const wide = item.control.type === "text" || item.control.type === "fkey" || item.control.type === "tags";
               return (
                 <div key={item.key} role="group" aria-label={item.title} className="flex items-center justify-between gap-4 border-b border-app-line py-2.5">
                   <div className={wide ? "w-48 shrink-0" : "min-w-0"}>
@@ -424,9 +432,19 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
                         label={item.title}
                         value={String(value)}
                         options={item.control.options}
-                        disabled={!!broken}
+                        disabled={!!broken || (item.key === "behavior.theme" && randomTheme)}
                         onChange={(v) => void api.setConfigValue(item.key, { kind: "str", value: v })}
                         onPreview={item.key === "behavior.theme" ? onThemePreview : undefined}
+                      />
+                    )}
+                    {item.control.type === "tags" && (
+                      <TagInput
+                        label={item.title}
+                        value={parseThemeList(String(value))}
+                        options={item.control.options}
+                        disabled={!!broken || !randomTheme}
+                        onChange={(v) => void api.setConfigValue(item.key, { kind: "str", value: v.join(",") })}
+                        onPreview={onThemePreview}
                       />
                     )}
                     {item.control.type === "color" && (

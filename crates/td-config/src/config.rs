@@ -30,6 +30,10 @@ pub struct Config {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct Behavior {
     pub theme: String,
+    /// 켜면 `theme` 대신 `random_themes` 중 하나를 앱을 켤 때마다 무작위로 쓴다.
+    pub random_theme: bool,
+    /// 랜덤 테마 후보. 테마 이름(apps/desktop/themes의 파일 이름)을 쉼표로 이은 문자열이고, 모르는 이름은 무시한다.
+    pub random_themes: String,
     /// 앱 UI의 글꼴. CSS `font-family` 값이고 비우면 기본 글꼴이다.
     pub ui_font: String,
     /// 미리보기 본문의 글꼴. CSS `font-family` 값이고 비우면 기본 글꼴이다.

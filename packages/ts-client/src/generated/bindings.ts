@@ -454,6 +454,14 @@ usageUpdate: "usage-update"
 
 export type Behavior = { theme: string; 
 /**
+ * 켜면 `theme` 대신 `random_themes` 중 하나를 앱을 켤 때마다 무작위로 쓴다.
+ */
+random_theme: boolean; 
+/**
+ * 랜덤 테마 후보. 테마 이름(apps/desktop/themes의 파일 이름)을 쉼표로 이은 문자열이고, 모르는 이름은 무시한다.
+ */
+random_themes: string; 
+/**
  * 앱 UI의 글꼴. CSS `font-family` 값이고 비우면 기본 글꼴이다.
  */
 ui_font: string; 

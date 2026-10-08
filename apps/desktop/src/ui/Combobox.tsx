@@ -18,6 +18,8 @@ interface Props {
   /** 트리거 버튼의 접근성 이름. */
   label: string;
   className?: string;
+  /** 트리거 버튼에 현재 값 대신 보일 글자(값을 고르는 게 아니라 항목을 더하는 상자일 때). */
+  triggerText?: string;
 }
 
 const POPUP_WIDTH = 288;
@@ -27,7 +29,7 @@ const LIST_MAX = 256;
  * 검색할 수 있는 선택 상자(shadcn combobox 구조): 트리거 버튼을 누르면 검색 입력과 목록이 뜬다.
  * 입력으로 퍼지 필터링하고 ↑↓로 고르고 Enter로 확정, Esc는 이 목록만 닫는다(설정 화면은 닫히지 않는다).
  */
-export function Combobox({ value, options, onChange, onPreview, disabled, label, className }: Props) {
+export function Combobox({ value, options, onChange, onPreview, disabled, label, className, triggerText }: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(0);
@@ -105,7 +107,7 @@ export function Combobox({ value, options, onChange, onPreview, disabled, label,
           (className ?? "w-56")
         }
       >
-        <span className="truncate">{selected?.label ?? value}</span>
+        <span className="truncate">{triggerText ?? selected?.label ?? value}</span>
         <span aria-hidden className="text-ink-dull">
           ▾
         </span>
