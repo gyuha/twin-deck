@@ -52,6 +52,7 @@ trash = false
 audio_autoplay = false
 video_autoplay = false
 close_on_outside_click = false
+office = false
 
 [layout]
 action_bar = []

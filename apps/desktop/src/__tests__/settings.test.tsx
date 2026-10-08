@@ -108,6 +108,19 @@ describe("설정 값 바꾸기", () => {
     await waitFor(async () => expect((await backend.getConfig()).config.behavior.theme).toBe("solarized-light"));
   });
 
+  it("Office 문서 미리보기 스위치: 기본은 꺼짐이고 설명에 데이터만 보는 기능이라 적혀 있으며, 켜면 저장된다", async () => {
+    const { user, backend } = await renderApp();
+    await open(user);
+    await dialog();
+    await user.click(screen.getByRole("tab", { name: "미리보기" }));
+    const sw = screen.getByRole("switch", { name: "Office 문서 미리보기" });
+    expect(sw).toHaveAttribute("aria-checked", "false");
+    const row = screen.getByRole("group", { name: "Office 문서 미리보기" });
+    expect(row).toHaveTextContent("데이터만 보는 기능");
+    await user.click(sw);
+    await waitFor(async () => expect((await backend.getConfig()).config.preview.office).toBe(true));
+  });
+
   it("숫자 입력(아이콘 크기)은 Enter로 저장된다", async () => {
     const { user, backend } = await renderApp();
     await open(user);

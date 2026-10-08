@@ -110,6 +110,8 @@ pub struct PreviewConfig {
     pub video_autoplay: bool,
     /// 미리보기 창 바깥을 클릭하면 미리보기를 닫는다.
     pub close_on_outside_click: bool,
+    /// Office 문서(docx·xlsx·pptx)의 데이터 미리보기를 보여 준다. 읽기가 느리고 실제 문서 화면과 달라 기본은 끈다.
+    pub office: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

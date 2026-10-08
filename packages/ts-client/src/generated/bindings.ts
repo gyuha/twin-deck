@@ -641,7 +641,11 @@ video_autoplay: boolean;
 /**
  * 미리보기 창 바깥을 클릭하면 미리보기를 닫는다.
  */
-close_on_outside_click: boolean }
+close_on_outside_click: boolean; 
+/**
+ * Office 문서(docx·xlsx·pptx)의 데이터 미리보기를 보여 준다. 읽기가 느리고 실제 문서 화면과 달라 기본은 끈다.
+ */
+office: boolean }
 /**
  * 미리보기 (VIEW-01). 텍스트는 앞부분, 이미지는 data URL.
  */

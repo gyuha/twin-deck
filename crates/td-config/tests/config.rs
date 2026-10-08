@@ -712,6 +712,18 @@ fn preview_autoplay_round_trips_through_user_config() {
 }
 
 #[test]
+fn preview_office_defaults_off_and_round_trips() {
+    use td_config::{set_user_value, ConfigValue};
+    assert!(!load("").config.preview.office);
+    let l = load("[preview]\noffice = true\n");
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert!(l.config.preview.office);
+    let dir = tempfile::tempdir().unwrap();
+    set_user_value(dir.path(), "preview.office", ConfigValue::Bool(true)).unwrap();
+    assert!(load_dir(dir.path(), Platform::Linux).config.preview.office);
+}
+
+#[test]
 fn folder_size_on_select_defaults_to_true_and_can_be_turned_off() {
     let l = load("");
     assert!(l.warnings.is_empty(), "{:?}", l.warnings);

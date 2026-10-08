@@ -89,6 +89,7 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
     items: [
       { key: "preview.audio_autoplay", title: "사운드 자동 재생", desc: "mp3, wav, ogg 같은 사운드 파일의 미리보기를 열면 바로 재생합니다", control: { type: "switch" } },
       { key: "preview.video_autoplay", title: "비디오 자동 재생", desc: "mp4, mov, webm 같은 비디오 파일의 미리보기를 열면 바로 재생합니다", control: { type: "switch" } },
+      { key: "preview.office", title: "Office 문서 미리보기", desc: "docx, xlsx, pptx 파일의 미리보기를 보여 줍니다. 실제 문서 화면이 아니라 데이터만 보는 기능이라 서식·배치·그림은 나오지 않고, 문서를 읽는 데 시간이 걸릴 수 있어 기본은 꺼 둡니다", control: { type: "switch" } },
       { key: "preview.close_on_outside_click", title: "바깥 클릭으로 닫기", desc: "미리보기 창 바깥을 클릭하면 미리보기를 닫습니다", control: { type: "switch" } },
     ],
   },

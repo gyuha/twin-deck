@@ -92,7 +92,10 @@ export function Preview() {
   // 항목을 넘기는 동안 `data`는 이전 파일의 것이다. 크기·내용으로 파일을 읽는 뷰어(3D·Office)는 새 항목의 데이터가 온 뒤에만 띄운다.
   const fresh = p.status === "ready";
   const model = p.isDir || isArchivePath(p.path) ? null : modelKindOf(p.name); // 3D 모델이면 서비스가 돌려준 kind와 무관하게 3D 뷰어로 보여 준다(압축 파일 안은 asset 프로토콜로 읽을 수 없어 제외)
-  const office = p.isDir || model ? null : officeKindOf(p.name); // Office 문서도 같은 방식으로 kind와 무관하게 보여 준다
+  const officeKind = p.isDir || model ? null : officeKindOf(p.name);
+  // Office 문서도 같은 방식으로 kind와 무관하게 보여 준다. 설정 `preview.office`가 꺼져 있으면(기본) 미리 볼 수 없는 형식으로 둔다.
+  const office = previewConfig.office ? officeKind : null;
+  const officeOff = !previewConfig.office && officeKind !== null;
   // 텍스트 본문. 3D 뷰어가 모델을 읽지 못하면 텍스트 형식은 이것으로 돌아간다.
   const textBody = d?.kind === "text" ? (
     <>
@@ -173,7 +176,8 @@ export function Preview() {
             ))}
           {(d?.kind === "directory" || (d?.kind === "other" && !model && !office)) && (
             <p className="text-ink-faint">
-              {KIND_LABEL[d.kind]} — 미리 볼 수 없는 형식입니다{d.kind === "other" ? ` (${size(d.size)})` : ""}
+              {KIND_LABEL[d.kind]} — {officeOff ? "Office 문서 미리보기가 꺼져 있습니다 (설정의 미리보기에서 켤 수 있습니다)" : "미리 볼 수 없는 형식입니다"}
+              {d.kind === "other" ? ` (${size(d.size)})` : ""}
             </p>
           )}
         </div>
