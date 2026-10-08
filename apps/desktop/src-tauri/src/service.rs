@@ -1140,6 +1140,17 @@ pub fn reveal<L: Launcher>(launch: &Launch<L>, path: &str) -> ServiceResult<()> 
     launch.reveal(path, meta.is_dir())
 }
 
+/// 설정 폴더 열기. 폴더 안에 `config.toml`이 있으면 그 파일을 선택해 보여 주고, 없으면 폴더를 보여 준다.
+/// 폴더 이름이 앱 식별자(`dev.twindeck.app`)라 macOS에서는 폴더째로 열 수 없다(앱 번들로 취급).
+pub fn reveal_config<L: Launcher>(launch: &Launch<L>, dir: &str) -> ServiceResult<()> {
+    let file = Path::new(dir).join("config.toml");
+    if file.is_file() {
+        reveal(launch, &file.to_string_lossy())
+    } else {
+        reveal(launch, dir)
+    }
+}
+
 /// 기본 프로그램으로 파일 실행. 없는 경로는 실행하지 않는다.
 pub fn open_file<L: Launcher>(launch: &Launch<L>, path: &str) -> ServiceResult<()> {
     std::fs::symlink_metadata(path).map_err(|e| format!("{path}: {e}"))?;
@@ -1841,6 +1852,39 @@ mod tests {
         let names: Vec<String> = ["a.txt", "b.md", "C.TXT", "d"].map(String::from).to_vec();
         assert_eq!(svc.glob_filter("*.txt", &names), [0, 2]);
         assert_eq!(svc.glob_filter("nothing*", &names), Vec::<u32>::new());
+    }
+
+    #[test]
+    fn reveal_config_selects_config_toml_or_falls_back_to_the_folder() {
+        use std::cell::RefCell;
+        use std::rc::Rc;
+        struct Rec(Rc<RefCell<Vec<td_launch::Command>>>);
+        impl Launcher for Rec {
+            fn run(&self, c: &td_launch::Command) -> Result<(), String> {
+                self.0.borrow_mut().push(c.clone());
+                Ok(())
+            }
+        }
+        let t = tempfile::tempdir().unwrap();
+        // 설정 폴더 이름이 .app으로 끝난다(앱 식별자 dev.twindeck.app).
+        let dir = t.path().join("dev.twindeck.app");
+        std::fs::create_dir(&dir).unwrap();
+        let dir = dir.to_string_lossy().into_owned();
+        let log = Rc::new(RefCell::new(Vec::new()));
+        let launch = Launch::new(Rec(log.clone()), td_launch::Os::Mac);
+
+        // config.toml이 없으면 폴더를 보여 준다(.app 이름 폴더는 open -R).
+        reveal_config(&launch, &dir).unwrap();
+        // 있으면 그 파일을 선택해 보여 준다(Finder가 폴더 안을 열고 파일이 선택된다).
+        std::fs::write(format!("{dir}/config.toml"), "").unwrap();
+        reveal_config(&launch, &dir).unwrap();
+
+        let log = log.borrow();
+        assert_eq!(log[0].args, ["-R".to_string(), dir.clone()]);
+        assert_eq!(
+            log[1].args,
+            ["-R".to_string(), format!("{dir}/config.toml")]
+        );
     }
 
     #[test]

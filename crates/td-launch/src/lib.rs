@@ -46,9 +46,20 @@ fn parent_of(path: &str) -> String {
     }
 }
 
+/// 이름이 `.app`으로 끝나는가(대소문자 무시, 끝의 구분자는 무시). macOS는 이런 폴더를 앱 번들로 다룬다.
+fn is_app_bundle_name(path: &str) -> bool {
+    let name = path.trim_end_matches(['/', '\\']);
+    let name = name.rsplit(['/', '\\']).next().unwrap_or(name);
+    name.len() > 4 && name[name.len() - 4..].eq_ignore_ascii_case(".app")
+}
+
 /// 파일 관리자에서 `path`를 보여 주는 명령. `is_dir`이면 그 폴더를 연다.
 pub fn reveal_command(os: Os, path: &str, is_dir: bool) -> Command {
     match os {
+        // 이름이 .app으로 끝나는 폴더는 `open`에 그대로 주면 앱 번들로 보고 실행하려다 실패한다(설정 폴더 dev.twindeck.app). Finder에서 선택해 보여 준다.
+        Os::Mac if is_dir && is_app_bundle_name(path) => {
+            Command::new("open", ["-R".to_string(), path.to_string()])
+        }
         // 파일은 Finder에서 선택된 상태로, 폴더는 그 폴더를 연다.
         Os::Mac if is_dir => Command::new("open", [path.to_string()]),
         Os::Mac => Command::new("open", ["-R".to_string(), path.to_string()]),
@@ -193,7 +204,29 @@ pub trait Launcher {
     fn run(&self, cmd: &Command) -> Result<(), String>;
 }
 
-/// 프로세스를 띄우고 기다리지 않는다.
+/// 프로그램이 끝날 때까지 기다린다. 종료 코드가 0이 아니면 stderr(없으면 종료 코드)를 오류로 돌려준다.
+/// 짧게 끝나는 명령(macOS의 `open`)에만 쓴다. 실패를 삼키면 화면에 아무 일도 없어 원인을 알 수 없다.
+pub fn run_wait(program: &str, args: &[String]) -> Result<(), String> {
+    let out = Process::new(program)
+        .args(args)
+        .stdin(std::process::Stdio::null())
+        .output()
+        .map_err(|e| format!("{program} 실행 실패: {e}"))?;
+    if out.status.success() {
+        return Ok(());
+    }
+    let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+    Err(if stderr.is_empty() {
+        match out.status.code() {
+            Some(c) => format!("{program}가 종료 코드 {c}로 끝났습니다"),
+            None => format!("{program}가 신호로 끝났습니다"),
+        }
+    } else {
+        stderr
+    })
+}
+
+/// 프로세스를 띄우고 기다리지 않는다. 단, macOS의 `open`은 결과를 확인한다(`run_wait`).
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SystemLauncher;
 
@@ -205,6 +238,9 @@ impl Launcher for SystemLauncher {
                 .map(|p| std::env::split_paths(&p).collect())
                 .unwrap_or_default();
             program = resolve_windows_program(&program, &dirs);
+        }
+        if cfg!(target_os = "macos") && program == "open" {
+            return run_wait(&program, &cmd.args);
         }
         let mut process = Process::new(&program);
         process.args(&cmd.args);

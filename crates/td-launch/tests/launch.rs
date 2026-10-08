@@ -2,7 +2,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use td_launch::{
-    app_command, editor_command, open_command, reveal_command, Command, Launch, Launcher, Os,
+    app_command, editor_command, open_command, reveal_command, run_wait, Command, Launch, Launcher,
+    Os,
 };
 
 fn cmd(program: &str, args: &[&str]) -> Command {
@@ -341,4 +342,68 @@ fn windows_program_without_extension_is_resolved() {
     // 확장자가 있거나 찾지 못하면 그대로 둔다
     assert_eq!(resolve_windows_program("notepad.exe", &dirs), "notepad.exe");
     assert_eq!(resolve_windows_program("nope", &dirs), "nope");
+}
+
+#[test]
+fn macos_app_named_folder_is_revealed_not_opened() {
+    // 이름이 .app으로 끝나는 폴더(설정 폴더 dev.twindeck.app)를 `open`에 그대로 주면 앱 번들로 보고 실행하려다 실패한다.
+    let dir = "/Users/me/Library/Application Support/dev.twindeck.app";
+    let expected = cmd("open", &["-R", dir]);
+    assert_eq!(reveal_command(Os::Mac, dir, true), expected);
+    assert_eq!(
+        reveal_command(Os::Mac, &format!("{dir}/"), true),
+        cmd("open", &["-R", &format!("{dir}/")])
+    );
+    assert_eq!(
+        reveal_command(Os::Mac, "/Applications/Foo.APP", true),
+        cmd("open", &["-R", "/Applications/Foo.APP"])
+    );
+    // 일반 폴더는 지금처럼 폴더를 연다. .app이 이름 중간에만 있어도 마찬가지다.
+    assert_eq!(
+        reveal_command(Os::Mac, "/Users/me/dir", true),
+        cmd("open", &["/Users/me/dir"])
+    );
+    assert_eq!(
+        reveal_command(Os::Mac, "/Users/me/my.app.d", true),
+        cmd("open", &["/Users/me/my.app.d"])
+    );
+    // Windows·Linux는 규칙을 바꾸지 않는다.
+    assert_eq!(
+        reveal_command(Os::Windows, "C:\\x\\Foo.app", true),
+        cmd("explorer", &["C:\\x\\Foo.app"])
+    );
+    assert_eq!(
+        reveal_command(Os::Linux, "/home/me/Foo.app", true),
+        cmd("xdg-open", &["/home/me/Foo.app"])
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn run_wait_reports_exit_status_and_stderr() {
+    let ok = run_wait("sh", &["-c".to_string(), "exit 0".to_string()]);
+    assert_eq!(ok, Ok(()));
+    let err = run_wait(
+        "sh",
+        &["-c".to_string(), "echo boom >&2; exit 3".to_string()],
+    )
+    .unwrap_err();
+    assert!(err.contains("boom"), "stderr가 오류에 담겨야 한다: {err}");
+    let silent = run_wait("sh", &["-c".to_string(), "exit 2".to_string()]).unwrap_err();
+    assert!(
+        silent.contains('2'),
+        "stderr가 없으면 종료 코드를 알린다: {silent}"
+    );
+    assert!(run_wait("definitely-not-a-program-xyz", &[]).is_err());
+}
+
+// 실제 macOS의 `open`이 .app 이름 폴더를 실행하려다 실패하고, 그 실패가 Err로 올라오는지(이슈 #35의 재현).
+#[cfg(target_os = "macos")]
+#[test]
+fn macos_open_failure_on_app_named_folder_is_reported() {
+    let dir = std::env::temp_dir().join(format!("td-launch-{}.app", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let err = run_wait("open", &[dir.to_string_lossy().into_owned()]).unwrap_err();
+    std::fs::remove_dir_all(&dir).ok();
+    assert!(!err.is_empty());
 }

@@ -12,7 +12,7 @@ OS별 설정 디렉터리는 Tauri의 경로 API 또는 `directories` 크레이�
 
 | OS | 설정 디렉터리 |
 |---|---|
-| macOS | `~/Library/Application Support/twin-deck/` |
+| macOS | `~/Library/Application Support/dev.twindeck.app/` (앱 식별자. 이름이 `.app`으로 끝나 Finder는 앱 번들로 다룬다) |
 | Windows | `%APPDATA%\twin-deck\` |
 | Linux | `$XDG_CONFIG_HOME/twin-deck/` (기본 `~/.config/twin-deck/`) |
 

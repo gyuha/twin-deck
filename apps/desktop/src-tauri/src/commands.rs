@@ -11,8 +11,9 @@ use td_state::{LoadedState, Snapshot, Spawner};
 use td_volumes::{SystemUnmounter, Volumes};
 
 use crate::service::{
-    edit, open_file, reveal, ConflictDto, EntryDto, FileInfoDto, FindSpecDto, JobDto, JobKindDto,
-    PreviewDto, QueueItemDto, SearchStartDto, SearchSummaryDto, Service, ServiceResult,
+    edit, open_file, reveal, reveal_config, ConflictDto, EntryDto, FileInfoDto, FindSpecDto,
+    JobDto, JobKindDto, PreviewDto, QueueItemDto, SearchStartDto, SearchSummaryDto, Service,
+    ServiceResult,
 };
 
 pub type AppService = Service<SystemTrash>;
@@ -230,7 +231,7 @@ pub fn reveal_config_dir(
     config: State<'_, ConfigState>,
 ) -> ServiceResult<()> {
     let dir = config_dir(&config)?.to_string_lossy().into_owned();
-    reveal(&launch, &dir)
+    reveal_config(&launch, &dir)
 }
 
 #[tauri::command]
