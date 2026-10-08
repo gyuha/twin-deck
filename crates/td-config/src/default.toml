@@ -32,6 +32,7 @@ recent_limit = 20
 show_drive_bar = true
 pane_highlight = true
 tab_style = "underline"
+tab_close_button = false
 
 [display]
 relative_date = true

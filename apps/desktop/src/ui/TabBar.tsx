@@ -11,6 +11,8 @@ export function TabBar({ pane }: { pane: PaneId }) {
   const { tabs, active } = useApp((s) => s.panes[pane]);
   const segments = useApp((s) => s.loaded.config.behavior.layout.tab_style === "segments");
   const { api } = useAppStore();
+  const closeable = useApp((s) => s.loaded.config.behavior.layout.tab_close_button);
+  const [hover, setHover] = useState<number | null>(null); // 호버한 탭(닫기 버튼이 켜졌을 때 ✕를 보일 탭)
   const dropTarget = useApp((s) => s.tabDropTarget === pane);
   // 끌기 중: 끌린 탭(from)은 커서를 따라 dx만큼 움직이고, 지나는 탭들은 shift만큼 비켜 놓일 자리(to)를 보여 준다.
   const [drag, setDrag] = useState<{ from: number; to: number; dx: number; shift: number } | null>(null);
@@ -123,44 +125,82 @@ export function TabBar({ pane }: { pane: PaneId }) {
   };
   return (
     <div role="tablist" aria-label="탭" data-pane={pane} data-drop-target={dropTarget ? "true" : undefined} className={segments ? "flex border-b border-app-line text-sm" : "flex gap-1 border-b border-app-line px-1 text-sm"}>
-      {tabs.map((t, i) => (
-        <button
-          key={t.id}
-          role="tab"
-          type="button"
-          tabIndex={-1}
-          aria-selected={i === active}
-          onMouseDown={(e) => {
-            if (e.button === 1) {
-              // 가운데 버튼: 끌기를 시작하지 않고 자동 스크롤도 막는다(닫기는 뗄 때 auxclick에서). 패널 활성화도 하지 않는다(다른 패널의 탭을 닫아도 활성 패널은 그대로).
+      {tabs.map((t, i) => {
+        const name = t.virtual ? t.virtual.title : baseName(t.path) || t.path;
+        const pad = closeable ? "px-6" : "px-2";
+        const tabButton = (
+          <button
+            key={closeable ? undefined : t.id}
+            role="tab"
+            type="button"
+            tabIndex={-1}
+            aria-selected={i === active}
+            onMouseDown={(e) => {
+              if (e.button === 1) {
+                // 가운데 버튼: 끌기를 시작하지 않고 자동 스크롤도 막는다(닫기는 뗄 때 auxclick에서). 패널 활성화도 하지 않는다(다른 패널의 탭을 닫아도 활성 패널은 그대로).
+                e.preventDefault();
+                e.stopPropagation();
+              }
+              else press(e, i);
+            }}
+            onAuxClick={(e) => {
+              if (e.button !== 1) return;
               e.preventDefault();
-              e.stopPropagation();
+              void api.closeTabAt(pane, i);
+            }}
+            onClick={() => {
+              if (!justDragged.current) api.activate(pane, i);
+            }}
+            style={closeable ? undefined : dragStyle(i)}
+            className={
+              // 탭은 키보드 대상이 아니라(tabIndex -1) 클릭으로만 포커스를 받는다. 기본 포커스 링이 미리보기 같은 키보드 조작 중에 테두리로 보이지 않게 끈다.
+              // 닫기 버튼이 켜지면 ✕ 자리를 위해 좌우 패딩을 같게 넓힌다(px-6). 호버로 글자가 움직이지 않고 칸형에서도 글자가 가운데에 남는다.
+              "outline-none " +
+              (segments
+                ? // 칸형(Marta식): 폭을 균등 분할하고 활성 탭은 배경으로 구분한다. 좁아지면 이름을 말줄임으로 줄인다.
+                  (closeable ? "min-w-0 flex-1 truncate px-6 py-1 text-center " : "min-w-0 flex-1 truncate border-r border-app-line px-2 py-1 text-center last:border-r-0 ") +
+                  (i === active ? "bg-app-selected font-semibold" : "text-ink-faint")
+                : i === active
+                  ? `border-b-2 border-accent ${pad} py-1 font-semibold`
+                  : `${pad} py-1 text-ink-faint`)
             }
-            else press(e, i);
-          }}
-          onAuxClick={(e) => {
-            if (e.button !== 1) return;
-            e.preventDefault();
-            void api.closeTabAt(pane, i);
-          }}
-          onClick={() => {
-            if (!justDragged.current) api.activate(pane, i);
-          }}
-          style={dragStyle(i)}
-          className={
-            // 탭은 키보드 대상이 아니라(tabIndex -1) 클릭으로만 포커스를 받는다. 기본 포커스 링이 미리보기 같은 키보드 조작 중에 테두리로 보이지 않게 끈다.
-            "outline-none " +
-            (segments
-              ? // 칸형(Marta식): 폭을 균등 분할하고 활성 탭은 배경으로 구분한다. 좁아지면 이름을 말줄임으로 줄인다.
-                "min-w-0 flex-1 truncate border-r border-app-line px-2 py-1 text-center last:border-r-0 " + (i === active ? "bg-app-selected font-semibold" : "text-ink-faint")
-              : i === active
-                ? "border-b-2 border-accent px-2 py-1 font-semibold"
-                : "px-2 py-1 text-ink-faint")
-          }
-        >
-          {t.virtual ? t.virtual.title : baseName(t.path) || t.path}
-        </button>
-      ))}
+          >
+            {name}
+          </button>
+        );
+        if (!closeable) return tabButton;
+        return (
+          <div
+            key={t.id}
+            style={dragStyle(i)}
+            onMouseEnter={() => setHover(i)}
+            onMouseLeave={() => setHover((h) => (h === i ? null : h))}
+            className={"relative flex " + (segments ? "min-w-0 flex-1 border-r border-app-line last:border-r-0" : "")}
+          >
+            {tabButton}
+            {hover === i && tabs.length > 1 && !drag && (
+              <button
+                type="button"
+                tabIndex={-1}
+                aria-label={`탭 닫기: ${name}`}
+                // 가운데 클릭처럼 끌기를 시작하지 않고 패널 활성화도 하지 않는다(다른 패널의 탭을 닫아도 활성 패널은 그대로).
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setHover(null);
+                  void api.closeTabAt(pane, i);
+                }}
+                className="absolute right-1 top-1/2 flex size-4 -translate-y-1/2 items-center justify-center rounded text-xs leading-none text-ink-faint outline-none hover:bg-app-selected hover:text-ink"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

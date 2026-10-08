@@ -474,7 +474,11 @@ pane_highlight: boolean;
 /**
  * 탭 모양: "underline"(글자 + 활성 탭 밑줄) | "segments"(폭을 균등 분할, 활성 탭은 배경).
  */
-tab_style: string }
+tab_style: string; 
+/**
+ * 탭 닫기 버튼: 켜면 모든 탭에 좌우 대칭 패딩을 두고, 마우스를 올린 탭의 오른쪽에 ✕가 보인다(탭이 하나뿐이면 숨김).
+ */
+tab_close_button: boolean }
 export type BehaviorTable = { icon_size: number; 
 /**
  * 끝에서 처음으로 순환 (NAV-06).

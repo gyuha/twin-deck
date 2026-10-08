@@ -83,6 +83,8 @@ pub struct BehaviorLayout {
     pub pane_highlight: bool,
     /// 탭 모양: "underline"(글자 + 활성 탭 밑줄) | "segments"(폭을 균등 분할, 활성 탭은 배경).
     pub tab_style: String,
+    /// 탭 닫기 버튼: 켜면 모든 탭에 좌우 대칭 패딩을 두고, 마우스를 올린 탭의 오른쪽에 ✕가 보인다(탭이 하나뿐이면 숨김).
+    pub tab_close_button: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
