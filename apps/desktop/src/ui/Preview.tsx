@@ -10,7 +10,7 @@ import { useApp, useAppStore, useT } from "../state/context";
 import { CodeView } from "./CodeView";
 import { usePreviewFont } from "./fonts";
 import { JsonView } from "./JsonView";
-import { MarkdownView } from "./MarkdownView";
+import { MarkdownView, resolveMarkdownImage } from "./MarkdownView";
 import { AudioView } from "./AudioView";
 import { VideoView } from "./VideoView";
 import { PdfView } from "./PdfView";
@@ -127,7 +127,7 @@ export function Preview() {
   const textBody = d?.kind === "text" ? (
     <>
               {isMarkdown(p.name) ? (
-                <MarkdownView text={d.text ?? ""} />
+                <MarkdownView text={d.text ?? ""} resolveImage={(src) => resolveMarkdownImage(src, p.path, api.fileUrl)} />
               ) : isJson(p.name) ? (
                 <JsonView text={d.text ?? ""} />
               ) : languageFor(p.name) ? (
