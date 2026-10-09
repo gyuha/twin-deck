@@ -14,6 +14,7 @@ import type {
   QueueItemDto,
   PreviewRectDto,
   QuickLookDto,
+  EpubInfoDto,
   ShowOutcome,
   SearchStartDto,
   Snapshot,
@@ -377,6 +378,39 @@ export class FakeBackend implements Backend {
     const n = this.need(path);
     if (this.quickLookResponder) return this.quickLookResponder(path);
     return { html: n.content, dir: `/tmp/ql${path}.qlpreview`, sheets: [] };
+  }
+
+  /** 테스트용: 시드한 epub. 경로가 파일로도 있어야 목록에 보인다(`seed`). `error`가 있으면 열 때 그 오류로 거부된다. */
+  readonly epubs = new Map<string, { title?: string; author?: string; cover?: string; chapters: Array<{ title: string; html: string }>; error?: string }>();
+  /** `epubOpen`·`epubChapter` 호출 기록. */
+  readonly epubOpenCalls: string[] = [];
+  readonly epubChapterCalls: Array<{ path: string; index: number }> = [];
+
+  seedEpub(path: string, book: { title?: string; author?: string; cover?: string; chapters: Array<{ title: string; html: string }>; error?: string }): this {
+    this.epubs.set(path, book);
+    return this;
+  }
+
+  private epubBook(path: string) {
+    if (path.includes("!/")) throw new BackendError("압축 파일 안의 epub은 미리 볼 수 없습니다");
+    this.need(path);
+    const book = this.epubs.get(path);
+    if (!book) throw new BackendError("epub(ZIP) 파일이 아닙니다");
+    if (book.error) throw new BackendError(book.error);
+    return book;
+  }
+
+  async epubOpen(path: string): Promise<EpubInfoDto> {
+    this.epubOpenCalls.push(path);
+    const b = this.epubBook(path);
+    return { title: b.title ?? null, author: b.author ?? null, cover: b.cover ?? null, chapters: b.chapters.map((c) => ({ title: c.title })) };
+  }
+
+  async epubChapter(path: string, index: number): Promise<string> {
+    this.epubChapterCalls.push({ path, index });
+    const c = this.epubBook(path).chapters[index];
+    if (!c) throw new BackendError("챕터 번호가 범위를 벗어났습니다");
+    return c.html;
   }
 
   /** 테스트용: 미리보기 처리기 호출 기록(호출 순서대로). */

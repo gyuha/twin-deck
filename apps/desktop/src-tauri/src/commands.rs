@@ -280,6 +280,23 @@ pub fn quicklook_preview(
     svc.quicklook_preview(&path, seq)
 }
 
+/// epub의 제목·저자·표지·챕터 목록. 파일을 열어 읽으므로 메인 스레드가 아닌 곳에서 돌린다.
+#[tauri::command(async)]
+#[specta::specta]
+pub fn epub_open(
+    svc: State<'_, AppService>,
+    path: String,
+) -> ServiceResult<crate::epub::EpubInfoDto> {
+    svc.epub_open(&path)
+}
+
+/// epub의 한 챕터 HTML.
+#[tauri::command(async)]
+#[specta::specta]
+pub fn epub_chapter(svc: State<'_, AppService>, path: String, index: u32) -> ServiceResult<String> {
+    svc.epub_chapter(&path, index)
+}
+
 /// 웹뷰 기준 CSS 픽셀 사각형(미리보기 자리).
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Type)]
 pub struct PreviewRectDto {
@@ -775,6 +792,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             file_info,
             preview_file,
             quicklook_preview,
+            epub_open,
+            epub_chapter,
             preview_handler_show,
             preview_handler_set_rect,
             preview_handler_set_visible,

@@ -123,6 +123,7 @@ Intel Mac과 Linux용 설치 파일은 없습니다. 아래 "소스에서 빌드
 | 폴더 | 하위 항목을 가지 모양 목록으로 |
 | 사운드, 비디오 | 재생 화면. 재생 버튼을 눌러야 재생 |
 | 3D 모델(GLB, OBJ, STL 등) | 3D로 그린 화면 |
+| epub | 표지·제목·저자와 목차, 챕터 본문. 챕터는 `Ctrl+Tab`/`Ctrl+Shift+Tab`이나 목차 상자로 넘깁니다(디스크 위 파일만, DRM이 걸린 파일은 제외) |
 
 ![cbz 미리보기](docs/screenshots/preview-cbz.png)
 

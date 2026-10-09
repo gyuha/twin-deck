@@ -152,7 +152,7 @@ Shift+이동 키(범위의 선택 반전)는 액션이 아니라 `pane` 스코�
 
 | 액션 ID | 이름 | macOS 키 | Windows/Linux 키 | 출처 |
 |---|---|---|---|---|
-| `core.tab.new` | 새 탭 | `Mod+T` | `Ctrl+T` | 자체 (Marta 키는 서드파티 정보) |
+| `core.tab.new` | 새 탭 (탭 줄의 빈 곳을 더블클릭해도 그 패널에 만들어진다) | `Mod+T` | `Ctrl+T` | 자체 (Marta 키는 서드파티 정보) |
 | `core.tab.close` | 탭 닫기 | `Mod+W` | `Ctrl+W` | 자체 (같음). `Mod+W`는 창 닫기와 충돌하지 않게 앱이 가로챈다 |
 | `core.tab.next` / `core.tab.prev` | 다음/이전 탭 | `Alt+Mod+Right` / `Alt+Mod+Left`, `Ctrl+Tab` / `Ctrl+Shift+Tab` | `Ctrl+PageDown` / `Ctrl+PageUp`, `Ctrl+Tab` / `Ctrl+Shift+Tab` | `next`는 ID 추정 |
 | `core.window.new` | 새 창 | `Mod+N` | `Ctrl+N` | 자체 |
@@ -170,7 +170,7 @@ Shift+이동 키(범위의 선택 반전)는 액션이 아니라 `pane` 스코�
 | `core.preview.forward` | 미리보기: 폴더 위에서는 그 안으로 들어가 첫 항목을 미리보고(항목이 없으면 미리보기를 닫는다), 파일 위에서는 다음 항목으로 넘어간다 | `Right` | `Right` | preview | 자체 ID. `Down`은 폴더 위에서도 다음 항목(`core.preview.next`) |
 | `core.preview.open` | 미리보기 닫고 열기. 압축 파일(아카이브) 미리보기에서는 열지 않고 압축을 푼다(`core.extract`와 같이 압축 파일 옆의 새 폴더로) | `Return` | `Return` | preview | 자체 ID. 이슈 #9 |
 | `core.preview.page_up` / `core.preview.page_down` | 미리보기: 본문을 한 화면 위/아래로 스크롤 (텍스트·코드·JSON·Markdown, macOS의 Quick Look 미리보기 문서). PDF는 한 쪽씩 넘긴다. 다른 파일로 넘어가면 맨 위로 돌아간다 | `PageUp` / `PageDown` | `PageUp` / `PageDown` | preview | 자체 ID |
-| `core.preview.next_sheet` / `core.preview.prev_sheet` | 미리보기: 다음/이전 시트. macOS의 Quick Look 미리보기에서 시트가 둘 이상인 xlsx·xls·xlsm일 때만 동작하고, 끝에서 처음으로 돌아간다. 시트 탭을 클릭해도 바뀐다 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | `Ctrl+Tab` / `Ctrl+Shift+Tab` | preview | 자체 ID. ADR-0014 |
+| `core.preview.next_sheet` / `core.preview.prev_sheet` | 미리보기: 다음/이전 시트(epub은 챕터). macOS의 Quick Look 미리보기에서 시트가 둘 이상인 xlsx·xls·xlsm이거나 epub 미리보기에서 챕터가 둘 이상일 때만 동작하고, 끝에서 처음으로 돌아간다. 시트 탭을 클릭하거나 epub의 목차 선택 상자로 골라도 바뀐다 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | `Ctrl+Tab` / `Ctrl+Shift+Tab` | preview | 자체 ID. ADR-0014 |
 | `core.preview.delete` | 미리보기: 파일 삭제 (영구 삭제 확인을 거친다. 다음 파일로 넘어가고 남은 파일이 없으면 닫는다) | `Delete`, `Shift+F8` | `Delete`, `Shift+F8` | preview | 자체 ID |
 | `core.preview.save` | 미리보기: 편집 중인 내용을 파일에 저장한다(저장한 뒤에도 편집 상태 유지). 본문을 더블클릭해 편집을 시작한 뒤에만 동작한다 | `Mod+S` | `Mod+S` | preview | 자체 ID, 이슈 #38 |
 | `core.find.open` | 파일 찾기(Double Commander "파일 찾기" 기본 탭, 하위 폴더 검색) | `Mod+F` | `Ctrl+F` | 자체 ID. 결과는 새 가상 탭. Quick Select는 이 키를 내주고 `Mod+Shift+F`로 옮겼다 |

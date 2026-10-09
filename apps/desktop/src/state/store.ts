@@ -1544,13 +1544,18 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     },
 
     async newTab() {
+      await api.newTabIn(get().activePane);
+    },
+    /** `pane`의 현재 폴더를 가리키는 새 탭을 그 패널 끝에 만들고 활성으로 한다(탭 줄의 빈 곳을 더블클릭할 때도 쓴다). */
+    async newTabIn(pane: PaneId) {
       const s = get();
-      const p = s.panes[s.activePane];
-      const tab = newTab(hereOf(activeTab(s)));
+      const p = s.panes[pane];
+      const tab = newTab(hereOf(p.tabs[p.active]));
       set({
-        panes: { ...s.panes, [s.activePane]: { tabs: [...p.tabs, tab], active: p.tabs.length } },
+        activePane: pane,
+        panes: { ...s.panes, [pane]: { tabs: [...p.tabs, tab], active: p.tabs.length } },
       });
-      await reload(s.activePane, tab.id);
+      await reload(pane, tab.id);
       await syncWatches();
     },
     async closeTab() {
@@ -1949,6 +1954,14 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     /** macOS Quick Look이 만든 Office 문서 미리보기(ADR-0014). `seq`는 요청 순번(클수록 최근)이다. */
     quickLookPreview(path: string, seq: number) {
       return backend.quickLookPreview(path, seq);
+    },
+    /** epub의 제목·저자·표지·챕터 목록. */
+    epubOpen(path: string) {
+      return backend.epubOpen(path);
+    },
+    /** epub의 `index`번째 챕터 HTML. */
+    epubChapter(path: string, index: number) {
+      return backend.epubChapter(path, index);
     },
     /** Windows 미리보기 처리기(ADR-0015): 앱 창 위 `rect`(웹뷰 기준 CSS 픽셀) 자리에 `path`를 띄운다. 결과는 shown·unavailable(처리기 없음)·blocked(인터넷에서 받은 파일). */
     previewHandlerShow(path: string, rect: PreviewRectDto): Promise<ShowOutcome> {

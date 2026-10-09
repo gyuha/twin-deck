@@ -38,6 +38,8 @@ export type {
   DiskSpaceDto,
   UpdateInfoDto,
   QuickLookDto,
+  EpubInfoDto,
+  EpubChapterDto,
 } from "./generated/bindings";
 export * from "./backend";
 export { archiveFileName, archiveRoot, isArchiveName, isArchivePath } from "./archive";

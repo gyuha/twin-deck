@@ -73,6 +73,28 @@ async quicklookPreview(path: string, seq: number) : Promise<Result<QuickLookDto,
 }
 },
 /**
+ * epub의 제목·저자·표지·챕터 목록. 파일을 열어 읽으므로 메인 스레드가 아닌 곳에서 돌린다.
+ */
+async epubOpen(path: string) : Promise<Result<EpubInfoDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("epub_open", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * epub의 한 챕터 HTML.
+ */
+async epubChapter(path: string, index: number) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("epub_chapter", { path, index }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Windows 미리보기 처리기로 `path`를 앱 창 위 `rect` 자리에 띄운다 (ADR-0015). 이 형식의 처리기가 없거나 Windows가 아니면 false.
  * 처리기가 문서를 그릴 때까지 기다리므로 메인 스레드가 아닌 곳에서 돌린다.
  */
@@ -664,6 +686,11 @@ mode: number | null; hidden: boolean;
  */
 linkIsDir: boolean }
 export type Environment = { text_editor: string; terminal: string }
+export type EpubChapterDto = { title: string }
+/**
+ * epub 한 권의 겉모습. `cover`는 이미지 한도 안일 때만 들어 있다(데이터 주소).
+ */
+export type EpubInfoDto = { title: string | null; author: string | null; cover: string | null; chapters: EpubChapterDto[] }
 /**
  * `write_text_file`이 쓰기 전에 확인할 파일 상태(편집을 시작할 때 본 값). 시각은 epoch 밀리초.
  */

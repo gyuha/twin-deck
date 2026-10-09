@@ -1,4 +1,4 @@
-import type { ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, ExpectedFileDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, LoadedState, PreviewDto, PreviewRectDto, QueueItemDto, QuickLookDto, SearchStartDto, ShowOutcome, SearchSummaryDto, Snapshot, UpdateInfoDto, UserDirsDto, VolumeDto, WriteTextResultDto } from "./generated/bindings";
+import type { ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, EpubInfoDto, ExpectedFileDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, LoadedState, PreviewDto, PreviewRectDto, QueueItemDto, QuickLookDto, SearchStartDto, ShowOutcome, SearchSummaryDto, Snapshot, UpdateInfoDto, UserDirsDto, VolumeDto, WriteTextResultDto } from "./generated/bindings";
 
 /** Look Up / Flatten / Disk Usage가 스트리밍으로 보내는 이벤트. 작업마다 마지막은 `done`이다. */
 export type SearchEvent =
@@ -74,6 +74,10 @@ export interface Backend {
    * 더 큰 순번의 요청이 오면 이전 요청은 취소 오류로 끝나고, 늦게 들어온 작은 순번의 요청은 바로 취소된다.
    */
   quickLookPreview(path: string, seq: number): Promise<QuickLookDto>;
+  /** 디스크 위 epub의 제목·저자·표지(데이터 주소, 이미지 한도 안일 때만)·챕터 목록. 압축 파일 안의 epub·DRM·깨진 파일은 오류로 거부된다. */
+  epubOpen(path: string): Promise<EpubInfoDto>;
+  /** epub의 `index`번째 챕터 HTML(안의 이미지·스타일은 넣고 스크립트는 뺐다). 범위 밖이거나 너무 크면 거부된다. */
+  epubChapter(path: string, index: number): Promise<string>;
   /**
    * Windows 미리보기 처리기(탐색기 미리보기 창이 쓰는 것, ADR-0015)로 `path`를 앱 창 위 `rect`(웹뷰 기준 CSS 픽셀) 자리에 띄운다.
    * 결과: "shown"(그렸다), "unavailable"(이 형식의 처리기가 없거나 Windows가 아니다), "blocked"(인터넷에서 받은 파일이라 Office가 막는다 — 차단을 풀면 보인다).

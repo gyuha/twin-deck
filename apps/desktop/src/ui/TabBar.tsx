@@ -125,7 +125,12 @@ export function TabBar({ pane }: { pane: PaneId }) {
     return { transform: between ? `translateX(${dir * drag.shift}px)` : undefined, transition: "transform 120ms" };
   };
   return (
-    <div role="tablist" aria-label={tr("tabs.aria")} data-pane={pane} data-drop-target={dropTarget ? "true" : undefined} className={segments ? "flex border-b border-app-line text-sm" : "flex gap-1 border-b border-app-line px-1 text-sm"}>
+    <div role="tablist" aria-label={tr("tabs.aria")} data-pane={pane} data-drop-target={dropTarget ? "true" : undefined}
+      // 탭 줄의 빈 곳(탭 버튼이 아닌 곳)을 더블클릭하면 이 패널에 새 탭을 만든다.
+      onDoubleClick={(e) => {
+        if (e.target === e.currentTarget) void api.newTabIn(pane);
+      }}
+      className={segments ? "flex border-b border-app-line text-sm" : "flex gap-1 border-b border-app-line px-1 text-sm"}>
       {tabs.map((t, i) => {
         const name = t.virtual ? t.virtual.title : baseName(t.path) || t.path;
         const pad = closeable ? "px-6" : "px-2";

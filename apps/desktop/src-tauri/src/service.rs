@@ -17,6 +17,7 @@ use td_search::{CancelToken, SearchOptions, UsageItem, UsageOptions};
 use td_vfs::{sort_entries, Entry, EntryKind, ListOptions, Vfs, VfsPath};
 use td_watch::DirWatcher;
 
+use crate::epub::EpubInfoDto;
 use crate::quicklook::{QuickLook, QuickLookDto};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -1214,6 +1215,22 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
             return Err("압축 파일 안의 문서는 Quick Look으로 볼 수 없습니다".into());
         }
         self.quicklook.preview(Path::new(path), seq)
+    }
+
+    /// 디스크 위 epub의 제목·저자·표지·챕터 목록. 압축 파일 안의 epub은 읽지 않는다. 표지는 이미지 한도 안일 때만 싣는다.
+    pub fn epub_open(&self, path: &str) -> ServiceResult<EpubInfoDto> {
+        if self.fs.is_archive_path(&vp(path)) {
+            return Err("압축 파일 안의 epub은 미리 볼 수 없습니다".into());
+        }
+        crate::epub::open(Path::new(path), self.limits().image_bytes)
+    }
+
+    /// epub의 `index`번째 챕터 HTML(이미지·스타일은 안에 넣고 스크립트는 뺀다).
+    pub fn epub_chapter(&self, path: &str, index: u32) -> ServiceResult<String> {
+        if self.fs.is_archive_path(&vp(path)) {
+            return Err("압축 파일 안의 epub은 미리 볼 수 없습니다".into());
+        }
+        crate::epub::chapter(Path::new(path), index, self.limits().image_bytes)
     }
 
     /// `pattern`과 일치하는 이름의 인덱스 (Select Group).
@@ -2806,6 +2823,40 @@ mod tests {
                 "{name}: 0은 제한 없음"
             );
         }
+    }
+
+    #[test]
+    fn epub_open_and_chapter_read_disk_files_and_refuse_archive_paths() {
+        let (_t, svc, _ch, root) = setup();
+        let container = r#"<?xml version="1.0"?><container xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="c.opf"/></rootfiles></container>"#;
+        let opf = r#"<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>책</dc:title></metadata><manifest><item id="a" href="a.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="a"/></spine></package>"#;
+        let epub = format!("{root}/b.epub");
+        let mut z = td_archive::ZipEdit::create(Path::new(&epub)).unwrap();
+        for (n, body) in [
+            ("META-INF/container.xml", container),
+            ("c.opf", opf),
+            ("a.xhtml", "<html>본문</html>"),
+        ] {
+            z.add_file(n, td_archive::Source::Bytes(body.as_bytes().to_vec()));
+        }
+        z.commit().unwrap();
+        let info = svc.epub_open(&epub).unwrap();
+        assert_eq!(info.title.as_deref(), Some("책"));
+        assert_eq!(info.chapters.len(), 1);
+        assert_eq!(svc.epub_chapter(&epub, 0).unwrap(), "<html>본문</html>");
+        // 압축 파일 안의 epub은 읽지 않는다.
+        let zip = format!("{root}/x.zip");
+        let mut z = td_archive::ZipEdit::create(Path::new(&zip)).unwrap();
+        z.add_file("b.epub", td_archive::Source::Path(epub.clone().into()));
+        z.commit().unwrap();
+        assert!(svc
+            .epub_open(&format!("{zip}!/b.epub"))
+            .unwrap_err()
+            .contains("압축"));
+        assert!(svc
+            .epub_chapter(&format!("{zip}!/b.epub"), 0)
+            .unwrap_err()
+            .contains("압축"));
     }
 
     #[test]
