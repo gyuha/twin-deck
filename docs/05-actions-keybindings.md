@@ -106,7 +106,7 @@ Marta에서는 수정자 없는 단일 키 바인딩이 Quick Select에 가로�
 | `core.file.symlink` | 심볼릭 링크 만들기 | 없음 | 없음 | pane | 자체 (키 미확인) |
 | `core.file.info` | 파일 정보 | `Mod+I` | `Ctrl+I` | pane | 자체 ID, 키 확인 |
 | `core.path.copy_folder` | 폴더 경로 복사 | `F12` | `F12` | pane | 자체 ID, 키 확인 |
-| `core.path.copy_files` | 파일 경로 복사 | `Mod+F12` | `Ctrl+F12` | pane | 자체 ID, 키 확인 |
+| `core.path.copy_files` | 파일 경로 복사 (파일 행 컨텍스트 메뉴의 `경로 복사`, 이슈 #43) | `Mod+F12` | `Ctrl+F12` | pane | 자체 ID, 키 확인 |
 | `core.reveal` | 파일 관리자에서 보기 | 없음 | 없음 | pane | 자체 |
 | `core.open.with` | Open With… | `Mod+Return` | `Ctrl+Return` | pane | 자체 ID, 키 확인 |
 

@@ -18,7 +18,7 @@ describe("파일 행 컨텍스트 메뉴", () => {
     expect(menu()).toBeNull();
     rightClick(1);
     expect(menu()).toBeTruthy();
-    expect(labels()).toEqual(["열기", "다음으로 열기", "여기에 압축…", "압축 풀기", "이동", "복사", "삭제", "이름 바꾸기", "파일 속성 표시"]);
+    expect(labels()).toEqual(["열기", "다음으로 열기", "여기에 압축…", "압축 풀기", "이동", "복사", "삭제", "이름 바꾸기", "경로 복사", "파일 속성 표시"]);
     expect(within(menu()!).getAllByRole("separator")).toHaveLength(3);
   });
 
@@ -81,6 +81,25 @@ describe("파일 행 컨텍스트 메뉴", () => {
     await user.click(item("삭제"));
     // F8과 같은 경로: 휴지통 확인 설정의 기본값이 꺼짐이라 바로 휴지통으로 간다.
     await waitFor(() => expect(backend.trashed).toEqual(["/home/a/a.txt"]));
+  });
+
+  it("경로 복사: 단축키 힌트가 나오고 클릭하면 대상 경로가 클립보드에 들어간다 (이슈 #43)", async () => {
+    const backend = seed();
+    const { user } = await renderApp(backend);
+    rightClick(1);
+    expect(item("경로 복사")).toHaveTextContent("Ctrl+F12");
+    await user.click(item("경로 복사"));
+    expect(menu()).toBeNull();
+    await waitFor(() => expect(backend.clipboard).toEqual(["/home/a/a.txt"]));
+  });
+
+  it("경로 복사: 여러 항목을 선택했으면 줄바꿈으로 이어 복사한다", async () => {
+    const backend = seed();
+    const { user } = await renderApp(backend);
+    await user.keyboard("{Insert}{Insert}"); // docs, a.txt 선택
+    rightClick(1);
+    await user.click(item("경로 복사"));
+    await waitFor(() => expect(backend.clipboard).toEqual(["/home/a/docs\n/home/a/a.txt"]));
   });
 
   it("열기: 파일은 실행하고 폴더는 들어간다", async () => {

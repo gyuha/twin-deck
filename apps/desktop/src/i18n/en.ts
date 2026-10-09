@@ -173,6 +173,7 @@ export const en: Record<Key, string> = {
   "ctx.copy": "Copy",
   "ctx.delete": "Delete",
   "ctx.rename": "Rename",
+  "ctx.copy_path": "Copy Path",
   "ctx.info": "Show Properties",
   "store.virtual.no_create": "Cannot create items in a search/analysis result tab. Try in a folder tab",
   "store.virtual.no_dest": "A search/analysis result tab cannot be a copy/move destination. Switch the opposite pane to a folder",

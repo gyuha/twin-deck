@@ -235,6 +235,7 @@ export const CONTEXT_MENU: readonly CtxItem[] = [
   { get label() { return tr("ctx.copy"); }, actionId: "core.copy" },
   { get label() { return tr("ctx.delete"); }, actionId: "core.trash" },
   { get label() { return tr("ctx.rename"); }, actionId: "core.rename" },
+  { get label() { return tr("ctx.copy_path"); }, actionId: "core.path.copy_files" },
   {},
   { get label() { return tr("ctx.info"); }, actionId: "core.file.info" },
 ];
