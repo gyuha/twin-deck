@@ -21,20 +21,26 @@ export function Dialog() {
   const dialog = useApp((s) => s.dialog);
   const { api } = useAppStore();
   const input = useRef<HTMLInputElement>(null);
+  const root = useRef<HTMLDivElement>(null);
   const kind = dialog?.kind;
   const jobId = dialog?.kind === "progress" ? dialog.jobId : null;
   const job = useApp((s) => (jobId === null ? undefined : s.queue.find((j) => j.id === jobId)));
   const sizeFormat = useApp((s) => s.loaded.config.display.size_format);
   const selectStem = dialog?.kind === "name" && dialog.selectStem;
 
-  // 열릴 때 첫 입력에 포커스, 이름 변경이면 확장자를 뺀 부분을 선택한다.
+  // 진행 창은 작업이 끝나면 버튼이 "닫기"로 바뀌므로, 그때도 기본 버튼에 포커스를 다시 준다.
+  const activeJob = job ? isActiveJob(job) : false;
+  // 열릴 때 입력칸이 있으면 거기에, 없으면 기본 버튼(확인)에 포커스한다. 이름 변경이면 확장자를 뺀 부분을 선택한다.
   useEffect(() => {
     const el = input.current;
-    if (!el) return;
-    el.focus();
-    const dot = el.value.lastIndexOf(".");
-    el.setSelectionRange(0, selectStem && dot > 0 ? dot : el.value.length);
-  }, [kind, selectStem]);
+    if (el) {
+      el.focus();
+      const dot = el.value.lastIndexOf(".");
+      el.setSelectionRange(0, selectStem && dot > 0 ? dot : el.value.length);
+      return;
+    }
+    root.current?.querySelector<HTMLButtonElement>("[data-dialog-primary]:not(:disabled)")?.focus();
+  }, [kind, selectStem, activeJob, job?.id]);
 
   // 닫힐 때 포커스를 문서로 돌려준다(패널은 키 라우터가 받는다).
   useEffect(() => {
@@ -45,6 +51,7 @@ export function Dialog() {
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/30">
       <div
+        ref={root}
         role="dialog"
         aria-modal="true"
         aria-label={dialog.title}
@@ -118,19 +125,19 @@ export function Dialog() {
                 ))}
               </div>
             )}
-            <div className="mt-3 flex justify-end gap-2">
+            <div data-dialog-buttons className="mt-3 flex justify-end gap-2">
               {isActiveJob(job) ? (
                 <>
                   {/* 창만 닫고 작업은 큐에서 계속 돈다. 그동안 큐 팝업(=)을 열거나 다른 복사를 걸 수 있다. */}
-                  <button type="button" className="rounded border border-app-line px-3 py-0.5" onClick={() => api.dialogConfirm()}>
+                  <button type="button" data-dialog-primary className="rounded border border-app-line px-3 py-0.5 focus:ring-2 focus:ring-accent" onClick={() => api.dialogConfirm()}>
                     {t("dialog.background")}
                   </button>
-                  <button type="button" className="rounded border border-app-line px-3 py-0.5" onClick={() => api.dialogCancel()}>
+                  <button type="button" className="rounded border border-app-line px-3 py-0.5 focus:ring-2 focus:ring-accent" onClick={() => api.dialogCancel()}>
                     {t("dialog.abort")}
                   </button>
                 </>
               ) : (
-                <button type="button" className="rounded border border-app-line px-3 py-0.5" onClick={() => api.dialogConfirm()}>
+                <button type="button" data-dialog-primary className="rounded border border-app-line px-3 py-0.5 focus:ring-2 focus:ring-accent" onClick={() => api.dialogConfirm()}>
                   {t("common.close")}
                 </button>
               )}
@@ -188,21 +195,22 @@ export function Dialog() {
           </>
         )}
         {dialog.kind !== "progress" && (
-          <div className="mt-3 flex justify-end gap-2">
+          <div data-dialog-buttons className="mt-3 flex justify-end gap-2">
             {dialog.kind === "multirename" && (
-              <button type="button" className="mr-auto rounded border border-app-line px-3 py-0.5" onClick={() => api.dialogMultiRenameReset()}>
+              <button type="button" className="mr-auto rounded border border-app-line px-3 py-0.5 focus:ring-2 focus:ring-accent" onClick={() => api.dialogMultiRenameReset()}>
                 {t("dialog.reset_all")}
               </button>
             )}
             {dialog.kind !== "info" && (
-              <button type="button" className="rounded border border-app-line px-3 py-0.5" onClick={() => api.dialogCancel()}>
+              <button type="button" className="rounded border border-app-line px-3 py-0.5 focus:ring-2 focus:ring-accent" onClick={() => api.dialogCancel()}>
                 {dialog.kind === "multirename" ? t("common.close") : t("common.cancel")}
               </button>
             )}
             <button
               type="button"
               disabled={dialog.kind === "multirename" && !canMultiRename(dialog)}
-              className="rounded bg-accent px-3 py-0.5 text-accent-ink disabled:opacity-40"
+              data-dialog-primary={dialog.kind === "name" || dialog.kind === "multirename" ? undefined : ""}
+              className="rounded bg-accent px-3 py-0.5 text-accent-ink focus:ring-2 focus:ring-accent-ink disabled:opacity-40"
               onClick={() => api.dialogConfirm()}
             >
               {(dialog.kind === "name" || dialog.kind === "confirm") && dialog.confirmLabel ? dialog.confirmLabel : dialog.kind === "multirename" ? t("dialog.rename") : t("common.ok")}

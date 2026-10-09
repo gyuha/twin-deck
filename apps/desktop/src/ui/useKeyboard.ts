@@ -73,19 +73,33 @@ export function useKeyboard({ app, keymap, registry }: Options) {
         void api.menuSelectNth(Number(e.key));
         return;
       }
-      // 선택 창(저장하지 않은 변경 등): 방향키로 고른다. Return 확인·Esc 취소는 기본 키다.
+      // 다이얼로그 버튼에 포커스가 있으면: ←/→로 버튼 사이를 옮기고, Return은 포커스된 버튼이 처리한다(전역 "확인"으로 가로채지 않는다).
+      if (top === "dialog" && plain && e.target instanceof Element) {
+        const btn = e.target.closest<HTMLButtonElement>("[data-dialog-buttons] button");
+        if (btn) {
+          if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+            e.preventDefault();
+            const all = [...(btn.closest("[data-dialog-buttons]")?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? [])];
+            const next = all[all.indexOf(btn) + (e.key === "ArrowLeft" ? -1 : 1)];
+            next?.focus();
+            return;
+          }
+          if (e.key === "Enter") return;
+        }
+      }
+      // 선택 창(저장하지 않은 변경 등): ↑/↓로 고른다(←/→는 버튼 포커스 이동). Return 확인·Esc 취소는 기본 키다.
       if (top === "dialog" && s.dialog?.kind === "choice" && plain) {
-        const step = { ArrowUp: -1, ArrowLeft: -1, ArrowDown: 1, ArrowRight: 1 }[e.key];
+        const step = { ArrowUp: -1, ArrowDown: 1 }[e.key];
         if (step) {
           e.preventDefault();
           api.dialogSetChoice(s.dialog.selected + step);
           return;
         }
       }
-      // 충돌 다이얼로그: 방향키로 고르고 O/S/R로 바로 확정한다. A는 "남은 항목에도 적용"을 켜고 끈다.
+      // 충돌 다이얼로그: ↑/↓로 고르고 O/S/R로 바로 확정한다(←/→는 버튼 포커스 이동). A는 "남은 항목에도 적용"을 켜고 끈다.
       if (top === "dialog" && s.dialog?.kind === "conflict" && plain) {
         const d = s.dialog;
-        const step = { ArrowUp: -1, ArrowLeft: -1, ArrowDown: 1, ArrowRight: 1 }[e.key];
+        const step = { ArrowUp: -1, ArrowDown: 1 }[e.key];
         if (step) {
           e.preventDefault();
           api.dialogSetChoice(d.selected + step);

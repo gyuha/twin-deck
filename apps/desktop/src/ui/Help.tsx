@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, useEffect, useRef } from "react";
 import { t as translate } from "../i18n";
 import type { Key } from "../i18n";
 import { useApp, useAppStore, useT } from "../state/context";
@@ -38,6 +38,11 @@ export function Help() {
   const { api } = useAppStore();
   const { registry } = useUi();
   const t = useT();
+  const closeBtn = useRef<HTMLButtonElement>(null);
+  // 열리면 닫기 버튼에 포커스를 둔다(Return으로 닫힌다).
+  useEffect(() => {
+    if (open) closeBtn.current?.focus();
+  }, [open]);
   if (!open) return null;
   const groups = new Map<string, { id: string; title: string; keys: string }[]>();
   for (const i of api.helpItems()) {
@@ -56,7 +61,7 @@ export function Help() {
       >
         <header className="flex items-baseline justify-between border-b border-app-line px-5 py-3">
           <h2 className="text-base font-semibold">{t("help.title")}</h2>
-          <button type="button" className="text-sm font-semibold text-status-warning underline underline-offset-2" onClick={() => api.closeHelp()}>
+          <button type="button" ref={closeBtn} className="text-sm font-semibold text-status-warning underline underline-offset-2" onClick={() => api.closeHelp()}>
             {t("help.close")}
           </button>
         </header>
