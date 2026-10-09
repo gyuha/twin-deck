@@ -985,3 +985,54 @@ fn tab_close_button_defaults_off_and_round_trips() {
     assert!(l.warnings.is_empty(), "{:?}", l.warnings);
     assert!(l.config.behavior.layout.tab_close_button);
 }
+
+#[test]
+fn preview_limits_default_and_accept_zero() {
+    let none = load_from_strs(None, None, Platform::Linux);
+    assert!(none.warnings.is_empty(), "{:?}", none.warnings);
+    assert_eq!(
+        (
+            none.config.preview.image_max_mb,
+            none.config.preview.pdf_max_mb,
+            none.config.preview.audio_max_mb
+        ),
+        (10, 10, 20)
+    );
+    let l = load("[preview]\nimage_max_mb = 0\npdf_max_mb = 64\naudio_max_mb = 1\n");
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert_eq!(
+        (
+            l.config.preview.image_max_mb,
+            l.config.preview.pdf_max_mb,
+            l.config.preview.audio_max_mb
+        ),
+        (0, 64, 1)
+    );
+}
+
+#[test]
+fn preview_limits_invalid_values_warn_and_keep_defaults() {
+    for bad in ["-5", "\"큼\"", "1.5", "true"] {
+        let l = load(&format!("[preview]\npdf_max_mb = {bad}\n"));
+        assert!(!l.warnings.is_empty(), "{bad}: 경고가 있어야 한다");
+        assert_eq!(
+            l.config.preview.pdf_max_mb, 10,
+            "{bad}: 기본값으로 돌아간다"
+        );
+    }
+}
+
+#[test]
+fn preview_pdf_direct_defaults_off_and_validates() {
+    let none = load_from_strs(None, None, Platform::Linux);
+    assert!(!none.config.preview.pdf_direct);
+    let on = load("[preview]\npdf_direct = true\n");
+    assert!(on.warnings.is_empty(), "{:?}", on.warnings);
+    assert!(on.config.preview.pdf_direct);
+    let bad = load("[preview]\npdf_direct = \"켜\"\n");
+    assert!(!bad.warnings.is_empty());
+    assert!(
+        !bad.config.preview.pdf_direct,
+        "문자열은 기본값(꺼짐)으로 돌아간다"
+    );
+}

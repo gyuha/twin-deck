@@ -57,6 +57,10 @@ audio_autoplay = false
 video_autoplay = false
 close_on_outside_click = false
 office = false
+image_max_mb = 10 # 이미지·PDF·사운드 미리보기의 최대 파일 크기(MB). 0은 제한 없음
+pdf_max_mb = 10
+audio_max_mb = 20
+pdf_direct = false # (시험) 디스크 PDF를 파일 주소로 직접 열기. 켜면 PDF 용량 한도를 쓰지 않는다
 
 [layout]
 action_bar = []

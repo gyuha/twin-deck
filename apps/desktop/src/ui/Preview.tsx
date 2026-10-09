@@ -280,6 +280,8 @@ export function Preview() {
           {d?.kind === "pdf" &&
             (d.dataUrl ? (
               <PdfView dataUrl={d.dataUrl} name={p.name} />
+            ) : !d.truncated && fresh ? (
+              <PdfView fileSrc={api.fileUrl(p.path)} name={p.name} />
             ) : (
               <p className="text-ink-faint">{t("preview.pdf_too_big", { size: size(d.size) })}</p>
             ))}

@@ -18,9 +18,10 @@ use service::{coalesce, SearchMsg};
 use std::time::Duration;
 use tauri::Manager;
 
-/// 설정의 ZIP 추가 확장자를 서비스에 반영한다 (ARC-01).
-fn apply_archive_extensions(svc: &AppService, loaded: &td_config::Loaded) {
+/// 설정 중 서비스가 들고 있는 값(ZIP 추가 확장자 ARC-01, 미리보기 한도)을 서비스에 반영한다.
+pub fn apply_config(svc: &AppService, loaded: &td_config::Loaded) {
     svc.set_archive_extensions(loaded.config.file_systems.zip.additional_extensions.clone());
+    svc.set_preview_limits(&loaded.config.preview);
 }
 
 fn main() {
@@ -96,7 +97,7 @@ fn main() {
                 store,
                 startup_warning,
             });
-            apply_archive_extensions(
+            apply_config(
                 &app.state::<AppService>(),
                 &app.state::<ConfigState>().current(),
             );
@@ -104,7 +105,7 @@ fn main() {
                 let handle = app.handle().clone();
                 std::thread::spawn(move || {
                     while let Ok(loaded) = rx.recv() {
-                        apply_archive_extensions(&handle.state::<AppService>(), &loaded);
+                        apply_config(&handle.state::<AppService>(), &loaded);
                         let _ = ConfigChanged { loaded }.emit(&handle);
                     }
                 });

@@ -12,8 +12,8 @@ mod themes;
 pub use columns::{normalize_columns, parse_column, ColumnSpec, SortMarker, COLUMN_NAMES};
 pub use config::{
     Behavior, BehaviorLayout, BehaviorTable, Config, ConfirmConfig, Display, Environment,
-    FavoriteDto, FavoriteLeaf, FileSystemsConfig, LayoutConfig, QuickSelect, SelectionConfig,
-    TableView, ViewConfig, ZipConfig,
+    FavoriteDto, FavoriteLeaf, FileSystemsConfig, LayoutConfig, PreviewConfig, QuickSelect,
+    SelectionConfig, TableView, ViewConfig, ZipConfig,
 };
 pub use keybindings::BindingSpec;
 pub use load::{load_dir, load_from_strs, Loaded, Platform, Warning};

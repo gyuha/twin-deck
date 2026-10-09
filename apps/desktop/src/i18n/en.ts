@@ -663,4 +663,12 @@ export const en: Record<Key, string> = {
   "model.cad_failed": "Could not read the CAD file",
   "office.no_slide": "Could not find the first slide",
   "icon.missing": "Icon file not found: {icon}",
+  "settings.item.preview.image_max_mb.title": "Image size limit (MB)",
+  "settings.item.preview.image_max_mb.desc": "Maximum file size (MB) for opening an image preview. Larger files show \"too large to preview\". 0 means no limit (large files use a lot of memory)",
+  "settings.item.preview.pdf_max_mb.title": "PDF size limit (MB)",
+  "settings.item.preview.pdf_max_mb.desc": "Maximum file size (MB) for opening a PDF preview. 0 means no limit (large files use a lot of memory)",
+  "settings.item.preview.audio_max_mb.title": "Sound size limit (MB)",
+  "settings.item.preview.audio_max_mb.desc": "Maximum file size (MB) for opening a sound preview. 0 means no limit (large files use a lot of memory)",
+  "settings.item.preview.pdf_direct.title": "Open PDFs directly from the file (experimental)",
+  "settings.item.preview.pdf_direct.desc": "Lets the webview read PDFs on disk directly instead of loading them as data. Large PDFs open faster and the PDF size limit is not used. This is experimental: turn it off if a PDF does not open or page navigation fails (PDFs inside archives are unaffected)",
 };

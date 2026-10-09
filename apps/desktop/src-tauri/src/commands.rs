@@ -200,6 +200,7 @@ pub fn add_favorite(
 #[tauri::command]
 #[specta::specta]
 pub fn set_config_value(
+    svc: State<'_, AppService>,
     config: State<'_, ConfigState>,
     key: String,
     value: td_config::ConfigValue,
@@ -209,19 +210,27 @@ pub fn set_config_value(
         .as_ref()
         .ok_or("설정 디렉터리를 사용할 수 없습니다")?;
     td_config::set_user_value(store.dir(), &key, value)?;
-    Ok(store.refresh())
+    let loaded = store.refresh();
+    crate::apply_config(&svc, &loaded);
+    Ok(loaded)
 }
 
 /// 설정 화면: 사용자 `config.toml`에서 키 하나를 지워 내장 기본값으로 되돌린다.
 #[tauri::command]
 #[specta::specta]
-pub fn reset_config_value(config: State<'_, ConfigState>, key: String) -> ServiceResult<Loaded> {
+pub fn reset_config_value(
+    svc: State<'_, AppService>,
+    config: State<'_, ConfigState>,
+    key: String,
+) -> ServiceResult<Loaded> {
     let store = config
         .store
         .as_ref()
         .ok_or("설정 디렉터리를 사용할 수 없습니다")?;
     td_config::reset_user_value(store.dir(), &key)?;
-    Ok(store.refresh())
+    let loaded = store.refresh();
+    crate::apply_config(&svc, &loaded);
+    Ok(loaded)
 }
 
 /// 설정 화면: 설정 폴더를 파일 관리자로 연다.

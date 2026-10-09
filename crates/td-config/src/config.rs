@@ -122,6 +122,15 @@ pub struct PreviewConfig {
     /// macOS는 이 값과 관계없이 Office 문서에 Quick Look 미리보기를 쓰고(ADR-0014), Windows는 docx에 미리보기 처리기를 쓴다(ADR-0015).
     /// 그 밖의 경우(Linux, Windows의 xlsx·pptx, Office가 없는 Windows)만 이 값이 쓰인다.
     pub office: bool,
+    /// 이미지 미리보기를 싣는 최대 파일 크기(MB). 이보다 크면 "너무 커서 미리 볼 수 없습니다"가 보인다. 0은 제한 없음.
+    pub image_max_mb: u32,
+    /// PDF 미리보기의 최대 파일 크기(MB). 0은 제한 없음.
+    pub pdf_max_mb: u32,
+    /// 사운드 미리보기의 최대 파일 크기(MB). 0은 제한 없음.
+    pub audio_max_mb: u32,
+    /// (시험 기능) 디스크의 PDF를 데이터로 싣지 않고 파일 주소로 웹뷰가 직접 읽게 한다. 큰 PDF가 빨리 열리지만
+    /// 웹뷰의 PDF 뷰어가 파일 주소를 여는지·쪽 이동이 되는지는 실제 앱에서 확인해야 한다. 켜면 `pdf_max_mb`는 이 경로에서 쓰이지 않고, 압축 안 PDF는 영향이 없다.
+    pub pdf_direct: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

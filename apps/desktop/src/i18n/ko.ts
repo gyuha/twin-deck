@@ -661,6 +661,14 @@ export const ko = {
   "model.cad_failed": "CAD 파일을 읽지 못했습니다",
   "office.no_slide": "첫 슬라이드를 찾지 못했습니다",
   "icon.missing": "아이콘 파일이 없습니다: {icon}",
+  "settings.item.preview.image_max_mb.title": "이미지 용량 한도(MB)",
+  "settings.item.preview.image_max_mb.desc": "이미지 미리보기를 열 수 있는 최대 파일 크기(MB). 이보다 크면 \"너무 커서 미리 볼 수 없습니다\"가 보입니다. 0은 제한 없음(큰 파일은 메모리를 많이 씁니다)",
+  "settings.item.preview.pdf_max_mb.title": "PDF 용량 한도(MB)",
+  "settings.item.preview.pdf_max_mb.desc": "PDF 미리보기를 열 수 있는 최대 파일 크기(MB). 0은 제한 없음(큰 파일은 메모리를 많이 씁니다)",
+  "settings.item.preview.audio_max_mb.title": "사운드 용량 한도(MB)",
+  "settings.item.preview.audio_max_mb.desc": "사운드 미리보기를 열 수 있는 최대 파일 크기(MB). 0은 제한 없음(큰 파일은 메모리를 많이 씁니다)",
+  "settings.item.preview.pdf_direct.title": "PDF를 파일 주소로 직접 열기 (시험)",
+  "settings.item.preview.pdf_direct.desc": "디스크의 PDF를 데이터로 싣지 않고 웹뷰가 파일을 직접 읽게 합니다. 큰 PDF가 빨리 열리고 PDF 용량 한도를 쓰지 않습니다. 시험 기능이라 PDF가 안 열리거나 쪽 이동이 안 되면 끄세요(압축 안 PDF는 영향 없음)",
 } as const;
 
 export type Key = keyof typeof ko;

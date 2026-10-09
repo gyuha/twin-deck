@@ -357,6 +357,8 @@ export class FakeBackend implements Backend {
     const audio = { mp3: "audio/mpeg", wav: "audio/wav", ogg: "audio/ogg", oga: "audio/ogg", opus: "audio/ogg", flac: "audio/flac", m4a: "audio/mp4", aac: "audio/aac", weba: "audio/webm" }[ext];
     if (audio) return { ...base, kind: "audio", dataUrl: `data:${audio};base64,${btoa(n.content)}` };
     if (["mp4", "m4v", "mov", "webm", "ogv", "mkv", "avi"].includes(ext)) return { ...base, kind: "video" };
+    // (시험) pdf_direct가 켜져 있으면 디스크 PDF는 읽지 않고 "PDF임"만 알린다(압축 안 경로는 제외). 실제 서비스와 같다.
+    if (ext === "pdf" && this.loaded.config.preview.pdf_direct && !path.includes("!/")) return { ...base, kind: "pdf" };
     if (ext === "pdf") return { ...base, kind: "pdf", dataUrl: `data:application/pdf;base64,${btoa(n.content)}` };
     if (n.content.includes("\u0000")) return { ...base, kind: "other" };
     const limit = 64 * 1024;

@@ -318,8 +318,7 @@ fn archive_tree_lines(paths: &[(&str, bool)], max_lines: usize) -> (Vec<String>,
 }
 
 /// cbz(이미지를 ZIP으로 묶은 만화 파일)의 미리보기: 안의 첫 이미지. 이미지가 없거나 ZIP이 아니면 "기타"(종류와 크기)다.
-fn cbz_preview(path: &str) -> td_vfs::Preview {
-    let limit = td_vfs::PreviewLimits::default().image_bytes;
+fn cbz_preview(path: &str, limit: u64) -> td_vfs::Preview {
     let other = |size| td_vfs::Preview {
         kind: td_vfs::PreviewKind::Other,
         text: None,
@@ -725,6 +724,19 @@ pub struct Service<T: Trasher> {
     file_clipboard: Box<dyn FileClipboard>,
     /// macOS Office 문서의 Quick Look 미리보기(ADR-0014). 한 번에 하나만 돌린다.
     quicklook: QuickLook,
+    /// 이미지·PDF·사운드 미리보기의 파일 크기 한도. 설정(`preview.*_max_mb`)을 따라 바뀐다.
+    preview_limits: Mutex<td_vfs::PreviewLimits>,
+    /// (시험) 디스크 PDF를 읽지 않고 파일 주소로 열게 한다(`preview.pdf_direct`).
+    pdf_direct: std::sync::atomic::AtomicBool,
+}
+
+/// 설정의 MB 한도를 바이트로. 0은 제한 없음이다.
+fn mb_limit(mb: u32) -> u64 {
+    if mb == 0 {
+        u64::MAX
+    } else {
+        u64::from(mb) * 1024 * 1024
+    }
 }
 
 impl<T: Trasher + Clone + Send + 'static> Service<T> {
@@ -746,6 +758,8 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
                 search_tx,
                 file_clipboard: Box::new(SystemFileClipboard),
                 quicklook: QuickLook::new("/usr/bin/qlmanage", Duration::from_secs(10)),
+                preview_limits: Mutex::new(td_vfs::PreviewLimits::default()),
+                pdf_direct: std::sync::atomic::AtomicBool::new(false),
             },
             Channels {
                 dir_changes,
@@ -964,6 +978,20 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
         }
     }
 
+    /// 설정 `preview.image_max_mb`·`pdf_max_mb`·`audio_max_mb`를 반영한다. 다음 미리보기부터 적용된다.
+    pub fn set_preview_limits(&self, c: &td_config::PreviewConfig) {
+        let mut l = self.preview_limits.lock().unwrap();
+        l.image_bytes = mb_limit(c.image_max_mb);
+        l.pdf_bytes = mb_limit(c.pdf_max_mb);
+        l.audio_bytes = mb_limit(c.audio_max_mb);
+        self.pdf_direct
+            .store(c.pdf_direct, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    fn limits(&self) -> td_vfs::PreviewLimits {
+        *self.preview_limits.lock().unwrap()
+    }
+
     /// 설정 `file_systems.zip.additional_extensions`를 반영한다.
     pub fn set_archive_extensions(&self, exts: Vec<String>) {
         self.fs.set_extra_zip_exts(exts);
@@ -1139,10 +1167,27 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
 
     pub fn preview(&self, path: &str) -> ServiceResult<PreviewDto> {
         if path.to_ascii_lowercase().ends_with(".cbz") && std::path::Path::new(path).is_file() {
-            return Ok(cbz_preview(path).into());
+            return Ok(cbz_preview(path, self.limits().image_bytes).into());
+        }
+        // (시험) 디스크 PDF는 읽지 않고 "PDF임"만 알린다. 프런트가 파일 주소로 직접 연다. 한도(`pdf_max_mb`)도 쓰지 않는다.
+        if self.pdf_direct.load(std::sync::atomic::Ordering::Relaxed)
+            && path.to_ascii_lowercase().ends_with(".pdf")
+            && !self.fs.is_archive_path(&vp(path))
+        {
+            if let Ok(m) = std::fs::metadata(path) {
+                if m.is_file() {
+                    return Ok(PreviewDto {
+                        kind: PreviewKindDto::Pdf,
+                        text: None,
+                        truncated: false,
+                        size: m.len() as f64,
+                        data_url: None,
+                    });
+                }
+            }
         }
         if self.fs.is_archive_path(&vp(path)) {
-            return td_vfs::read_preview_vfs(&self.fs, &vp(path), td_vfs::PreviewLimits::default())
+            return td_vfs::read_preview_vfs(&self.fs, &vp(path), self.limits())
                 .map(PreviewDto::from)
                 .map_err(|e| e.to_string());
         }
@@ -1154,7 +1199,7 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
                 return Ok(p.into());
             }
         }
-        td_vfs::read_preview(&vp(path), td_vfs::PreviewLimits::default())
+        td_vfs::read_preview(&vp(path), self.limits())
             .map(PreviewDto::from)
             .map_err(|e| e.to_string())
     }
@@ -2691,5 +2736,172 @@ mod tests {
         let got = ch.dir_changes.recv_timeout(Duration::from_secs(5)).unwrap();
         assert_eq!(got, PathBuf::from(&root));
         svc.unwatch(&root).unwrap();
+    }
+
+    /// 크기만 큰 빈 파일(희소 파일)을 만든다. 한도 판정은 크기만 보므로 내용은 필요 없다.
+    fn sparse(path: &str, mb: u64) {
+        let f = std::fs::File::create(path).unwrap();
+        f.set_len(mb * 1024 * 1024).unwrap();
+    }
+
+    fn limits_cfg(image: u32, pdf: u32, audio: u32) -> td_config::PreviewConfig {
+        let mut c = td_config::load_from_strs(None, None, td_config::Platform::Linux)
+            .config
+            .preview;
+        c.image_max_mb = image;
+        c.pdf_max_mb = pdf;
+        c.audio_max_mb = audio;
+        c
+    }
+
+    #[test]
+    fn preview_limits_default_cuts_at_10_10_20_mb() {
+        let (_t, svc, _ch, root) = setup();
+        let c = td_config::load_from_strs(None, None, td_config::Platform::Linux).config;
+        svc.set_preview_limits(&c.preview);
+        for (name, mb, shown) in [
+            ("a.pdf", 10, true),
+            ("b.pdf", 11, false),
+            ("a.png", 10, true),
+            ("b.png", 11, false),
+            ("a.mp3", 20, true),
+            ("b.mp3", 21, false),
+        ] {
+            let p = format!("{root}/{name}");
+            sparse(&p, mb);
+            let r = svc.preview(&p).unwrap();
+            assert_eq!(r.data_url.is_some(), shown, "{name} {mb}MB");
+        }
+    }
+
+    #[test]
+    fn preview_limits_follow_config_up_down_and_zero_is_unlimited() {
+        let (_t, svc, _ch, root) = setup();
+        for (name, which) in [("x.pdf", 1), ("x.png", 0), ("x.mp3", 2)] {
+            let p = format!("{root}/{name}");
+            sparse(&p, 3);
+            let set = |mb: u32| {
+                let mut v = [10u32, 10, 20];
+                v[which] = mb;
+                svc.set_preview_limits(&limits_cfg(v[0], v[1], v[2]));
+            };
+            set(1);
+            assert!(
+                svc.preview(&p).unwrap().data_url.is_none(),
+                "{name}: 1MB 한도에서 3MB는 안 보인다"
+            );
+            set(4);
+            assert!(
+                svc.preview(&p).unwrap().data_url.is_some(),
+                "{name}: 한도를 올리면 보인다"
+            );
+            set(2);
+            assert!(
+                svc.preview(&p).unwrap().data_url.is_none(),
+                "{name}: 한도를 줄이면 다시 안 보인다"
+            );
+            set(0);
+            assert!(
+                svc.preview(&p).unwrap().data_url.is_some(),
+                "{name}: 0은 제한 없음"
+            );
+        }
+    }
+
+    #[test]
+    fn preview_limits_apply_to_images_inside_archives_and_cbz() {
+        let (_t, svc, _ch, root) = setup();
+        let png = vec![0x89u8, b'P', b'N', b'G', 1, 2, 3];
+        let zip = format!("{root}/a.zip");
+        let mut z = td_archive::ZipEdit::create(Path::new(&zip)).unwrap();
+        z.add_file(
+            "p.png",
+            td_archive::Source::Bytes(vec![7u8; 2 * 1024 * 1024]),
+        );
+        z.commit().unwrap();
+        let cbz = format!("{root}/c.cbz");
+        let mut z = td_archive::ZipEdit::create(Path::new(&cbz)).unwrap();
+        z.add_file(
+            "1.png",
+            td_archive::Source::Bytes(vec![7u8; 2 * 1024 * 1024]),
+        );
+        z.commit().unwrap();
+        let _ = png;
+        svc.set_preview_limits(&limits_cfg(1, 10, 20));
+        assert!(svc
+            .preview(&format!("{zip}!/p.png"))
+            .unwrap()
+            .data_url
+            .is_none());
+        assert!(svc.preview(&cbz).unwrap().data_url.is_none());
+        svc.set_preview_limits(&limits_cfg(3, 10, 20));
+        assert!(svc
+            .preview(&format!("{zip}!/p.png"))
+            .unwrap()
+            .data_url
+            .is_some());
+        assert!(svc.preview(&cbz).unwrap().data_url.is_some());
+    }
+
+    #[test]
+    fn preview_limits_follow_config_from_a_loaded_config() {
+        // 시작·설정 화면·파일 재읽기가 모두 이 변환을 거쳐 서비스에 반영된다(main.rs의 `apply_config`).
+        let (_t, svc, _ch, root) = setup();
+        let p = format!("{root}/y.pdf");
+        sparse(&p, 12);
+        let l = td_config::load_from_strs(
+            Some("[preview]\npdf_max_mb = 16\n"),
+            None,
+            td_config::Platform::Linux,
+        );
+        svc.set_preview_limits(&l.config.preview);
+        assert!(svc.preview(&p).unwrap().data_url.is_some());
+    }
+
+    fn direct_cfg(on: bool, pdf_mb: u32) -> td_config::PreviewConfig {
+        let mut c = limits_cfg(10, pdf_mb, 20);
+        c.pdf_direct = on;
+        c
+    }
+
+    #[test]
+    fn pdf_direct_on_skips_reading_and_ignores_the_size_limit_for_disk_pdfs() {
+        let (_t, svc, _ch, root) = setup();
+        let p = format!("{root}/big.pdf");
+        sparse(&p, 11);
+        svc.set_preview_limits(&direct_cfg(false, 10));
+        let off = svc.preview(&p).unwrap();
+        assert!(
+            off.truncated && off.data_url.is_none(),
+            "꺼짐: 11MB는 지금처럼 한도 초과"
+        );
+        svc.set_preview_limits(&direct_cfg(true, 10));
+        let on = svc.preview(&p).unwrap();
+        assert_eq!(on.kind, PreviewKindDto::Pdf);
+        assert!(
+            !on.truncated && on.data_url.is_none(),
+            "켜짐: 읽지 않고 한도도 무시"
+        );
+        assert_eq!(on.size, 11.0 * 1024.0 * 1024.0);
+    }
+
+    #[test]
+    fn pdf_direct_keeps_the_current_way_for_pdfs_inside_archives_and_when_off() {
+        let (_t, svc, _ch, root) = setup();
+        let zip = format!("{root}/a.zip");
+        let mut z = td_archive::ZipEdit::create(Path::new(&zip)).unwrap();
+        z.add_file("d.pdf", td_archive::Source::Bytes(b"%PDF-1.4".to_vec()));
+        z.commit().unwrap();
+        svc.set_preview_limits(&direct_cfg(true, 10));
+        let inner = svc.preview(&format!("{zip}!/d.pdf")).unwrap();
+        // 압축 안은 파일 주소를 쓸 수 없어 직접 열기 대상이 아니다(지금 방식의 결과: PDF를 미리 볼 수 없는 종류로 둔다).
+        assert!(inner.data_url.is_none());
+        let small = format!("{root}/s.pdf");
+        std::fs::write(&small, b"%PDF-1.4").unwrap();
+        svc.set_preview_limits(&direct_cfg(false, 10));
+        assert!(
+            svc.preview(&small).unwrap().data_url.is_some(),
+            "꺼짐이면 지금처럼 데이터로 싣는다"
+        );
     }
 }
