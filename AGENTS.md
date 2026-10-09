@@ -2,7 +2,7 @@
 
 This file provides guidance to coding agents (Codex, Claude Code, and others) when working with code in this repository. `CLAUDE.md` imports it, so keep the shared guidance here.
 
-Twin Deck is a keyboard-driven dual-pane file manager (Tauri 2 + Rust core + React 19 UI, Bun workspaces). UI text, docs, comments, and test names are written in Korean; match that. README.md and `docs/` (00-overview … 11-roadmap, `docs/adr/`) hold the product spec; `docs/05-actions-keybindings.md` is the action/key catalog and should be updated when actions or default keys change.
+Twin Deck is a keyboard-driven dual-pane file manager (Tauri 2 + Rust core + React 19 UI, Bun workspaces). UI text, docs, comments, and test names are written in Korean; match that. README.md and `docs/` (00-overview … 11-roadmap, `docs/adr/`) hold the product spec; **`README.md` (Korean) and `README.en.md` (English) are a pair: whenever you change README.md, update README.en.md to match in the same commit (and keep the language links on the first line of both).** `docs/05-actions-keybindings.md` is the action/key catalog and should be updated when actions or default keys change.
 
 ## Commands
 
