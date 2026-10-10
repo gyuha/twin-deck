@@ -48,7 +48,7 @@ vi.mock("../lib/terminalEngine", () => ({
   },
 }));
 
-const OPEN = "{Control>}o{/Control}"; // Mod+O (linux)
+const OPEN = "{Control>}{Alt>}t{/Alt}{/Control}"; // Alt+Mod+T (linux)
 const TOGGLE = "{Control>}{Alt>}o{/Alt}{/Control}"; // Alt+Mod+O
 const termIn = (pane: "left" | "right") => document.querySelector(`[data-pane="${pane}"] [data-terminal]`);
 const backend = () => new FakeBackend().seed({ "/home/a/a.txt": "a", "/home/a/sub/x.txt": "x", "/home/b/b.txt": "b" });
@@ -59,7 +59,7 @@ beforeEach(() => {
 });
 
 describe("내장 터미널 패널", () => {
-  it("Mod+O가 활성 패널 폴더를 cwd로 세션을 열고 반대편 패널이 터미널이 된다(왼쪽 → 오른쪽)", async () => {
+  it("Alt+Mod+T가 활성 패널 폴더를 cwd로 세션을 열고 반대편 패널이 터미널이 된다(왼쪽 → 오른쪽)", async () => {
     const b = backend();
     const { user } = await renderApp(b);
     expect(termIn("right")).toBeNull();
@@ -82,7 +82,7 @@ describe("내장 터미널 패널", () => {
     expect([...b.terminals.values()].map((t) => t.cwd)).toEqual(["/home/b"]);
   });
 
-  it("이미 열려 있으면 Mod+O는 세션을 새로 만들지 않고 포커스만 준다", async () => {
+  it("이미 열려 있으면 Alt+Mod+T는 세션을 새로 만들지 않고 포커스만 준다", async () => {
     const b = backend();
     const { user } = await renderApp(b);
     await user.keyboard(OPEN);
