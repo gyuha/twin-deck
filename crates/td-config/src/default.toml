@@ -20,6 +20,7 @@ zebra_rows = false
 show_marks = true
 folder_style = "none"
 cursor_fill = false
+show_parent_row = false
 
 [behavior.quick_select]
 match_only_prefix = false

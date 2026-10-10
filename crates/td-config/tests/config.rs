@@ -861,6 +861,25 @@ fn remove_favorite_drops_matching_entry_and_keeps_the_rest() {
 }
 
 #[test]
+fn show_parent_row_defaults_off_and_user_can_turn_it_on() {
+    use td_config::{set_user_value, ConfigValue};
+    let none = load("");
+    assert!(none.warnings.is_empty(), "{:?}", none.warnings);
+    assert!(!none.config.behavior.table.show_parent_row);
+
+    let dir = tempfile::tempdir().unwrap();
+    set_user_value(
+        dir.path(),
+        "behavior.table.show_parent_row",
+        ConfigValue::Bool(true),
+    )
+    .unwrap();
+    let l = load_dir(dir.path(), Platform::Linux);
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert!(l.config.behavior.table.show_parent_row);
+}
+
+#[test]
 fn list_appearance_defaults_round_trip_and_validate_folder_style() {
     use td_config::{set_user_value, ConfigValue};
     // 기본값은 지금 모양과 같다

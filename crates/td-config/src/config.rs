@@ -62,6 +62,8 @@ pub struct BehaviorTable {
     pub folder_style: String,
     /// 활성 패널의 커서 행을 강조색으로 꽉 채운다.
     pub cursor_fill: bool,
+    /// 파일 목록 맨 위에 상위 폴더로 가는 `..` 행을 보인다. 전체 선택·복사·이동 같은 작업 대상에는 들지 않는다.
+    pub show_parent_row: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

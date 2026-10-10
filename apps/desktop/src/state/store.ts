@@ -420,10 +420,14 @@ function isArchiveEntry(e: EntryDto | undefined, extraExts: string[]): boolean {
   return e?.kind === "file" && isArchiveName(e.name, extraExts);
 }
 
+/** `..` 상위 폴더 행을 보이는가: 옵션이 켜져 있고, 가상 탭이 아니며, 상위 폴더가 있을 때. 이 행은 커서 위치 `-1`이고 `entries`에는 들지 않는다. */
+export const parentRowVisible = (tab: TabState, enabled: boolean): boolean => enabled && !tab.virtual && parentPath(tab.path) !== null;
+
 export function actionContext(s: AppState): ActionContext {
   const tab = activeTab(s);
   return {
     hasCursorItem: !!cursorEntry(tab),
+    onParentRow: tab.cursor < 0 && parentRowVisible(tab, s.loaded.config.behavior.table.show_parent_row),
     selectedCount: tab.selection.size,
     tabCount: s.panes[s.activePane].tabs.length,
     canGoUp: tab.virtual?.kind === "usage" && tab.virtual.view === "treemap" ? parentPath(tab.virtual.base) !== null : !tab.virtual && parentPath(tab.path) !== null,
@@ -1306,6 +1310,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     async open() {
       const tab = activeTab(get());
       if (tab.virtual?.kind === "usage" && tab.virtual.view === "treemap") return api.usageOpenOther();
+      if (tab.cursor < 0 && parentRowVisible(tab, cfg().behavior.table.show_parent_row)) return api.goUp(); // `..` 행
       const c = cursorEntry(tab);
       if (c && isFolderEntry(c)) await api.navigate(c.path);
       else if (c?.kind === "file" && isArchiveName(c.name, cfg().file_systems.zip.additional_extensions)) {
@@ -1351,13 +1356,16 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     moveCursor(delta: number) {
       if (Math.abs(delta) === 1 && isTreemap(activeTab(get()))) return api.usageMove(delta < 0 ? "up" : "down");
       const circular = cfg().behavior.table.circular_selection;
+      const showParent = cfg().behavior.table.show_parent_row;
       patchActive((t) => {
         const len = t.entries.length;
-        if (len === 0) return {};
+        // `..` 행(커서 -1)이 보이면 목록 맨 앞 한 칸이 더 있다.
+        const lo = parentRowVisible(t, showParent) ? -1 : 0;
+        if (len === 0 && lo === 0) return {};
         let next = t.cursor + delta;
         // 순환 선택(NAV-06)은 한 칸 이동에만 적용한다.
-        if (circular && Math.abs(delta) === 1) next = (next + len) % len;
-        return { cursor: clamp(next, len) };
+        if (circular && Math.abs(delta) === 1) next = lo + ((((next - lo) % (len - lo)) + (len - lo)) % (len - lo));
+        return { cursor: Math.min(Math.max(next, lo), Math.max(len - 1, lo)) };
       });
     },
     /** 반 페이지 이동 (NAV-02). */
@@ -1367,7 +1375,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     /** 다중 컬럼 모드에서 이전/다음 컬럼으로 (NAV-05). 컬럼은 위에서 아래로 채워진다. */
     moveColumn(dir: 1 | -1) {
       patchActive((t) => {
-        if (t.view.mode !== "columns" || t.entries.length === 0) return {};
+        if (t.view.mode !== "columns" || t.entries.length === 0 || t.cursor < 0) return {};
         const rows = Math.ceil(t.entries.length / t.view.count);
         return { cursor: clamp(t.cursor + dir * rows, t.entries.length) };
       });
@@ -1435,7 +1443,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         const lo = Math.min(t.cursor, to);
         const hi = Math.max(t.cursor, to);
         const sel = new Set(t.selection);
-        for (let i = lo; i <= hi; i++) {
+        for (let i = Math.max(lo, 0); i <= hi; i++) {
           if (i === to && to !== t.cursor) continue;
           const path = t.entries[i].path;
           if (sel.has(path)) sel.delete(path);
@@ -1474,7 +1482,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       set((s) => ({ activePane: pane, panes: { ...s.panes, [pane]: { ...s.panes[pane], active: tab } } }));
     },
     setCursor(index: number) {
-      patchActive((t) => ({ cursor: clamp(index, t.entries.length) }));
+      const showParent = cfg().behavior.table.show_parent_row;
+      patchActive((t) => ({ cursor: index === -1 && parentRowVisible(t, showParent) ? -1 : clamp(index, t.entries.length) }));
     },
     /** Shift+클릭: 지금 커서 항목부터 클릭한 항목까지(양 끝 포함)를 기존 선택에 더하고 커서를 옮긴다. */
     selectRangeTo(index: number) {
@@ -1482,7 +1491,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         if (t.entries.length === 0) return {};
         const to = clamp(index, t.entries.length);
         const sel = new Set(t.selection);
-        for (let i = Math.min(t.cursor, to); i <= Math.max(t.cursor, to); i++) sel.add(t.entries[i].path);
+        for (let i = Math.max(Math.min(t.cursor, to), 0); i <= Math.max(t.cursor, to); i++) sel.add(t.entries[i].path);
         return { cursor: to, selection: sel };
       });
     },

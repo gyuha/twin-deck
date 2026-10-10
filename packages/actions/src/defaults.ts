@@ -6,6 +6,8 @@ import type { Action, ActionCategory } from "./registry";
 export interface ActionContext {
   /** 커서가 가리키는 항목이 있는지 (".." 제외). */
   hasCursorItem: boolean;
+  /** 커서가 목록 맨 위의 `..` 상위 폴더 행에 있는지(열기만 가능하다). */
+  onParentRow?: boolean;
   selectedCount: number;
   /** 활성 패널의 탭 수. */
   tabCount: number;
@@ -65,7 +67,7 @@ export const DEFAULT_ACTION_META = [
   { id: "core.select.invert_current", title: "현재 항목 선택 반전", category: "Selection", scopes: ["pane"], isApplicable: (c) => c.hasCursorItem },
   { id: "core.select.group", title: "패턴으로 선택", category: "Selection", scopes: ["pane"] },
   { id: "core.deselect.group", title: "패턴으로 선택 해제", category: "Selection", scopes: ["pane"] },
-  { id: "core.open", title: "열기", category: "Navigation", scopes: ["pane"], isApplicable: (c) => c.hasCursorItem },
+  { id: "core.open", title: "열기", category: "Navigation", scopes: ["pane"], isApplicable: (c) => c.hasCursorItem || !!c.onParentRow },
   { id: "core.compress", title: "압축", category: "File", scopes: ["pane"], isApplicable: hasTarget },
   { id: "core.extract", title: "추출 (옆의 새 폴더로)", category: "File", scopes: ["pane"], isApplicable: hasTarget },
   { id: "core.extract.to_inactive", title: "추출 (반대편 패널로)", category: "File", scopes: ["pane"], isApplicable: hasTarget },

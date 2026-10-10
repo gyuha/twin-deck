@@ -10,7 +10,7 @@ import { SORT_KEYS } from "../lib/sort";
 import { FileIcon } from "./FileIcon";
 import type { SortKey } from "../lib/sort";
 import { useApp, useAppStore, useT } from "../state/context";
-import { activeTab, effectiveSort, isFolderEntry } from "../state/store";
+import { activeTab, effectiveSort, isFolderEntry, parentRowVisible } from "../state/store";
 import type { PaneId } from "../state/store";
 
 const ROW_HEIGHT = 24;
@@ -39,9 +39,10 @@ const gridTemplate = (cols: ColumnSpec[], iconSize: number, showMarks: boolean) 
 const FOLDER_DECOR: Record<string, [string, string]> = { brackets: ["[", "]"], parens: ["(", ")"], slash: ["", "/"] };
 
 /** 보이는 행만 그리는 가상 스크롤러. jsdom처럼 크기 관찰이 없는 환경에서도 동작하도록 측정을 직접 제공한다. */
-function useRows(count: number, ref: React.RefObject<HTMLDivElement | null>): Virtualizer<HTMLDivElement, Element> {
+function useRows(count: number, ref: React.RefObject<HTMLDivElement | null>, scrollMargin = 0): Virtualizer<HTMLDivElement, Element> {
   return useVirtualizer<HTMLDivElement, Element>({
     count,
+    scrollMargin,
     getScrollElement: () => ref.current,
     estimateSize: () => ROW_HEIGHT,
     overscan: 8,
@@ -108,16 +109,58 @@ export function FileTable({ pane }: { pane: PaneId }) {
   const colCount = tab.view.mode === "columns" ? tab.view.count : 1;
   const rows = Math.max(1, Math.ceil(tab.entries.length / colCount));
   const listRef = useRef<HTMLDivElement>(null);
-  const virtualizer = useRows(rows, listRef);
+  // `..` 상위 폴더 행(커서 -1)은 목록 맨 위에 두고 가상 스크롤 영역은 그 높이만큼 아래에서 시작한다.
+  const parentRow = parentRowVisible(tab, config.behavior.table.show_parent_row);
+  const virtualizer = useRows(rows, listRef, parentRow ? ROW_HEIGHT : 0);
   const rowId = (i: number) => `${pane}-${tab.id}-row-${i}`;
 
   // 커서가 화면 밖이면 스크롤한다 (열 우선 배치: index = 열 * rows + 행).
   useEffect(() => {
-    if (tab.entries.length > 0) virtualizer.scrollToIndex(tab.cursor % rows, { align: "auto" });
+    if (tab.cursor < 0) virtualizer.scrollToOffset(0);
+    else if (tab.entries.length > 0) virtualizer.scrollToIndex(tab.cursor % rows, { align: "auto" });
   }, [tab.cursor, rows, tab.entries.length, virtualizer]);
 
   const activate = () => api.activate(pane);
   const drag = useApp((s) => s.drag);
+
+  const renderParentRow = () => {
+    const cursor = tab.cursor < 0;
+    const fill = cursor && isActive && cursorFill;
+    return (
+      <div
+        id={rowId(-1)}
+        role="option"
+        aria-selected={false}
+        aria-label={t("table.parent_row_aria")}
+        data-parent-row
+        data-cursor={cursor}
+        data-cursor-fill={fill ? "true" : undefined}
+        data-pane={pane}
+        onClick={() => {
+          activate();
+          api.setCursor(-1);
+        }}
+        onDoubleClick={() => {
+          activate();
+          api.setCursor(-1);
+          void api.open();
+        }}
+        style={{
+          gridTemplateColumns: multi
+            ? `${showMarks ? `${MARK_COLUMN} ` : ""}${iconColumn(iconSize)} minmax(0,1fr)`
+            : gridTemplate(columns, iconSize, showMarks),
+        }}
+        className={[
+          "grid h-6 cursor-default items-center border-l-[3px] px-2",
+          cursor ? (isActive ? (fill ? "border-accent bg-accent text-accent-ink" : "border-accent bg-app-selected") : "border-ink-faint bg-app-selected") : "border-transparent",
+        ].join(" ")}
+      >
+        {showMarks && <span aria-hidden data-mark />}
+        <FileIcon name=".." kind="dir" size={iconSize} />
+        <span className="truncate">..</span>
+      </div>
+    );
+  };
 
   const renderRow = (e: EntryDto, i: number) => {
     const selected = tab.selection.has(e.path);
@@ -257,11 +300,12 @@ export function FileTable({ pane }: { pane: PaneId }) {
         role="listbox"
         aria-label={t("table.list_aria", { side: pane === "left" ? t("common.left") : t("common.right") })}
         aria-multiselectable="true"
-        aria-activedescendant={tab.entries.length ? rowId(tab.cursor) : undefined}
+        aria-activedescendant={tab.entries.length || parentRow ? rowId(tab.cursor) : undefined}
         aria-rowcount={tab.entries.length}
         data-view={multi ? `columns-${colCount}` : "table"}
         className="min-h-0 flex-1 overflow-auto"
       >
+        {parentRow && renderParentRow()}
         <div style={{ height: virtualizer.getTotalSize(), position: "relative", width: "100%" }}>
           {virtualizer.getVirtualItems().map((v) => (
             <div
@@ -273,7 +317,7 @@ export function FileTable({ pane }: { pane: PaneId }) {
                 left: 0,
                 width: "100%",
                 height: ROW_HEIGHT,
-                transform: `translateY(${v.start}px)`,
+                transform: `translateY(${v.start - (parentRow ? ROW_HEIGHT : 0)}px)`,
                 display: multi ? "grid" : "block",
                 gridTemplateColumns: multi ? `repeat(${colCount}, minmax(0,1fr))` : undefined,
               }}
