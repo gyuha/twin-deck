@@ -586,6 +586,10 @@ ui_font: string;
  */
 preview_font: string; 
 /**
+ * 내장 터미널의 글꼴. CSS `font-family` 값이고 비우면 기본 고정폭 글꼴이다(미리보기 글꼴과 따로 쓴다).
+ */
+terminal_font: string; 
+/**
  * 앱 기본 글자색(`#rrggbb` 또는 `#rgb`). 비우면 테마 그대로다. 흐린 글자색은 이 색을 배경 쪽으로 섞어 만든다.
  */
 text_color: string; table: BehaviorTable; quick_select: QuickSelect; selection: SelectionConfig; layout: BehaviorLayout }

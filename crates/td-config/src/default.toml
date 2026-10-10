@@ -10,6 +10,7 @@ random_theme = false
 random_themes = "" # 랜덤 테마 후보: 테마 이름을 쉼표로 이은 값(예: "dracula-default,catppuccin-mocha")
 ui_font = ""
 preview_font = "Menlo, Consolas, monospace" # macOS 기본 Menlo, Windows 기본 Consolas, 그 밖은 시스템 고정폭
+terminal_font = "" # 내장 터미널의 글꼴. 비우면 기본 고정폭 글꼴
 text_color = "" # 앱 기본 글자색(#rrggbb). 비우면 테마 그대로
 
 [behavior.table]

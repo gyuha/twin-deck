@@ -61,21 +61,21 @@ export function Pane({ pane, onThemePreview }: { pane: PaneId; onThemePreview?: 
         ...(dropHere ? ["bg-accent/10"] : []),
       ].join(" ")}
     >
-      {hasSettings ? (
-        <Settings onThemePreview={onThemePreview} />
-      ) : (
+      {hasSettings && <Settings onThemePreview={onThemePreview} />}
+      {!hasSettings && (
         <>
           <DriveBar pane={pane} />
           <TabBar pane={pane} />
-          {terminals.map((term) => (
-            <TerminalView key={term.session} id={term.session} shown={activeTerminalTab === term.tab} focused={isActive} />
-          ))}
-          {activeTerminalTab === null && (
-            <>
-              {isVirtual ? <VirtualHeader pane={pane} /> : <Breadcrumb pane={pane} path={path} />}
-              {treemap ? <UsageTreemap pane={pane} /> : <FileTable pane={pane} />}
-            </>
-          )}
+        </>
+      )}
+      {/* 설정이 이 패널 자리에 떠 있어도 터미널은 지우지 않고 숨겨 둔다(지우면 열려 있는 터미널 화면이 사라진다). */}
+      {terminals.map((term) => (
+        <TerminalView key={term.session} id={term.session} shown={!hasSettings && activeTerminalTab === term.tab} focused={isActive} />
+      ))}
+      {!hasSettings && activeTerminalTab === null && (
+        <>
+          {isVirtual ? <VirtualHeader pane={pane} /> : <Breadcrumb pane={pane} path={path} />}
+          {treemap ? <UsageTreemap pane={pane} /> : <FileTable pane={pane} />}
         </>
       )}
     </section>

@@ -48,6 +48,7 @@ export async function createTerminalEngine(fontFamily = ""): Promise<TerminalEng
     setFontFamily(font) {
       term.options.fontFamily = font.trim() || DEFAULT_TERMINAL_FONT;
       fit.fit();
+      if (term.rows > 0) term.refresh(0, term.rows - 1); // 새 글꼴로 이미 그린 줄을 다시 그린다
     },
     focus: () => term.focus(),
     dispose: () => {

@@ -193,17 +193,43 @@ describe("내장 터미널 탭", () => {
     await waitFor(() => expect(b.terminals.size).toBe(1));
   });
 
-  it("글꼴은 설정의 미리보기 글꼴(behavior.preview_font)을 따르고 바꾸면 열린 터미널에도 반영된다", async () => {
+  it("글꼴은 터미널 글꼴 설정(behavior.terminal_font)을 따르고 바꾸면 열린 터미널에도 반영된다. 미리보기 글꼴과는 무관하다", async () => {
     const b = backend();
-    b.setConfig((l) => (l.config.behavior.preview_font = "D2Coding, monospace"));
+    b.setConfig((l) => {
+      l.config.behavior.terminal_font = "D2Coding, monospace";
+      l.config.behavior.preview_font = "Georgia, serif";
+    });
     const { user } = await renderApp(b);
     await user.keyboard(OPEN);
     await waitFor(() => expect(hoisted.engines[0]?.opened).not.toBeNull());
-    expect(hoisted.created).toEqual(["D2Coding, monospace"]);
+    expect(hoisted.created).toEqual(["D2Coding, monospace"]); // 미리보기 글꼴(Georgia)이 아니다
     await waitFor(() => expect(hoisted.engines[0].fonts.at(-1)).toBe("D2Coding, monospace"));
-    act(() => b.setConfig((l) => (l.config.behavior.preview_font = "Fira Code")));
+    act(() => b.setConfig((l) => (l.config.behavior.preview_font = "Verdana")));
+    await new Promise((r) => setTimeout(r, 30));
+    expect(hoisted.engines[0].fonts.at(-1)).toBe("D2Coding, monospace"); // 미리보기 글꼴을 바꿔도 터미널은 그대로
+    act(() => b.setConfig((l) => (l.config.behavior.terminal_font = "Fira Code")));
     await waitFor(() => expect(hoisted.engines[0].fonts.at(-1)).toBe("Fira Code"));
     expect(hoisted.engines).toHaveLength(1);
+  });
+
+  it("터미널 탭이 있는 패널에서 설정을 열어도 터미널은 지워지지 않고, 설정에서 바꾼 글꼴이 닫을 때 보인다", async () => {
+    const b = backend();
+    const { user } = await renderApp(b);
+    await user.keyboard(OPEN);
+    await waitFor(() => expect(hoisted.engines[0]?.opened).not.toBeNull());
+    const id = [...b.terminals.keys()][0];
+    act(() => b.emitTerminalOutput(id, "지워지면 안 됨"));
+    await user.keyboard("{Control>},{/Control}"); // 설정은 활성 패널(터미널이 있는 오른쪽) 자리에 뜬다
+    await waitFor(() => expect(shownTerm("right")).toBeNull()); // 숨겨진다
+    expect(allTerms("right")).toHaveLength(1); // 하지만 지워지지 않는다
+    expect(hoisted.engines).toHaveLength(1);
+    expect(hoisted.engines[0].disposed).toBe(false);
+    act(() => b.setConfig((l) => (l.config.behavior.terminal_font = "Hack")));
+    await waitFor(() => expect(hoisted.engines[0].fonts.at(-1)).toBe("Hack")); // 설정이 떠 있는 동안에도 반영된다
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(shownTerm("right")).not.toBeNull());
+    expect(hoisted.engines).toHaveLength(1);
+    expect(hoisted.engines[0].written.map(text).join("")).toBe("지워지면 안 됨");
   });
 
   it("압축 파일 안에서는 열지 않고 알림을 보인다", async () => {

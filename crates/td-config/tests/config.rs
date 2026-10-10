@@ -861,6 +861,31 @@ fn remove_favorite_drops_matching_entry_and_keeps_the_rest() {
 }
 
 #[test]
+fn terminal_font_defaults_empty_is_separate_from_preview_font_and_user_can_set_it() {
+    use td_config::{set_user_value, ConfigValue};
+    let none = load("");
+    assert!(none.warnings.is_empty(), "{:?}", none.warnings);
+    assert_eq!(none.config.behavior.terminal_font, "");
+    let l = load("[behavior]\npreview_font = \"D2Coding\"\n");
+    assert_eq!(l.config.behavior.preview_font, "D2Coding");
+    assert_eq!(
+        l.config.behavior.terminal_font, "",
+        "미리보기 글꼴을 바꿔도 터미널 글꼴은 그대로"
+    );
+    let dir = tempfile::tempdir().unwrap();
+    set_user_value(
+        dir.path(),
+        "behavior.terminal_font",
+        ConfigValue::Str("Fira Code, monospace".into()),
+    )
+    .unwrap();
+    let l = load_dir(dir.path(), Platform::Linux);
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert_eq!(l.config.behavior.terminal_font, "Fira Code, monospace");
+    assert_eq!(l.config.behavior.preview_font, "Menlo, Consolas, monospace");
+}
+
+#[test]
 fn show_parent_row_defaults_off_and_user_can_turn_it_on() {
     use td_config::{set_user_value, ConfigValue};
     let none = load("");

@@ -7,6 +7,7 @@
       "random_themes": "",
       "ui_font": "",
       "preview_font": "Menlo, Consolas, monospace",
+      "terminal_font": "",
       "text_color": "",
       "table": {
         "icon_size": 16,

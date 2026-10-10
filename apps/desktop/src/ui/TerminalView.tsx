@@ -10,8 +10,8 @@ import { useApp, useAppStore, useT } from "../state/context";
 export function TerminalView({ id, shown, focused }: { id: number; shown: boolean; focused: boolean }) {
   const t = useT();
   const { backend } = useAppStore();
-  // 글꼴은 미리보기 글꼴 설정(`behavior.preview_font`)을 따른다. 비우면 기본 글꼴이다.
-  const font = useApp((s) => s.loaded.config.behavior.preview_font);
+  // 글꼴은 터미널 글꼴 설정(`behavior.terminal_font`)을 따른다(미리보기 글꼴과 따로). 비우면 기본 글꼴이다.
+  const font = useApp((s) => s.loaded.config.behavior.terminal_font);
   const fontRef = useRef(font);
   fontRef.current = font;
   const host = useRef<HTMLDivElement>(null);
