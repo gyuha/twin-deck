@@ -14,6 +14,19 @@ const key = (init: KeyboardEventInit & { keyCode?: number }) => {
   ta.dispatchEvent(e);
 };
 
+/** IME가 가져간 키(keyCode 229)가 눌렸다. */
+const imeKey229 = () => key({ keyCode: 229, key: "Process" });
+const input = (inputType: string, data: string) => {
+  ta.dispatchEvent(new InputEvent("beforeinput", { bubbles: true, cancelable: true, inputType, data }));
+  ta.dispatchEvent(new InputEvent("input", { bubbles: true, inputType, data }));
+};
+/** 셸이 받은 바이트를 줄 편집기처럼 적용한다(DEL은 앞 글자를 지운다). */
+const typeShell = () => (chunks: string[]) => {
+  let line = "";
+  for (const c of chunks) for (const ch of c) line = ch === "\x7f" ? line.slice(0, -1) : line + ch;
+  return line;
+};
+
 beforeEach(() => {
   document.body.innerHTML = "";
   host = document.createElement("div");
@@ -69,22 +82,62 @@ describe("터미널 한글(IME) 브리지", () => {
     expect(sent).toEqual([]);
   });
 
-  it("textarea 값은 조합이 끝난 직후가 아니라 한동안 조합이 없을 때 비운다(조합 중 값을 건드리면 IME가 어긋난다)", () => {
-    vi.useFakeTimers();
-    try {
-      ta.value = "한";
-      comp("compositionstart");
-      comp("compositionend", "한");
-      expect(ta.value).toBe("한"); // 바로 지우지 않는다
-      comp("compositionstart"); // 다음 음절이 곧바로 시작된다
-      vi.advanceTimersByTime(400);
-      expect(ta.value).toBe("한"); // 조합 중이면 비우지 않는다
-      comp("compositionend", "글");
-      vi.advanceTimersByTime(400);
-      expect(ta.value).toBe(""); // 조합 없이 지나간 뒤에 비운다
-    } finally {
-      vi.useRealTimers();
-    }
+  it("WebKit 방식: insertText로 첫 자모, insertReplacementText로 이어지는 자모가 오면 교체해서 `한글`이 완성된다", () => {
+    const shell = typeShell();
+    // ㅎ ㅏ ㄴ ㄱ ㅡ ㄹ — 실제 웹뷰가 보낸 순서(캡처): 첫 자모는 insertText, 이어지는 것은 insertReplacementText
+    imeKey229();
+    input("insertText", "ㅎ");
+    imeKey229();
+    input("insertReplacementText", "하");
+    imeKey229();
+    input("insertReplacementText", "한");
+    imeKey229();
+    input("insertText", "ㄱ"); // 다음 음절이 시작된다
+    imeKey229();
+    input("insertReplacementText", "그");
+    imeKey229();
+    input("insertReplacementText", "글");
+    expect(shell(sent)).toBe("한글");
+    expect(seenByXterm.filter((t) => t === "input" || t === "beforeinput")).toEqual([]); // xterm은 이 입력을 보지 못한다
+  });
+
+  it("받침이 다음 음절로 넘어가는 교체(달 + ㅏ → 다라)도 맞다", () => {
+    const shell = typeShell();
+    imeKey229();
+    input("insertText", "ㄷ");
+    imeKey229();
+    input("insertReplacementText", "다");
+    imeKey229();
+    input("insertReplacementText", "달");
+    imeKey229();
+    input("insertReplacementText", "다"); // ㅏ가 오면 ㄹ이 다음 음절로 넘어간다
+    imeKey229();
+    input("insertText", "라");
+    expect(shell(sent)).toBe("다라");
+  });
+
+  it("조합 중 글자를 Backspace로 지우면 셸에서도 지워진다", () => {
+    const shell = typeShell();
+    imeKey229();
+    input("insertText", "ㅎ");
+    imeKey229();
+    input("insertReplacementText", "하");
+    imeKey229();
+    input("insertReplacementText", "ㅎ"); // Backspace: 하 → ㅎ
+    imeKey229();
+    input("deleteContentBackward", "");
+    expect(shell(sent)).toBe("");
+  });
+
+  it("IME가 아닌 키(영문, Enter 등)의 input은 xterm에 그대로 맡기고 textarea를 비운다", () => {
+    imeKey229();
+    input("insertText", "ㅎ");
+    ta.value = "ㅎ";
+    key({ key: "Enter", keyCode: 13 }); // 일반 키: 조합은 끝났다
+    expect(ta.value).toBe("");
+    ta.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: "x" }));
+    expect(seenByXterm).toContain("input"); // xterm이 받는다
+    expect(sent).toEqual(["ㅎ"]); // 우리가 보낸 것은 ㅎ뿐
   });
 
   it("진단 표시: Ctrl+Alt+Shift+I로 켜면 이벤트 순서와 보낸 글이 보인다", () => {
