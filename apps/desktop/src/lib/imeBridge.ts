@@ -9,6 +9,7 @@
 export function installImeBridge(host: HTMLElement, send: (text: string) => void): () => void {
   let composing = false;
   let endedAt = 0;
+  let clearTimer: ReturnType<typeof setTimeout> | undefined;
   const preview = document.createElement("div");
   preview.setAttribute("data-ime-preview", "");
   preview.style.cssText = "position:absolute;left:4px;bottom:4px;z-index:10;display:none;padding:1px 6px;border-radius:3px;background:#333;color:#fff;font-size:13px;pointer-events:none";
@@ -16,6 +17,32 @@ export function installImeBridge(host: HTMLElement, send: (text: string) => void
 
   const textarea = () => host.querySelector("textarea");
   const stop = (e: Event) => e.stopPropagation();
+
+  // 이벤트 순서를 눈으로 볼 수 있는 진단 표시(Ctrl+Alt+Shift+I로 켜고 끈다). 한글 입력이 어긋날 때 원인을 찾는 데 쓴다.
+  const t0 = Date.now();
+  const lines: string[] = [];
+  const logBox = document.createElement("pre");
+  logBox.setAttribute("data-ime-log", "");
+  logBox.style.cssText = "position:absolute;right:4px;top:4px;z-index:11;display:none;max-width:60%;max-height:70%;overflow:hidden;margin:0;padding:4px 6px;border-radius:3px;background:rgba(0,0,0,.85);color:#9f9;font:11px/1.3 monospace;pointer-events:none;white-space:pre-wrap";
+  host.appendChild(logBox);
+  const log = (what: string) => {
+    lines.push(`${String(Date.now() - t0).padStart(6)} ${what}`);
+    if (lines.length > 40) lines.shift();
+    if (logBox.style.display !== "none") logBox.textContent = lines.join("\n");
+  };
+  const describe = (e: Event) => {
+    const k = e as KeyboardEvent & InputEvent & CompositionEvent;
+    const v = textarea()?.value ?? "";
+    return `${e.type} ${e.type.startsWith("key") ? `key=${JSON.stringify(k.key)} code=${k.code} kc=${k.keyCode}` : ""}${e.type.startsWith("comp") ? `data=${JSON.stringify(k.data)}` : ""}${e.type.includes("input") ? `type=${k.inputType} data=${JSON.stringify(k.data)}` : ""} comp=${k.isComposing ? 1 : 0} ta=${JSON.stringify(v)}`;
+  };
+  const trace = (e: Event) => log(describe(e));
+  const toggleLog = (e: Event) => {
+    const k = e as KeyboardEvent;
+    if (!(k.ctrlKey && k.altKey && k.shiftKey && k.code === "KeyI")) return;
+    logBox.style.display = logBox.style.display === "none" ? "block" : "none";
+    logBox.textContent = lines.join("\n");
+    e.preventDefault();
+  };
 
   const onStart = (e: Event) => {
     stop(e);
@@ -36,9 +63,17 @@ export function installImeBridge(host: HTMLElement, send: (text: string) => void
     preview.textContent = "";
     preview.style.display = "none";
     const data = (e as CompositionEvent).data ?? "";
-    const ta = textarea();
-    if (ta) ta.value = ""; // xterm이 나중에 이 값을 다시 읽어 보내지 않게 비운다
-    if (data) send(data);
+    if (data) {
+      log(`SEND ${JSON.stringify(data)}`);
+      send(data);
+    }
+    // textarea 값은 여기서 바로 지우지 않는다: WebKit은 이 시점에 이미 다음 음절 조합을 시작했을 수 있고, 조합 중에 값을 건드리면
+    // IME 상태가 어긋나 모음이 빠진다. 조합이 없는 채로 잠시 지나간 뒤에 비운다.
+    clearTimeout(clearTimer);
+    clearTimer = setTimeout(() => {
+      const ta = textarea();
+      if (ta && !composing && Date.now() - endedAt >= 300) ta.value = "";
+    }, 300);
   };
   // IME가 가져간 키(keyCode 229·조합 중): xterm이 textarea 변화를 읽어 같은 글을 또 보내지 않게 막는다.
   const onKeyDown = (e: Event) => {
@@ -52,6 +87,9 @@ export function installImeBridge(host: HTMLElement, send: (text: string) => void
   };
 
   const opts = true; // 캡처 단계: 조상에서 먼저 받아 textarea의 xterm 리스너보다 앞선다
+  const traced = ["keydown", "keyup", "compositionstart", "compositionupdate", "compositionend", "beforeinput", "input"];
+  for (const t of traced) host.addEventListener(t, trace, opts); // 가장 먼저 등록해 모든 이벤트를 기록한다
+  host.addEventListener("keydown", toggleLog, opts);
   host.addEventListener("compositionstart", onStart, opts);
   host.addEventListener("compositionupdate", onUpdate, opts);
   host.addEventListener("compositionend", onEnd, opts);
@@ -65,6 +103,10 @@ export function installImeBridge(host: HTMLElement, send: (text: string) => void
     host.removeEventListener("keydown", onKeyDown, opts);
     host.removeEventListener("beforeinput", onInput, opts);
     host.removeEventListener("input", onInput, opts);
+    for (const t of traced) host.removeEventListener(t, trace, opts);
+    host.removeEventListener("keydown", toggleLog, opts);
+    clearTimeout(clearTimer);
     preview.remove();
+    logBox.remove();
   };
 }

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { installImeBridge } from "../lib/imeBridge";
 
 // xterm 대신 같은 모양(host > textarea)을 만들고, xterm의 리스너가 받는지·우리가 보내는지 본다.
@@ -69,10 +69,36 @@ describe("터미널 한글(IME) 브리지", () => {
     expect(sent).toEqual([]);
   });
 
-  it("조합이 끝나면 textarea 값을 비운다", () => {
-    ta.value = "한";
-    comp("compositionstart");
-    comp("compositionend", "한");
-    expect(ta.value).toBe("");
+  it("textarea 값은 조합이 끝난 직후가 아니라 한동안 조합이 없을 때 비운다(조합 중 값을 건드리면 IME가 어긋난다)", () => {
+    vi.useFakeTimers();
+    try {
+      ta.value = "한";
+      comp("compositionstart");
+      comp("compositionend", "한");
+      expect(ta.value).toBe("한"); // 바로 지우지 않는다
+      comp("compositionstart"); // 다음 음절이 곧바로 시작된다
+      vi.advanceTimersByTime(400);
+      expect(ta.value).toBe("한"); // 조합 중이면 비우지 않는다
+      comp("compositionend", "글");
+      vi.advanceTimersByTime(400);
+      expect(ta.value).toBe(""); // 조합 없이 지나간 뒤에 비운다
+    } finally {
+      vi.useRealTimers();
+    }
   });
+
+  it("진단 표시: Ctrl+Alt+Shift+I로 켜면 이벤트 순서와 보낸 글이 보인다", () => {
+    const box = () => host.querySelector<HTMLElement>("[data-ime-log]")!;
+    expect(box().style.display).toBe("none");
+    key({ ctrlKey: true, altKey: true, shiftKey: true, code: "KeyI", key: "I" });
+    expect(box().style.display).toBe("block");
+    comp("compositionstart");
+    comp("compositionupdate", "하");
+    comp("compositionend", "하");
+    expect(box().textContent).toContain("compositionupdate");
+    expect(box().textContent).toContain('SEND "하"');
+    key({ ctrlKey: true, altKey: true, shiftKey: true, code: "KeyI", key: "I" });
+    expect(box().style.display).toBe("none");
+  });
+
 });
