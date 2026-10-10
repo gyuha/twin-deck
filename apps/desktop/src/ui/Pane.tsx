@@ -8,6 +8,7 @@ import { UsageTreemap } from "./UsageTreemap";
 import { DriveBar } from "./DriveBar";
 import { TabBar } from "./TabBar";
 import { Settings } from "./Settings";
+import { TerminalView } from "./TerminalView";
 
 const swallow = (e: { stopPropagation(): void; preventDefault(): void }) => {
   e.stopPropagation();
@@ -24,6 +25,8 @@ export function Pane({ pane, onThemePreview }: { pane: PaneId; onThemePreview?: 
   const paneHighlight = useApp((s) => s.loaded.config.behavior.layout.pane_highlight);
   // 끌어 온 파일이 이 패널의 현재 폴더에 놓일 대상이다(폴더 행 위가 아닐 때).
   const dropHere = useApp((s) => !!s.drag?.target && !s.drag.target.row && s.drag.target.pane === pane);
+  // 터미널이 이 패널 자리에 떠 있다(반대편 패널을 대체한다).
+  const hasTerminal = useApp((s) => !!s.terminal?.visible && s.terminal.pane === pane);
   const hasSettings = useApp((s) => s.settingsOpen && s.settingsPane === pane); // 설정이 이 패널 자리에 떠 있다
   const otherHasSettings = useApp((s) => s.settingsOpen && s.settingsPane !== pane); // 설정은 반대쪽에 있고 이 패널은 결과를 보여 준다(누름 무시)
   // 반대쪽 패널은 눌러도(클릭·더블클릭·우클릭·끌기 시작) 아무 일도 하지 않는다. 캡처 단계에서 막아 안쪽 행·탭이 받지 못하게 한다. 휠 스크롤은 막지 않는다.
@@ -56,6 +59,8 @@ export function Pane({ pane, onThemePreview }: { pane: PaneId; onThemePreview?: 
     >
       {hasSettings ? (
         <Settings onThemePreview={onThemePreview} />
+      ) : hasTerminal ? (
+        <TerminalView />
       ) : (
         <>
           <DriveBar pane={pane} />

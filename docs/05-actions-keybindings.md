@@ -186,8 +186,8 @@ Shift+이동 키(범위의 선택 반전)는 액션이 아니라 `pane` 스코�
 | `core.reveal_in_tab` | 해당 폴더로 이동 (가상 탭 항목이 있는 폴더를 새 탭으로) | 없음 | 없음 | 자체 |
 | `core.queue.open` | 큐 열기 | `=` | `=` | 자체 ID, 키 확인. `=`는 문자 키이므로 `pane` 스코프에서는 Quick Select와 충돌한다. 3.2절 규칙에 따라 `global` 스코프의 예약 키로 지정한다 |
 | `core.actions.panel` | Actions Panel | `Mod+Shift+P` | `Ctrl+Shift+P` | 자체 ID, 키 확인 |
-| `core.terminal.focus` | 터미널 열기/포커스 | `Mod+O` | `Ctrl+O` | 자체 ID, 키 확인 |
-| `core.terminal.toggle` | 터미널 표시 토글 | `Alt+Mod+O` | `Ctrl+Alt+O` | 자체 ID, 키 확인 |
+| `core.terminal.focus` | 터미널 열기/포커스: 활성 패널의 폴더에서 **반대편 패널 전체를 대체**하는 터미널을 연다. 이미 열려 있으면 새로 만들지 않고 포커스만 준다. 검색 결과(가상 탭)·압축 안에서는 알림만 보인다. 구현됨(이슈 #46) | `Mod+O` | `Ctrl+O` | pane·terminal, 자체 ID, 키 확인 |
+| `core.terminal.toggle` | 터미널 표시 토글: 숨기거나 다시 보인다(셸은 계속 돈다). 터미널이 없으면 연다. 구현됨(이슈 #46) | `Alt+Mod+O` | `Ctrl+Alt+O` | pane·terminal, 자체 ID, 키 확인 |
 | `core.terminal.external` | 외부 터미널 | `F11` | `F11` | 자체 ID, 키 확인 |
 | `core.config.open` | 설정 폴더 열기 | 없음 | 없음 | 자체 |
 | `core.app.check_update` | 업데이트 확인 (GitHub 최신 릴리스를 보고, 새 버전이면 확인 창을 거쳐 설치 후 다시 시작) | 없음 | 없음 | 자체 |

@@ -49,7 +49,7 @@ Spacedrive에 없거나 twin-deck 요구에 맞게 새로 고르는 항목이다
 
 | 용도 | 후보 | 이유/확인 사항 |
 |---|---|---|
-| 터미널 UI | xterm.js | 표준적인 웹 터미널 |
+| 터미널 UI | `ghostty-web` 0.4.0 | Ghostty의 VT 엔진(WASM)을 xterm.js와 같은 API로 쓴다. wasm은 JS 안에 base64로 내장돼 별도 파일 요청이 없다(이슈 #46). 처음 계획은 xterm.js였다 |
 | pty | `portable-pty` | 3개 OS 지원 |
 | 휴지통 | `trash` 크레이트 | Spacedrive 삭제 전략이 `trash 3.3.1` 사용 `[높음]` |
 | 파일 감시 | `notify` (`sd-fs-watcher` 경유, 8.2) | |

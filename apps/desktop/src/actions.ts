@@ -103,6 +103,8 @@ export function queueHandlers({ api }: AppStore): Partial<ActionHandlers> {
     "core.settings.open": () => api.openSettings(),
     "core.settings.close": () => api.closeSettings(),
     "core.queue.open": () => api.toggleQueue(),
+    "core.terminal.focus": () => api.terminalFocus(),
+    "core.terminal.toggle": () => api.terminalToggle(),
     "core.queue.close": () => api.toggleQueue(),
     "core.queue.up": () => api.queueMove(-1),
     "core.queue.down": () => api.queueMove(1),

@@ -19,6 +19,7 @@
     "@twin-deck/material-icons": "workspace:*",
     "@twin-deck/ts-client": "workspace:*",
     "dompurify": "^3.4.16",
+    "ghostty-web": "0.4.0",
     "highlight.js": "^11.12.0",
     "jszip": "^3.10.2",
     "mammoth": "^1.13.0",

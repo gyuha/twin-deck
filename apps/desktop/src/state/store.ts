@@ -170,6 +170,19 @@ export interface DragState {
   target: DropTarget | null;
 }
 
+/** 내장 터미널 세션과 그것을 보이는 패널. */
+export interface TerminalState {
+  /** 터미널이 파일 목록을 대체해서 보이는 패널(열 때 활성 패널의 반대편). */
+  pane: PaneId;
+  id: number;
+  /** 열 때의 폴더. */
+  cwd: string;
+  /** 숨겨도 세션은 계속 돈다. */
+  visible: boolean;
+  /** 키 입력이 터미널(pty)로 간다. */
+  focused: boolean;
+}
+
 export const CONFLICT_CHOICES: readonly ConflictDto[] = ["overwrite", "skip", "rename"];
 
 export type DialogState =
@@ -332,6 +345,8 @@ export interface AppState {
   /** 작업 큐 스냅샷 (끝난 작업은 팝업을 닫을 때까지 남는다). */
   queue: JobDto[];
   queueOpen: boolean;
+  /** 내장 터미널(이슈 #46). 없으면 null. 세션은 숨겨도 계속 돈다. */
+  terminal: TerminalState | null;
   /** 설정 화면이 열려 있는지, 어느 섹션인지, 마지막 저장 오류. */
   /** 마운트된 볼륨 목록(드라이브 바). */
   volumes: VolumeDto[];
@@ -458,6 +473,8 @@ export function scopeStack(s: AppState): Scope[] {
   if (s.menu || s.ctxMenu) return ["panel", "global"];
   // 큐 팝업이 열려 있으면 패널 키는 받지 않는다.
   if (s.queueOpen) return ["queue", "global"];
+  // 터미널에 포커스가 있으면 키는 pty로 간다. 터미널을 여닫는 키만 앱이 받는다(terminal 스코프).
+  if (s.terminal?.visible && s.terminal.focused) return ["terminal"];
   return activeTab(s).quick !== null ? ["quickSelect", "pane", "global"] : ["pane", "global"];
 }
 
@@ -519,6 +536,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     userDirs: { home: null, downloads: null, documents: null, desktop: null, pictures: null, music: null, movies: null },
     queue: [],
     queueOpen: false,
+    terminal: null,
     volumes: [],
     diskSpace: { left: null, right: null },
     settingsOpen: false,
@@ -813,6 +831,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
 
   // 다른 앱(Finder)에서 끌어 온 파일: Tauri가 OS 드롭을 가로채 이벤트로 알린다(이슈 #39).
   subscribe(() => backend.onFileDrop((e) => api.externalDrop(e, typeof document !== "undefined" && document.elementFromPoint ? document.elementFromPoint(e.x, e.y) : null)));
+  // 내장 터미널의 셸이 끝나면(exit, Ctrl+D) 패널이 파일 목록으로 돌아온다(이슈 #46).
+  subscribe(() => backend.onTerminalEvent((e) => e.type === "exit" && api.terminalExited(e.id)));
   subscribe(() => backend.onDirChanged((path) => {
     for (const pane of ["left", "right"] as const) {
       for (const t of get().panes[pane].tabs) if (t.path === path) void reload(pane, t.id);
@@ -1328,6 +1348,36 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       }
     },
 
+    /** 활성 패널의 폴더에서 반대편 패널에 터미널을 열고 포커스한다(`core.terminal.focus`). 이미 열려 있으면 새로 만들지 않고 포커스만 준다. */
+    async terminalFocus() {
+      const term = get().terminal;
+      if (term) {
+        set({ terminal: { ...term, visible: true, focused: true } });
+        return;
+      }
+      const s = get();
+      const tab = activeTab(s);
+      if (tab.virtual) return fail(tr("terminal.notice.virtual"));
+      if (isArchivePath(tab.path)) return fail(tr("terminal.notice.archive"));
+      try {
+        // 처음 크기는 임시다. 터미널 화면이 그려지면 패널 크기에 맞춰 바로 바꾼다.
+        const id = await backend.terminalOpen(tab.path, 80, 24);
+        set({ terminal: { pane: other(s.activePane), id, cwd: tab.path, visible: true, focused: true } });
+      } catch (e) {
+        fail(e);
+      }
+    },
+    /** 터미널을 숨기거나 다시 보인다(`core.terminal.toggle`). 세션은 계속 돈다. 터미널이 없으면 연다. */
+    async terminalToggle() {
+      const term = get().terminal;
+      if (!term) return api.terminalFocus();
+      set({ terminal: term.visible ? { ...term, visible: false, focused: false } : { ...term, visible: true, focused: true } });
+    },
+    /** 셸이 끝났다: 그 세션이면 터미널을 없애 패널이 파일 목록으로 돌아오게 한다. */
+    terminalExited(id: number) {
+      if (get().terminal?.id === id) set({ terminal: null });
+    },
+
     /** 확장자와 무관하게 커서의 파일을 아카이브로 연다 (ARC-04, `core.open.as_archive`). */
     async openAsArchive() {
       const c = cursorEntry(activeTab(get()));
@@ -1475,6 +1525,9 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     },
 
     activate(pane: PaneId, tab?: number) {
+      // 터미널이 보이는 패널을 누르면 키가 터미널로 가고, 다른 패널을 누르면 키가 파일 목록으로 돌아온다.
+      const term = get().terminal;
+      if (term?.visible) set({ terminal: { ...term, focused: pane === term.pane } });
       if (tab === undefined) {
         set({ activePane: pane });
         return;
@@ -3226,7 +3279,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
   setBackendErrorTranslator(rustText); // 한국어 Rust 오류 문구를 영어로
   setLanguage(store.getState().loaded.config.behavior.language);
   store.subscribe((s) => setLanguage(s.loaded.config.behavior.language));
-  return { store, api };
+  return { store, api, backend };
 }
 
 function clamp(i: number, len: number): number {
