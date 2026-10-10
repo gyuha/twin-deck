@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FakeBackend } from "@twin-deck/ts-client";
 import { renderApp } from "./helpers";
 
-// ghostty-web(wasm·canvas)은 jsdom에서 돌지 않는다: 화면 엔진을 가짜로 바꿔 입력·출력·크기가 이어지는지만 본다.
+// xterm.js는 jsdom에서 제대로 그려지지 않는다(canvas·크기 측정 없음): 화면 엔진을 가짜로 바꿔 입력·출력·크기가 이어지는지만 본다.
 const hoisted = vi.hoisted(() => ({
   engines: [] as {
     written: (Uint8Array | string)[];

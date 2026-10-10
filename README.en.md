@@ -161,7 +161,7 @@ To find folders that take a lot of space, press `Alt+T` on a folder. Subfolders 
 - **Pane width**: drag the middle border to adjust it.
 - **Quick access**: `Alt+2` is the favorites menu and `Alt+3` the recent locations menu; both can be filtered by typing. In the favorites menu, add the current folder with `Ctrl+=`. Assign frequently used folders to `Ctrl+0`~`9` in the **Folder shortcuts** tab of Settings.
 - **Drive bar**: pick and eject volumes above the panes. Free space appears at the right end of the path bar.
-- **Built-in terminal**: `Alt+Mod+T` opens a terminal in the current folder (rendered by `ghostty-web`, Ghostty's terminal engine), replacing the opposite pane. `Alt+Mod+O` hides or shows it again (the shell keeps running), and when the shell ends (`exit`, `Ctrl+D`) the pane returns to the file list. It does not open in search results or inside an archive.
+- **Built-in terminal**: `Alt+Mod+T` opens a terminal in the current folder (rendered by `xterm.js`), replacing the opposite pane. `Alt+Mod+O` hides or shows it again (the shell keeps running), and when the shell ends (`exit`, `Ctrl+D`) the pane returns to the file list. It does not open in search results or inside an archive.
 
 ### Make it your own
 

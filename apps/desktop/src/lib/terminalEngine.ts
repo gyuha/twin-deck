@@ -1,4 +1,4 @@
-// 터미널 화면 엔진. Ghostty의 VT 엔진(ghostty-web, WASM)으로 그리고, 테스트에서는 이 모듈을 가짜로 바꾼다.
+// 터미널 화면 엔진. xterm.js로 그리고, 테스트에서는 이 모듈을 가짜로 바꾼다.
 
 export interface TerminalEngine {
   /** 화면을 `el` 안에 그리고 `el` 크기에 맞춘다. */
@@ -15,18 +15,21 @@ export interface TerminalEngine {
   dispose(): void;
 }
 
-/** ghostty-web을 처음 쓸 때 불러 초기화하고(wasm은 JS 안에 내장돼 있다) 엔진을 만든다. */
+/** xterm.js를 처음 쓸 때 불러 엔진을 만든다. 패널 크기가 바뀌면 칸 수를 다시 맞춘다. */
 export async function createTerminalEngine(): Promise<TerminalEngine> {
-  const { init, Terminal, FitAddon } = await import("ghostty-web");
-  await init();
+  const [{ Terminal }, { FitAddon }] = await Promise.all([import("@xterm/xterm"), import("@xterm/addon-fit"), import("@xterm/xterm/css/xterm.css")]);
   const term = new Terminal({ fontSize: 13, fontFamily: "ui-monospace, Menlo, Consolas, monospace", cursorBlink: true });
   const fit = new FitAddon();
   term.loadAddon(fit);
+  let observer: ResizeObserver | null = null;
   return {
     open(el) {
       term.open(el);
       fit.fit();
-      fit.observeResize();
+      if (typeof ResizeObserver !== "undefined") {
+        observer = new ResizeObserver(() => fit.fit());
+        observer.observe(el);
+      }
     },
     write: (data) => term.write(data),
     onData: (cb) => void term.onData(cb),
@@ -39,6 +42,7 @@ export async function createTerminalEngine(): Promise<TerminalEngine> {
     },
     focus: () => term.focus(),
     dispose: () => {
+      observer?.disconnect();
       fit.dispose();
       term.dispose();
     },
