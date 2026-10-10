@@ -3,12 +3,13 @@ import { createTerminalEngine } from "../lib/terminalEngine";
 import type { TerminalEngine } from "../lib/terminalEngine";
 import { useApp, useAppStore, useT } from "../state/context";
 
-/** 패널을 대체해서 보이는 내장 터미널. 세션(pty)은 스토어가 열고, 이 화면은 입력·출력·크기만 이어 준다. */
-export function TerminalView() {
+/**
+ * 터미널 탭의 화면. 세션(pty)은 스토어가 열고, 이 화면은 입력·출력·크기만 이어 준다.
+ * 탭을 옮겨도 화면(스크롤 내용)이 사라지지 않게 패널이 터미널 탭마다 하나씩 계속 그려 두고, 보이지 않는 탭은 숨기기만 한다.
+ */
+export function TerminalView({ id, shown, focused }: { id: number; shown: boolean; focused: boolean }) {
   const t = useT();
   const { backend } = useAppStore();
-  const id = useApp((s) => s.terminal?.id);
-  const focused = useApp((s) => !!s.terminal?.focused);
   // 글꼴은 미리보기 글꼴 설정(`behavior.preview_font`)을 따른다. 비우면 기본 글꼴이다.
   const font = useApp((s) => s.loaded.config.behavior.preview_font);
   const fontRef = useRef(font);
@@ -19,7 +20,7 @@ export function TerminalView() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (id === undefined || !host.current) return;
+    if (!host.current) return;
     let disposed = false;
     // 엔진이 준비되기 전에 온 출력은 모아 두었다가 준비되면 쓴다.
     let pending: Uint8Array[] | null = [];
@@ -58,11 +59,11 @@ export function TerminalView() {
   }, [font, ready]);
 
   useEffect(() => {
-    if (focused && ready) engine.current?.focus();
-  }, [focused, ready]);
+    if (shown && focused && ready) engine.current?.focus();
+  }, [shown, focused, ready]);
 
   return (
-    <div role="region" aria-label={t("terminal.aria")} data-terminal className="relative min-h-0 flex-1 bg-black">
+    <div role="region" aria-label={t("terminal.aria")} data-terminal data-shown={shown} className={shown ? "relative min-h-0 flex-1 bg-black" : "hidden"}>
       <div ref={host} className="absolute inset-0" />
       {!ready && !error && <p className="absolute left-2 top-1 text-xs text-ink-faint">{t("terminal.starting")}</p>}
       {error && (

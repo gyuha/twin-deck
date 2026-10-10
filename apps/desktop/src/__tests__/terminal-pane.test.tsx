@@ -54,8 +54,12 @@ vi.mock("../lib/terminalEngine", () => ({
 }));
 
 const OPEN = "{Control>}{Alt>}t{/Alt}{/Control}"; // Alt+Mod+T (linux)
-const TOGGLE = "{Control>}{Alt>}o{/Alt}{/Control}"; // Alt+Mod+O
-const termIn = (pane: "left" | "right") => document.querySelector(`[data-pane="${pane}"] [data-terminal]`);
+const NEXT_TAB = "{Control>}{Tab}{/Control}";
+const CLOSE_TAB = "{Control>}w{/Control}";
+/** 보이는 터미널(숨긴 것 제외). */
+const shownTerm = (pane: "left" | "right") => document.querySelector(`section[data-pane="${pane}"] [data-terminal][data-shown="true"]`);
+const allTerms = (pane: "left" | "right") => document.querySelectorAll(`section[data-pane="${pane}"] [data-terminal]`);
+const tabNames = (pane: "left" | "right") => within(screen.getAllByRole("tablist")[pane === "left" ? 0 : 1]).getAllByRole("tab").map((t) => t.textContent);
 const backend = () => new FakeBackend().seed({ "/home/a/a.txt": "a", "/home/a/sub/x.txt": "x", "/home/b/b.txt": "b" });
 const text = (e: Uint8Array | string) => (typeof e === "string" ? e : new TextDecoder().decode(e));
 
@@ -64,56 +68,88 @@ beforeEach(() => {
   hoisted.created.length = 0;
 });
 
-describe("내장 터미널 패널", () => {
-  it("Alt+Mod+T가 활성 패널 폴더를 cwd로 세션을 열고 반대편 패널이 터미널이 된다(왼쪽 → 오른쪽)", async () => {
+describe("내장 터미널 탭", () => {
+  it("Alt+Mod+T가 활성 패널 폴더에서 시작하는 터미널 탭을 반대편 패널의 탭 줄에 만들고 그 탭이 활성이 된다(왼쪽 → 오른쪽)", async () => {
     const b = backend();
     const { user } = await renderApp(b);
-    expect(termIn("right")).toBeNull();
+    expect(tabNames("right")).toEqual(["b"]);
     await user.keyboard(OPEN);
-    await waitFor(() => expect(termIn("right")).not.toBeNull());
-    expect(termIn("left")).toBeNull();
+    await waitFor(() => expect(shownTerm("right")).not.toBeNull());
+    expect(tabNames("right")).toEqual(["b", "터미널: a"]); // 파일 탭 b가 그대로 있고 터미널 탭이 더해진다
+    expect(tabNames("left")).toEqual(["a"]);
     expect([...b.terminals.values()].map((t) => t.cwd)).toEqual(["/home/a"]);
-    // 파일 목록은 왼쪽에 그대로 있다
-    expect(screen.getByRole("listbox", { name: "왼쪽 파일 목록" })).toBeInTheDocument();
+    // 터미널이 활성인 패널은 파일 목록 대신 터미널을 보인다. 왼쪽 파일 목록은 그대로다.
     expect(screen.queryByRole("listbox", { name: "오른쪽 파일 목록" })).toBeNull();
+    expect(screen.getByRole("listbox", { name: "왼쪽 파일 목록" })).toBeInTheDocument();
   });
 
-  it("오른쪽 패널이 활성이면 터미널은 왼쪽에 뜨고 cwd는 오른쪽 폴더다", async () => {
+  it("오른쪽 패널이 활성이면 터미널 탭은 왼쪽에 생기고 cwd는 오른쪽 폴더다", async () => {
     const b = backend();
     const { user } = await renderApp(b);
-    await user.keyboard("{Tab}"); // 오른쪽 패널 활성
+    await user.keyboard("{Tab}");
     await user.keyboard(OPEN);
-    await waitFor(() => expect(termIn("left")).not.toBeNull());
-    expect(termIn("right")).toBeNull();
+    await waitFor(() => expect(shownTerm("left")).not.toBeNull());
+    expect(tabNames("left")).toEqual(["a", "터미널: b"]);
+    expect(shownTerm("right")).toBeNull();
     expect([...b.terminals.values()].map((t) => t.cwd)).toEqual(["/home/b"]);
   });
 
-  it("이미 열려 있으면 Alt+Mod+T는 세션을 새로 만들지 않고 포커스만 준다", async () => {
+  it("누를 때마다 새 터미널 탭이다(세션도 새로 열린다)", async () => {
     const b = backend();
     const { user } = await renderApp(b);
     await user.keyboard(OPEN);
-    await waitFor(() => expect(termIn("right")).not.toBeNull());
-    await waitFor(() => expect(hoisted.engines[0]?.opened).not.toBeNull());
-    await user.click(screen.getByRole("listbox", { name: "왼쪽 파일 목록" })); // 파일 쪽으로 포커스를 돌린다
-    const before = hoisted.engines[0].focused;
-    await user.keyboard(OPEN);
-    expect(b.terminals.size).toBe(1);
-    await waitFor(() => expect(hoisted.engines[0].focused).toBeGreaterThan(before));
+    await waitFor(() => expect(shownTerm("right")).not.toBeNull());
+    await user.keyboard(OPEN); // 터미널 탭이 활성인 채로 누르면 같은 패널에 새 터미널 탭(그 터미널의 폴더에서)
+    await waitFor(() => expect(b.terminals.size).toBe(2));
+    expect(tabNames("right")).toEqual(["b", "터미널: a", "터미널: a"]);
   });
 
-  it("Alt+Mod+O가 숨기고 다시 보이게 하며 세션은 닫히지 않는다", async () => {
+  it("다른 탭으로 옮기면 터미널은 숨겨지되 세션과 화면은 살아 있고, 돌아오면 그대로 보인다", async () => {
     const b = backend();
     const { user } = await renderApp(b);
     await user.keyboard(OPEN);
-    await waitFor(() => expect(termIn("right")).not.toBeNull());
+    await waitFor(() => expect(hoisted.engines[0]?.opened).not.toBeNull());
     const id = [...b.terminals.keys()][0];
-    await user.keyboard(TOGGLE);
-    await waitFor(() => expect(termIn("right")).toBeNull());
+    act(() => b.emitTerminalOutput(id, "남아 있어야 함"));
+    await user.keyboard(NEXT_TAB); // 터미널 탭에서도 탭 이동 키는 앱이 받는다 → 파일 탭 b
+    await waitFor(() => expect(shownTerm("right")).toBeNull());
     expect(screen.getByRole("listbox", { name: "오른쪽 파일 목록" })).toBeInTheDocument();
+    expect(allTerms("right")).toHaveLength(1); // 숨겼을 뿐 지우지 않았다
     expect(b.terminals.has(id)).toBe(true);
-    await user.keyboard(TOGGLE);
-    await waitFor(() => expect(termIn("right")).not.toBeNull());
-    expect(b.terminals.size).toBe(1);
+    expect(hoisted.engines[0].disposed).toBe(false);
+    act(() => b.emitTerminalOutput(id, " 숨겨진 동안의 출력"));
+    await waitFor(() => expect(hoisted.engines[0].written.map(text).join("")).toBe("남아 있어야 함 숨겨진 동안의 출력"));
+    await user.keyboard(NEXT_TAB);
+    await waitFor(() => expect(shownTerm("right")).not.toBeNull());
+    expect(hoisted.engines).toHaveLength(1);
+  });
+
+  it("터미널 탭을 닫으면(Mod+W) 세션이 끝나고 패널은 파일 목록으로 돌아온다", async () => {
+    const b = backend();
+    const { user } = await renderApp(b);
+    await user.keyboard(OPEN);
+    await waitFor(() => expect(shownTerm("right")).not.toBeNull());
+    const id = [...b.terminals.keys()][0];
+    await user.keyboard(CLOSE_TAB);
+    await waitFor(() => expect(b.terminals.has(id)).toBe(false));
+    await waitFor(() => expect(shownTerm("right")).toBeNull());
+    expect(tabNames("right")).toEqual(["b"]);
+    expect(screen.getByRole("listbox", { name: "오른쪽 파일 목록" })).toBeInTheDocument();
+    expect(hoisted.engines[0].disposed).toBe(true);
+  });
+
+  it("패널에 터미널 탭만 남아도 닫을 수 있고, 그러면 시작한 폴더를 보는 파일 탭이 된다", async () => {
+    const b = backend();
+    const { user } = await renderApp(b);
+    await user.keyboard(OPEN);
+    await waitFor(() => expect(shownTerm("right")).not.toBeNull());
+    await user.keyboard(NEXT_TAB); // 파일 탭 b
+    await user.keyboard(CLOSE_TAB); // 파일 탭 닫기 → 터미널 탭만 남는다
+    await waitFor(() => expect(tabNames("right")).toEqual(["터미널: a"]));
+    await user.keyboard(CLOSE_TAB);
+    await waitFor(() => expect(tabNames("right")).toEqual(["a"]));
+    expect(b.terminals.size).toBe(0);
+    await waitFor(() => expect(screen.getByRole("listbox", { name: "오른쪽 파일 목록" })).toBeInTheDocument());
   });
 
   it("터미널 입력은 세션으로 쓰이고 세션 출력은 화면에, 크기는 세션에 전해진다", async () => {
@@ -126,19 +162,35 @@ describe("내장 터미널 패널", () => {
     await waitFor(() => expect(b.terminalWrites).toEqual([{ id, data: "ls\r" }]));
     act(() => b.emitTerminalOutput(id, "안녕 파일"));
     await waitFor(() => expect(hoisted.engines[0].written.map(text).join("")).toBe("안녕 파일"));
-    await waitFor(() => expect(b.terminals.get(id)).toMatchObject({ cols: 100, rows: 30 })); // 열자마자 맞춘 크기
+    await waitFor(() => expect(b.terminals.get(id)).toMatchObject({ cols: 100, rows: 30 }));
     act(() => hoisted.engines[0].emitResize(120, 40));
     await waitFor(() => expect(b.terminals.get(id)).toMatchObject({ cols: 120, rows: 40 }));
   });
 
-  it("터미널 포커스에서는 일반 키가 앱 단축키(Quick Select 등)로 가지 않는다", async () => {
+  it("터미널 탭이 활성이면 일반 키가 앱 단축키(Quick Select 등)로 가지 않는다", async () => {
     const b = backend();
     const { user } = await renderApp(b);
     await user.keyboard(OPEN);
-    await waitFor(() => expect(termIn("right")).not.toBeNull());
-    await user.keyboard("a"); // 파일 목록이면 Quick Select가 시작된다
+    await waitFor(() => expect(shownTerm("right")).not.toBeNull());
+    await user.keyboard("b"); // 파일 목록이면 Quick Select가 시작된다
     expect(screen.queryByRole("status", { name: "빠른 선택" })).toBeNull();
-    expect(within(screen.getByRole("listbox", { name: "왼쪽 파일 목록" })).queryAllByRole("option").some((o) => o.getAttribute("data-cursor") === "true" && /sub/.test(o.textContent ?? ""))).toBe(true);
+    expect(b.terminals.size).toBe(1);
+  });
+
+  it("셸이 끝나면 그 터미널 탭이 사라지고 파일 목록으로 돌아온다", async () => {
+    const b = backend();
+    const { user } = await renderApp(b);
+    await user.keyboard(OPEN);
+    await waitFor(() => expect(shownTerm("right")).not.toBeNull());
+    const id = [...b.terminals.keys()][0];
+    act(() => b.emitTerminalExit(id, 0));
+    await waitFor(() => expect(shownTerm("right")).toBeNull());
+    expect(tabNames("right")).toEqual(["b"]);
+    expect(screen.getByRole("listbox", { name: "오른쪽 파일 목록" })).toBeInTheDocument();
+    expect(hoisted.engines[0].disposed).toBe(true);
+    await user.keyboard("{Tab}"); // 왼쪽(a)으로 돌아가 새로 연다
+    await user.keyboard(OPEN);
+    await waitFor(() => expect(b.terminals.size).toBe(1));
   });
 
   it("글꼴은 설정의 미리보기 글꼴(behavior.preview_font)을 따르고 바꾸면 열린 터미널에도 반영된다", async () => {
@@ -151,21 +203,7 @@ describe("내장 터미널 패널", () => {
     await waitFor(() => expect(hoisted.engines[0].fonts.at(-1)).toBe("D2Coding, monospace"));
     act(() => b.setConfig((l) => (l.config.behavior.preview_font = "Fira Code")));
     await waitFor(() => expect(hoisted.engines[0].fonts.at(-1)).toBe("Fira Code"));
-    expect(hoisted.engines).toHaveLength(1); // 글꼴을 바꿔도 터미널을 새로 만들지 않는다
-  });
-
-  it("셸이 끝나면 패널이 파일 목록으로 돌아온다", async () => {
-    const b = backend();
-    const { user } = await renderApp(b);
-    await user.keyboard(OPEN);
-    await waitFor(() => expect(termIn("right")).not.toBeNull());
-    const id = [...b.terminals.keys()][0];
-    act(() => b.emitTerminalExit(id, 0));
-    await waitFor(() => expect(termIn("right")).toBeNull());
-    expect(screen.getByRole("listbox", { name: "오른쪽 파일 목록" })).toBeInTheDocument();
-    expect(hoisted.engines[0].disposed).toBe(true);
-    await user.keyboard(OPEN); // 새 세션
-    await waitFor(() => expect(b.terminals.size).toBe(1));
+    expect(hoisted.engines).toHaveLength(1);
   });
 
   it("압축 파일 안에서는 열지 않고 알림을 보인다", async () => {
@@ -174,7 +212,7 @@ describe("내장 터미널 패널", () => {
     await user.keyboard(OPEN);
     expect(await screen.findByText(/압축 파일 안에서는 터미널을 열 수 없습니다/)).toBeInTheDocument();
     expect(b.terminals.size).toBe(0);
-    expect(termIn("right")).toBeNull();
+    expect(tabNames("right")).toEqual(["b"]);
   });
 
   it("검색 결과 같은 가상 탭에서는 열지 않고 알림을 보인다", async () => {

@@ -80,7 +80,8 @@ export interface TabState {
   virtual?: VirtualTab;
 }
 
-export type VirtualKind = "lookup" | "flatten" | "usage" | "find";
+/** `terminal`은 내장 터미널 탭이다(이슈 #46): `jobId`가 pty 세션 번호이고 `base`가 시작한 폴더다. 탭을 닫으면 세션이 끝난다. */
+export type VirtualKind = "lookup" | "flatten" | "usage" | "find" | "terminal";
 
 /** Look Up / Flatten / Disk Usage 결과를 담은 탭의 부가 상태. 탭을 닫으면 결과를 버린다. */
 export interface VirtualTab {
@@ -168,19 +169,6 @@ export interface DragState {
   /** Control 키가 눌려 있다(이동). 아니면 복사. */
   ctrl: boolean;
   target: DropTarget | null;
-}
-
-/** 내장 터미널 세션과 그것을 보이는 패널. */
-export interface TerminalState {
-  /** 터미널이 파일 목록을 대체해서 보이는 패널(열 때 활성 패널의 반대편). */
-  pane: PaneId;
-  id: number;
-  /** 열 때의 폴더. */
-  cwd: string;
-  /** 숨겨도 세션은 계속 돈다. */
-  visible: boolean;
-  /** 키 입력이 터미널(pty)로 간다. */
-  focused: boolean;
 }
 
 export const CONFLICT_CHOICES: readonly ConflictDto[] = ["overwrite", "skip", "rename"];
@@ -345,8 +333,6 @@ export interface AppState {
   /** 작업 큐 스냅샷 (끝난 작업은 팝업을 닫을 때까지 남는다). */
   queue: JobDto[];
   queueOpen: boolean;
-  /** 내장 터미널(이슈 #46). 없으면 null. 세션은 숨겨도 계속 돈다. */
-  terminal: TerminalState | null;
   /** 설정 화면이 열려 있는지, 어느 섹션인지, 마지막 저장 오류. */
   /** 마운트된 볼륨 목록(드라이브 바). */
   volumes: VolumeDto[];
@@ -442,6 +428,7 @@ export function actionContext(s: AppState): ActionContext {
   const tab = activeTab(s);
   return {
     hasCursorItem: !!cursorEntry(tab),
+    terminalTab: tab.virtual?.kind === "terminal",
     onParentRow: tab.cursor < 0 && parentRowVisible(tab, s.loaded.config.behavior.table.show_parent_row),
     selectedCount: tab.selection.size,
     tabCount: s.panes[s.activePane].tabs.length,
@@ -473,8 +460,8 @@ export function scopeStack(s: AppState): Scope[] {
   if (s.menu || s.ctxMenu) return ["panel", "global"];
   // 큐 팝업이 열려 있으면 패널 키는 받지 않는다.
   if (s.queueOpen) return ["queue", "global"];
-  // 터미널에 포커스가 있으면 키는 pty로 간다. 터미널을 여닫는 키만 앱이 받는다(terminal 스코프).
-  if (s.terminal?.visible && s.terminal.focused) return ["terminal"];
+  // 활성 탭이 터미널이면 키는 pty로 간다. 새 터미널·탭 조작 키만 앱이 받는다(terminal 스코프).
+  if (activeTab(s).virtual?.kind === "terminal") return ["terminal"];
   return activeTab(s).quick !== null ? ["quickSelect", "pane", "global"] : ["pane", "global"];
 }
 
@@ -536,7 +523,6 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     userDirs: { home: null, downloads: null, documents: null, desktop: null, pictures: null, music: null, movies: null },
     queue: [],
     queueOpen: false,
-    terminal: null,
     volumes: [],
     diskSpace: { left: null, right: null },
     settingsOpen: false,
@@ -832,7 +818,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
   // 다른 앱(Finder)에서 끌어 온 파일: Tauri가 OS 드롭을 가로채 이벤트로 알린다(이슈 #39).
   subscribe(() => backend.onFileDrop((e) => api.externalDrop(e, typeof document !== "undefined" && document.elementFromPoint ? document.elementFromPoint(e.x, e.y) : null)));
   // 내장 터미널의 셸이 끝나면(exit, Ctrl+D) 패널이 파일 목록으로 돌아온다(이슈 #46).
-  subscribe(() => backend.onTerminalEvent((e) => e.type === "exit" && api.terminalExited(e.id)));
+  subscribe(() => backend.onTerminalEvent((e) => e.type === "exit" && void api.terminalExited(e.id)));
   subscribe(() => backend.onDirChanged((path) => {
     for (const pane of ["left", "right"] as const) {
       for (const t of get().panes[pane].tabs) if (t.path === path) void reload(pane, t.id);
@@ -886,6 +872,25 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     earlySearchEvents.set(e.id, [...(earlySearchEvents.get(e.id) ?? []), e]);
   }));
   /** 탭이 실행 중인 검색/순회를 취소한다. */
+  /** 터미널 탭을 없앤다(세션도 닫는다). 패널의 마지막 탭이면 시작한 폴더를 보는 파일 탭으로 바꾼다. */
+  async function removeTerminalTab(pane: PaneId, index: number) {
+    const s = get();
+    const p = s.panes[pane];
+    const tab = p.tabs[index];
+    if (tab?.virtual?.kind !== "terminal") return;
+    void backend.terminalClose(tab.virtual.jobId).catch(() => {});
+    if (p.tabs.length === 1) {
+      const file = newTab(tab.virtual.base);
+      set({ panes: { ...s.panes, [pane]: { tabs: [file], active: 0 } } });
+      await reload(pane, file.id);
+    } else {
+      const tabs = p.tabs.filter((_, i) => i !== index);
+      const active = index === p.active ? Math.min(index, tabs.length - 1) : tabs.indexOf(p.tabs[p.active]);
+      set({ panes: { ...s.panes, [pane]: { tabs, active } } });
+    }
+    await syncWatches();
+  }
+
   const stopSearch = (tab: TabState) => {
     if (tab.virtual?.running) void backend.cancelSearch(tab.virtual.jobId).catch(() => {});
   };
@@ -1266,6 +1271,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     async navigate(path: string, focusName?: string, how: "push" | "back" | "forward" = "push", pane: PaneId = get().activePane) {
       const s = get();
       const tab = activeTab(s, pane);
+      if (tab.virtual?.kind === "terminal") return; // 터미널 탭은 폴더를 보지 않는다(세션이 새어 나가지 않게 막는다)
       stopSearch(tab); // 가상 탭에서 실제 위치로 나가면 결과를 버린다
       addRecent([...(tab.virtual || tab.path === path ? [] : [tab.path]), path]);
       patchTab(pane, tab.id, (t) => {
@@ -1348,34 +1354,39 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       }
     },
 
-    /** 활성 패널의 폴더에서 반대편 패널에 터미널을 열고 포커스한다(`core.terminal.focus`). 이미 열려 있으면 새로 만들지 않고 포커스만 준다. */
+    /**
+     * 활성 패널의 폴더에서 시작하는 새 터미널 탭을 반대편 패널의 탭 줄에 만들고 활성으로 한다(`core.terminal.focus`).
+     * 누를 때마다 새 탭이다. 활성 탭이 터미널이면 그 터미널을 연 폴더에서 같은 패널에 새 탭을 만든다.
+     * 검색 결과 같은 가상 탭과 압축 안에서는 열지 않는다.
+     */
     async terminalFocus() {
-      const term = get().terminal;
-      if (term) {
-        set({ terminal: { ...term, visible: true, focused: true } });
-        return;
-      }
       const s = get();
-      const tab = activeTab(s);
-      if (tab.virtual) return fail(tr("terminal.notice.virtual"));
-      if (isArchivePath(tab.path)) return fail(tr("terminal.notice.archive"));
+      const here = activeTab(s);
+      const fromTerminal = here.virtual?.kind === "terminal";
+      if (here.virtual && !fromTerminal) return fail(tr("terminal.notice.virtual"));
+      const cwd = fromTerminal ? here.virtual!.base : here.path;
+      if (isArchivePath(cwd)) return fail(tr("terminal.notice.archive"));
+      const pane = fromTerminal ? s.activePane : other(s.activePane);
       try {
         // 처음 크기는 임시다. 터미널 화면이 그려지면 패널 크기에 맞춰 바로 바꾼다.
-        const id = await backend.terminalOpen(tab.path, 80, 24);
-        set({ terminal: { pane: other(s.activePane), id, cwd: tab.path, visible: true, focused: true } });
+        const id = await backend.terminalOpen(cwd, 80, 24);
+        const now = get();
+        const p = now.panes[pane];
+        const tab = newTab("");
+        tab.path = `virtual:terminal:${tab.id}`;
+        tab.history = [tab.path];
+        tab.virtual = { kind: "terminal", title: `${tr("terminal.tab")}: ${baseName(cwd) || cwd}`, base: cwd, jobId: id, running: false, cancelled: false, warnings: [], summary: null, totalBytes: 0, view: "list", recheck: [] };
+        set({ activePane: pane, panes: { ...now.panes, [pane]: { tabs: [...p.tabs, tab], active: p.tabs.length } } });
       } catch (e) {
         fail(e);
       }
     },
-    /** 터미널을 숨기거나 다시 보인다(`core.terminal.toggle`). 세션은 계속 돈다. 터미널이 없으면 연다. */
-    async terminalToggle() {
-      const term = get().terminal;
-      if (!term) return api.terminalFocus();
-      set({ terminal: term.visible ? { ...term, visible: false, focused: false } : { ...term, visible: true, focused: true } });
-    },
-    /** 셸이 끝났다: 그 세션이면 터미널을 없애 패널이 파일 목록으로 돌아오게 한다. */
-    terminalExited(id: number) {
-      if (get().terminal?.id === id) set({ terminal: null });
+    /** 셸이 끝났다: 그 세션의 터미널 탭을 없앤다. 패널의 마지막 탭이면 시작한 폴더를 보는 파일 탭으로 바꾼다. */
+    async terminalExited(id: number) {
+      for (const pane of ["left", "right"] as const) {
+        const index = get().panes[pane].tabs.findIndex((t) => t.virtual?.kind === "terminal" && t.virtual.jobId === id);
+        if (index >= 0) return removeTerminalTab(pane, index);
+      }
     },
 
     /** 확장자와 무관하게 커서의 파일을 아카이브로 연다 (ARC-04, `core.open.as_archive`). */
@@ -1525,9 +1536,6 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     },
 
     activate(pane: PaneId, tab?: number) {
-      // 터미널이 보이는 패널을 누르면 키가 터미널로 가고, 다른 패널을 누르면 키가 파일 목록으로 돌아온다.
-      const term = get().terminal;
-      if (term?.visible) set({ terminal: { ...term, focused: pane === term.pane } });
       if (tab === undefined) {
         set({ activePane: pane });
         return;
@@ -1631,6 +1639,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     async closeTabAt(pane: PaneId, index: number) {
       const s = get();
       const p = s.panes[pane];
+      if (p.tabs[index]?.virtual?.kind === "terminal") return removeTerminalTab(pane, index);
       if (p.tabs.length <= 1 || index < 0 || index >= p.tabs.length) return;
       stopSearch(p.tabs[index]); // 가상 탭을 닫으면 진행 중인 작업도 멈추고 결과를 버린다
       const tabs = p.tabs.filter((_, i) => i !== index);

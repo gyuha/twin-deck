@@ -6,6 +6,8 @@ import type { Action, ActionCategory } from "./registry";
 export interface ActionContext {
   /** 커서가 가리키는 항목이 있는지 (".." 제외). */
   hasCursorItem: boolean;
+  /** 활성 탭이 내장 터미널 탭인지(패널의 마지막 탭이어도 닫을 수 있다). */
+  terminalTab?: boolean;
   /** 커서가 목록 맨 위의 `..` 상위 폴더 행에 있는지(열기만 가능하다). */
   onParentRow?: boolean;
   selectedCount: number;
@@ -118,10 +120,10 @@ export const DEFAULT_ACTION_META = [
   { id: "core.preview.prev_sheet", title: "미리보기: 이전 시트", category: "View", scopes: ["preview"] },
   { id: "core.preview.delete", title: "미리보기: 파일 삭제", category: "View", scopes: ["preview"] },
   { id: "core.preview.save", title: "미리보기: 편집한 내용 저장", category: "View", scopes: ["preview"] },
-  { id: "core.tab.new", title: "새 탭", category: "Tab", scopes: ["pane"] },
-  { id: "core.tab.close", title: "탭 닫기", category: "Tab", scopes: ["pane"], isApplicable: (c) => c.tabCount > 1 },
-  { id: "core.tab.next", title: "다음 탭", category: "Tab", scopes: ["pane"], isApplicable: (c) => c.tabCount > 1 },
-  { id: "core.tab.prev", title: "이전 탭", category: "Tab", scopes: ["pane"], isApplicable: (c) => c.tabCount > 1 },
+  { id: "core.tab.new", title: "새 탭", category: "Tab", scopes: ["pane", "terminal"] },
+  { id: "core.tab.close", title: "탭 닫기", category: "Tab", scopes: ["pane", "terminal"], isApplicable: (c) => c.tabCount > 1 || !!c.terminalTab },
+  { id: "core.tab.next", title: "다음 탭", category: "Tab", scopes: ["pane", "terminal"], isApplicable: (c) => c.tabCount > 1 },
+  { id: "core.tab.prev", title: "이전 탭", category: "Tab", scopes: ["pane", "terminal"], isApplicable: (c) => c.tabCount > 1 },
   { id: "core.view.drive_bar", title: "드라이브 바 표시 토글", category: "View", scopes: ["pane"] },
   { id: "core.view.action_bar", title: "Action Bar 표시 토글", category: "View", scopes: ["pane"] },
   { id: "core.view.hidden", title: "숨김 파일 표시 토글", category: "View", scopes: ["pane"] },
@@ -161,8 +163,7 @@ export const DEFAULT_ACTION_META = [
   { id: "core.settings.open", title: "설정 화면 열기", category: "View", scopes: ["global"] },
   { id: "core.settings.close", title: "설정 화면 닫기", category: "View", scopes: ["settings"] },
   { id: "core.queue.open", title: "작업 큐 열기/닫기", category: "View", scopes: ["global"] },
-  { id: "core.terminal.focus", title: "터미널 열기/포커스", category: "View", scopes: ["pane", "terminal"] },
-  { id: "core.terminal.toggle", title: "터미널 표시 토글", category: "View", scopes: ["pane", "terminal"] },
+  { id: "core.terminal.focus", title: "새 터미널 탭", category: "View", scopes: ["pane", "terminal"] },
   { id: "core.queue.up", title: "큐: 위로", category: "Navigation", scopes: ["queue"] },
   { id: "core.queue.down", title: "큐: 아래로", category: "Navigation", scopes: ["queue"] },
   { id: "core.queue.pause", title: "큐: 일시정지/재개", category: "View", scopes: ["queue"] },
@@ -278,6 +279,10 @@ export const DEFAULT_BINDINGS: Binding[] = [
   b("pane", "core.tab.close", "Mod+W"),
   b("pane", "core.tab.next", "Ctrl+Tab"),
   b("pane", "core.tab.prev", "Ctrl+Shift+Tab"),
+  b("terminal", "core.tab.new", "Mod+T"),
+  b("terminal", "core.tab.close", "Mod+W"),
+  b("terminal", "core.tab.next", "Ctrl+Tab"),
+  b("terminal", "core.tab.prev", "Ctrl+Shift+Tab"),
   b("pane", "core.view.hidden", "Mod+Shift+."),
   b("pane", "core.view.drive_bar", "Mod+Shift+D"),
   b("pane", "core.view.action_bar", "Mod+Shift+A"),
@@ -312,8 +317,6 @@ export const DEFAULT_BINDINGS: Binding[] = [
   b("global", "core.queue.open", "="),
   b("pane", "core.terminal.focus", "Alt+Mod+T"),
   b("terminal", "core.terminal.focus", "Alt+Mod+T"),
-  b("pane", "core.terminal.toggle", "Alt+Mod+O"),
-  b("terminal", "core.terminal.toggle", "Alt+Mod+O"),
   b("global", "core.settings.open", "Mod+,"),
   b("settings", "core.settings.close", "Escape"),
   b("queue", "core.queue.up", "Up"),
@@ -330,11 +333,15 @@ export const DEFAULT_BINDINGS_BY_PLATFORM: Record<"mac" | "other", Binding[]> = 
   mac: [
     b("pane", "core.tab.next", "Alt+Mod+Right"),
     b("pane", "core.tab.prev", "Alt+Mod+Left"),
+    b("terminal", "core.tab.next", "Alt+Mod+Right"),
+    b("terminal", "core.tab.prev", "Alt+Mod+Left"),
   ],
   other: [
     b("pane", "core.go.up", "Alt+Up"),
     b("pane", "core.tab.next", "Ctrl+PageDown"),
     b("pane", "core.tab.prev", "Ctrl+PageUp"),
+    b("terminal", "core.tab.next", "Ctrl+PageDown"),
+    b("terminal", "core.tab.prev", "Ctrl+PageUp"),
     b("pane", "core.view.hidden", "Ctrl+H"),
   ],
 };
