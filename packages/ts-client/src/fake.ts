@@ -1,6 +1,6 @@
 import { archiveRoot, isArchivePath } from "./archive";
 import { BackendError, baseName, joinPath, parentPath } from "./backend";
-import type { Backend, FileDropEvent, SearchEvent } from "./backend";
+import type { Backend, FileDropEvent, SearchEvent, TerminalEvent } from "./backend";
 import type {
   ConfigValue,
   ConflictDto,
@@ -1160,6 +1160,52 @@ export class FakeBackend implements Backend {
   onDirChanged(callback: (path: string) => void) {
     this.listeners.add(callback);
     return () => void this.listeners.delete(callback);
+  }
+
+  /** 열린 터미널 세션: 세션 번호 → 연 위치. */
+  terminals = new Map<number, { cwd: string; cols: number; rows: number }>();
+  /** `terminalWrite`로 쓴 입력 기록. */
+  terminalWrites: { id: number; data: string }[] = [];
+  private nextTerminal = 1;
+  private terminalListeners = new Set<(e: TerminalEvent) => void>();
+
+  async terminalOpen(cwd: string, cols: number, rows: number) {
+    const id = this.nextTerminal++;
+    this.terminals.set(id, { cwd, cols, rows });
+    return id;
+  }
+
+  async terminalWrite(id: number, data: string) {
+    if (!this.terminals.has(id)) throw new Error(`터미널 세션 ${id}번이 없습니다`);
+    this.terminalWrites.push({ id, data });
+  }
+
+  async terminalResize(id: number, cols: number, rows: number) {
+    const t = this.terminals.get(id);
+    if (!t) throw new Error(`터미널 세션 ${id}번이 없습니다`);
+    t.cols = cols;
+    t.rows = rows;
+  }
+
+  async terminalClose(id: number) {
+    this.terminals.delete(id);
+  }
+
+  onTerminalEvent(callback: (e: TerminalEvent) => void) {
+    this.terminalListeners.add(callback);
+    return () => void this.terminalListeners.delete(callback);
+  }
+
+  /** 터미널이 글을 출력한 것처럼 만든다(테스트용). */
+  emitTerminalOutput(id: number, text: string): void {
+    const data = new TextEncoder().encode(text);
+    for (const l of [...this.terminalListeners]) l({ type: "output", id, data });
+  }
+
+  /** 셸이 끝난 것처럼 만든다(테스트용). 세션도 닫힌다. */
+  emitTerminalExit(id: number, code: number | null = 0): void {
+    this.terminals.delete(id);
+    for (const l of [...this.terminalListeners]) l({ type: "exit", id, code });
   }
 
   private fileDropListeners = new Set<(e: FileDropEvent) => void>();

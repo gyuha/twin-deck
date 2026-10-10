@@ -2,7 +2,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { BackendError } from "./backend";
-import type { Backend, FileDropEvent, SearchEvent } from "./backend";
+import type { Backend, FileDropEvent, SearchEvent, TerminalEvent } from "./backend";
 import { commands, events } from "./generated/bindings";
 import type { ConfigValue, ConflictDto, ExpectedFileDto, FileInfoDto, FindSpecDto, JobDto, LoadedState, PreviewDto, PreviewRectDto, QuickLookDto, EpubInfoDto, ShowOutcome, Snapshot, JobKindDto, Loaded, QueueItemDto, Result, WriteTextResultDto } from "./generated/bindings";
 
@@ -18,6 +18,14 @@ type TauriDragDrop =
   | { type: "over"; position: { x: number; y: number } }
   | { type: "drop"; paths: string[]; position: { x: number; y: number } }
   | { type: "leave" };
+
+/** base64 글을 바이트로 푼다(터미널 출력은 UTF-8 글자 중간에서 잘릴 수 있어 바이트로 받는다). */
+export function decodeBase64(data: string): Uint8Array {
+  const bin = atob(data);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
 
 /** Tauri 드래그 앤 드롭 이벤트를 `FileDropEvent`로 바꾼다. 물리 좌표를 `scale`(devicePixelRatio)로 나눠 CSS px로 만든다. */
 export function toFileDropEvent(payload: TauriDragDrop, scale: number): FileDropEvent {
@@ -73,6 +81,27 @@ export class TauriBackend implements Backend {
   }
   async queueClearFinished() {
     await commands.queueClearFinished();
+  }
+  async terminalOpen(cwd: string, cols: number, rows: number) {
+    return unwrap(await commands.terminalOpen(cwd, cols, rows));
+  }
+  async terminalWrite(id: number, data: string) {
+    unwrap(await commands.terminalWrite(id, data));
+  }
+  async terminalResize(id: number, cols: number, rows: number) {
+    unwrap(await commands.terminalResize(id, cols, rows));
+  }
+  async terminalClose(id: number) {
+    unwrap(await commands.terminalClose(id));
+  }
+  onTerminalEvent(callback: (e: TerminalEvent) => void) {
+    const offs = [
+      events.terminalOutput.listen((e) => callback({ type: "output", id: e.payload.id, data: decodeBase64(e.payload.data) })),
+      events.terminalExit.listen((e) => callback({ type: "exit", id: e.payload.id, code: e.payload.code })),
+    ];
+    return () => {
+      for (const u of offs) void u.then((fn) => fn());
+    };
   }
   async watch(path: string) {
     unwrap(await commands.watchDir(path));

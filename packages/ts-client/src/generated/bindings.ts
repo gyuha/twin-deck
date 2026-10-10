@@ -434,6 +434,38 @@ async renameEntry(path: string, newName: string) : Promise<Result<string, string
     else return { status: "error", error: e  as any };
 }
 },
+async terminalOpen(cwd: string, cols: number, rows: number) : Promise<Result<number, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("terminal_open", { cwd, cols, rows }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async terminalWrite(id: number, data: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("terminal_write", { id, data }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async terminalResize(id: number, cols: number, rows: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("terminal_resize", { id, cols, rows }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async terminalClose(id: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("terminal_close", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async watchDir(path: string) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("watch_dir", { path }) };
@@ -512,6 +544,8 @@ dirChanged: DirChanged,
 queueChanged: QueueChanged,
 searchChunk: SearchChunk,
 searchDone: SearchDone,
+terminalExit: TerminalExit,
+terminalOutput: TerminalOutput,
 usageUpdate: UsageUpdate
 }>({
 configChanged: "config-changed",
@@ -519,6 +553,8 @@ dirChanged: "dir-changed",
 queueChanged: "queue-changed",
 searchChunk: "search-chunk",
 searchDone: "search-done",
+terminalExit: "terminal-exit",
+terminalOutput: "terminal-output",
 usageUpdate: "usage-update"
 })
 
@@ -885,6 +921,14 @@ export type TableView = {
  * 컬럼 명세 `[<|>]이름[:너비]`.
  */
 columns: string[] }
+/**
+ * 내장 터미널의 셸이 끝났다.
+ */
+export type TerminalExit = { id: number; code: number | null }
+/**
+ * 내장 터미널이 출력을 냈다. `data`는 pty가 낸 바이트의 base64(UTF-8 글자 중간에서 잘릴 수 있어 글이 아니라 바이트로 보낸다).
+ */
+export type TerminalOutput = { id: number; data: string }
 /**
  * 파일 찾기의 "파일에서 텍스트 찾기" 조건.
  */

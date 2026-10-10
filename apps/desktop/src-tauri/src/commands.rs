@@ -58,6 +58,20 @@ pub struct SearchDone {
     pub summary: SearchSummaryDto,
 }
 
+/// 내장 터미널이 출력을 냈다. `data`는 pty가 낸 바이트의 base64(UTF-8 글자 중간에서 잘릴 수 있어 글이 아니라 바이트로 보낸다).
+#[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
+pub struct TerminalOutput {
+    pub id: u32,
+    pub data: String,
+}
+
+/// 내장 터미널의 셸이 끝났다.
+#[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
+pub struct TerminalExit {
+    pub id: u32,
+    pub code: Option<u32>,
+}
+
 /// 설정이 바뀌었다(파일 감시). 문법 오류가 있으면 이전 유효 설정과 경고가 온다.
 #[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
 pub struct ConfigChanged {
@@ -730,6 +744,40 @@ pub fn cancel_search(svc: State<'_, AppService>, id: u32) {
 
 #[tauri::command]
 #[specta::specta]
+pub fn terminal_open(
+    svc: State<'_, AppService>,
+    cwd: String,
+    cols: u32,
+    rows: u32,
+) -> ServiceResult<u32> {
+    svc.terminal_open(&cwd, cols, rows)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn terminal_write(svc: State<'_, AppService>, id: u32, data: String) -> ServiceResult<()> {
+    svc.terminal_write(id, &data)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn terminal_resize(
+    svc: State<'_, AppService>,
+    id: u32,
+    cols: u32,
+    rows: u32,
+) -> ServiceResult<()> {
+    svc.terminal_resize(id, cols, rows)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn terminal_close(svc: State<'_, AppService>, id: u32) -> ServiceResult<()> {
+    svc.terminal_close(id)
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn watch_dir(svc: State<'_, AppService>, path: String) -> ServiceResult<()> {
     svc.watch(&path)
 }
@@ -835,6 +883,10 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             queue_abort,
             queue_clear_finished,
             rename_entry,
+            terminal_open,
+            terminal_write,
+            terminal_resize,
+            terminal_close,
             watch_dir,
             unwatch_dir,
             start_lookup,
@@ -851,7 +903,9 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             ConfigChanged,
             SearchChunk,
             UsageUpdate,
-            SearchDone
+            SearchDone,
+            TerminalOutput,
+            TerminalExit
         ])
 }
 

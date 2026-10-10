@@ -13,7 +13,7 @@ use td_ops::SystemTrash;
 
 use commands::{
     specta_builder, AppLaunch, AppService, AppVolumes, ConfigChanged, ConfigState, DirChanged,
-    QueueChanged, SearchChunk, SearchDone, UsageUpdate,
+    QueueChanged, SearchChunk, SearchDone, TerminalExit, TerminalOutput, UsageUpdate,
 };
 use service::{coalesce, SearchMsg};
 use std::time::Duration;
@@ -28,10 +28,11 @@ pub fn apply_config(svc: &AppService, loaded: &td_config::Loaded) {
 fn main() {
     let builder = specta_builder();
     let (service, channels) = AppService::new(SystemTrash).expect("서비스 초기화 실패");
-    let (changes, queue_events, search_events) = (
+    let (changes, queue_events, search_events, terminal_events) = (
         channels.dir_changes,
         channels.queue_events,
         channels.search_events,
+        channels.terminal_events,
     );
 
     tauri::Builder::default()
@@ -111,6 +112,22 @@ fn main() {
                     }
                 });
             }
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                // 내장 터미널의 출력과 종료를 UI로 전달한다. 출력은 바이트라 base64로 보낸다.
+                use base64::Engine;
+                while let Ok(ev) = terminal_events.recv() {
+                    match ev {
+                        td_terminal::TermEvent::Output { id, data } => {
+                            let data = base64::engine::general_purpose::STANDARD.encode(data);
+                            let _ = TerminalOutput { id, data }.emit(&handle);
+                        }
+                        td_terminal::TermEvent::Exit { id, code } => {
+                            let _ = TerminalExit { id, code }.emit(&handle);
+                        }
+                    }
+                }
+            });
             let handle = app.handle().clone();
             std::thread::spawn(move || {
                 // 큐 이벤트가 오면 최신 스냅샷을 UI로 보낸다.

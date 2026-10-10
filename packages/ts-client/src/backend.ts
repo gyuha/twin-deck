@@ -25,6 +25,9 @@ export class BackendError extends Error {
  * 실제 앱은 `TauriBackend`, UI 테스트는 `FakeBackend`를 쓴다.
  */
 /** Finder 같은 다른 앱에서 파일을 끌어 올 때의 이벤트. 좌표는 창 안의 CSS px(Tauri가 주는 물리 좌표를 `devicePixelRatio`로 나눈 값)이다. */
+/** 내장 터미널이 화면으로 보내는 이벤트. 출력은 pty가 낸 바이트 그대로다(UTF-8 글자 중간에서 잘릴 수 있다). */
+export type TerminalEvent = { type: "output"; id: number; data: Uint8Array } | { type: "exit"; id: number; code: number | null };
+
 export interface FileDropEvent {
   /** `enter`: 끌어 들어옴, `over`: 창 위에서 움직임, `drop`: 놓음, `leave`: 놓지 않고 나감. */
   type: "enter" | "over" | "drop" | "leave";
@@ -162,6 +165,14 @@ export interface Backend {
   unwatch(path: string): Promise<void>;
   /** 감시 중인 디렉터리가 바뀌면 호출된다. 구독 해제 함수를 돌려준다. */
   onDirChanged(callback: (path: string) => void): () => void;
+  /** `cwd` 폴더에서 셸을 pty로 열고 세션 번호를 돌려준다. */
+  terminalOpen(cwd: string, cols: number, rows: number): Promise<number>;
+  /** 세션에 입력(키 입력을 글로 바꾼 것)을 쓴다. */
+  terminalWrite(id: number, data: string): Promise<void>;
+  terminalResize(id: number, cols: number, rows: number): Promise<void>;
+  terminalClose(id: number): Promise<void>;
+  /** 터미널 세션의 출력·종료를 받는다. 구독 해제 함수를 돌려준다. */
+  onTerminalEvent(callback: (e: TerminalEvent) => void): () => void;
   /** 다른 앱(Finder 등)에서 끌어 온 파일 이벤트를 받는다. 구독 해제 함수를 돌려준다. */
   onFileDrop(callback: (e: FileDropEvent) => void): () => void;
 }

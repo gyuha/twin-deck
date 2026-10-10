@@ -14,6 +14,7 @@ use td_launch::{Launch, Launcher};
 use td_ops::{ConflictPolicy, Ops, Trasher};
 use td_queue::{Item, JobInfo, JobKind, JobSpec, JobStatus, Queue, QueueEvent};
 use td_search::{CancelToken, SearchOptions, UsageItem, UsageOptions};
+use td_terminal::{TermEvent, Terminals};
 use td_vfs::{sort_entries, Entry, EntryKind, ListOptions, Vfs, VfsPath};
 use td_watch::DirWatcher;
 
@@ -675,6 +676,8 @@ pub struct Channels {
     pub queue_events: Receiver<QueueEvent>,
     /// Look Up / Flatten / Disk Usage 작업이 흘려 보내는 결과.
     pub search_events: Receiver<SearchMsg>,
+    /// 내장 터미널의 출력과 종료.
+    pub terminal_events: Receiver<TermEvent>,
 }
 
 /// 파일 작업과 감시, 작업 큐를 묶은 서비스. 앱 상태로 보관한다.
@@ -729,6 +732,8 @@ pub struct Service<T: Trasher> {
     preview_limits: Mutex<td_vfs::PreviewLimits>,
     /// (시험) 디스크 PDF를 읽지 않고 파일 주소로 열게 한다(`preview.pdf_direct`).
     pdf_direct: std::sync::atomic::AtomicBool,
+    /// 내장 터미널의 pty 세션들.
+    terminals: Terminals,
 }
 
 /// 설정의 MB 한도를 바이트로. 0은 제한 없음이다.
@@ -746,6 +751,7 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
         let fs = CompositeFs::default();
         let (search_tx, search_events) = std::sync::mpsc::channel();
         let (queue, queue_events) = Queue::new(Ops::new(fs.clone(), trasher.clone()));
+        let (terminals, terminal_events) = Terminals::new();
         Ok((
             Self {
                 ops: Ops::new(fs.clone(), trasher),
@@ -761,13 +767,60 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
                 quicklook: QuickLook::new("/usr/bin/qlmanage", Duration::from_secs(10)),
                 preview_limits: Mutex::new(td_vfs::PreviewLimits::default()),
                 pdf_direct: std::sync::atomic::AtomicBool::new(false),
+                terminals,
             },
             Channels {
                 dir_changes,
                 queue_events,
                 search_events,
+                terminal_events,
             },
         ))
+    }
+
+    /// `cwd` 폴더에서 사용자의 셸을 pty로 연다. 돌려주는 값은 세션 번호다.
+    pub fn terminal_open(&self, cwd: &str, cols: u32, rows: u32) -> ServiceResult<u32> {
+        let (cols, rows) = (
+            cols.min(u16::MAX as u32) as u16,
+            rows.min(u16::MAX as u32) as u16,
+        );
+        self.terminals
+            .open(Path::new(cwd), cols, rows)
+            .map_err(|e| e.to_string())
+    }
+
+    /// 테스트용: 셸 대신 지정한 프로그램을 연다.
+    #[cfg(test)]
+    pub fn terminal_open_command(
+        &self,
+        program: &str,
+        args: &[&str],
+        cwd: &str,
+    ) -> ServiceResult<u32> {
+        self.terminals
+            .open_command(program, args, Path::new(cwd), 80, 24)
+            .map_err(|e| e.to_string())
+    }
+
+    /// 세션에 입력(키 입력을 UTF-8 글로 바꾼 것)을 쓴다.
+    pub fn terminal_write(&self, id: u32, data: &str) -> ServiceResult<()> {
+        self.terminals
+            .write(id, data.as_bytes())
+            .map_err(|e| e.to_string())
+    }
+
+    pub fn terminal_resize(&self, id: u32, cols: u32, rows: u32) -> ServiceResult<()> {
+        let (cols, rows) = (
+            cols.min(u16::MAX as u32) as u16,
+            rows.min(u16::MAX as u32) as u16,
+        );
+        self.terminals
+            .resize(id, cols, rows)
+            .map_err(|e| e.to_string())
+    }
+
+    pub fn terminal_close(&self, id: u32) -> ServiceResult<()> {
+        self.terminals.close(id).map_err(|e| e.to_string())
     }
 
     /// 파일 클립보드 구현을 바꾼다(테스트용).
@@ -2609,6 +2662,30 @@ mod tests {
         assert_eq!(p.kind, PreviewKindDto::Text);
         assert!(p.truncated);
         assert_eq!(p.text.unwrap().lines().count(), 2000);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn terminal_session_runs_in_folder_and_streams_output() {
+        use std::time::{Duration, Instant};
+        let (_t, svc, ch, root) = setup();
+        let id = svc
+            .terminal_open_command("/bin/sh", &["-c", "pwd; cat"], &root)
+            .unwrap();
+        svc.terminal_write(id, "ping\n").unwrap();
+        let mut out = String::new();
+        let end = Instant::now() + Duration::from_secs(10);
+        while Instant::now() < end && !(out.contains("ping") && out.contains("root")) {
+            if let Ok(td_terminal::TermEvent::Output { id: i, data }) =
+                ch.terminal_events.recv_timeout(Duration::from_millis(200))
+            {
+                assert_eq!(i, id);
+                out.push_str(&String::from_utf8_lossy(&data));
+            }
+        }
+        assert!(out.contains("root") && out.contains("ping"), "{out:?}");
+        svc.terminal_close(id).unwrap();
+        assert!(svc.terminal_resize(9999, 10, 10).is_err());
     }
 
     #[test]
