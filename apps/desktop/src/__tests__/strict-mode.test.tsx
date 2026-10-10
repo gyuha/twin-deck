@@ -65,7 +65,7 @@ describe("StrictMode(개발 모드)에서도 백엔드 이벤트가 UI에 닿는
     await screen.findByRole("dialog", { name: /복사/ });
     await user.keyboard("{Enter}");
     const d = await screen.findByRole("dialog", { name: "복사 중" });
-    expect(within(d).getAllByRole("progressbar")).toHaveLength(2); // 현재 파일 + 전체 개수
+    expect(within(d).getAllByRole("progressbar")).toHaveLength(1); // 바이트를 알기 전에는 개수 막대 1개
     await act(async () => {
       for (let i = 0; i < 6; i++) await b.advance();
     });

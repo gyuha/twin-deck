@@ -170,7 +170,7 @@ describe("전송 진행 창", () => {
   it("오래 걸리면 N/M개와 현재 파일을 보여 주고 끝나면 닫힌다", async () => {
     const { backend } = await startManual();
     const d = await screen.findByRole("dialog", { name: "복사 중" });
-    expect(within(d).getByRole("progressbar", { name: "전체 진행" })).toHaveAttribute("aria-valuenow", "0");
+    expect(within(d).getByRole("progressbar")).toHaveAttribute("aria-valuenow", "0"); // 바이트를 알기 전엔 막대 1개
     expect(d).toHaveTextContent("0/5개");
     await advance(backend);
     await waitFor(() => expect(screen.getByRole("dialog", { name: "복사 중" })).toHaveTextContent("1/5개"));
@@ -195,13 +195,13 @@ describe("전송 진행 창", () => {
     expect(within(screen.getByRole("dialog", { name: "복사 중" })).getByRole("progressbar")).toHaveAttribute("aria-valuenow", "15");
   });
 
-  it("막대 2개: 파일이 2개 이상이면 현재 파일 바이트 막대와 전체 개수 막대를 함께 보여 준다", async () => {
+  it("막대 2개: 파일이 2개 이상이면 바이트를 안 뒤에 현재 파일 바이트 막대와 전체 개수 막대를 함께 보여 준다(그 전에는 1개)", async () => {
     const { backend } = await startManual();
     const d = await screen.findByRole("dialog", { name: "복사 중" });
     const [job] = await backend.queueJobs();
-    // 바이트를 아직 모를 때도 두 막대 자리가 유지된다(현재 파일 막대는 값 없이 진행 표시).
-    expect(within(d).getAllByRole("progressbar")).toHaveLength(2);
-    expect(within(d).getByRole("progressbar", { name: "현재 파일 진행" })).not.toHaveAttribute("aria-valuenow");
+    // 바이트를 아직 모르는 집계 직후에는 막대 1개(개수)만 보인다.
+    expect(within(d).getAllByRole("progressbar")).toHaveLength(1);
+    expect(within(d).getByRole("progressbar", { name: "전송 진행" })).toHaveAttribute("aria-valuenow", "0");
     await advance(backend); // 1개 끝
     act(() => backend.reportBytes(job.id, 12_300_000, 80_000_000));
     const dlg = await screen.findByRole("dialog", { name: "복사 중" });

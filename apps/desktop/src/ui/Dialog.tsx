@@ -90,7 +90,8 @@ export function Dialog() {
           // 그 밖의 작업은 파일이 1개이고 바이트를 알면 바이트 막대, 아니면 개수 막대 1개다.
           const transfer = job.kind === "copy" || job.kind === "move";
           const bytesKnown = job.bytesTotal !== null && job.bytesTotal > 0;
-          const multi = transfer && job.filesTotal !== null && job.filesTotal >= 2;
+          // 현재 파일의 바이트를 알기 전(집계 직후)에는 막대 1개(개수)만 보이고, 바이트가 오면 2개가 된다.
+          const multi = transfer && job.filesTotal !== null && job.filesTotal >= 2 && bytesKnown;
           const byBytes = (transfer ? job.filesTotal !== null : job.filesTotal === 1) && bytesKnown;
           const fileRatio = bytesKnown ? job.bytesDone / job.bytesTotal! : 0;
           const countRatio = job.filesTotal ? job.filesDone / job.filesTotal : 0;
