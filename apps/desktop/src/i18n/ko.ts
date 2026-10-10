@@ -423,6 +423,8 @@ export const ko = {
   "dialog.choice.rename": "이름 바꿔 복사 (R)",
   "dialog.name": "이름",
   "dialog.progress_aria": "전송 진행",
+  "dialog.file_progress_aria": "현재 파일 진행",
+  "dialog.total_progress_aria": "전체 진행",
   "dialog.counting": "집계 중…",
   "dialog.files_progress": "{done}/{total}개",
   "dialog.errors": "{count}개 항목에 실패했습니다",

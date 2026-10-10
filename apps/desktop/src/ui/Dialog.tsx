@@ -86,29 +86,43 @@ export function Dialog() {
         )}
         {dialog.kind === "multirename" && <MultiRename items={dialog.items} existing={dialog.existing} options={dialog.options} />}
         {dialog.kind === "progress" && job && (() => {
-          // 파일이 1개이고 바이트를 알면 그 파일의 바이트 진행률을, 아니면 파일 개수 진행을 보여 준다.
-          const byBytes = job.filesTotal === 1 && job.bytesTotal !== null && job.bytesTotal > 0;
-          const ratio = byBytes ? job.bytesDone / job.bytesTotal! : job.filesTotal ? job.filesDone / job.filesTotal : 0;
+          // 복사·이동은 지금 처리 중인 파일의 바이트 막대와 전체 개수 막대를 함께 보인다(파일이 1개면 앞의 것만).
+          // 그 밖의 작업은 파일이 1개이고 바이트를 알면 바이트 막대, 아니면 개수 막대 1개다.
+          const transfer = job.kind === "copy" || job.kind === "move";
+          const bytesKnown = job.bytesTotal !== null && job.bytesTotal > 0;
+          const multi = transfer && job.filesTotal !== null && job.filesTotal >= 2;
+          const byBytes = (transfer ? job.filesTotal !== null : job.filesTotal === 1) && bytesKnown;
+          const fileRatio = bytesKnown ? job.bytesDone / job.bytesTotal! : 0;
+          const countRatio = job.filesTotal ? job.filesDone / job.filesTotal : 0;
+          const ratio = byBytes ? fileRatio : countRatio;
           const started = byBytes ? job.bytesDone > 0 : job.filesDone > 0;
-          return (
-          <>
+          const bar = (label: string, value: number | undefined, r: number, pulse: boolean) => (
             <div
               role="progressbar"
-              aria-label={t("dialog.progress_aria")}
+              aria-label={label}
               aria-valuemin={0}
               aria-valuemax={100}
-              aria-valuenow={byBytes || job.filesTotal ? Math.round(ratio * 100) : undefined}
+              aria-valuenow={value}
               className="h-2 w-full overflow-hidden rounded bg-app-slider"
             >
               {/* 아직 시작한 진행이 없으면 막대가 죽어 보이지 않게 깜빡이는 진행 중 표시를 한다. */}
-              {isActiveJob(job) && !started ? (
-                <div className="h-full w-full animate-pulse bg-accent opacity-40" />
-              ) : (
-                <div className="h-full bg-accent" style={{ width: `${ratio * 100}%` }} />
-              )}
+              {pulse ? <div className="h-full w-full animate-pulse bg-accent opacity-40" /> : <div className="h-full bg-accent" style={{ width: `${r * 100}%` }} />}
             </div>
+          );
+          return (
+          <>
+            {multi ? (
+              <>
+                {bar(t("dialog.file_progress_aria"), bytesKnown ? Math.round(fileRatio * 100) : undefined, fileRatio, isActiveJob(job) && job.bytesDone === 0)}
+                {bytesKnown && <p className="mt-1">{`${formatSpace(job.bytesDone, sizeFormat)} / ${formatSpace(job.bytesTotal!, sizeFormat)}`}</p>}
+                <div className="mt-2" />
+                {bar(t("dialog.total_progress_aria"), Math.round(countRatio * 100), countRatio, isActiveJob(job) && job.filesDone === 0)}
+              </>
+            ) : (
+              bar(t("dialog.progress_aria"), byBytes || job.filesTotal ? Math.round(ratio * 100) : undefined, ratio, isActiveJob(job) && !started)
+            )}
             <p className="mt-1">
-              {byBytes
+              {byBytes && !multi
                 ? `${formatSpace(job.bytesDone, sizeFormat)} / ${formatSpace(job.bytesTotal!, sizeFormat)}`
                 : job.filesTotal === null
                   ? t("dialog.counting")

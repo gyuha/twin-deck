@@ -425,6 +425,8 @@ export const en: Record<Key, string> = {
   "dialog.choice.rename": "Copy with new name (R)",
   "dialog.name": "Name",
   "dialog.progress_aria": "Transfer progress",
+  "dialog.file_progress_aria": "Current file progress",
+  "dialog.total_progress_aria": "Overall progress",
   "dialog.counting": "Counting…",
   "dialog.files_progress": "{done}/{total} files",
   "dialog.errors": "{count} items failed",

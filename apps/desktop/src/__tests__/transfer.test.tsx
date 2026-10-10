@@ -170,7 +170,7 @@ describe("전송 진행 창", () => {
   it("오래 걸리면 N/M개와 현재 파일을 보여 주고 끝나면 닫힌다", async () => {
     const { backend } = await startManual();
     const d = await screen.findByRole("dialog", { name: "복사 중" });
-    expect(within(d).getByRole("progressbar")).toHaveAttribute("aria-valuenow", "0");
+    expect(within(d).getByRole("progressbar", { name: "전체 진행" })).toHaveAttribute("aria-valuenow", "0");
     expect(d).toHaveTextContent("0/5개");
     await advance(backend);
     await waitFor(() => expect(screen.getByRole("dialog", { name: "복사 중" })).toHaveTextContent("1/5개"));
@@ -195,13 +195,54 @@ describe("전송 진행 창", () => {
     expect(within(screen.getByRole("dialog", { name: "복사 중" })).getByRole("progressbar")).toHaveAttribute("aria-valuenow", "15");
   });
 
-  it("바이트: 파일이 2개 이상이면 바이트 정보가 있어도 N/M개를 유지한다", async () => {
+  it("막대 2개: 파일이 2개 이상이면 현재 파일 바이트 막대와 전체 개수 막대를 함께 보여 준다", async () => {
     const { backend } = await startManual();
+    const d = await screen.findByRole("dialog", { name: "복사 중" });
+    const [job] = await backend.queueJobs();
+    // 바이트를 아직 모를 때도 두 막대 자리가 유지된다(현재 파일 막대는 값 없이 진행 표시).
+    expect(within(d).getAllByRole("progressbar")).toHaveLength(2);
+    expect(within(d).getByRole("progressbar", { name: "현재 파일 진행" })).not.toHaveAttribute("aria-valuenow");
+    await advance(backend); // 1개 끝
+    act(() => backend.reportBytes(job.id, 12_300_000, 80_000_000));
+    const dlg = await screen.findByRole("dialog", { name: "복사 중" });
+    await waitFor(() => expect(dlg).toHaveTextContent("12.3 MB / 80.0 MB"));
+    expect(dlg).toHaveTextContent("1/5개");
+    expect(within(dlg).getAllByRole("progressbar")).toHaveLength(2);
+    expect(within(dlg).getByRole("progressbar", { name: "현재 파일 진행" })).toHaveAttribute("aria-valuenow", "15");
+    expect(within(dlg).getByRole("progressbar", { name: "전체 진행" })).toHaveAttribute("aria-valuenow", "20");
+  });
+
+  it("막대 1개: 파일이 1개면 현재 파일 바이트 막대만 보이고 전체 개수는 보이지 않는다", async () => {
+    const backend = seedBackend();
+    backend.queueMode = "manual";
+    const { user } = await renderApp(backend);
+    await user.keyboard("{ArrowDown}{ArrowDown}{F5}"); // a.txt 하나
+    await confirmDialog(/복사/);
+    await user.keyboard("{Enter}");
     await screen.findByRole("dialog", { name: "복사 중" });
     const [job] = await backend.queueJobs();
-    act(() => backend.reportBytes(job.id, 1_000_000, 8_000_000));
-    await waitFor(() => expect(screen.getByRole("dialog", { name: "복사 중" })).toHaveTextContent("0/5개"));
-    expect(screen.getByRole("dialog", { name: "복사 중" })).not.toHaveTextContent("MB");
+    act(() => backend.reportBytes(job.id, 12_300_000, 80_000_000));
+    await waitFor(() => expect(screen.getByRole("dialog", { name: "복사 중" })).toHaveTextContent("12.3 MB / 80.0 MB"));
+    const d = within(screen.getByRole("dialog", { name: "복사 중" }));
+    expect(d.getAllByRole("progressbar")).toHaveLength(1);
+    expect(d.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "15");
+    expect(screen.getByRole("dialog", { name: "복사 중" })).not.toHaveTextContent(/\d+\/1개/);
+  });
+
+  it("이동 막대: 이동도 막대 2개를 보여 준다", async () => {
+    const backend = seedBackend();
+    backend.queueMode = "manual";
+    const { user } = await renderApp(backend);
+    await user.keyboard("{Control>}a{/Control}{F6}");
+    await confirmDialog(/이동/);
+    await user.keyboard("{Enter}");
+    const d = await screen.findByRole("dialog", { name: "이동 중" });
+    const [job] = await backend.queueJobs();
+    act(() => backend.reportBytes(job.id, 40_000_000, 80_000_000));
+    await waitFor(() => expect(screen.getByRole("dialog", { name: "이동 중" })).toHaveTextContent("40.0 MB / 80.0 MB"));
+    expect(within(d).getAllByRole("progressbar")).toHaveLength(2);
+    expect(within(d).getByRole("progressbar", { name: "현재 파일 진행" })).toHaveAttribute("aria-valuenow", "50");
+    expect(within(d).getByRole("progressbar", { name: "전체 진행" })).toHaveAttribute("aria-valuenow", "0");
   });
 
   it("Esc/중단 버튼: 작업을 중단하고 닫는다", async () => {
