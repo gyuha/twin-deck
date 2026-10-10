@@ -154,6 +154,7 @@ export const ko = {
   "action.core.settings.close": "설정 화면 닫기",
   "action.core.queue.open": "작업 큐 열기/닫기",
   "action.core.terminal.focus": "새 터미널 탭",
+  "action.core.terminal.open_folder": "터미널 열기(커서 폴더)",
   "action.core.queue.up": "큐: 위로",
   "action.core.queue.down": "큐: 아래로",
   "action.core.queue.pause": "큐: 일시정지/재개",

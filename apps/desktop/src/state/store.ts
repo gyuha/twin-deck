@@ -237,7 +237,7 @@ export const CONTEXT_MENU: readonly CtxItem[] = [
   { get label() { return tr("ctx.delete"); }, actionId: "core.trash" },
   { get label() { return tr("ctx.rename"); }, actionId: "core.rename" },
   { get label() { return tr("ctx.copy_path"); }, actionId: "core.path.copy_files" },
-  { get label() { return tr("ctx.terminal"); }, actionId: "core.terminal.focus" },
+  { get label() { return tr("ctx.terminal"); }, actionId: "core.terminal.open_folder" },
   {},
   { get label() { return tr("ctx.info"); }, actionId: "core.file.info" },
 ];
@@ -1360,12 +1360,13 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
      * 누를 때마다 새 탭이다. 활성 탭이 터미널이면 그 터미널을 연 폴더에서 같은 패널에 새 탭을 만든다.
      * 검색 결과 같은 가상 탭과 압축 안에서는 열지 않는다.
      */
-    async terminalFocus() {
+    async terminalFocus(folder?: string) {
       const s = get();
       const here = activeTab(s);
       const fromTerminal = here.virtual?.kind === "terminal";
-      if (here.virtual && !fromTerminal) return fail(tr("terminal.notice.virtual"));
-      const cwd = fromTerminal ? here.virtual!.base : here.path;
+      // 폴더를 지정하면(컨텍스트 메뉴의 폴더 행) 가상 탭에서도 그 폴더에서 연다.
+      if (!folder && here.virtual && !fromTerminal) return fail(tr("terminal.notice.virtual"));
+      const cwd = folder ?? (fromTerminal ? here.virtual!.base : here.path);
       if (isArchivePath(cwd)) return fail(tr("terminal.notice.archive"));
       const pane = fromTerminal ? s.activePane : other(s.activePane);
       try {
@@ -1381,6 +1382,12 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       } catch (e) {
         fail(e);
       }
+    },
+    /** 컨텍스트 메뉴의 "터미널 열기": 커서가 폴더 행이면 그 폴더에서, 아니면 이 패널의 현재 폴더에서 연다. */
+    async terminalOpenCursorFolder() {
+      const tab = activeTab(get());
+      const c = cursorEntry(tab);
+      await api.terminalFocus(c && isFolderEntry(c) ? c.path : undefined);
     },
     /** 셸이 끝났다: 그 세션의 터미널 탭을 없앤다. 패널의 마지막 탭이면 시작한 폴더를 보는 파일 탭으로 바꾼다. */
     async terminalExited(id: number) {

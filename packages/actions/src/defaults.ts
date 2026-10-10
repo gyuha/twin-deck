@@ -164,6 +164,7 @@ export const DEFAULT_ACTION_META = [
   { id: "core.settings.close", title: "설정 화면 닫기", category: "View", scopes: ["settings"] },
   { id: "core.queue.open", title: "작업 큐 열기/닫기", category: "View", scopes: ["global"] },
   { id: "core.terminal.focus", title: "새 터미널 탭", category: "View", scopes: ["pane", "terminal"] },
+  { id: "core.terminal.open_folder", title: "터미널 열기(커서 폴더)", category: "View", scopes: ["pane"] },
   { id: "core.queue.up", title: "큐: 위로", category: "Navigation", scopes: ["queue"] },
   { id: "core.queue.down", title: "큐: 아래로", category: "Navigation", scopes: ["queue"] },
   { id: "core.queue.pause", title: "큐: 일시정지/재개", category: "View", scopes: ["queue"] },

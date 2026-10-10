@@ -156,6 +156,7 @@ export const en: Record<Key, string> = {
   "action.core.settings.close": "Close Settings",
   "action.core.queue.open": "Open/Close Job Queue",
   "action.core.terminal.focus": "New Terminal Tab",
+  "action.core.terminal.open_folder": "Open Terminal (Cursor Folder)",
   "action.core.queue.up": "Queue: Up",
   "action.core.queue.down": "Queue: Down",
   "action.core.queue.pause": "Queue: Pause/Resume",

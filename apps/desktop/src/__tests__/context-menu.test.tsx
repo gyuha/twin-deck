@@ -98,15 +98,23 @@ describe("파일 행 컨텍스트 메뉴", () => {
     await waitFor(() => expect(backend.clipboard).toEqual(["/home/a/a.txt"]));
   });
 
-  it("터미널 열기: 단축키 힌트가 나오고 클릭하면 이 패널 폴더에서 시작하는 터미널 탭이 반대편 패널에 생긴다 (이슈 #46)", async () => {
+  it("터미널 열기: 파일 행에서는 이 패널의 현재 폴더에서 시작하는 터미널 탭이 반대편 패널에 생긴다 (이슈 #46)", async () => {
     const backend = seed();
     const { user } = await renderApp(backend);
-    rightClick(1);
-    expect(item("터미널 열기")).toHaveTextContent("Alt+Ctrl+T");
+    rightClick(1); // a.txt
     await user.click(item("터미널 열기"));
     expect(menu()).toBeNull();
     await waitFor(() => expect([...backend.terminals.values()].map((t) => t.cwd)).toEqual(["/home/a"]));
-    await waitFor(() => expect(screen.getAllByRole("tablist")[1].textContent).toContain("터미널"));
+    await waitFor(() => expect(screen.getAllByRole("tablist")[1].textContent).toContain("터미널: a"));
+  });
+
+  it("터미널 열기: 폴더 행에서는 그 폴더에서 시작한다 (이슈 #46)", async () => {
+    const backend = seed();
+    const { user } = await renderApp(backend);
+    rightClick(0); // docs 폴더
+    await user.click(item("터미널 열기"));
+    await waitFor(() => expect([...backend.terminals.values()].map((t) => t.cwd)).toEqual(["/home/a/docs"]));
+    await waitFor(() => expect(screen.getAllByRole("tablist")[1].textContent).toContain("터미널: docs"));
   });
 
   it("경로 복사: 여러 항목을 선택했으면 줄바꿈으로 이어 복사한다", async () => {
