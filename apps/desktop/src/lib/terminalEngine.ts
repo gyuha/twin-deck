@@ -11,14 +11,19 @@ export interface TerminalEngine {
   onResize(cb: (size: { cols: number; rows: number }) => void): void;
   readonly cols: number;
   readonly rows: number;
+  /** 글꼴을 바꾸고 칸 수를 다시 맞춘다. */
+  setFontFamily(font: string): void;
   focus(): void;
   dispose(): void;
 }
 
-/** xterm.js를 처음 쓸 때 불러 엔진을 만든다. 패널 크기가 바뀌면 칸 수를 다시 맞춘다. */
-export async function createTerminalEngine(): Promise<TerminalEngine> {
+/** 설정 `behavior.preview_font`가 비었을 때 쓰는 글꼴(미리보기 본문의 `font-mono`와 같은 계열). */
+export const DEFAULT_TERMINAL_FONT = "ui-monospace, Menlo, Consolas, monospace";
+
+/** xterm.js를 처음 쓸 때 불러 엔진을 만든다. `fontFamily`는 미리보기 글꼴 설정이고 비면 기본 글꼴이다. 패널 크기가 바뀌면 칸 수를 다시 맞춘다. */
+export async function createTerminalEngine(fontFamily = ""): Promise<TerminalEngine> {
   const [{ Terminal }, { FitAddon }] = await Promise.all([import("@xterm/xterm"), import("@xterm/addon-fit"), import("@xterm/xterm/css/xterm.css")]);
-  const term = new Terminal({ fontSize: 13, fontFamily: "ui-monospace, Menlo, Consolas, monospace", cursorBlink: true });
+  const term = new Terminal({ fontSize: 13, fontFamily: fontFamily.trim() || DEFAULT_TERMINAL_FONT, cursorBlink: true });
   const fit = new FitAddon();
   term.loadAddon(fit);
   let observer: ResizeObserver | null = null;
@@ -39,6 +44,10 @@ export async function createTerminalEngine(): Promise<TerminalEngine> {
     },
     get rows() {
       return term.rows;
+    },
+    setFontFamily(font) {
+      term.options.fontFamily = font.trim() || DEFAULT_TERMINAL_FONT;
+      fit.fit();
     },
     focus: () => term.focus(),
     dispose: () => {

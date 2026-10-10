@@ -14,10 +14,13 @@ const hoisted = vi.hoisted(() => ({
     rows: number;
     emitData(d: string): void;
     emitResize(c: number, r: number): void;
+    fonts: string[];
   }[],
+  created: [] as string[],
 }));
 vi.mock("../lib/terminalEngine", () => ({
-  createTerminalEngine: async () => {
+  createTerminalEngine: async (font = "") => {
+    hoisted.created.push(font);
     let data: (d: string) => void = () => {};
     let resize: (s: { cols: number; rows: number }) => void = () => {};
     const eng = {
@@ -29,6 +32,7 @@ vi.mock("../lib/terminalEngine", () => ({
       rows: 30,
       emitData: (d: string) => data(d),
       emitResize: (c: number, r: number) => resize({ cols: c, rows: r }),
+      fonts: [] as string[],
     };
     hoisted.engines.push(eng);
     return {
@@ -42,6 +46,7 @@ vi.mock("../lib/terminalEngine", () => ({
       get rows() {
         return eng.rows;
       },
+      setFontFamily: (f: string) => void eng.fonts.push(f),
       focus: () => void eng.focused++,
       dispose: () => void (eng.disposed = true),
     };
@@ -56,6 +61,7 @@ const text = (e: Uint8Array | string) => (typeof e === "string" ? e : new TextDe
 
 beforeEach(() => {
   hoisted.engines.length = 0;
+  hoisted.created.length = 0;
 });
 
 describe("내장 터미널 패널", () => {
@@ -133,6 +139,19 @@ describe("내장 터미널 패널", () => {
     await user.keyboard("a"); // 파일 목록이면 Quick Select가 시작된다
     expect(screen.queryByRole("status", { name: "빠른 선택" })).toBeNull();
     expect(within(screen.getByRole("listbox", { name: "왼쪽 파일 목록" })).queryAllByRole("option").some((o) => o.getAttribute("data-cursor") === "true" && /sub/.test(o.textContent ?? ""))).toBe(true);
+  });
+
+  it("글꼴은 설정의 미리보기 글꼴(behavior.preview_font)을 따르고 바꾸면 열린 터미널에도 반영된다", async () => {
+    const b = backend();
+    b.setConfig((l) => (l.config.behavior.preview_font = "D2Coding, monospace"));
+    const { user } = await renderApp(b);
+    await user.keyboard(OPEN);
+    await waitFor(() => expect(hoisted.engines[0]?.opened).not.toBeNull());
+    expect(hoisted.created).toEqual(["D2Coding, monospace"]);
+    await waitFor(() => expect(hoisted.engines[0].fonts.at(-1)).toBe("D2Coding, monospace"));
+    act(() => b.setConfig((l) => (l.config.behavior.preview_font = "Fira Code")));
+    await waitFor(() => expect(hoisted.engines[0].fonts.at(-1)).toBe("Fira Code"));
+    expect(hoisted.engines).toHaveLength(1); // 글꼴을 바꿔도 터미널을 새로 만들지 않는다
   });
 
   it("셸이 끝나면 패널이 파일 목록으로 돌아온다", async () => {

@@ -304,7 +304,7 @@ export const en: Record<Key, string> = {
   "settings.item.behavior.ui_font.title": "UI font",
   "settings.item.behavior.ui_font.desc": "Font for the whole app. A CSS font-family value (e.g. Pretendard, sans-serif). Default is Menlo on macOS and Consolas on Windows. Empty uses the app default monospace",
   "settings.item.behavior.preview_font.title": "Preview font",
-  "settings.item.behavior.preview_font.desc": "Font for the body of text, code, JSON, and Markdown previews. Empty uses the default font",
+  "settings.item.behavior.preview_font.desc": "Font for the body of text, code, JSON, and Markdown previews and for the built-in terminal. Empty uses the default font",
   "settings.item.behavior.text_color.title": "Text color",
   "settings.item.behavior.text_color.desc": "Default text color for the app. Pick on the color wheel or type #rrggbb. Empty keeps the theme as is, and dim text is derived by blending this color toward the background. The color is the same for every theme, so it may become hard to read when the theme (especially system) changes — clear it then",
   "settings.item.behavior.table.icon_size.title": "Icon size",

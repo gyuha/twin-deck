@@ -9,6 +9,10 @@ export function TerminalView() {
   const { backend } = useAppStore();
   const id = useApp((s) => s.terminal?.id);
   const focused = useApp((s) => !!s.terminal?.focused);
+  // 글꼴은 미리보기 글꼴 설정(`behavior.preview_font`)을 따른다. 비우면 기본 글꼴이다.
+  const font = useApp((s) => s.loaded.config.behavior.preview_font);
+  const fontRef = useRef(font);
+  fontRef.current = font;
   const host = useRef<HTMLDivElement>(null);
   const engine = useRef<TerminalEngine | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +28,7 @@ export function TerminalView() {
       if (engine.current) engine.current.write(e.data);
       else pending?.push(e.data);
     });
-    createTerminalEngine().then(
+    createTerminalEngine(fontRef.current).then(
       (eng) => {
         if (disposed || !host.current) return eng.dispose();
         engine.current = eng;
@@ -47,6 +51,11 @@ export function TerminalView() {
       setReady(false);
     };
   }, [backend, id]);
+
+  // 설정에서 글꼴을 바꾸면 열려 있는 터미널에도 바로 반영한다.
+  useEffect(() => {
+    if (ready) engine.current?.setFontFamily(font);
+  }, [font, ready]);
 
   useEffect(() => {
     if (focused && ready) engine.current?.focus();
