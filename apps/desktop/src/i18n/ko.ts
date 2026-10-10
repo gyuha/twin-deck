@@ -173,6 +173,7 @@ export const ko = {
   "ctx.delete": "삭제",
   "ctx.rename": "이름 바꾸기",
   "ctx.copy_path": "경로 복사",
+  "ctx.terminal": "터미널 열기",
   "ctx.info": "파일 속성 표시",
   "store.virtual.no_create": "검색/분석 결과 탭에서는 새로 만들 수 없습니다. 폴더 탭에서 시도하세요",
   "store.virtual.no_dest": "검색/분석 결과 탭은 복사·이동의 대상이 될 수 없습니다. 반대편 패널을 폴더로 바꾸세요",

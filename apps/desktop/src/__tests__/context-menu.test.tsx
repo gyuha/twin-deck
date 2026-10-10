@@ -1,7 +1,12 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { FakeBackend } from "@twin-deck/ts-client";
 import { cursorName, list, renderApp, selectedNames } from "./helpers";
+
+// 터미널 열기 항목 시험용: xterm.js는 jsdom에서 그려지지 않으므로 화면 엔진을 비운 가짜로 바꾼다.
+vi.mock("../lib/terminalEngine", () => ({
+  createTerminalEngine: async () => ({ open() {}, write() {}, onData() {}, onResize() {}, setFontFamily() {}, focus() {}, dispose() {}, cols: 80, rows: 24 }),
+}));
 
 // 이름순: docs, a.txt, b.txt
 const seed = () => new FakeBackend().seed({ "/home/a/docs/in.txt": "x", "/home/a/a.txt": "a", "/home/a/b.txt": "b", "/home/b": null });
@@ -18,7 +23,7 @@ describe("파일 행 컨텍스트 메뉴", () => {
     expect(menu()).toBeNull();
     rightClick(1);
     expect(menu()).toBeTruthy();
-    expect(labels()).toEqual(["열기", "다음으로 열기", "여기에 압축…", "압축 풀기", "이동", "복사", "삭제", "이름 바꾸기", "경로 복사", "파일 속성 표시"]);
+    expect(labels()).toEqual(["열기", "다음으로 열기", "여기에 압축…", "압축 풀기", "이동", "복사", "삭제", "이름 바꾸기", "경로 복사", "터미널 열기", "파일 속성 표시"]);
     expect(within(menu()!).getAllByRole("separator")).toHaveLength(3);
   });
 
@@ -91,6 +96,17 @@ describe("파일 행 컨텍스트 메뉴", () => {
     await user.click(item("경로 복사"));
     expect(menu()).toBeNull();
     await waitFor(() => expect(backend.clipboard).toEqual(["/home/a/a.txt"]));
+  });
+
+  it("터미널 열기: 단축키 힌트가 나오고 클릭하면 이 패널 폴더에서 시작하는 터미널 탭이 반대편 패널에 생긴다 (이슈 #46)", async () => {
+    const backend = seed();
+    const { user } = await renderApp(backend);
+    rightClick(1);
+    expect(item("터미널 열기")).toHaveTextContent("Alt+Ctrl+T");
+    await user.click(item("터미널 열기"));
+    expect(menu()).toBeNull();
+    await waitFor(() => expect([...backend.terminals.values()].map((t) => t.cwd)).toEqual(["/home/a"]));
+    await waitFor(() => expect(screen.getAllByRole("tablist")[1].textContent).toContain("터미널"));
   });
 
   it("경로 복사: 여러 항목을 선택했으면 줄바꿈으로 이어 복사한다", async () => {
