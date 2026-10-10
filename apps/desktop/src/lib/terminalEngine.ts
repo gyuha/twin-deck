@@ -1,4 +1,5 @@
 // 터미널 화면 엔진. xterm.js로 그리고, 테스트에서는 이 모듈을 가짜로 바꾼다.
+import { installImeBridge } from "./imeBridge";
 
 export interface TerminalEngine {
   /** 화면을 `el` 안에 그리고 `el` 크기에 맞춘다. */
@@ -27,8 +28,12 @@ export async function createTerminalEngine(fontFamily = ""): Promise<TerminalEng
   const fit = new FitAddon();
   term.loadAddon(fit);
   let observer: ResizeObserver | null = null;
+  let removeIme: (() => void) | null = null;
+  let sendData: (data: string) => void = () => {};
   return {
     open(el) {
+      // 한글 조합은 xterm이 아니라 직접 받는다(WebKit에서 모음이 빠지는 문제). 확정된 글은 일반 입력과 같은 길로 보낸다.
+      removeIme = installImeBridge(el, (text) => sendData(text));
       term.open(el);
       fit.fit();
       if (typeof ResizeObserver !== "undefined") {
@@ -37,7 +42,10 @@ export async function createTerminalEngine(fontFamily = ""): Promise<TerminalEng
       }
     },
     write: (data) => term.write(data),
-    onData: (cb) => void term.onData(cb),
+    onData: (cb) => {
+      sendData = cb;
+      term.onData(cb);
+    },
     onResize: (cb) => void term.onResize(cb),
     get cols() {
       return term.cols;
@@ -53,6 +61,7 @@ export async function createTerminalEngine(fontFamily = ""): Promise<TerminalEng
     focus: () => term.focus(),
     dispose: () => {
       observer?.disconnect();
+      removeIme?.();
       fit.dispose();
       term.dispose();
     },
