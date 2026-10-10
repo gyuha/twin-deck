@@ -819,6 +819,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
   // 다른 앱(Finder)에서 끌어 온 파일: Tauri가 OS 드롭을 가로채 이벤트로 알린다(이슈 #39).
   subscribe(() => backend.onFileDrop((e) => api.externalDrop(e, typeof document !== "undefined" && document.elementFromPoint ? document.elementFromPoint(e.x, e.y) : null)));
   // 내장 터미널의 셸이 끝나면(exit, Ctrl+D) 패널이 파일 목록으로 돌아온다(이슈 #46).
+  // 실행 중인 앱에 `td` 명령이 경로를 넘기면 같은 규칙으로 연다(이슈 #45).
+  subscribe(() => backend.onOpenPaths((request) => void api.openPaths(request)));
   subscribe(() => backend.onTerminalEvent((e) => e.type === "exit" && void api.terminalExited(e.id)));
   subscribe(() => backend.onDirChanged((path) => {
     for (const pane of ["left", "right"] as const) {
@@ -1220,6 +1222,9 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       // 복원이 끝난 상태를 기준으로 삼아, 그 뒤에 달라진 것만 저장한다.
       lastSaved = JSON.stringify(toSnapshot());
       saveEnabled = true;
+      // 터미널에서 `td 폴더`로 시작했다면 복원이 끝난 뒤 한 번만 연다(가져가면 비워서 StrictMode의 두 번째 init에는 없다).
+      const launch = await backend.takeLaunchPaths().catch(() => null);
+      if (launch) await api.openPaths(launch);
     },
     /** 저장을 미루지 않고 지금 저장한다(창을 닫기 직전 등). */
     saveNow,
@@ -1388,6 +1393,51 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const tab = activeTab(get());
       const c = cursorEntry(tab);
       await api.terminalFocus(c && isFolderEntry(c) ? c.path : undefined);
+    },
+    /**
+     * "명령줄 도구 설치"(`core.cli.install`): 터미널에서 `td 폴더`로 앱을 열 수 있게 한다. 설치돼 있으면 알리기만 하고, 남의 `td`가 있으면 건드리지 않고
+     * 알리며, 그 밖에는 무엇을 하는지 확인 창으로 보여 준 뒤 설치한다.
+     */
+    async installCli() {
+      const st = await backend.cliStatus().catch((e) => void fail(e));
+      if (!st) return;
+      if (st.state === "unsupported") return fail(tr("cli.notice.unsupported"));
+      if (st.state === "foreign") return fail(tr("cli.notice.foreign", { link: st.link }));
+      if (st.state === "installed") return fail(tr("cli.notice.already"));
+      const ok = await ask<boolean>({
+        kind: "confirm",
+        title: tr("cli.install.title"),
+        lines: [tr(st.link.toLowerCase().endsWith(".cmd") ? "cli.install.line_win" : "cli.install.line_mac", { link: st.link })],
+        confirmLabel: tr("cli.install.confirm"),
+      });
+      if (!ok) return;
+      try {
+        await backend.cliInstall();
+        fail(tr("cli.notice.installed"));
+      } catch (e) {
+        fail(e);
+      }
+    },
+    /** "명령줄 도구 제거"(`core.cli.uninstall`): 우리가 만든 것만 지운다. 없으면 알리기만 하고, 남의 `td`면 건드리지 않는다. */
+    async uninstallCli() {
+      const st = await backend.cliStatus().catch((e) => void fail(e));
+      if (!st) return;
+      if (st.state === "unsupported") return fail(tr("cli.notice.unsupported"));
+      if (st.state === "foreign") return fail(tr("cli.notice.foreign", { link: st.link }));
+      if (st.state === "absent") return fail(tr("cli.notice.not_installed"));
+      const ok = await ask<boolean>({
+        kind: "confirm",
+        title: tr("cli.uninstall.title"),
+        lines: [tr("cli.uninstall.line", { link: st.link })],
+        confirmLabel: tr("cli.uninstall.confirm"),
+      });
+      if (!ok) return;
+      try {
+        await backend.cliUninstall();
+        fail(tr("cli.notice.removed"));
+      } catch (e) {
+        fail(e);
+      }
     },
     /** 셸이 끝났다: 그 세션의 터미널 탭을 없앤다. 패널의 마지막 탭이면 시작한 폴더를 보는 파일 탭으로 바꾼다. */
     async terminalExited(id: number) {
@@ -1634,6 +1684,33 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         panes: { ...s.panes, [pane]: { tabs: [...p.tabs, tab], active: p.tabs.length } },
       });
       await reload(pane, tab.id);
+      await syncWatches();
+    },
+    /**
+     * `td` 명령이 넘긴 요청을 연다: 왼쪽 경로는 왼쪽 패널, 오른쪽 경로는 오른쪽 패널에 새 탭으로 열고 활성으로 한다.
+     * 오류면 알림만 보이고 아무것도 열지 않는다. 열린 탭이 속한 패널(왼쪽 우선)이 활성 패널이 된다.
+     */
+    async openPaths(request: { left: { folder: string; focus: string | null } | null; right: { folder: string; focus: string | null } | null; error: string | null }) {
+      if (request.error) return fail(request.error);
+      if (request.right) await api.openFolderTab("right", request.right.folder, request.right.focus ?? undefined);
+      if (request.left) await api.openFolderTab("left", request.left.folder, request.left.focus ?? undefined);
+    },
+    /**
+     * `pane`에서 `folder`를 보는 탭을 활성으로 한다. 그 패널에 같은 폴더를 보는 탭이 이미 있으면 새로 만들지 않고 그 탭을 쓴다
+     * (같은 `td .`를 여러 번 쳐도 탭이 쌓이지 않게). `focus`가 있으면 커서를 그 이름에 둔다. 그 패널이 활성 패널이 된다.
+     */
+    async openFolderTab(pane: PaneId, folder: string, focus?: string) {
+      const s = get();
+      const p = s.panes[pane];
+      const index = p.tabs.findIndex((t) => !t.virtual && t.path === folder);
+      if (index >= 0) {
+        set({ activePane: pane, panes: { ...s.panes, [pane]: { ...p, active: index } } });
+        if (focus) await reload(pane, p.tabs[index].id, focus);
+        return;
+      }
+      const tab = newTab(folder);
+      set({ activePane: pane, panes: { ...s.panes, [pane]: { tabs: [...p.tabs, tab], active: p.tabs.length } } });
+      await reload(pane, tab.id, focus);
       await syncWatches();
     },
     async closeTab() {

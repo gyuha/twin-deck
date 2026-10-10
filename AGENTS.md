@@ -115,10 +115,11 @@ flowchart TD
 
 - macOS filenames are NFD on disk/SMB but the UI uses NFC. `td-vfs/src/local.rs` retries failed stat/create/copy/rename/remove with an NFD path (`retry_nfd`); SMB shares return "not found" for NFC paths, which previously broke copy and conflict detection. Keep that when adding new `LocalFs` operations.
 - Windows and Linux code paths exist (`cfg(windows)`) but are only compile-verified from macOS.
+- The whole app crate can't be cross-checked for Windows from macOS (`zstd-sys` needs the MSVC C toolchain), so keep Windows-only code in small C-free crates like `crates/td-cli` and check it with `rustup target add x86_64-pc-windows-msvc && cargo clippy -p td-cli --target x86_64-pc-windows-msvc -- -D warnings`. The NSIS installer itself (`windows/hooks.nsh`) can only be verified by building on Windows.
 
 ## Verifying in the real app
 
-Tests don't cover WKWebView behavior (drag, media, scrolling). To check the real UI, run an isolated instance (`HOME=/tmp/td-iso target/debug/twin-deck-desktop` with a pre-written `state.json`/`config.toml` under `~/Library/Application Support/dev.twindeck.app`; it loads the frontend from the Vite dev server). Send keys/mouse only to that instance's pid — the user's own `tauri dev` app has the same executable name, so never select processes by name.
+Tests don't cover WKWebView behavior (drag, media, scrolling). To check the real UI, run an isolated instance (`HOME=/tmp/td-iso target/debug/twin-deck-desktop` with a pre-written `state.json`/`config.toml` under `~/Library/Application Support/dev.twindeck.app`; it loads the frontend from the Vite dev server). Set `TWIN_DECK_MULTI=1` for it, otherwise the single-instance plugin hands the launch to your running app and exits. Send keys/mouse only to that instance's pid — the user's own `tauri dev` app has the same executable name, so never select processes by name.
 
 ## Workflow notes
 

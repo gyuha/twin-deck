@@ -29,6 +29,8 @@ td-state = { path = "../../../crates/td-state" }
 td-volumes = { path = "../../../crates/td-volumes" }
 td-watch = { path = "../../../crates/td-watch" }
 td-terminal = { path = "../../../crates/td-terminal" }
+td-cli = { path = "../../../crates/td-cli" }
+tauri-plugin-single-instance = "2"
 base64 = "0.22"
 clipboard-rs = "0.3.5"
 drag = "2.1.1"

@@ -105,6 +105,8 @@ export function queueHandlers({ api }: AppStore): Partial<ActionHandlers> {
     "core.queue.open": () => api.toggleQueue(),
     "core.terminal.focus": () => api.terminalFocus(),
     "core.terminal.open_folder": () => api.terminalOpenCursorFolder(),
+    "core.cli.install": () => api.installCli(),
+    "core.cli.uninstall": () => api.uninstallCli(),
     "core.queue.close": () => api.toggleQueue(),
     "core.queue.up": () => api.queueMove(-1),
     "core.queue.down": () => api.queueMove(1),

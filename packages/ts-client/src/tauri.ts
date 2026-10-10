@@ -4,7 +4,7 @@ import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { BackendError } from "./backend";
 import type { Backend, FileDropEvent, SearchEvent, TerminalEvent } from "./backend";
 import { commands, events } from "./generated/bindings";
-import type { ConfigValue, ConflictDto, ExpectedFileDto, FileInfoDto, FindSpecDto, JobDto, LoadedState, PreviewDto, PreviewRectDto, QuickLookDto, EpubInfoDto, ShowOutcome, Snapshot, JobKindDto, Loaded, QueueItemDto, Result, WriteTextResultDto } from "./generated/bindings";
+import type { CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigValue, ConflictDto, ExpectedFileDto, FileInfoDto, FindSpecDto, JobDto, LoadedState, PreviewDto, PreviewRectDto, QuickLookDto, EpubInfoDto, ShowOutcome, Snapshot, JobKindDto, Loaded, QueueItemDto, Result, WriteTextResultDto } from "./generated/bindings";
 
 function unwrap<T>(r: Result<T, string>): T {
   if (r.status === "error") throw new BackendError(r.error);
@@ -81,6 +81,24 @@ export class TauriBackend implements Backend {
   }
   async queueClearFinished() {
     await commands.queueClearFinished();
+  }
+  async cliStatus(): Promise<CliStatusDto> {
+    return unwrap(await commands.cliStatus());
+  }
+  async cliInstall(): Promise<CliOutcomeDto> {
+    return unwrap(await commands.cliInstall());
+  }
+  async cliUninstall(): Promise<CliOutcomeDto> {
+    return unwrap(await commands.cliUninstall());
+  }
+  async takeLaunchPaths() {
+    return commands.takeLaunchPaths();
+  }
+  onOpenPaths(callback: (request: OpenPathsDto) => void) {
+    const unlisten = events.openPaths.listen((e) => callback(e.payload.request));
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
   }
   async terminalOpen(cwd: string, cols: number, rows: number) {
     return unwrap(await commands.terminalOpen(cwd, cols, rows));

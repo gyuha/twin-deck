@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod cli;
 mod commands;
 mod epub;
 mod preview_handler;
@@ -13,7 +14,8 @@ use td_ops::SystemTrash;
 
 use commands::{
     specta_builder, AppLaunch, AppService, AppVolumes, ConfigChanged, ConfigState, DirChanged,
-    QueueChanged, SearchChunk, SearchDone, TerminalExit, TerminalOutput, UsageUpdate,
+    LaunchPaths, OpenPaths, OpenPathsDto, QueueChanged, SearchChunk, SearchDone, TerminalExit,
+    TerminalOutput, UsageUpdate,
 };
 use service::{coalesce, SearchMsg};
 use std::time::Duration;
@@ -25,7 +27,31 @@ pub fn apply_config(svc: &AppService, loaded: &td_config::Loaded) {
     svc.set_preview_limits(&loaded.config.preview);
 }
 
+/// 터미널에서 `td`로 불린 요청을 해석해 화면에 알리고 창을 앞으로 가져온다(이미 떠 있던 앱이 받는다).
+fn handle_second_instance(app: &tauri::AppHandle, argv: Vec<String>, cwd: String) {
+    let request = OpenPathsDto::from_result(cli::launch_request(
+        argv.get(1..).unwrap_or(&[]),
+        std::path::Path::new(&cwd),
+    ));
+    let _ = OpenPaths { request }.emit(app);
+    let window = app
+        .get_webview_window("main")
+        .or_else(|| app.webview_windows().into_values().next());
+    if let Some(w) = window {
+        let _ = w.unminimize();
+        let _ = w.show();
+        let _ = w.set_focus();
+    }
+}
+
 fn main() {
+    // 설치 파일이 `--td-install-cli`/`--td-uninstall-cli`로 앱을 한 번 실행하면 화면 없이 `td` 명령만 설치·제거하고 끝난다.
+    if let Some(flag) = cli::manage_flag(&std::env::args().skip(1).collect::<Vec<_>>()) {
+        std::process::exit(cli::run_manage(flag));
+    }
+    // `td`라는 이름으로 불렸으면 인수를 검사하고 터미널에서 떨어져 나온다(앱 시작보다 먼저).
+    #[cfg(unix)]
+    cli::detach_if_td();
     let builder = specta_builder();
     let (service, channels) = AppService::new(SystemTrash).expect("서비스 초기화 실패");
     let (changes, queue_events, search_events, terminal_events) = (
@@ -35,7 +61,23 @@ fn main() {
         channels.terminal_events,
     );
 
-    tauri::Builder::default()
+    // 시작 인수(`td 폴더`)를 한 번 해석해 두고, 화면이 상태를 복원한 뒤 가져가 연다.
+    let launch = {
+        let args: Vec<String> = std::env::args().skip(1).collect();
+        let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("/"));
+        match cli::launch_request(&args, &cwd) {
+            Ok(req) if req == cli::OpenRequest::default() => None,
+            other => Some(OpenPathsDto::from_result(other)),
+        }
+    };
+    let mut app = tauri::Builder::default();
+    // 이미 떠 있으면 그 앱으로 경로를 넘기고 끝난다. 개발·시험으로 여러 개를 띄워야 하면 TWIN_DECK_MULTI=1.
+    if std::env::var_os("TWIN_DECK_MULTI").is_none() {
+        app = app.plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
+            handle_second_instance(app, argv, cwd)
+        }));
+    }
+    app
         // 창은 숨긴 채 만들어지고(tauri.conf.json), 저장된 위치로 복원된 뒤 화면이 처음 그려졌을 때 보인다.
         // 기본 위치에 보였다가 옮겨지는 깜빡임을 막는다.
         .on_page_load(|webview, payload| {
@@ -58,6 +100,7 @@ fn main() {
         )
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(service)
+        .manage(LaunchPaths(std::sync::Mutex::new(launch)))
         .manage(preview_handler::PreviewHandlers::default())
         .manage(AppLaunch::new(
             td_launch::SystemLauncher,
@@ -220,11 +263,16 @@ mod capability_tests {
             "core:default 권한이 없다"
         );
 
+        // 화면이 부르는 명령이 없어 권한 파일 자체가 없는 플러그인(single-instance는 `permissions` 디렉터리가 없다).
+        const NO_PERMISSIONS: [&str; 1] = ["single-instance"];
         let manifest =
             fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml")).unwrap();
         for line in manifest.lines() {
             if let Some(rest) = line.trim().strip_prefix("tauri-plugin-") {
                 let name = rest.split(['=', ' ']).next().unwrap();
+                if NO_PERMISSIONS.contains(&name) {
+                    continue;
+                }
                 let prefix = format!("{name}:");
                 assert!(
                     perms.iter().any(|p| p.starts_with(&prefix)),

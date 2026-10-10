@@ -1,4 +1,9 @@
 export type {
+  CliOutcomeDto,
+  CliStateDto,
+  CliStatusDto,
+  OpenPathsDto,
+  OpenTargetDto,
   BindingSpec,
   Config,
   ConfigValue,

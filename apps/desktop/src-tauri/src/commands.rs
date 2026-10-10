@@ -72,6 +72,141 @@ pub struct TerminalExit {
     pub code: Option<u32>,
 }
 
+/// `td` 명령의 설치 상태.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "lowercase")]
+pub enum CliStateDto {
+    Absent,
+    Installed,
+    /// 다른 프로그램의 `td`가 있다(macOS).
+    Foreign,
+    Unsupported,
+}
+
+/// 설치 상태와, 링크(macOS) 또는 `td.cmd`(Windows)의 위치.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct CliStatusDto {
+    pub state: CliStateDto,
+    pub link: String,
+}
+
+/// 설치·제거를 한 결과.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub enum CliOutcomeDto {
+    Installed,
+    AlreadyInstalled,
+    Removed,
+    NotInstalled,
+}
+
+impl From<td_cli::Status> for CliStatusDto {
+    fn from(s: td_cli::Status) -> Self {
+        let state = match s.state {
+            td_cli::State::Absent => CliStateDto::Absent,
+            td_cli::State::Installed => CliStateDto::Installed,
+            td_cli::State::Foreign => CliStateDto::Foreign,
+            td_cli::State::Unsupported => CliStateDto::Unsupported,
+        };
+        Self {
+            state,
+            link: s.link,
+        }
+    }
+}
+
+impl From<td_cli::Outcome> for CliOutcomeDto {
+    fn from(o: td_cli::Outcome) -> Self {
+        match o {
+            td_cli::Outcome::Installed => CliOutcomeDto::Installed,
+            td_cli::Outcome::AlreadyInstalled => CliOutcomeDto::AlreadyInstalled,
+            td_cli::Outcome::Removed => CliOutcomeDto::Removed,
+            td_cli::Outcome::NotInstalled => CliOutcomeDto::NotInstalled,
+        }
+    }
+}
+
+/// 이 앱의 실제 실행 파일(링크를 푼 경로).
+fn app_exe() -> ServiceResult<std::path::PathBuf> {
+    std::env::current_exe()
+        .and_then(std::fs::canonicalize)
+        .map_err(|e| format!("앱 실행 파일 위치를 알 수 없습니다: {e}"))
+}
+
+/// `td` 명령의 설치 상태를 돌려준다.
+#[tauri::command]
+#[specta::specta]
+pub async fn cli_status() -> ServiceResult<CliStatusDto> {
+    let exe = app_exe()?;
+    Ok(td_cli::status(&exe).into())
+}
+
+/// `td` 명령을 설치한다. macOS에서는 관리자 암호 창이 뜰 수 있어 UI 스레드를 막지 않게 따로 돌린다.
+#[tauri::command]
+#[specta::specta]
+pub async fn cli_install() -> ServiceResult<CliOutcomeDto> {
+    let exe = app_exe()?;
+    tauri::async_runtime::spawn_blocking(move || td_cli::install(&exe).map(Into::into))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// `td` 명령을 제거한다(우리가 만든 것만).
+#[tauri::command]
+#[specta::specta]
+pub async fn cli_uninstall() -> ServiceResult<CliOutcomeDto> {
+    let exe = app_exe()?;
+    tauri::async_runtime::spawn_blocking(move || td_cli::uninstall(&exe).map(Into::into))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// `td` 명령으로 넘어온, 패널에 열 한 곳. 파일을 주면 `folder`는 그 파일이 든 폴더이고 `focus`가 파일 이름이다.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct OpenTargetDto {
+    pub folder: String,
+    pub focus: Option<String>,
+}
+
+/// `td` 명령이 앱에 넘긴 요청: 왼쪽·오른쪽 패널에 새 탭으로 열 곳과, 해석에 실패했을 때의 오류 문구.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, Type)]
+pub struct OpenPathsDto {
+    pub left: Option<OpenTargetDto>,
+    pub right: Option<OpenTargetDto>,
+    pub error: Option<String>,
+}
+
+impl OpenPathsDto {
+    pub fn from_result(r: Result<crate::cli::OpenRequest, crate::cli::CliError>) -> Self {
+        let dto = |t: crate::cli::OpenTarget| OpenTargetDto {
+            folder: t.folder,
+            focus: t.focus,
+        };
+        match r {
+            Ok(req) => Self {
+                left: req.left.map(dto),
+                right: req.right.map(dto),
+                error: None,
+            },
+            Err(e) => Self {
+                left: None,
+                right: None,
+                error: Some(e.message()),
+            },
+        }
+    }
+}
+
+/// 실행 중인 앱에 `td` 명령이 경로를 넘겼다(단일 인스턴스).
+#[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
+pub struct OpenPaths {
+    pub request: OpenPathsDto,
+}
+
+/// 앱이 시작될 때 받은 `td` 인수. 화면이 처음 한 번 가져가면 비운다.
+#[derive(Default)]
+pub struct LaunchPaths(pub std::sync::Mutex<Option<OpenPathsDto>>);
+
 /// 설정이 바뀌었다(파일 감시). 문법 오류가 있으면 이전 유효 설정과 경고가 온다.
 #[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
 pub struct ConfigChanged {
@@ -776,6 +911,13 @@ pub fn terminal_close(svc: State<'_, AppService>, id: u32) -> ServiceResult<()> 
     svc.terminal_close(id)
 }
 
+/// 시작 인수로 받은 `td` 요청을 한 번 돌려준다(없으면 null). 가져가면 비워서 두 번 적용되지 않는다.
+#[tauri::command]
+#[specta::specta]
+pub fn take_launch_paths(state: State<'_, LaunchPaths>) -> Option<OpenPathsDto> {
+    state.0.lock().unwrap().take()
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn watch_dir(svc: State<'_, AppService>, path: String) -> ServiceResult<()> {
@@ -883,6 +1025,10 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             queue_abort,
             queue_clear_finished,
             rename_entry,
+            take_launch_paths,
+            cli_status,
+            cli_install,
+            cli_uninstall,
             terminal_open,
             terminal_write,
             terminal_resize,
@@ -905,7 +1051,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             UsageUpdate,
             SearchDone,
             TerminalOutput,
-            TerminalExit
+            TerminalExit,
+            OpenPaths
         ])
 }
 

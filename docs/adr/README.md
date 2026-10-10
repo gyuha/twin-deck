@@ -35,5 +35,6 @@
 | [0014](0014-macos-office-quicklook-preview.md) | macOS Office 미리보기는 Quick Look HTML을 스크립트 없는 iframe으로 | Accepted |
 | [0015](0015-windows-office-preview-handler.md) | Windows Office 미리보기는 미리보기 처리기를 앱 창 위에 네이티브 창으로 | Accepted |
 | [0016](0016-i18n-dictionary-and-rust-catalog.md) | 다국어: 직접 만든 사전과 Rust 문구 대응표 | Accepted |
+| [0017](0017-td-command-is-the-app-executable.md) | `td` 명령은 앱 실행 파일 자체이고, Windows 설치 훅은 앱을 한 번 실행해 설치한다 | Accepted |
 
 Accepted는 2026-09-29에 사용자가 설계안을 승인한 결정이다. 세부 사항(버전, 라이브러리 선택)은 각 문서의 "미확인 과제"에 남아 있다.

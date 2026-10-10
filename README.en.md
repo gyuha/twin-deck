@@ -69,6 +69,28 @@ Press **Check for Updates** at the top of the Settings screen (`Mod+,`; on macOS
 
 `Mod` is `Cmd` on macOS and `Ctrl` on Windows.
 
+### Open from a terminal: `td`
+
+`td folder` opens Twin Deck from a terminal.
+
+```sh
+td .          # the current folder as a new tab in the left pane
+td ~/work     # that folder as a new tab in the left pane
+td a b        # a in the left pane, b in the right pane, each as a new tab
+td notes.txt  # opens the folder containing the file and puts the cursor on it
+```
+
+- If Twin Deck is already running, the paths are handed to it and its window comes to the front; otherwise the app starts. If that pane already has a tab for the same folder, it switches to that tab instead of making a new one.
+- A path that does not exist prints an error (exit code 1); three or more paths or any option prints the usage (exit code 2) in the terminal. (On Windows the app shows a notice instead.)
+- **Install**: Homebrew (`brew install --cask gyuha/tap/twin-deck`) links `td` automatically, and the Windows installer adds `td` to your user PATH (it works in terminals opened afterwards). For a directly downloaded macOS app, use **Install Command Line Tool (td)** in the actions panel (`Mod+Shift+P`; it may ask for an administrator password), or link it with one line:
+
+  ```sh
+  sudo ln -s '/Applications/Twin Deck.app/Contents/MacOS/twin-deck-desktop' /usr/local/bin/td
+  ```
+
+  **Uninstall Command Line Tool (td)** removes it; it only removes what this app created and never touches another program's `td`.
+- The name `td` can clash with other tools such as the Treasure Data CLI. The in-app install action never overwrites another `td` and tells you instead, and Homebrew stops the install if a link with the same name already exists.
+
 ## Getting started
 
 When you open the app you see two panes. The one with the highlighted border is the pane you are using, and copy and move go from it to the folder in the opposite pane. Learn these keys first.

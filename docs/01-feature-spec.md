@@ -115,7 +115,7 @@ Marta의 기본 키는 Total Commander 계열(F5 복사, F6 이동 등)을 따�
 | TERM-03 | 터미널 cwd와 패널 위치의 양방향 동기화 (중첩 셸/ssh 제외) | 같음 | P2 | 셸 통합 방식은 OS/셸별 검증 필요 `[낮음]` |
 | TERM-04 | 터미널 테마, 폰트, 셸, 환경 변수 설정 | 같음 | P2 | |
 | TERM-05 | 외부 터미널 실행 (F11) | 같음 | P2 | OS별 기본 터미널 |
-| CLI-01 | `twin-deck .` / `twin-deck a b` (두 경로를 두 패널로), `--existing-tab`, `--new-window` | `/docs/advanced/cli/` | P2 | 실행 파일 심볼릭 링크 대신 설치기가 PATH 등록 |
+| CLI-01 | `td .` / `td a b` (두 경로를 두 패널로) | `/docs/advanced/cli/` | P2 | 구현됨(이슈 #45): `td 폴더`/`td a b`(왼쪽·오른쪽 패널 새 탭, 단일 인스턴스, 터미널 분리). 설치는 Homebrew Cask `binary`·Windows 설치 파일 훅·앱 안 설치 액션(`core.cli.install`). `--existing-tab`·`--new-window`는 없다 |
 
 ## 9. 커스터마이징
 

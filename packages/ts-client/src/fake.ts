@@ -25,6 +25,9 @@ import type {
   FindSpecDto,
   ExpectedFileDto,
   WriteTextResultDto,
+  OpenPathsDto,
+  CliOutcomeDto,
+  CliStatusDto,
 } from "./generated/bindings";
 import { globMatch } from "./glob";
 import defaultConfigJson from "./generated/default-config.json";
@@ -1168,6 +1171,62 @@ export class FakeBackend implements Backend {
   terminalWrites: { id: number; data: string }[] = [];
   private nextTerminal = 1;
   private terminalListeners = new Set<(e: TerminalEvent) => void>();
+
+  /** `td` 명령의 설치 상태(테스트가 바꾼다). `cliInstall`·`cliUninstall`이 그 상태를 바꾼다. */
+  cli: CliStatusDto = { state: "absent", link: "/usr/local/bin/td" };
+  /** `cliInstall`·`cliUninstall`을 부른 횟수. */
+  cliCalls = { install: 0, uninstall: 0 };
+  /** 다음 `cliInstall`·`cliUninstall`이 던질 오류(한 번 쓰면 비운다). */
+  cliError: string | null = null;
+
+  async cliStatus(): Promise<CliStatusDto> {
+    return { ...this.cli };
+  }
+
+  async cliInstall(): Promise<CliOutcomeDto> {
+    this.cliCalls.install++;
+    this.throwCliError();
+    if (this.cli.state === "foreign") throw new Error("다른 td가 이미 있어 덮어쓰지 않습니다");
+    const was = this.cli.state === "installed";
+    this.cli = { ...this.cli, state: "installed" };
+    return was ? "alreadyInstalled" : "installed";
+  }
+
+  async cliUninstall(): Promise<CliOutcomeDto> {
+    this.cliCalls.uninstall++;
+    this.throwCliError();
+    if (this.cli.state === "foreign") throw new Error("다른 td라서 지우지 않습니다");
+    const was = this.cli.state === "installed";
+    this.cli = { ...this.cli, state: "absent" };
+    return was ? "removed" : "notInstalled";
+  }
+
+  private throwCliError() {
+    if (!this.cliError) return;
+    const e = this.cliError;
+    this.cliError = null;
+    throw new Error(e);
+  }
+
+  /** 시작 인수로 받은 `td` 요청(테스트가 앱을 그리기 전에 넣는다). 한 번 가져가면 비운다. */
+  launchPaths: OpenPathsDto | null = null;
+  private openPathsListeners = new Set<(request: OpenPathsDto) => void>();
+
+  async takeLaunchPaths() {
+    const l = this.launchPaths;
+    this.launchPaths = null;
+    return l;
+  }
+
+  onOpenPaths(callback: (request: OpenPathsDto) => void) {
+    this.openPathsListeners.add(callback);
+    return () => void this.openPathsListeners.delete(callback);
+  }
+
+  /** 실행 중인 앱에 `td` 명령이 경로를 넘긴 것처럼 만든다(테스트용). */
+  emitOpenPaths(request: OpenPathsDto): void {
+    for (const l of [...this.openPathsListeners]) l(request);
+  }
 
   async terminalOpen(cwd: string, cols: number, rows: number) {
     const id = this.nextTerminal++;

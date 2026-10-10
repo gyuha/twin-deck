@@ -434,6 +434,45 @@ async renameEntry(path: string, newName: string) : Promise<Result<string, string
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * 시작 인수로 받은 `td` 요청을 한 번 돌려준다(없으면 null). 가져가면 비워서 두 번 적용되지 않는다.
+ */
+async takeLaunchPaths() : Promise<OpenPathsDto | null> {
+    return await TAURI_INVOKE("take_launch_paths");
+},
+/**
+ * `td` 명령의 설치 상태를 돌려준다.
+ */
+async cliStatus() : Promise<Result<CliStatusDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cli_status") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * `td` 명령을 설치한다. macOS에서는 관리자 암호 창이 뜰 수 있어 UI 스레드를 막지 않게 따로 돌린다.
+ */
+async cliInstall() : Promise<Result<CliOutcomeDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cli_install") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * `td` 명령을 제거한다(우리가 만든 것만).
+ */
+async cliUninstall() : Promise<Result<CliOutcomeDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cli_uninstall") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async terminalOpen(cwd: string, cols: number, rows: number) : Promise<Result<number, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("terminal_open", { cwd, cols, rows }) };
@@ -541,6 +580,7 @@ async cancelDirSize(path: string) : Promise<void> {
 export const events = __makeEvents__<{
 configChanged: ConfigChanged,
 dirChanged: DirChanged,
+openPaths: OpenPaths,
 queueChanged: QueueChanged,
 searchChunk: SearchChunk,
 searchDone: SearchDone,
@@ -550,6 +590,7 @@ usageUpdate: UsageUpdate
 }>({
 configChanged: "config-changed",
 dirChanged: "dir-changed",
+openPaths: "open-paths",
 queueChanged: "queue-changed",
 searchChunk: "search-chunk",
 searchDone: "search-done",
@@ -655,6 +696,22 @@ args: Partial<{ [key in string]: string }>;
  * 스코프를 강제로 지정할 때만 값이 있다.
  */
 scope: string | null }
+/**
+ * 설치·제거를 한 결과.
+ */
+export type CliOutcomeDto = "installed" | "alreadyInstalled" | "removed" | "notInstalled"
+/**
+ * `td` 명령의 설치 상태.
+ */
+export type CliStateDto = "absent" | "installed" | 
+/**
+ * 다른 프로그램의 `td`가 있다(macOS).
+ */
+"foreign" | "unsupported"
+/**
+ * 설치 상태와, 링크(macOS) 또는 `td.cmd`(Windows)의 위치.
+ */
+export type CliStatusDto = { state: CliStateDto; link: string }
 export type Config = { behavior: Behavior; display: Display; environment: Environment; core: CoreConfig; 
 /**
  * 미리보기 옵션.
@@ -781,6 +838,18 @@ export type LoadedState = { snapshot: Snapshot | null;
  * 파일이 있었지만 읽을 수 없어 무시했다면 그 이유.
  */
 warning: string | null }
+/**
+ * 실행 중인 앱에 `td` 명령이 경로를 넘겼다(단일 인스턴스).
+ */
+export type OpenPaths = { request: OpenPathsDto }
+/**
+ * `td` 명령이 앱에 넘긴 요청: 왼쪽·오른쪽 패널에 새 탭으로 열 곳과, 해석에 실패했을 때의 오류 문구.
+ */
+export type OpenPathsDto = { left: OpenTargetDto | null; right: OpenTargetDto | null; error: string | null }
+/**
+ * `td` 명령으로 넘어온, 패널에 열 한 곳. 파일을 주면 `folder`는 그 파일이 든 폴더이고 `focus`가 파일 이름이다.
+ */
+export type OpenTargetDto = { folder: string; focus: string | null }
 export type PaneSnap = { tabs: TabSnap[]; active: number }
 /**
  * 미리보기 옵션. 사운드/비디오는 기본으로 자동 재생하지 않고 재생 UI만 띄운다.

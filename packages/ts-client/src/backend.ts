@@ -1,4 +1,4 @@
-import type { ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, EpubInfoDto, ExpectedFileDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, LoadedState, PreviewDto, PreviewRectDto, QueueItemDto, QuickLookDto, SearchStartDto, ShowOutcome, SearchSummaryDto, Snapshot, UpdateInfoDto, UserDirsDto, VolumeDto, WriteTextResultDto } from "./generated/bindings";
+import type { CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, EpubInfoDto, ExpectedFileDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, LoadedState, PreviewDto, PreviewRectDto, QueueItemDto, QuickLookDto, SearchStartDto, ShowOutcome, SearchSummaryDto, Snapshot, UpdateInfoDto, UserDirsDto, VolumeDto, WriteTextResultDto } from "./generated/bindings";
 
 /** Look Up / Flatten / Disk Usage가 스트리밍으로 보내는 이벤트. 작업마다 마지막은 `done`이다. */
 export type SearchEvent =
@@ -165,6 +165,16 @@ export interface Backend {
   unwatch(path: string): Promise<void>;
   /** 감시 중인 디렉터리가 바뀌면 호출된다. 구독 해제 함수를 돌려준다. */
   onDirChanged(callback: (path: string) => void): () => void;
+  /** `td` 명령의 설치 상태(macOS: `/usr/local/bin/td` 링크, Windows: `td.cmd`와 사용자 PATH). */
+  cliStatus(): Promise<CliStatusDto>;
+  /** `td` 명령을 설치한다. macOS에서는 관리자 암호 창이 뜰 수 있다. */
+  cliInstall(): Promise<CliOutcomeDto>;
+  /** `td` 명령을 제거한다(우리가 만든 것만). */
+  cliUninstall(): Promise<CliOutcomeDto>;
+  /** 시작 인수(`td 폴더`)로 받은 요청을 한 번 돌려준다. 가져가면 비워서 두 번 적용되지 않는다. 없으면 null. */
+  takeLaunchPaths(): Promise<OpenPathsDto | null>;
+  /** 실행 중인 앱에 `td` 명령이 경로를 넘기면 호출된다(단일 인스턴스). 구독 해제 함수를 돌려준다. */
+  onOpenPaths(callback: (request: OpenPathsDto) => void): () => void;
   /** `cwd` 폴더에서 셸을 pty로 열고 세션 번호를 돌려준다. */
   terminalOpen(cwd: string, cols: number, rows: number): Promise<number>;
   /** 세션에 입력(키 입력을 글로 바꾼 것)을 쓴다. */

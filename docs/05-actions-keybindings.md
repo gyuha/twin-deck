@@ -188,6 +188,8 @@ Shift+이동 키(범위의 선택 반전)는 액션이 아니라 `pane` 스코�
 | `core.actions.panel` | Actions Panel | `Mod+Shift+P` | `Ctrl+Shift+P` | 자체 ID, 키 확인 |
 | `core.terminal.focus` | 새 터미널 탭: 활성 패널의 폴더에서 시작하는 터미널 탭을 **반대편 패널의 탭 줄**에 만들고 활성으로 한다. 누를 때마다 새 탭이다(터미널 탭이 활성이면 그 터미널의 폴더에서 같은 패널에 새 탭). 탭을 닫으면(`core.tab.close`) 세션이 끝나고, 셸이 끝나도 탭이 사라진다. 검색 결과(가상 탭)·압축 안에서는 알림만 보인다. 구현됨(이슈 #46) | `Alt+Mod+T` | `Ctrl+Alt+T` | pane·terminal, 자체 ID, 키 확인 |
 | `core.terminal.open_folder` | 터미널 열기(커서 폴더): 컨텍스트 메뉴의 "터미널 열기"가 쓴다. 커서가 폴더 행이면 그 폴더에서, 아니면 이 패널의 현재 폴더에서 터미널 탭을 연다. 구현됨(이슈 #46) | 없음 | 없음 | pane, 자체 ID |
+| `core.cli.install` | 명령줄 도구 설치(`td`): 터미널에서 `td 폴더`로 앱을 열 수 있게 한다. macOS는 `/usr/local/bin/td`를 앱 실행 파일로 가는 링크로 만들고 권한이 모자라면 관리자 암호를 묻는다(고정된 두 명령만 실행). Windows는 앱 폴더의 `td.cmd`를 만들고 그 폴더를 사용자 PATH에 더한다. 이미 설치돼 있거나 남의 `td`가 있으면 알리기만 한다. 구현됨(이슈 #45) | 없음 | 없음 | global, 자체 ID |
+| `core.cli.uninstall` | 명령줄 도구 제거(`td`): 이 앱이 만든 링크(macOS)·`td.cmd`와 PATH 항목(Windows)만 지운다. 남의 `td`는 지우지 않는다. 구현됨(이슈 #45) | 없음 | 없음 | global, 자체 ID |
 | `core.terminal.external` | 외부 터미널 | `F11` | `F11` | 자체 ID, 키 확인 |
 | `core.config.open` | 설정 폴더 열기 | 없음 | 없음 | 자체 |
 | `core.app.check_update` | 업데이트 확인 (GitHub 최신 릴리스를 보고, 새 버전이면 확인 창을 거쳐 설치 후 다시 시작) | 없음 | 없음 | 자체 |
