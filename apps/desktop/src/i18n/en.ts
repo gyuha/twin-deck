@@ -499,6 +499,7 @@ export const en: Record<Key, string> = {
   "virtual.total": "Total {size}",
   "virtual.warnings": "Warnings",
   "table.header_aria": "Column headers",
+  "table.resize_aria": "Resize {name} column",
   "table.searching": "Searching…",
   "table.parent_row_aria": "Parent folder",
   "table.empty": "No items",

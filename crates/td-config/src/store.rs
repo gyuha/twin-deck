@@ -116,13 +116,14 @@ impl ConfigStore {
     }
 }
 
-/// 설정 화면이 쓰는 값 하나. 배열과 테이블은 다루지 않는다.
+/// 설정 화면이 쓰는 값 하나. 문자열 목록 말고 배열과 테이블은 다루지 않는다.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(tag = "kind", content = "value", rename_all = "camelCase")]
 pub enum ConfigValue {
     Bool(bool),
     Int(i32),
     Str(String),
+    StrList(Vec<String>),
 }
 
 /// 사용자 `config.toml`을 읽어 편집 가능한 문서로 만든다. 없으면 빈 문서. 문법 오류면 파일을 건드리지 않도록 오류.
@@ -164,6 +165,7 @@ pub fn set_user_value(dir: &Path, key: &str, value: ConfigValue) -> Result<(), S
         ConfigValue::Bool(b) => b.into(),
         ConfigValue::Int(i) => i64::from(i).into(),
         ConfigValue::Str(s) => s.into(),
+        ConfigValue::StrList(list) => list.into_iter().collect::<toml_edit::Array>().into(),
     };
     // 기존 값 뒤의 주석을 지키려고, 값만 갈아 끼우고 장식(공백, 주석)은 옮긴다.
     match table.get_mut(leaf).and_then(|i| i.as_value_mut()) {

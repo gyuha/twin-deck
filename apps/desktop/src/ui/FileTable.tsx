@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Rect, Virtualizer } from "@tanstack/react-virtual";
 import type { EntryDto } from "@twin-deck/ts-client";
-import { parseColumns } from "../lib/columns";
+import { parseColumns, withColumnWidth, MAX_COLUMN_WIDTH, MIN_COLUMN_WIDTH } from "../lib/columns";
 import type { ColumnSpec } from "../lib/columns";
 import { COLUMN_TITLES, cellText } from "../lib/format";
 import { quickMatchRange } from "../lib/names";
@@ -102,7 +102,13 @@ export function FileTable({ pane }: { pane: PaneId }) {
   const iconSize = config.behavior.table.icon_size;
   const { zebra_rows: zebra, show_marks: showMarks, folder_style: folderStyle, cursor_fill: cursorFill } = config.behavior.table;
   const [decoPre, decoPost] = FOLDER_DECOR[folderStyle] ?? ["", ""];
-  const columns = useMemo(() => parseColumns(config.view.table.columns), [config.view.table.columns]);
+  const parsedColumns = useMemo(() => parseColumns(config.view.table.columns), [config.view.table.columns]);
+  // 헤더 경계를 끄는 동안의 너비. 헤더와 모든 행이 같은 열 정의를 쓰므로 여기만 바꾸면 같이 따라온다.
+  const [resizing, setResizing] = useState<{ name: ColumnSpec["name"]; width: number } | null>(null);
+  const columns = useMemo(
+    () => (resizing ? parsedColumns.map((c) => (c.name === resizing.name ? { ...c, width: resizing.width } : c)) : parsedColumns),
+    [parsedColumns, resizing],
+  );
   const sort = effectiveSort(tab, config.view.table.columns);
 
   const multi = tab.view.mode === "columns";
@@ -122,6 +128,31 @@ export function FileTable({ pane }: { pane: PaneId }) {
 
   const activate = () => api.activate(pane);
   const drag = useApp((s) => s.drag);
+
+  /** 컬럼 왼쪽 경계를 끌어 너비를 조절한다. 끄는 동안은 화면만 바꾸고, 놓을 때 설정(`view.table.columns`)에 한 번 쓴다. */
+  const startResize = (ev: React.MouseEvent, c: ColumnSpec, headerCell: HTMLElement | null) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    const defaultPx = DEFAULT_WIDTH[c.name].endsWith("rem") ? parseFloat(DEFAULT_WIDTH[c.name]) * 16 : 100;
+    const measured = headerCell?.getBoundingClientRect().width ?? 0;
+    const start = c.width ?? (measured > 0 ? measured : defaultPx);
+    const startX = ev.clientX;
+    let width = start;
+    const clamp = (w: number) => Math.min(MAX_COLUMN_WIDTH, Math.max(MIN_COLUMN_WIDTH, Math.round(w)));
+    const move = (e: MouseEvent) => {
+      width = clamp(start - (e.clientX - startX)); // 왼쪽으로 끌면 넓어진다(남는 폭은 이름 컬럼이 받는다)
+      setResizing({ name: c.name, width });
+    };
+    const up = () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+      if (width === start) return setResizing(null);
+      // 설정이 반영될 때까지 끈 너비를 유지해, 놓는 순간 옛 너비로 깜박이지 않게 한다.
+      void api.setConfigValue("view.table.columns", { kind: "strList", value: withColumnWidth(config.view.table.columns, c.name, width) }).finally(() => setResizing(null));
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  };
 
   const renderParentRow = () => {
     const cursor = tab.cursor < 0;
@@ -279,10 +310,20 @@ export function FileTable({ pane }: { pane: PaneId }) {
                   activate();
                   api.setOrder({ by: c.name as SortKey });
                 }}
-                className={(c.name === "name" ? "" : "text-right ") + (sortable ? "cursor-pointer" : "")}
+                className={(c.name === "name" ? "" : "relative text-right ") + (sortable ? "cursor-pointer" : "")}
               >
                 {COLUMN_TITLES[c.name]}
                 {active ? (sort.dir === "asc" ? " ▲" : " ▼") : ""}
+                {c.name !== "name" && (
+                  <span
+                    role="separator"
+                    aria-orientation="vertical"
+                    aria-label={t("table.resize_aria", { name: COLUMN_TITLES[c.name] })}
+                    onMouseDown={(ev) => startResize(ev, c, ev.currentTarget.parentElement)}
+                    onClick={(ev) => ev.stopPropagation()}
+                    className="absolute inset-y-0 -left-1 w-2 cursor-col-resize hover:bg-accent/40"
+                  />
+                )}
               </span>
             );
           })}

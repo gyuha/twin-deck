@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Config, EntryDto } from "@twin-deck/ts-client";
 import { defaultLoaded } from "@twin-deck/ts-client";
-import { parseColumn, parseColumns } from "../lib/columns";
+import { parseColumn, parseColumns, withColumnWidth } from "../lib/columns";
 import { cellText, formatDate, formatOctal, formatPermissions, formatSize, formatSpace, strftime } from "../lib/format";
 import { DEFAULT_SORT, sortEntries, sortFromColumns } from "../lib/sort";
 
@@ -209,5 +209,29 @@ describe("formatSpace (볼륨 용량)", () => {
     expect(formatSpace(73.8e9, "MB")).toBe("73800.0 MB");
     expect(formatSpace(512, "adaptive")).toBe("512 B");
     expect(formatSpace(1234, "bytes")).toBe("1234 B");
+  });
+});
+
+describe("컬럼 너비 반영", () => {
+  it("대상 컬럼의 너비만 바꾸고 순서와 다른 컬럼은 그대로 둔다", () => {
+    expect(withColumnWidth(["name", "size", "modified:140"], "size", 110)).toEqual(["name", "size:110", "modified:140"]);
+  });
+  it("너비가 없던 컬럼에 너비를 더하고 기존 너비는 바꾼다", () => {
+    expect(withColumnWidth(["name", "size:90"], "size", 120)).toEqual(["name", "size:120"]);
+    expect(withColumnWidth(["name", "modified"], "modified", 150)).toEqual(["name", "modified:150"]);
+  });
+  it("정렬 표시를 보존한다", () => {
+    expect(withColumnWidth(["name", ">size", "<modified:100"], "modified", 130)).toEqual(["name", ">size", "<modified:130"]);
+    expect(withColumnWidth(["name", ">size"], "size", 80)).toEqual(["name", ">size:80"]);
+  });
+  it("최소 40, 최대 600으로 자른다", () => {
+    expect(withColumnWidth(["name", "size"], "size", 5)).toEqual(["name", "size:40"]);
+    expect(withColumnWidth(["name", "size"], "size", 9999)).toEqual(["name", "size:600"]);
+  });
+  it("정수로 반올림한다", () => {
+    expect(withColumnWidth(["name", "size"], "size", 100.6)).toEqual(["name", "size:101"]);
+  });
+  it("목록에 없는 컬럼이면 그대로 돌려준다", () => {
+    expect(withColumnWidth(["name", "size"], "created", 100)).toEqual(["name", "size"]);
   });
 });

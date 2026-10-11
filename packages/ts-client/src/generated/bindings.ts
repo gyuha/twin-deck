@@ -742,9 +742,9 @@ favorites?: FavoriteDto[] }
  */
 export type ConfigChanged = { loaded: Loaded }
 /**
- * 설정 화면이 쓰는 값 하나. 배열과 테이블은 다루지 않는다.
+ * 설정 화면이 쓰는 값 하나. 문자열 목록 말고 배열과 테이블은 다루지 않는다.
  */
-export type ConfigValue = { kind: "bool"; value: boolean } | { kind: "int"; value: number } | { kind: "str"; value: string }
+export type ConfigValue = { kind: "bool"; value: boolean } | { kind: "int"; value: number } | { kind: "str"; value: string } | { kind: "strList"; value: string[] }
 /**
  * 삭제/휴지통 확인 대화상자 on/off (OP-13).
  */

@@ -533,6 +533,43 @@ fn user_value_set_creates_file_and_tables_with_each_type() {
 }
 
 #[test]
+fn user_value_set_writes_string_list_and_keeps_other_keys() {
+    let d = user_value_dir(Some(
+        "# 내 설정\n[behavior]\ntheme = \"dark\" # 테마\n\n[view.table]\ncolumns = [\"name\", \"size\", \"modified\"]\n",
+    ));
+    td_config::set_user_value(
+        d.path(),
+        "view.table.columns",
+        td_config::ConfigValue::StrList(vec!["name".into(), "size:110".into(), "modified".into()]),
+    )
+    .unwrap();
+    let text = fs::read_to_string(d.path().join("config.toml")).unwrap();
+    assert!(text.contains("# 내 설정"), "{text}");
+    assert!(text.contains("theme = \"dark\" # 테마"), "{text}");
+    let l = load_dir(d.path(), Platform::Linux);
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert_eq!(
+        l.config.view.table.columns,
+        ["name", "size:110", "modified"]
+    );
+    assert_eq!(l.config.behavior.theme, "dark");
+}
+
+#[test]
+fn user_value_set_string_list_creates_missing_tables() {
+    let d = user_value_dir(None);
+    td_config::set_user_value(
+        d.path(),
+        "view.table.columns",
+        td_config::ConfigValue::StrList(vec!["name".into(), ">size:90".into()]),
+    )
+    .unwrap();
+    let l = load_dir(d.path(), Platform::Linux);
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert_eq!(l.config.view.table.columns, ["name", ">size:90"]);
+}
+
+#[test]
 fn user_value_reset_removes_key_and_prunes_empty_tables() {
     let d = user_value_dir(Some(
         "[behavior]\ntheme = \"nord\"\n\n[core.confirm]\ndelete = false\n",

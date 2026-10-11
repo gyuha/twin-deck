@@ -497,6 +497,7 @@ export const ko = {
   "virtual.total": "총 {size}",
   "virtual.warnings": "경고",
   "table.header_aria": "컬럼 머리글",
+  "table.resize_aria": "{name} 너비 조절",
   "table.searching": "찾는 중…",
   "table.parent_row_aria": "상위 폴더",
   "table.empty": "항목 없음",
