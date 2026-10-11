@@ -65,6 +65,24 @@ describe("파일 목록 아이콘", () => {
     expect(rowOf("main.ts").querySelector("[data-link='true']")).toBeNull();
   });
 
+  it("폴더를 가리키는 링크는 폴더 아이콘에 링크 표시가 붙는다 (이슈 #47)", async () => {
+    const b = seeded();
+    b.seedLink("/home/a/to-src", "/home/a/src"); // 폴더 링크
+    b.seedLink("/home/a/link.ts", "/home/a/main.ts"); // 파일 링크(아이콘은 링크 자신의 이름으로 정해진다)
+    b.seedLink("/home/a/dangling", "/home/a/nowhere"); // 끊어진 링크
+    await renderApp(b);
+    // 폴더 링크: 폴더 아이콘 + 링크 표시
+    expect(iconOf("to-src").getAttribute("src")).toMatch(/\/folder[^/]*\.svg$/);
+    expect(rowOf("to-src").querySelector("[data-link='true']")).not.toBeNull();
+    // 진짜 폴더에는 링크 표시가 없다
+    expect(rowOf("src").querySelector("[data-link='true']")).toBeNull();
+    // 파일 링크·끊어진 링크는 그대로 파일 아이콘 + 링크 표시
+    expect(iconOf("link.ts").getAttribute("src")).toMatch(/\/typescript\.svg$/);
+    expect(rowOf("link.ts").querySelector("[data-link='true']")).not.toBeNull();
+    expect(iconOf("dangling").getAttribute("src")).toMatch(/\/file\.svg$/);
+    expect(rowOf("dangling").querySelector("[data-link='true']")).not.toBeNull();
+  });
+
   it("멀티 컬럼 모드에서도 아이콘이 렌더된다", async () => {
     const { user } = await renderApp(seeded());
     await user.keyboard("{Control>}{Alt>}3{/Alt}{/Control}");

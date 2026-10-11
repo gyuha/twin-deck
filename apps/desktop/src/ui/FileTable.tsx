@@ -234,7 +234,8 @@ export function FileTable({ pane }: { pane: PaneId }) {
             {mark}
           </span>
         )}
-        <FileIcon name={e.name} kind={e.kind} size={iconSize} />
+        {/* 폴더를 가리키는 링크는 폴더 아이콘에 링크 표시를 얹는다(이슈 #47). 파일 링크·끊어진 링크는 파일 아이콘에 링크 표시. */}
+        <FileIcon name={e.name} kind={e.kind === "symlink" && e.linkIsDir ? "dir" : e.kind} link={e.kind === "symlink"} size={iconSize} />
         {(multi ? [{ name: "name" } as ColumnSpec] : columns).map((c, k) => (
           <span key={`${c.name}-${k}`} className={c.name === "name" ? "truncate" : "truncate text-right tabular-nums"}>
             {c.name === "name" && tab.quick ? (

@@ -2,9 +2,12 @@ import { iconNameFor } from "@twin-deck/material-icons";
 import type { IconKind } from "@twin-deck/material-icons";
 import { iconUrl } from "../lib/iconUrls";
 
-/** 이름과 종류에 맞는 파일 아이콘. 장식이므로 보조 기술에는 노출하지 않는다. 심볼릭 링크에는 작은 화살표를 얹는다. */
-export function FileIcon({ name, kind, size }: { name: string; kind: IconKind; size: number }) {
-  const link = kind === "symlink";
+/**
+ * 이름과 종류에 맞는 파일 아이콘. 장식이므로 보조 기술에는 노출하지 않는다. 심볼릭 링크에는 작은 화살표를 얹는다.
+ * 링크는 `kind`가 `symlink`이거나(대상 파일의 아이콘 규칙) 폴더 아이콘(`kind="dir"`)에 `link`를 켜서 "폴더 링크"를 나타낸다.
+ */
+export function FileIcon({ name, kind, size, link: linkProp }: { name: string; kind: IconKind; size: number; link?: boolean }) {
+  const link = linkProp ?? kind === "symlink";
   return (
     <div
       aria-hidden="true"
