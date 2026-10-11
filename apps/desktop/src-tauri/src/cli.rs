@@ -26,6 +26,7 @@ pub enum CliError {
 
 impl CliError {
     /// 종료 코드: 없는 경로 1, 사용법 오류 2.
+    #[cfg_attr(not(unix), allow(dead_code))] // 호출하는 `run_if_cli`가 unix 전용
     pub fn exit_code(&self) -> i32 {
         match self {
             CliError::NotFound(_) => 1,
@@ -97,11 +98,13 @@ fn absolute(path: &str, cwd: &Path) -> PathBuf {
 }
 
 /// `argv[0]`의 파일 이름이 정확히 `td`인가.
+#[cfg_attr(not(unix), allow(dead_code))]
 pub fn invoked_as_td(argv0: &str) -> bool {
     Path::new(argv0).file_name().is_some_and(|n| n == "td")
 }
 
 /// 터미널에서 떨어져 나와 자기 자신을 다시 실행할지: `td`로 불렸고, 이미 떨어져 나온 프로세스가 아니며, 인수가 올바를 때만(unix).
+#[cfg_attr(not(unix), allow(dead_code))]
 pub fn should_detach(argv0: &str, detached_env: Option<&str>, args_ok: bool) -> bool {
     cfg!(unix) && invoked_as_td(argv0) && detached_env.is_none() && args_ok
 }
