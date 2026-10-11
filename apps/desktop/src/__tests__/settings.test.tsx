@@ -43,6 +43,27 @@ describe("설정 화면 열기와 닫기", () => {
   });
 });
 
+describe("환경 섹션: 터미널 셸은 macOS에서 숨긴다", () => {
+  const openEnvironment = async (platform: "mac" | "linux" | "windows") => {
+    const { user } = await renderApp(seedBackend(), platform);
+    await user.keyboard(platform === "mac" ? "{Meta>},{/Meta}" : "{Control>},{/Control}");
+    await dialog();
+    await user.click(screen.getByRole("tab", { name: "환경" }));
+  };
+
+  it("macOS: 터미널 셸 항목이 없고 다른 환경 항목은 그대로 있다", async () => {
+    await openEnvironment("mac");
+    expect(await screen.findByText("텍스트 편집기")).toBeInTheDocument();
+    expect(screen.queryByText("터미널 셸")).toBeNull();
+  });
+
+  it.each(["windows", "linux"] as const)("%s: 터미널 셸 항목이 보인다", async (platform) => {
+    await openEnvironment(platform);
+    expect(await screen.findByText("텍스트 편집기")).toBeInTheDocument();
+    expect(screen.getByText("터미널 셸")).toBeInTheDocument();
+  });
+});
+
 describe("설정 값 바꾸기", () => {
   it("스위치는 바꾸는 즉시 저장되고 화면에 반영된다", async () => {
     const { user, backend } = await renderApp();
