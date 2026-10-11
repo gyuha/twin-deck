@@ -82,7 +82,7 @@ folder_size_on_select = true      # 폴더를 선택하면 하위 파일의 총 
 
 [environment]
 text_editor = "Visual Studio Code" # 편집 액션이 사용할 앱
-terminal = "default"              # 외부 터미널 (F11)
+terminal = "default"              # 내장 터미널의 셸(Windows): default(cmd) | cmd | powershell | gitbash(Git for Windows). 다른 OS는 $SHELL
 
 [core.confirm]
 delete = true                     # 영구 삭제 확인

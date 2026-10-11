@@ -881,11 +881,13 @@ pub fn cancel_search(svc: State<'_, AppService>, id: u32) {
 #[specta::specta]
 pub fn terminal_open(
     svc: State<'_, AppService>,
+    config: State<'_, ConfigState>,
     cwd: String,
     cols: u32,
     rows: u32,
 ) -> ServiceResult<u32> {
-    svc.terminal_open(&cwd, cols, rows)
+    let shell = config.current().config.environment.terminal;
+    svc.terminal_open(&shell, &cwd, cols, rows)
 }
 
 #[tauri::command]

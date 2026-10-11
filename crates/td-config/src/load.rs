@@ -91,7 +91,13 @@ fn syntax_warning(file: &str, src: &str, e: &toml::de::Error) -> Warning {
     }
 }
 
-const ENUMS: [(&str, &str, &[&str]); 6] = [
+const ENUMS: [(&str, &str, &[&str]); 7] = [
+    // 내장 터미널의 셸. Windows에서만 의미가 있고(다른 OS는 `$SHELL`), apps/desktop의 Settings.tsx에 같은 목록이 있다.
+    (
+        "environment",
+        "terminal",
+        &["default", "cmd", "powershell", "gitbash"],
+    ),
     // 화면 언어. 새 언어를 더하면 앱의 i18n/locales.ts에도 같은 코드를 등록한다.
     ("behavior", "language", &["ko", "en"]),
     (

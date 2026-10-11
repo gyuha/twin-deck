@@ -391,6 +391,8 @@ export const en: Record<Key, string> = {
   "settings.section.environment.title": "Environment",
   "settings.item.environment.text_editor.title": "Text editor",
   "settings.item.environment.text_editor.desc": "The program opened with F4. Empty uses the default app",
+  "settings.item.environment.terminal.title": "Terminal shell",
+  "settings.item.environment.terminal.desc": "The shell the built-in terminal opens (Windows). \"default\" is cmd; \"gitbash\" is Git for Windows' bash. Applies to terminals opened afterwards; other OSes use $SHELL",
   "settings.theme.system": "system · Follow the OS setting",
   "settings.theme.dark": "Dark",
   "settings.theme.light": "Light",

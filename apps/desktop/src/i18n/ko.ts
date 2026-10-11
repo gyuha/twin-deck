@@ -389,6 +389,8 @@ export const ko = {
   "settings.section.environment.title": "환경",
   "settings.item.environment.text_editor.title": "텍스트 편집기",
   "settings.item.environment.text_editor.desc": "F4로 여는 프로그램. 비우면 기본 앱",
+  "settings.item.environment.terminal.title": "터미널 셸",
+  "settings.item.environment.terminal.desc": "내장 터미널이 여는 셸(Windows). default는 cmd, gitbash는 Git for Windows의 bash입니다. 새로 여는 터미널부터 적용되고, 다른 OS는 $SHELL을 씁니다",
   "settings.theme.system": "system · OS 설정을 따름",
   "settings.theme.dark": "어두움",
   "settings.theme.light": "밝음",

@@ -778,14 +778,20 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
         ))
     }
 
-    /// `cwd` 폴더에서 사용자의 셸을 pty로 연다. 돌려주는 값은 세션 번호다.
-    pub fn terminal_open(&self, cwd: &str, cols: u32, rows: u32) -> ServiceResult<u32> {
+    /// `cwd` 폴더에서 `shell`(설정 `environment.terminal`)로 고른 셸을 pty로 연다. 돌려주는 값은 세션 번호다.
+    pub fn terminal_open(
+        &self,
+        shell: &str,
+        cwd: &str,
+        cols: u32,
+        rows: u32,
+    ) -> ServiceResult<u32> {
         let (cols, rows) = (
             cols.min(u16::MAX as u32) as u16,
             rows.min(u16::MAX as u32) as u16,
         );
         self.terminals
-            .open(Path::new(cwd), cols, rows)
+            .open(shell, Path::new(cwd), cols, rows)
             .map_err(|e| e.to_string())
     }
 

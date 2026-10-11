@@ -886,6 +886,30 @@ fn terminal_font_defaults_empty_is_separate_from_preview_font_and_user_can_set_i
 }
 
 #[test]
+fn terminal_shell_defaults_to_default_accepts_the_three_windows_shells_and_rejects_others() {
+    let none = load("");
+    assert!(none.warnings.is_empty(), "{:?}", none.warnings);
+    assert_eq!(none.config.environment.terminal, "default");
+    for shell in ["cmd", "powershell", "gitbash"] {
+        let l = load(&format!("[environment]\nterminal = \"{shell}\"\n"));
+        assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+        assert_eq!(l.config.environment.terminal, shell);
+    }
+    let l = load("[environment]\nterminal = \"zsh\"\n");
+    assert!(
+        l.warnings
+            .iter()
+            .any(|w| w.message.contains("environment.terminal")),
+        "{:?}",
+        l.warnings
+    );
+    assert_eq!(
+        l.config.environment.terminal, "default",
+        "잘못된 값은 기본값"
+    );
+}
+
+#[test]
 fn show_parent_row_defaults_off_and_user_can_turn_it_on() {
     use td_config::{set_user_value, ConfigValue};
     let none = load("");

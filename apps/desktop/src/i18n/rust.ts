@@ -159,6 +159,7 @@ export const RUST_MESSAGES: readonly (readonly [ko: string, en: string])[] = [
   ["{mount_point}: 아직 사용 중이어서 꺼내지 못했습니다. 열려 있는 파일이나 창을 닫고 다시 시도하세요", "{mount_point}: could not eject because it is still in use. Close open files or windows and try again"],
   ["감시 실패: {0}", "Watch failed: {0}"],
   ["터미널 세션 {0}번이 없습니다", "There is no terminal session {0}"],
+  ["Git Bash를 찾지 못했습니다 (Git for Windows가 필요합니다)", "Git Bash was not found (Git for Windows is required)"],
   ["경로를 찾을 수 없습니다: {p}", "Path not found: {p}"],
   ["다른 td가 이미 있어 덮어쓰지 않습니다: {}", "Another td already exists, not overwriting it: {}"],
   ["링크를 만들지 못했습니다: {}", "Could not create the link: {}"],

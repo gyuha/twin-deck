@@ -4,6 +4,7 @@
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::Path;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 
@@ -36,6 +37,52 @@ struct Session {
     master: Box<dyn MasterPty + Send>,
     writer: Box<dyn Write + Send>,
     killer: Box<dyn ChildKiller + Send + Sync>,
+    /// 출력에서 본 커서 위치 질문(`ESC[6n`) 중 아직 답을 받지 못한 수.
+    cpr_pending: Arc<AtomicUsize>,
+}
+
+/// 커서 위치 질문 `ESC[6n`.
+const CPR_QUERY: &[u8] = b"\x1b[6n";
+
+/// `chunk`에 든 커서 위치 질문의 수. 청크 경계에 걸친 질문은 앞 청크의 끝 `carry`로 잇고, 다음 번을 위해 `carry`를 갱신한다.
+fn count_cpr_queries(carry: &mut Vec<u8>, chunk: &[u8]) -> usize {
+    let head = carry.len();
+    let mut joined = std::mem::take(carry);
+    joined.extend_from_slice(chunk);
+    let n = joined
+        .windows(CPR_QUERY.len())
+        .enumerate()
+        .filter(|(i, w)| *w == CPR_QUERY && i + CPR_QUERY.len() > head)
+        .count();
+    let keep = joined.len().min(CPR_QUERY.len() - 1);
+    carry.extend_from_slice(&joined[joined.len() - keep..]);
+    n
+}
+
+/// 0이 아니면 하나 줄이고 true. (`fetch_update`는 새 툴체인에서 이름이 바뀌어 직접 돌린다.)
+fn take_one(n: &AtomicUsize) -> bool {
+    let mut cur = n.load(Ordering::SeqCst);
+    while cur > 0 {
+        match n.compare_exchange(cur, cur - 1, Ordering::SeqCst, Ordering::SeqCst) {
+            Ok(_) => return true,
+            Err(now) => cur = now,
+        }
+    }
+    false
+}
+
+/// 입력 전체가 커서 위치 답(`ESC[행;열R`)인가.
+fn is_cpr_reply(data: &[u8]) -> bool {
+    let Some(body) = data
+        .strip_prefix(b"\x1b[")
+        .and_then(|d| d.strip_suffix(b"R"))
+    else {
+        return false;
+    };
+    let mut parts = body.split(|&b| b == b';');
+    let num =
+        |p: Option<&[u8]>| p.is_some_and(|p| !p.is_empty() && p.iter().all(u8::is_ascii_digit));
+    num(parts.next()) && num(parts.next()) && parts.next().is_none()
 }
 
 /// 열려 있는 터미널 세션들.
@@ -58,9 +105,14 @@ impl Terminals {
         )
     }
 
-    /// 사용자의 셸(`$SHELL`, 없으면 `/bin/sh`, Windows는 `cmd.exe`)을 `cwd`에서 연다.
-    pub fn open(&self, cwd: &Path, cols: u16, rows: u16) -> Result<u32> {
-        self.open_command(&default_shell(), &[], cwd, cols, rows)
+    /// 설정 `environment.terminal`로 고른 셸을 `cwd`에서 연다. 값은 [`resolve_shell`]을 본다.
+    pub fn open(&self, shell: &str, cwd: &Path, cols: u16, rows: u16) -> Result<u32> {
+        let (program, args) =
+            resolve_shell(shell, cfg!(windows), &|k| std::env::var(k).ok(), &|p| {
+                p.is_file()
+            })?;
+        let args: Vec<&str> = args.iter().map(String::as_str).collect();
+        self.open_command(&program, &args, cwd, cols, rows)
     }
 
     /// 지정한 프로그램을 pty로 연다(테스트와 셸 지정용).
@@ -92,22 +144,37 @@ impl Terminals {
             *n += 1;
             id
         };
+        let cpr_pending = Arc::new(AtomicUsize::new(0));
         self.sessions.lock().unwrap().insert(
             id,
             Session {
                 master: pair.master,
                 writer,
                 killer,
+                cpr_pending: Arc::clone(&cpr_pending),
             },
         );
         let tx = self.tx.clone();
         let sessions = Arc::clone(&self.sessions);
+        // Windows(ConPTY)는 자식이 끝나도 pty를 닫기 전에는 읽기가 끝나지 않는다. 그래서 자식 대기를 따로 두고,
+        // 끝나면 세션(pty)을 닫아 읽기 스레드가 남은 출력을 다 보낸 뒤 EOF로 끝나게 한다.
+        let (code_tx, code_rx) = channel();
+        let waiter_sessions = Arc::clone(&self.sessions);
+        std::thread::spawn(move || {
+            let code = child.wait().ok().map(|s| s.exit_code());
+            let _ = code_tx.send(code);
+            waiter_sessions.lock().unwrap().remove(&id);
+        });
         std::thread::spawn(move || {
             let mut buf = [0u8; 8192];
+            let mut carry = Vec::new();
             loop {
                 match reader.read(&mut buf) {
                     Ok(0) | Err(_) => break,
                     Ok(n) => {
+                        // 화면이 답하기 전에 센다(답이 먼저 들어와 버려지는 일이 없게).
+                        cpr_pending
+                            .fetch_add(count_cpr_queries(&mut carry, &buf[..n]), Ordering::SeqCst);
                         if tx
                             .send(TermEvent::Output {
                                 id,
@@ -120,7 +187,7 @@ impl Terminals {
                     }
                 }
             }
-            let code = child.wait().ok().map(|s| s.exit_code());
+            let code = code_rx.recv().ok().flatten();
             sessions.lock().unwrap().remove(&id);
             let _ = tx.send(TermEvent::Exit { id, code });
         });
@@ -130,6 +197,10 @@ impl Terminals {
     pub fn write(&self, id: u32, data: &[u8]) -> Result<()> {
         let mut sessions = self.sessions.lock().unwrap();
         let s = sessions.get_mut(&id).ok_or(TerminalError::NoSession(id))?;
+        // 질문 없이 온 커서 위치 답(화면이 같은 질문에 두 번 답한 경우 등)은 버린다. 셸 입력으로 들어가면 Git Bash가 `R`을 찍는다.
+        if is_cpr_reply(data) && !take_one(&s.cpr_pending) {
+            return Ok(());
+        }
         s.writer.write_all(data).map_err(pty_err)?;
         s.writer.flush().map_err(pty_err)
     }
@@ -158,14 +229,50 @@ fn size(cols: u16, rows: u16) -> PtySize {
     }
 }
 
-fn default_shell() -> String {
-    if cfg!(windows) {
-        return std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".into());
+/// `environment.terminal` 값을 실행할 프로그램과 인수로 푼다. `env`는 환경 변수, `exists`는 파일 존재 여부(시험에서 바꿔 끼운다).
+/// Windows에서만 `cmd`·`powershell`·`gitbash`를 고를 수 있고, 그 밖의 값(`default` 포함)과 다른 OS는 `$SHELL`(없으면 `/bin/sh`, Windows는 `COMSPEC`)이다.
+pub fn resolve_shell(
+    choice: &str,
+    windows: bool,
+    env: &dyn Fn(&str) -> Option<String>,
+    exists: &dyn Fn(&Path) -> bool,
+) -> Result<(String, Vec<String>)> {
+    let comspec = || env("COMSPEC").unwrap_or_else(|| "cmd.exe".into());
+    if !windows {
+        let shell = env("SHELL")
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| "/bin/sh".into());
+        return Ok((shell, vec![]));
     }
-    std::env::var("SHELL")
-        .ok()
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| "/bin/sh".into())
+    match choice {
+        "cmd" => Ok((comspec(), vec![])),
+        "powershell" => Ok(("powershell.exe".into(), vec!["-NoLogo".into()])),
+        "gitbash" => {
+            // Git for Windows의 bash. System32의 bash.exe는 WSL이라 후보에 넣지 않는다.
+            let roots = [
+                env("ProgramFiles"),
+                env("ProgramFiles(x86)"),
+                env("LOCALAPPDATA").map(|p| format!("{p}\\Programs")),
+            ];
+            roots
+                .into_iter()
+                .flatten()
+                .map(|r| Path::new(&r).join("Git").join("bin").join("bash.exe"))
+                .find(|p| exists(p))
+                .map(|p| {
+                    (
+                        p.to_string_lossy().into_owned(),
+                        vec!["--login".into(), "-i".into()],
+                    )
+                })
+                .ok_or_else(|| {
+                    TerminalError::Pty(
+                        "Git Bash를 찾지 못했습니다 (Git for Windows가 필요합니다)".into(),
+                    )
+                })
+        }
+        _ => Ok((comspec(), vec![])),
+    }
 }
 
 #[cfg(test)]
@@ -190,6 +297,166 @@ mod tests {
             }
         }
         panic!("출력에 {want:?}가 없다: {out:?}");
+    }
+
+    fn env_of<'a>(pairs: &'a [(&'a str, &'a str)]) -> impl Fn(&str) -> Option<String> + 'a {
+        move |k| {
+            pairs
+                .iter()
+                .find(|(n, _)| *n == k)
+                .map(|(_, v)| v.to_string())
+        }
+    }
+
+    #[test]
+    fn windows_셸_선택은_cmd_powershell_gitbash를_각자_프로그램으로_푼다() {
+        let env = env_of(&[
+            ("COMSPEC", "C:\\Windows\\System32\\cmd.exe"),
+            ("ProgramFiles", "C:\\Program Files"),
+        ]);
+        let git = Path::new("C:\\Program Files")
+            .join("Git")
+            .join("bin")
+            .join("bash.exe");
+        let exists = |p: &Path| p == git;
+
+        let (p, a) = resolve_shell("cmd", true, &env, &exists).unwrap();
+        assert_eq!((p.as_str(), a.len()), ("C:\\Windows\\System32\\cmd.exe", 0));
+        let (p, a) = resolve_shell("powershell", true, &env, &exists).unwrap();
+        assert_eq!(
+            (p.as_str(), a),
+            ("powershell.exe", vec!["-NoLogo".to_string()])
+        );
+        let (p, a) = resolve_shell("gitbash", true, &env, &exists).unwrap();
+        assert_eq!(Path::new(&p), git);
+        assert_eq!(a, vec!["--login".to_string(), "-i".to_string()]);
+    }
+
+    #[test]
+    fn windows에서_default와_모르는_값은_comspec이고_gitbash가_없으면_오류다() {
+        let env = env_of(&[("COMSPEC", "C:\\x\\cmd.exe")]);
+        for choice in ["default", "", "zsh"] {
+            assert_eq!(
+                resolve_shell(choice, true, &env, &|_| false).unwrap().0,
+                "C:\\x\\cmd.exe"
+            );
+        }
+        let err = resolve_shell("gitbash", true, &env, &|_| false).unwrap_err();
+        assert!(err.to_string().contains("Git Bash"), "{err}");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows에서_powershell과_cmd를_실제로_pty로_연다() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut shells = vec![("powershell", "Write-Output (6*7)\r"), ("cmd", "echo 42\r")];
+        // Git for Windows가 있는 PC에서만 gitbash도 확인한다.
+        if resolve_shell("gitbash", true, &|k| std::env::var(k).ok(), &|p| {
+            p.is_file()
+        })
+        .is_ok()
+        {
+            shells.push(("gitbash", "echo $((6*7))\r"));
+        }
+        for (shell, cmd) in shells {
+            let (t, rx) = Terminals::new();
+            let id = t.open(shell, dir.path(), 80, 24).unwrap();
+            // ConPTY는 시작할 때 커서 위치를 묻고(`ESC[6n`) 답을 받아야 출력을 이어 간다. 화면(xterm 계열)이 하는 답을 시험에서 대신한다.
+            collect_until(&rx, id, "\u{1b}[6n");
+            t.write(id, b"\x1b[1;1R").unwrap();
+            t.write(id, cmd.as_bytes()).unwrap();
+            collect_until(&rx, id, "42");
+            t.close(id).unwrap();
+        }
+    }
+
+    #[test]
+    fn 커서_위치_질문은_청크_경계에_걸려도_한_번만_센다() {
+        let mut carry = Vec::new();
+        assert_eq!(count_cpr_queries(&mut carry, b"a\x1b[6nb\x1b[6n"), 2);
+        assert_eq!(count_cpr_queries(&mut carry, b"x\x1b[6"), 0);
+        assert_eq!(count_cpr_queries(&mut carry, b"n y"), 1);
+        assert_eq!(count_cpr_queries(&mut carry, b"\x1b[6n"), 1);
+        assert_eq!(
+            count_cpr_queries(&mut carry, b"\x1b[6n"),
+            1,
+            "연달아 온 질문도 각각 센다"
+        );
+        assert_eq!(count_cpr_queries(&mut carry, b"plain"), 0);
+    }
+
+    #[test]
+    fn 커서_위치_답은_입력_전체가_정확히_그_모양일_때만_알아본다() {
+        assert!(is_cpr_reply(b"\x1b[1;1R"));
+        assert!(is_cpr_reply(b"\x1b[24;120R"));
+        for no in [
+            &b"R"[..],
+            b"\x1b[R",
+            b"\x1b[1R",
+            b"\x1b[1;R",
+            b"\x1b[;1R",
+            b"\x1b[1;2;3R",
+            b"\x1b[1;1Rx",
+            b"x\x1b[1;1R",
+            b"\x1b[1;1",
+            b"\x1b[I",
+        ] {
+            assert!(!is_cpr_reply(no), "{no:?}");
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows에서_질문_없는_커서_위치_답은_셸에_들어가지_않는다() {
+        let (t, rx) = Terminals::new();
+        let dir = tempfile::tempdir().unwrap();
+        let id = t.open("gitbash", dir.path(), 80, 24);
+        let Ok(id) = id else { return }; // Git for Windows가 없는 PC
+        collect_until(&rx, id, "\u{1b}[6n");
+        // 한 번은 질문의 답, 나머지 둘은 질문 없는 답이다. 둘째·셋째가 셸에 들어가면 입력 줄에 `R`이 남는다.
+        for _ in 0..3 {
+            t.write(id, b"\x1b[1;1R").unwrap();
+        }
+        let out = collect_until(&rx, id, "\u{276f}");
+        std::thread::sleep(Duration::from_millis(800));
+        while let Ok(TermEvent::Output { data, .. }) = rx.try_recv() {
+            assert!(
+                !String::from_utf8_lossy(&data).contains('R'),
+                "{data:?} {out:?}"
+            );
+        }
+        t.close(id).unwrap();
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows에서_exit로_셸이_끝나면_종료_이벤트가_온다() {
+        let dir = tempfile::tempdir().unwrap();
+        for shell in ["cmd", "powershell"] {
+            let (t, rx) = Terminals::new();
+            let id = t.open(shell, dir.path(), 80, 24).unwrap();
+            collect_until(&rx, id, "\u{1b}[6n");
+            t.write(id, b"\x1b[1;1R").unwrap();
+            t.write(id, b"exit\r").unwrap();
+            wait_exit(&rx, id);
+        }
+    }
+
+    #[test]
+    fn windows가_아니면_선택과_상관없이_shell_환경_변수를_쓴다() {
+        let env = env_of(&[("SHELL", "/bin/zsh")]);
+        assert_eq!(
+            resolve_shell("powershell", false, &env, &|_| true)
+                .unwrap()
+                .0,
+            "/bin/zsh"
+        );
+        assert_eq!(
+            resolve_shell("cmd", false, &env_of(&[]), &|_| true)
+                .unwrap()
+                .0,
+            "/bin/sh"
+        );
     }
 
     fn wait_exit(rx: &Receiver<TermEvent>, id: u32) -> Option<u32> {

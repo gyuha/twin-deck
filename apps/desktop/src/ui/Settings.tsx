@@ -73,7 +73,9 @@ const SIZE_FORMATS = ["adaptive", "adaptive_kibi", "bytes", "KB", "MB"] as const
 // folder_style의 허용 값도 td-config의 검증 목록(ENUMS)과 같아야 한다.
 // tab_style의 허용 값도 td-config의 검증 목록(ENUMS)과 같아야 한다.
 const TAB_STYLES = ["underline", "segments"] as const;
-const FOLDER_STYLES = ["none", "brackets", "parens", "slash"] as const;
+// environment.terminal의 허용 값도 td-config의 검증 목록(ENUMS)과 같아야 한다.
+const TERMINAL_SHELLS = ["default", "cmd", "powershell", "gitbash"] as const;
+const FOLDER_STYLES =["none", "brackets", "parens", "slash"] as const;
 
 const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
   {
@@ -158,7 +160,10 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
   },
   {
     get title() { return translate("settings.section.environment.title"); },
-    items: [{ key: "environment.text_editor", get title() { return translate("settings.item.environment.text_editor.title"); }, get desc() { return translate("settings.item.environment.text_editor.desc"); }, control: { type: "text" } }],
+    items: [
+      { key: "environment.text_editor", get title() { return translate("settings.item.environment.text_editor.title"); }, get desc() { return translate("settings.item.environment.text_editor.desc"); }, control: { type: "text" } },
+      { key: "environment.terminal", get title() { return translate("settings.item.environment.terminal.title"); }, get desc() { return translate("settings.item.environment.terminal.desc"); }, control: { type: "select", options: TERMINAL_SHELLS } },
+    ],
   },
 ];
 
