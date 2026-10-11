@@ -43,7 +43,7 @@ describe("설정 화면 열기와 닫기", () => {
   });
 });
 
-describe("환경 섹션: 터미널 셸은 macOS에서 숨긴다", () => {
+describe("환경 섹션: 터미널 셸은 Windows에서만 보인다", () => {
   const openEnvironment = async (platform: "mac" | "linux" | "windows") => {
     const { user } = await renderApp(seedBackend(), platform);
     await user.keyboard(platform === "mac" ? "{Meta>},{/Meta}" : "{Control>},{/Control}");
@@ -51,14 +51,14 @@ describe("환경 섹션: 터미널 셸은 macOS에서 숨긴다", () => {
     await user.click(screen.getByRole("tab", { name: "환경" }));
   };
 
-  it("macOS: 터미널 셸 항목이 없고 다른 환경 항목은 그대로 있다", async () => {
-    await openEnvironment("mac");
+  it.each(["mac", "linux"] as const)("%s: 터미널 셸 항목이 없고 다른 환경 항목은 그대로 있다", async (platform) => {
+    await openEnvironment(platform);
     expect(await screen.findByText("텍스트 편집기")).toBeInTheDocument();
     expect(screen.queryByText("터미널 셸")).toBeNull();
   });
 
-  it.each(["windows", "linux"] as const)("%s: 터미널 셸 항목이 보인다", async (platform) => {
-    await openEnvironment(platform);
+  it("windows: 터미널 셸 항목이 보인다", async () => {
+    await openEnvironment("windows");
     expect(await screen.findByText("텍스트 편집기")).toBeInTheDocument();
     expect(screen.getByText("터미널 셸")).toBeInTheDocument();
   });

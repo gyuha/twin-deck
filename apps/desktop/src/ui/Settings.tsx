@@ -32,7 +32,7 @@ interface Item {
   desc?: string;
   control: Control;
   /** 이 플랫폼에서는 설정 화면에 보이지 않는다(값은 설정 파일에 그대로 있다). */
-  hideOn?: Platform;
+  hideOn?: readonly Platform[];
 }
 
 /** 긴 설명을 ⓘ 아이콘에 숨기고, 마우스를 올리거나 포커스하면 말풍선으로 보인다(글자는 DOM에 있어 보조 기기에도 읽힌다). */
@@ -165,7 +165,7 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
     get title() { return translate("settings.section.environment.title"); },
     items: [
       { key: "environment.text_editor", get title() { return translate("settings.item.environment.text_editor.title"); }, get desc() { return translate("settings.item.environment.text_editor.desc"); }, control: { type: "text" } },
-      { key: "environment.terminal", get title() { return translate("settings.item.environment.terminal.title"); }, get desc() { return translate("settings.item.environment.terminal.desc"); }, control: { type: "select", options: TERMINAL_SHELLS } , hideOn: "mac" },
+      { key: "environment.terminal", get title() { return translate("settings.item.environment.terminal.title"); }, get desc() { return translate("settings.item.environment.terminal.desc"); }, control: { type: "select", options: TERMINAL_SHELLS } , hideOn: ["mac", "linux"] }, // Windows에서만 쓰는 설정이다
     ],
   },
 ];
@@ -363,7 +363,7 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
   const randomTheme = config.behavior.random_theme;
   const current = SECTIONS[section];
   const sectionItems: Item[] = current.title === t("settings.section.fkeys.title") ? [...current.items, ...comboKeys.map((k): Item => ({ key: `fkeys.${k}`, title: k, control: { type: "fkey" } }))] : current.items;
-  const items = sectionItems.filter((it) => it.hideOn !== platform);
+  const items = sectionItems.filter((it) => !it.hideOn?.includes(platform));
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-app text-ink">
       <div role="dialog" aria-label={t("settings.aria")} className="flex min-h-0 flex-1 flex-col">
