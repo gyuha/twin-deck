@@ -23,10 +23,13 @@ export function sortFromColumns(cols: readonly ColumnSpec[]): SortState | null {
   return c ? { key: c.name as SortKey, dir: c.sort! } : null;
 }
 
+/** 폴더이거나 폴더를 가리키는 심볼릭 링크인가(`isFolderEntry`와 같은 규칙; 순환 import를 피하려고 여기서 직접 판단한다). */
+const isFolder = (e: EntryDto) => e.kind === "dir" || (e.kind === "symlink" && e.linkIsDir);
+
 const nullsLast = (n: number | null | undefined, dir: SortDir) => n ?? (dir === "asc" ? Infinity : -Infinity);
 
 /**
- * 폴더를 먼저 두고 `sort` 기준으로 정렬한 새 배열. 같으면 이름순(항상 오름차순)으로 안정적으로 정한다.
+ * 폴더(폴더를 가리키는 심볼릭 링크 포함)를 먼저 두고 `sort` 기준으로 정렬한 새 배열. 같으면 이름순(항상 오름차순)으로 안정적으로 정한다.
  * 이름 키는 한 번만 계산해서 10만 항목에서도 빠르다.
  */
 export function sortEntries(entries: readonly EntryDto[], sort: SortState): EntryDto[] {
@@ -47,8 +50,9 @@ export function sortEntries(entries: readonly EntryDto[], sort: SortState): Entr
     }
   };
   decorated.sort((a, b) => {
-    const ad = a.e.kind === "dir";
-    if (ad !== (b.e.kind === "dir")) return ad ? -1 : 1;
+    // 폴더를 가리키는 심볼릭 링크도 폴더처럼 위에 둔다(열기·표시와 같은 규칙, 이슈 #47).
+    const ad = isFolder(a.e);
+    if (ad !== isFolder(b.e)) return ad ? -1 : 1;
     const pa = primary(a.e, a.name);
     const pb = primary(b.e, b.name);
     if (pa !== pb) return (pa < pb ? -1 : 1) * sign;

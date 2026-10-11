@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { FakeBackend } from "@twin-deck/ts-client";
 import { list, renderApp } from "./helpers";
 
-// /home/a 이름순(폴더 먼저): realdir(폴더) | a.txt, broken(끊어진 링크), dir-link(폴더 링크), file-link(파일 링크)
+// /home/a 이름순(폴더와 폴더 링크 먼저, 이슈 #47): dir-link(폴더 링크), realdir(폴더) | a.txt, broken(끊어진 링크), file-link(파일 링크)
 const seed = () => {
   const b = new FakeBackend().seed({
     "/home/a/realdir/inner.txt": "i",
@@ -29,6 +29,12 @@ const names = () => rows().map((r) => r.textContent ?? "");
 const IN_LINK = ["/", "home", "a", "dir-link"];
 
 describe("폴더 심볼릭 링크", () => {
+  it("목록 순서: 폴더 링크가 진짜 폴더와 함께 위에 있고 파일·파일 링크·끊어진 링크는 그 아래다", async () => {
+    await renderApp(seed());
+    const order = rows().map((r) => ["dir-link", "realdir", "a.txt", "broken", "file-link"].find((n) => r.textContent?.includes(n)));
+    expect(order).toEqual(["dir-link", "realdir", "a.txt", "broken", "file-link"]);
+  });
+
   it("Enter로 폴더 링크에 들어가면 링크 경로가 그대로 경로 표시줄에 남는다", async () => {
     const { user } = await renderApp(seed());
     await goTo(user, "dir-link");
@@ -39,7 +45,7 @@ describe("폴더 심볼릭 링크", () => {
 
   it("더블클릭으로도 들어간다", async () => {
     const { user } = await renderApp(seed());
-    await user.keyboard("{ArrowDown}".repeat(rowIndex("dir-link")));
+    await goTo(user, "dir-link");
     fireEvent.doubleClick(rows()[rowIndex("dir-link")]);
     await waitFor(() => expect(breadcrumb("left")).toEqual(IN_LINK));
   });
@@ -71,7 +77,8 @@ describe("폴더 심볼릭 링크", () => {
 
   it("일반 폴더는 이전처럼 들어간다", async () => {
     const { user } = await renderApp(seed());
-    await user.keyboard("{Enter}"); // 첫 항목 realdir
+    await goTo(user, "realdir");
+    await user.keyboard("{Enter}");
     await waitFor(() => expect(breadcrumb("left")).toEqual(["/", "home", "a", "realdir"]));
   });
 });

@@ -37,6 +37,51 @@ describe("columns_spec_parse (TS)", () => {
   });
 });
 
+describe("심볼릭 링크 정렬 (이슈 #47)", () => {
+  // 폴더를 가리키는 링크는 kind가 symlink이고 linkIsDir가 true다. 파일을 가리키거나 끊어진 링크는 linkIsDir가 false다.
+  const dirLink = (name: string, o: Partial<EntryDto> = {}) => entry(name, { kind: "symlink", linkIsDir: true, ...o });
+  const list = [
+    entry("b.txt", { size: 5, modifiedMs: 300 }),
+    dirLink("Mlink", { size: 1, modifiedMs: 50 }),
+    entry("zdir", { kind: "dir", size: 0, modifiedMs: 400 }),
+    entry("file-link", { kind: "symlink", size: 9, modifiedMs: 100 }), // 파일을 가리키는 링크
+    entry("adir", { kind: "dir", size: 0, modifiedMs: 10 }),
+    entry("broken", { kind: "symlink", size: 0, modifiedMs: 20 }), // 끊어진 링크
+    dirLink("alink", { size: 3, modifiedMs: 500 }),
+    entry("c.zip", { size: 7, modifiedMs: 200 }),
+  ];
+  const names = (es: EntryDto[]) => es.map((e) => e.name);
+  const FOLDERS = ["adir", "alink", "Mlink", "zdir"]; // 이름 오름차순(대소문자 무시)으로 진짜 폴더와 링크가 섞인다
+
+  it("이름 오름차순: 폴더 링크가 진짜 폴더와 섞여 위에 오고, 파일·파일 링크·끊어진 링크는 그 아래에 남는다", () => {
+    expect(names(sortEntries(list, DEFAULT_SORT))).toEqual([...FOLDERS, "b.txt", "broken", "c.zip", "file-link"]);
+  });
+  it("이름 내림차순에서도 폴더 링크는 폴더 묶음 안에 있다", () => {
+    expect(names(sortEntries(list, { key: "name", dir: "desc" }))).toEqual(["zdir", "Mlink", "alink", "adir", "file-link", "c.zip", "broken", "b.txt"]);
+  });
+  it("크기·수정일·확장자 정렬(오름·내림)에서도 폴더 링크가 모든 파일보다 앞이다", () => {
+    for (const key of ["size", "modified", "extension"] as const) {
+      for (const dir of ["asc", "desc"] as const) {
+        const out = names(sortEntries(list, { key, dir }));
+        const firstFile = out.findIndex((n) => !FOLDERS.includes(n));
+        expect(firstFile, `${key} ${dir}: ${out.join()}`).toBe(4); // 앞의 4개가 폴더 묶음
+        expect(out.slice(0, 4).sort()).toEqual([...FOLDERS].sort());
+      }
+    }
+  });
+  it("폴더 묶음 안에서는 선택한 기준으로 진짜 폴더와 링크가 함께 정렬된다(링크가 뒤로 몰리지 않는다)", () => {
+    // 수정일 내림차순: alink(500) > zdir(400) > Mlink(50) > adir(10)
+    expect(names(sortEntries(list, { key: "modified", dir: "desc" })).slice(0, 4)).toEqual(["alink", "zdir", "Mlink", "adir"]);
+  });
+  it("파일을 가리키는 링크와 끊어진 링크는 항상 파일 쪽에 있다", () => {
+    for (const sort of [DEFAULT_SORT, { key: "size", dir: "desc" } as const]) {
+      const out = names(sortEntries(list, sort));
+      expect(out.indexOf("file-link")).toBeGreaterThanOrEqual(4);
+      expect(out.indexOf("broken")).toBeGreaterThanOrEqual(4);
+    }
+  });
+});
+
 describe("크기 포맷 (CFG-05)", () => {
   it.each([
     [0, "adaptive", "0 B"],
