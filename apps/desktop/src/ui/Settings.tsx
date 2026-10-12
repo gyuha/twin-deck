@@ -24,7 +24,9 @@ type Control =
   /** 검색 입력이 있는 선택 상자(항목이 많을 때). */
   | { type: "combo"; options: readonly ComboOption[] }
   | { type: "tags"; options: readonly ComboOption[] }
-  | { type: "fkey" };
+  | { type: "fkey" }
+  /** 전역 단축키: 수식키 체크 + 키 선택 상자. 값은 `Mod+Alt+O` 문자열이다. */
+  | { type: "hotkey" };
 
 interface Item {
   key: string;
@@ -170,7 +172,7 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
       { key: "environment.terminal", get title() { return translate("settings.item.environment.terminal.title"); }, get desc() { return translate("settings.item.environment.terminal.desc"); }, control: { type: "select", options: TERMINAL_SHELLS } , hideOn: ["mac", "linux"] }, // Windows에서만 쓰는 설정이다
       { key: "environment.single_instance", get title() { return translate("settings.item.environment.single_instance.title"); }, get desc() { return translate("settings.item.environment.single_instance.desc"); }, control: { type: "switch" } },
       { key: "environment.global_hotkey_enabled", get title() { return translate("settings.item.environment.global_hotkey_enabled.title"); }, get desc() { return translate("settings.item.environment.global_hotkey_enabled.desc"); }, control: { type: "switch" } },
-      { key: "environment.global_hotkey", get title() { return translate("settings.item.environment.global_hotkey.title"); }, get desc() { return translate("settings.item.environment.global_hotkey.desc"); }, control: { type: "text" } },
+      { key: "environment.global_hotkey", get title() { return translate("settings.item.environment.global_hotkey.title"); }, get desc() { return translate("settings.item.environment.global_hotkey.desc"); }, control: { type: "hotkey" } },
     ],
   },
 ];
@@ -342,6 +344,62 @@ function FKeyAdder({ disabled }: { disabled: boolean }) {
   );
 }
 
+const HOTKEY_KEYS = [...Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i)), ...Array.from({ length: 10 }, (_, i) => String(i)), ...Array.from({ length: 12 }, (_, i) => `F${i + 1}`)];
+const isFKey = (k: string) => /^F\d+$/.test(k);
+
+/** `Mod+Alt+O`을 (수식키, 키)로 푼다. 수식키 순서가 다르거나 목록에 없는 키면 `null`. */
+function parseHotkey(value: string): { mods: string[]; key: string } | null {
+  const parts = value.split("+");
+  const key = parts.pop() ?? "";
+  if (!HOTKEY_KEYS.includes(key) || parts.some((m) => !(MODIFIERS as readonly string[]).includes(m))) return null;
+  return { mods: parts, key };
+}
+
+/** 전역 화면 열기 단축키: 수식키 체크 + 키 선택 상자. 글자·숫자는 수식키가 하나 이상일 때만 저장하고, 목록에 없는 값은 고르기 전까지 그대로 둔다. */
+function HotkeyControl({ name, value, disabled, onCommit }: { name: string; value: string; disabled: boolean; onCommit: (v: string) => void }) {
+  const t = useT();
+  const parsed = parseHotkey(value);
+  const [mods, setMods] = useState<string[]>(parsed?.mods ?? []);
+  const [key, setKey] = useState(parsed?.key ?? "");
+  useEffect(() => {
+    const p = parseHotkey(value);
+    if (p) {
+      setMods(p.mods);
+      setKey(p.key);
+    } else {
+      setKey("");
+      if (value !== "") setMods([]);
+    }
+  }, [value]);
+  const change = (nextMods: string[], nextKey: string) => {
+    setMods(nextMods);
+    setKey(nextKey);
+    if (nextKey === "") return nextKey !== key ? onCommit("") : undefined;
+    if (nextMods.length === 0 && !isFKey(nextKey)) return;
+    onCommit([...MODIFIERS.filter((m) => nextMods.includes(m)), nextKey].join("+"));
+  };
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-3">
+      {MODIFIERS.map((m) => (
+        <label key={m} className="flex items-center gap-1 text-sm">
+          <input type="checkbox" aria-label={m} checked={mods.includes(m)} disabled={disabled} onChange={(e) => change(e.target.checked ? [...mods, m] : mods.filter((x) => x !== m), key)} />
+          {m}
+        </label>
+      ))}
+      <select aria-label={name} value={key} disabled={disabled} onChange={(e) => change(mods, e.target.value)} className="rounded border border-app-line bg-app-box px-2 py-1 text-sm">
+        <option value="">{t("settings.hotkey.none")}</option>
+        {HOTKEY_KEYS.map((k) => (
+          <option key={k} value={k}>
+            {k}
+          </option>
+        ))}
+      </select>
+      {value !== "" && !parsed && <span className="text-xs text-ink-faint">{t("settings.hotkey.unlisted", { value })}</span>}
+      {key !== "" && !isFKey(key) && mods.length === 0 && <span className="text-xs text-status-error">{t("settings.hotkey.needs_modifier")}</span>}
+    </div>
+  );
+}
+
 /** 사용자 설정을 항목별 컨트롤로 바꾸는 화면(`Mod+,`). 바꾸는 즉시 저장한다. */
 export function Settings({ onThemePreview }: { onThemePreview?: (theme: string | null) => void }) {
   const t = useT();
@@ -428,7 +486,7 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
               // 설정 파일에 없는 내장 조합키는 값이 없다 → 기본값("")으로 본다.
               const value = (valueAt(config, item.key) ?? (item.control.type === "fkey" ? "" : undefined)) as string | number | boolean;
               const isDefault = value === (valueAt(defaults, item.key) ?? (item.control.type === "fkey" ? "" : undefined));
-              const wide = item.control.type === "text" || item.control.type === "fkey" || item.control.type === "tags";
+              const wide = item.control.type === "text" || item.control.type === "fkey" || item.control.type === "tags" || item.control.type === "hotkey";
               return (
                 <div key={item.key} role="group" aria-label={item.title} className="flex items-center justify-between gap-4 border-b border-app-line py-2.5">
                   <div className={wide ? "w-48 shrink-0" : "min-w-0"}>
@@ -460,6 +518,9 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
                         disabled={!!broken}
                         onCheckedChange={(v) => void api.setConfigValue(item.key, { kind: "bool", value: v })}
                       />
+                    )}
+                    {item.control.type === "hotkey" && (
+                      <HotkeyControl name={item.title} value={String(value)} disabled={!!broken || hotkeyOff} onCommit={(v) => void api.setConfigValue(item.key, { kind: "str", value: v })} />
                     )}
                     {item.control.type === "fkey" && <FKeyControl name={item.title} value={String(value)} disabled={!!broken} />}
                     {item.control.type === "fkey" && (
@@ -509,7 +570,7 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
                       <EditableControl
                         item={item}
                         value={value as string | number}
-                        disabled={!!broken || (item.key === "environment.global_hotkey" && hotkeyOff)}
+                        disabled={!!broken}
                         onCommit={(v) =>
                           void api.setConfigValue(item.key, item.control.type === "int" ? { kind: "int", value: Math.round(Number(v)) } : { kind: "str", value: v })
                         }
