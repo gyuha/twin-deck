@@ -913,6 +913,13 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     flashTimer = setTimeout(() => set({ flash: null }), 3000);
   };
   const fail = (e: unknown) => set({ notice: String(e instanceof Error ? e.message : e) });
+  /** 자소 문제를 고친 결과를 알리고 목록을 다시 읽는다. */
+  const reportHangul = async (r: { renamed: number; conflicts: number; failed: number; first_error: string | null }) => {
+    if (r.renamed > 0) await reloadAll();
+    if (r.failed > 0) return fail(tr("store.hangul.failed", { count: r.failed, reason: rustText(r.first_error ?? "") }));
+    if (r.renamed === 0 && r.conflicts === 0) return flash(tr("store.hangul.none"));
+    flash(tr("store.hangul.done", { count: r.renamed }) + (r.conflicts > 0 ? tr("store.hangul.conflicts", { count: r.conflicts }) : ""));
+  };
   /** 새로 만든 항목으로 커서를 옮긴다. 중첩 경로(`a/b/c`)면 이 폴더 바로 아래에 생긴 맨 위 폴더(`a`)로 간다. 길어서 화면 밖이어도 표가 따라 스크롤한다. */
   const cursorToCreated = (typed: string) => {
     const top = typed.split(/[\\/]/).find((part) => part !== "");
@@ -2326,6 +2333,31 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         }
       }
       await reloadAll();
+    },
+    /** 선택한 파일 한글 자소 문제 수정 (이슈 #50, `core.file.fix_hangul_selected`): 선택한 항목(없으면 커서 항목)의 이름만 조합형(NFC)으로 고친다. */
+    async fixHangulSelected() {
+      const tab = activeTab(get());
+      const targets = targetsOf(tab);
+      if (targets.length === 0) return;
+      if (targets.some((t) => isArchivePath(t.path))) return fail(tr("store.hangul.archive"));
+      set({ notice: null });
+      try {
+        await reportHangul(await backend.normalizeNames(targets.map((t) => t.path)));
+      } catch (e) {
+        fail(e);
+      }
+    },
+    /** 현재 폴더 한글 자소 문제 수정 (이슈 #50, `core.file.fix_hangul_dir`): 현재 폴더 바로 아래 항목의 이름을 조합형으로 고친다. 하위 폴더 안은 건드리지 않는다. */
+    async fixHangulDir() {
+      const tab = activeTab(get());
+      if (tab.virtual) return fail(tr("store.hangul.virtual"));
+      if (isArchivePath(tab.path)) return fail(tr("store.hangul.archive"));
+      set({ notice: null });
+      try {
+        await reportHangul(await backend.normalizeDir(tab.path));
+      } catch (e) {
+        fail(e);
+      }
     },
     /** 심볼릭 링크 만들기 (OP-12, `core.file.symlink`): 커서 항목을 반대편 패널 폴더에 링크로 만든다. */
     async symlink() {

@@ -10,6 +10,7 @@ td-vfs = { path = "../td-vfs" }
 td-archive = { path = "../td-archive" }
 thiserror.workspace = true
 trash = "5"
+unicode-normalization = "0.1"
 
 [dev-dependencies]
 tempfile.workspace = true

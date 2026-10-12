@@ -655,6 +655,30 @@ impl Batcher {
 
 pub type ServiceResult<T> = Result<T, String>;
 
+/// 이름을 조합형으로 고친 결과의 개수. 실패한 것이 있으면 첫 이유를 함께 담는다.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, Type)]
+pub struct NormalizeResultDto {
+    /// 고친 항목 수.
+    pub renamed: u32,
+    /// 같은 조합형 이름의 다른 항목이 있어 건드리지 않은 수.
+    pub conflicts: u32,
+    /// 이름을 바꾸지 못한 수.
+    pub failed: u32,
+    /// 바꾸지 못한 첫 항목의 이유.
+    pub first_error: Option<String>,
+}
+
+impl From<td_ops::NormalizeReport> for NormalizeResultDto {
+    fn from(r: td_ops::NormalizeReport) -> Self {
+        Self {
+            renamed: r.renamed.len() as u32,
+            conflicts: r.conflicts.len() as u32,
+            failed: r.failed.len() as u32,
+            first_error: r.failed.first().map(|(_, e)| e.clone()),
+        }
+    }
+}
+
 fn vp(p: &str) -> VfsPath {
     VfsPath::new(PathBuf::from(p))
 }
@@ -1320,6 +1344,20 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
         self.ops
             .rename(&vp(path), new_name)
             .map(|p| p.to_string())
+            .map_err(|e| e.to_string())
+    }
+
+    /// 자소가 분리된(NFD) 이름을 조합형(NFC)으로 고친다(이슈 #50).
+    pub fn normalize_names(&self, paths: &[String]) -> NormalizeResultDto {
+        let paths: Vec<VfsPath> = paths.iter().map(|p| vp(p)).collect();
+        NormalizeResultDto::from(self.ops.normalize_names(&paths))
+    }
+
+    /// 폴더 바로 아래 항목의 이름을 조합형으로 고친다. 하위 폴더 안은 건드리지 않는다.
+    pub fn normalize_dir(&self, dir: &str) -> ServiceResult<NormalizeResultDto> {
+        self.ops
+            .normalize_dir(&vp(dir))
+            .map(NormalizeResultDto::from)
             .map_err(|e| e.to_string())
     }
 

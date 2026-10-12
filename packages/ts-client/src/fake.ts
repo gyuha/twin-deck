@@ -6,6 +6,7 @@ import type {
   ConflictDto,
   EntryDto,
   FileInfoDto,
+  NormalizeResultDto,
   JobDto,
   JobKindDto,
   Loaded,
@@ -1132,6 +1133,32 @@ export class FakeBackend implements Backend {
     }
     this.notify(parent);
     return dest;
+  }
+
+  async normalizeNames(paths: string[]): Promise<NormalizeResultDto> {
+    const r: NormalizeResultDto = { renamed: 0, conflicts: 0, failed: 0, first_error: null };
+    for (const path of paths) {
+      const name = baseName(path);
+      const nfc = name.normalize("NFC");
+      if (nfc === name) continue;
+      if (this.nodes.has(joinPath(parentPath(path) ?? "/", nfc))) {
+        r.conflicts++;
+        continue;
+      }
+      try {
+        await this.rename(path, nfc);
+        r.renamed++;
+      } catch (e) {
+        r.failed++;
+        r.first_error ??= e instanceof Error ? e.message : String(e);
+      }
+    }
+    return r;
+  }
+
+  async normalizeDir(dir: string): Promise<NormalizeResultDto> {
+    const entries = await this.listDir(dir, true);
+    return this.normalizeNames(entries.map((e) => e.path));
   }
 
   async trash(path: string) {

@@ -15,6 +15,8 @@ export const RUST_MESSAGES: readonly (readonly [ko: string, en: string])[] = [
   ["처리기 {clsid}, 영역 {}×{} 위치 ({}, {})", "handler {clsid}, area {}×{} at ({}, {})"],
   ["미리보기 호스트가 잠겨 있습니다", "The preview host is locked"],
   ["{path}: 파일이 아닙니다", "{path}: not a file"],
+  ["임시 이름이 이미 있습니다", "The temporary name already exists"],
+  ["되돌리지 못했습니다({tmp}): {e}", "Could not restore the original name ({tmp}): {e}"],
   ["{path}: 차단을 해제하지 못했습니다: {e}", "{path}: could not unblock: {e}"],
   ["미리보기 처리기를 띄우지 못했습니다", "Could not start the preview handler"],
   ["처리기 ID가 잘못됐습니다: {e}", "Invalid handler ID: {e}"],

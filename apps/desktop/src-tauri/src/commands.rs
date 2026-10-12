@@ -826,6 +826,26 @@ pub fn rename_entry(
     svc.rename(&path, &new_name)
 }
 
+/// 자소가 분리된(NFD) 한글 이름을 조합형(NFC)으로 고친다(이슈 #50).
+#[tauri::command]
+#[specta::specta]
+pub fn normalize_names(
+    svc: State<'_, AppService>,
+    paths: Vec<String>,
+) -> crate::service::NormalizeResultDto {
+    svc.normalize_names(&paths)
+}
+
+/// 폴더 바로 아래 항목의 이름을 조합형으로 고친다. 하위 폴더 안은 건드리지 않는다.
+#[tauri::command]
+#[specta::specta]
+pub fn normalize_dir(
+    svc: State<'_, AppService>,
+    dir: String,
+) -> ServiceResult<crate::service::NormalizeResultDto> {
+    svc.normalize_dir(&dir)
+}
+
 /// Look Up을 시작한다. 결과는 `SearchChunk` 이벤트로 온다. 질의 오류는 위치가 든 문자열이다.
 #[tauri::command]
 #[specta::specta]
@@ -1027,6 +1047,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             queue_abort,
             queue_clear_finished,
             rename_entry,
+            normalize_names,
+            normalize_dir,
             take_launch_paths,
             cli_status,
             cli_install,

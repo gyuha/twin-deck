@@ -79,6 +79,8 @@ export function fileOpHandlers({ api }: AppStore): Partial<ActionHandlers> {
     "core.compress": () => api.compress(),
     "core.extract": () => api.extract(false),
     "core.extract.to_inactive": () => api.extract(true),
+    "core.file.fix_hangul_selected": () => api.fixHangulSelected(),
+    "core.file.fix_hangul_dir": () => api.fixHangulDir(),
     "core.file.symlink": () => api.symlink(),
     "core.file.info": () => api.showFileInfo(),
     "core.path.copy_folder": () => api.copyFolderPath(),

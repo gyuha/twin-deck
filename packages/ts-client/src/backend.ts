@@ -1,4 +1,4 @@
-import type { CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, EpubInfoDto, ExpectedFileDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, LoadedState, PreviewDto, PreviewRectDto, QueueItemDto, QuickLookDto, SearchStartDto, ShowOutcome, SearchSummaryDto, Snapshot, UpdateInfoDto, UserDirsDto, VolumeDto, WriteTextResultDto } from "./generated/bindings";
+import type { CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, EpubInfoDto, ExpectedFileDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, NormalizeResultDto, LoadedState, PreviewDto, PreviewRectDto, QueueItemDto, QuickLookDto, SearchStartDto, ShowOutcome, SearchSummaryDto, Snapshot, UpdateInfoDto, UserDirsDto, VolumeDto, WriteTextResultDto } from "./generated/bindings";
 
 /** Look Up / Flatten / Disk Usage가 스트리밍으로 보내는 이벤트. 작업마다 마지막은 `done`이다. */
 export type SearchEvent =
@@ -45,6 +45,10 @@ export interface Backend {
   /** `destDir`에 `src`와 같은 이름이 이미 있으면 그 경로. */
   detectConflict(src: string, destDir: string): Promise<string | null>;
   rename(path: string, newName: string): Promise<string>;
+  /** 자소가 분리된(NFD) 한글 이름을 조합형(NFC)으로 고친다(이슈 #50). */
+  normalizeNames(paths: string[]): Promise<NormalizeResultDto>;
+  /** 폴더 바로 아래 항목의 이름을 조합형으로 고친다. 하위 폴더 안은 건드리지 않는다. */
+  normalizeDir(dir: string): Promise<NormalizeResultDto>;
   /** 복사/이동/휴지통/삭제를 작업 큐에 넣는다. 작업 id를 돌려준다. */
   enqueue(kind: JobKindDto, items: QueueItemDto[]): Promise<number>;
   /** 압축 (OP-11): `sources`를 `destDir`의 ZIP 하나로 묶는 작업을 큐에 넣는다. 이름이 겹치면 번호를 붙이고 원본은 그대로 둔다. */

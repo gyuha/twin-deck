@@ -435,6 +435,23 @@ async renameEntry(path: string, newName: string) : Promise<Result<string, string
 }
 },
 /**
+ * 자소가 분리된(NFD) 한글 이름을 조합형(NFC)으로 고친다(이슈 #50).
+ */
+async normalizeNames(paths: string[]) : Promise<NormalizeResultDto> {
+    return await TAURI_INVOKE("normalize_names", { paths });
+},
+/**
+ * 폴더 바로 아래 항목의 이름을 조합형으로 고친다. 하위 폴더 안은 건드리지 않는다.
+ */
+async normalizeDir(dir: string) : Promise<Result<NormalizeResultDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("normalize_dir", { dir }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * 시작 인수로 받은 `td` 요청을 한 번 돌려준다(없으면 null). 가져가면 비워서 두 번 적용되지 않는다.
  */
 async takeLaunchPaths() : Promise<OpenPathsDto | null> {
@@ -854,6 +871,26 @@ export type LoadedState = { snapshot: Snapshot | null;
  * 파일이 있었지만 읽을 수 없어 무시했다면 그 이유.
  */
 warning: string | null }
+/**
+ * 이름을 조합형으로 고친 결과의 개수. 실패한 것이 있으면 첫 이유를 함께 담는다.
+ */
+export type NormalizeResultDto = { 
+/**
+ * 고친 항목 수.
+ */
+renamed: number; 
+/**
+ * 같은 조합형 이름의 다른 항목이 있어 건드리지 않은 수.
+ */
+conflicts: number; 
+/**
+ * 이름을 바꾸지 못한 수.
+ */
+failed: number; 
+/**
+ * 바꾸지 못한 첫 항목의 이유.
+ */
+first_error: string | null }
 /**
  * 실행 중인 앱에 `td` 명령이 경로를 넘겼다(단일 인스턴스).
  */

@@ -104,6 +104,8 @@ Marta에서는 수정자 없는 단일 키 바인딩이 Quick Select에 가로�
 | `core.extract` | 추출 (선택한 아카이브 옆의 새 폴더로) | 없음 | 없음 | pane | 자체 |
 | `core.extract.to_inactive` | 추출 (반대편 패널 폴더 아래 새 폴더로) | 없음 | 없음 | pane | 자체 |
 | `core.file.symlink` | 심볼릭 링크 만들기 | 없음 | 없음 | pane | 자체 (키 미확인) |
+| `core.file.fix_hangul_selected` | 선택한 파일 한글 자소 문제 수정 | 없음 | 없음 | pane | `nfd2nfc` 참고 (이슈 #50). 선택한 항목(없으면 커서 항목)의 이름을 자소 분리(NFD)에서 조합형(NFC)으로 바꾼다. 같은 이름이 이미 있으면 덮어쓰지 않고 건너뛴다 |
+| `core.file.fix_hangul_dir` | 현재 폴더 한글 자소 문제 수정 | 없음 | 없음 | pane | 현재 폴더 바로 아래 항목만 고친다(하위 폴더 안은 그대로). 검색 결과·압축 파일 안에서는 쓸 수 없다 |
 | `core.file.info` | 파일 정보 | `Mod+I` | `Ctrl+I` | pane | 자체 ID, 키 확인 |
 | `core.path.copy_folder` | 폴더 경로 복사 | `F12` | `F12` | pane | 자체 ID, 키 확인 |
 | `core.path.copy_files` | 파일 경로 복사 (파일 행 컨텍스트 메뉴의 `경로 복사`, 이슈 #43) | `Mod+F12` | `Ctrl+F12` | pane | 자체 ID, 키 확인 |

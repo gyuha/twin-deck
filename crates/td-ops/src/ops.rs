@@ -1,6 +1,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use td_vfs::{Entry, EntryKind, ListOptions, Vfs, VfsError, VfsPath};
+use unicode_normalization::UnicodeNormalization;
 
 use crate::{OpsError, Result, Trasher};
 
@@ -66,6 +67,17 @@ fn open_archive_for_extract(src: &VfsPath) -> Result<td_archive::Archive> {
             other => Err(other),
         })?,
     )
+}
+
+/// 이름을 조합형(NFC)으로 고친 결과.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct NormalizeReport {
+    /// (원래 경로, 고친 경로).
+    pub renamed: Vec<(VfsPath, VfsPath)>,
+    /// 같은 조합형 이름의 다른 항목이 이미 있어 건드리지 않은 경로.
+    pub conflicts: Vec<VfsPath>,
+    /// 이름을 바꾸지 못한 경로와 이유.
+    pub failed: Vec<(VfsPath, String)>,
 }
 
 pub struct Ops<V: Vfs, T: Trasher> {
@@ -558,6 +570,61 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
         }
         self.vfs.rename(src, &dest)?;
         Ok(dest)
+    }
+
+    /// 자소가 분리된(NFD) 한글 이름을 조합형(NFC)으로 바꾼다(이슈 #50). 이미 조합형인 이름은 건드리지 않는다.
+    /// APFS는 두 형태를 같은 이름으로 보므로 "이미 있음" 검사를 믿을 수 없다. 그래서 임시 이름으로 옮긴 뒤 조합형 이름으로 옮기고,
+    /// 그 사이에 같은 조합형 이름의 다른 항목이 보이면 원래 이름으로 되돌린다(덮어쓰지 않는다).
+    pub fn normalize_names(&self, paths: &[VfsPath]) -> NormalizeReport {
+        let mut report = NormalizeReport::default();
+        for (n, path) in paths.iter().enumerate() {
+            let Some(name) = path.file_name() else {
+                continue;
+            };
+            let nfc: String = name.nfc().collect();
+            if nfc == name {
+                continue;
+            }
+            let Some(parent) = path.parent() else {
+                continue;
+            };
+            let dest = parent.join(&nfc);
+            let tmp = parent.join(&format!(".td-nfc-{}-{n}", std::process::id()));
+            if self.exists(&tmp) {
+                report
+                    .failed
+                    .push((path.clone(), "임시 이름이 이미 있습니다".into()));
+                continue;
+            }
+            if let Err(e) = self.vfs.rename(path, &tmp) {
+                report.failed.push((path.clone(), e.to_string()));
+                continue;
+            }
+            if self.exists(&dest) {
+                match self.vfs.rename(&tmp, path) {
+                    Ok(()) => report.conflicts.push(path.clone()),
+                    Err(e) => report
+                        .failed
+                        .push((path.clone(), format!("되돌리지 못했습니다({tmp}): {e}"))),
+                }
+                continue;
+            }
+            match self.vfs.rename(&tmp, &dest) {
+                Ok(()) => report.renamed.push((path.clone(), dest)),
+                Err(e) => {
+                    let _ = self.vfs.rename(&tmp, path);
+                    report.failed.push((path.clone(), e.to_string()));
+                }
+            }
+        }
+        report
+    }
+
+    /// 폴더 바로 아래 항목(숨김 포함)의 이름을 조합형으로 고친다. 하위 폴더 안은 건드리지 않는다.
+    pub fn normalize_dir(&self, dir: &VfsPath) -> Result<NormalizeReport> {
+        let entries = self.vfs.list(dir, &ListOptions { show_hidden: true })?;
+        let paths: Vec<VfsPath> = entries.into_iter().map(|e| e.path).collect();
+        Ok(self.normalize_names(&paths))
     }
 
     /// 휴지통으로 이동 (OP-06).

@@ -55,6 +55,12 @@ export class TauriBackend implements Backend {
   async rename(path: string, newName: string) {
     return unwrap(await commands.renameEntry(path, newName));
   }
+  normalizeNames(paths: string[]) {
+    return commands.normalizeNames(paths);
+  }
+  async normalizeDir(dir: string) {
+    return unwrap(await commands.normalizeDir(dir));
+  }
   enqueue(kind: JobKindDto, items: QueueItemDto[]) {
     return commands.enqueueJob(kind, items);
   }

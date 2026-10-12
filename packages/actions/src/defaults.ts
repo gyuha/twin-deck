@@ -73,6 +73,8 @@ export const DEFAULT_ACTION_META = [
   { id: "core.compress", title: "압축", category: "File", scopes: ["pane"], isApplicable: hasTarget },
   { id: "core.extract", title: "추출 (옆의 새 폴더로)", category: "File", scopes: ["pane"], isApplicable: hasTarget },
   { id: "core.extract.to_inactive", title: "추출 (반대편 패널로)", category: "File", scopes: ["pane"], isApplicable: hasTarget },
+  { id: "core.file.fix_hangul_selected", title: "선택한 파일 한글 자소 문제 수정", category: "File", scopes: ["pane"], isApplicable: (c) => c.hasCursorItem },
+  { id: "core.file.fix_hangul_dir", title: "현재 폴더 한글 자소 문제 수정", category: "File", scopes: ["pane"] },
   { id: "core.file.symlink", title: "심볼릭 링크 만들기 (반대편 패널에)", category: "File", scopes: ["pane"], isApplicable: (c) => c.hasCursorItem },
   { id: "core.find.open", title: "파일 찾기", category: "Navigation", scopes: ["pane"] },
   { id: "core.find.close", title: "파일 찾기 닫기", category: "Navigation", scopes: ["find"] },
