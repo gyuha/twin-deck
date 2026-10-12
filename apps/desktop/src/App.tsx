@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { actionTitle, t as translate } from "./i18n";
 import { useStore } from "zustand";
-import { createDefaultRegistry, defaultBindingsFor, mergeUserBindings } from "@twin-deck/actions";
+import { type ActionHandlers, createDefaultRegistry, defaultBindingsFor, mergeUserBindings } from "@twin-deck/actions";
 import { formatKey } from "@twin-deck/keybinds";
 import { formatSpace } from "./lib/format";
 import { selectionSummary } from "./lib/selectionSummary";
@@ -165,7 +165,15 @@ function BarWarnings({ base }: { base: string[] }) {
 
 export function App({ backend, platform, leftPath, rightPath, snapshot, stateWarning }: AppProps) {
   const [app] = useState(() => createAppStore(backend, leftPath, rightPath, snapshot));
-  const registry = useMemo(() => createDefaultRegistry(allHandlers(app)), [app]);
+  const registry = useMemo(() => {
+    const handlers: Partial<ActionHandlers> = allHandlers(app);
+    // 한글 자소(NFD) 문제는 macOS 파일 시스템에서만 생기므로 다른 OS에서는 액션을 등록하지 않는다(이슈 #50).
+    if (platform !== "mac") {
+      delete handlers["core.file.fix_hangul_selected"];
+      delete handlers["core.file.fix_hangul_dir"];
+    }
+    return createDefaultRegistry(handlers);
+  }, [app, platform]);
   const loaded = useStore(app.store, (s) => s.loaded);
   // 기본 키맵 위에 사용자 바인딩을 병합한다. 설정이 바뀌면 다시 만든다.
   const { keymap, warnings } = useMemo(() => {
