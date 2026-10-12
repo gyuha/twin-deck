@@ -5277,6 +5277,7 @@ version = "0.6.4"
 dependencies = [
  "base64 0.22.1",
  "clipboard-rs",
+ "dirs",
  "drag",
  "objc2",
  "objc2-app-kit",

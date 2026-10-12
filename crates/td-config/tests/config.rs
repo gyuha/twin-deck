@@ -1200,3 +1200,18 @@ fn global_hotkey_enabled_defaults_on_and_can_be_turned_off() {
     assert!(l.warnings.is_empty(), "{:?}", l.warnings);
     assert!(!l.config.environment.global_hotkey_enabled);
 }
+
+#[test]
+fn single_instance_defaults_on_and_can_be_turned_off() {
+    let d = user_value_dir(None);
+    assert!(
+        load_dir(d.path(), Platform::Linux)
+            .config
+            .environment
+            .single_instance
+    );
+    let d = user_value_dir(Some("[environment]\nsingle_instance = false\n"));
+    let l = load_dir(d.path(), Platform::Linux);
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert!(!l.config.environment.single_instance);
+}

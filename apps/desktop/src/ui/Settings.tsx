@@ -168,6 +168,7 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
     items: [
       { key: "environment.text_editor", get title() { return translate("settings.item.environment.text_editor.title"); }, get desc() { return translate("settings.item.environment.text_editor.desc"); }, control: { type: "text" } },
       { key: "environment.terminal", get title() { return translate("settings.item.environment.terminal.title"); }, get desc() { return translate("settings.item.environment.terminal.desc"); }, control: { type: "select", options: TERMINAL_SHELLS } , hideOn: ["mac", "linux"] }, // Windows에서만 쓰는 설정이다
+      { key: "environment.single_instance", get title() { return translate("settings.item.environment.single_instance.title"); }, get desc() { return translate("settings.item.environment.single_instance.desc"); }, control: { type: "switch" } },
       { key: "environment.global_hotkey_enabled", get title() { return translate("settings.item.environment.global_hotkey_enabled.title"); }, get desc() { return translate("settings.item.environment.global_hotkey_enabled.desc"); }, control: { type: "switch" } },
       { key: "environment.global_hotkey", get title() { return translate("settings.item.environment.global_hotkey.title"); }, get desc() { return translate("settings.item.environment.global_hotkey.desc"); }, control: { type: "text" } },
     ],

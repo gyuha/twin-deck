@@ -328,6 +328,8 @@ export const en: Record<Key, string> = {
   "settings.item.behavior.terminal_font.desc": "Font of the built-in terminal (CSS font-family), separate from the preview font. Empty uses the default monospace font. Changes apply to open terminals immediately",
   "settings.item.behavior.text_color.title": "Text color",
   "settings.item.behavior.text_color.desc": "Default text color for the app. Pick on the color wheel or type #rrggbb. Empty keeps the theme as is, and dim text is derived by blending this color toward the background. The color is the same for every theme, so it may become hard to read when the theme (especially system) changes — clear it then",
+  "settings.item.environment.single_instance.title": "Run only one app",
+  "settings.item.environment.single_instance.desc": "When on, launching again while the app is running brings the running window to the front. When off, every launch starts a new app, including the td command in a terminal. Takes effect after restarting the app. The global open-window hotkey is registered only in the app that started first",
   "settings.item.environment.global_hotkey_enabled.title": "Use global open-window hotkey",
   "settings.item.environment.global_hotkey_enabled.desc": "When off, pressing the hotkey does not bring the window back. The hotkey value below is kept",
   "settings.item.environment.global_hotkey.title": "Global open-window hotkey",

@@ -792,6 +792,10 @@ mode: number | null; hidden: boolean;
 linkIsDir: boolean }
 export type Environment = { text_editor: string; terminal: string; 
 /**
+ * 앱을 한 번에 하나만 띄울지. 켜면 이미 떠 있을 때 다시 실행해도 그 앱의 창이 앞으로 오고, 끄면 실행할 때마다 새로 뜬다. 앱을 다시 시작해야 반영된다.
+ */
+single_instance: boolean; 
+/**
  * 전역 화면 열기 단축키를 쓸지. 끄면 `global_hotkey` 값이 있어도 등록하지 않는다.
  */
 global_hotkey_enabled: boolean; 

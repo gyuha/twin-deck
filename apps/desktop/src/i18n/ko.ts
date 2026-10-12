@@ -326,6 +326,8 @@ export const ko = {
   "settings.item.behavior.terminal_font.desc": "내장 터미널의 글꼴(CSS font-family). 미리보기 글꼴과 따로 씁니다. 비우면 기본 고정폭 글꼴. 바꾸면 열려 있는 터미널에 바로 적용됩니다",
   "settings.item.behavior.text_color.title": "글자 색",
   "settings.item.behavior.text_color.desc": "앱 기본 글자색. 색상환으로 고르거나 #rrggbb를 씁니다. 비우면 테마 그대로이고, 흐린 글자는 이 색을 배경 쪽으로 섞어 자동으로 만듭니다. 색은 테마와 무관하게 하나라서, 테마(특히 system)가 바뀌면 읽기 어려울 수 있으니 그때는 비우세요",
+  "settings.item.environment.single_instance.title": "앱을 하나만 실행",
+  "settings.item.environment.single_instance.desc": "켜면 이미 떠 있을 때 다시 실행해도 그 앱의 창이 앞으로 옵니다. 끄면 실행할 때마다 새 앱이 뜨고 터미널의 td 명령도 새 앱을 띄웁니다. 앱을 다시 시작해야 반영됩니다. 전역 화면 열기 단축키는 먼저 뜬 앱에만 등록됩니다",
   "settings.item.environment.global_hotkey_enabled.title": "전역 화면 열기 단축키 사용",
   "settings.item.environment.global_hotkey_enabled.desc": "끄면 단축키를 눌러도 창을 불러오지 않습니다. 아래 단축키 값은 그대로 남습니다",
   "settings.item.environment.global_hotkey.title": "전역 화면 열기 단축키",

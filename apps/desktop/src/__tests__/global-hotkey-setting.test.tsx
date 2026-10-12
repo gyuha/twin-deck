@@ -26,4 +26,12 @@ describe("전역 단축키 설정 (environment.global_hotkey)", () => {
     await user.click(sw);
     expect(await screen.findByRole("textbox", { name: "전역 화면 열기 단축키" })).toBeEnabled();
   });
+
+  it("앱을 하나만 실행 스위치가 환경 탭에 있고 기본으로 켜져 있다 (environment.single_instance)", async () => {
+    const { user } = await renderApp();
+    await user.keyboard("{Control>},{/Control}");
+    await screen.findByRole("dialog", { name: "설정" });
+    await user.click(screen.getByRole("tab", { name: "환경" }));
+    expect(await screen.findByRole("switch", { name: "앱을 하나만 실행" })).toBeChecked();
+  });
 });

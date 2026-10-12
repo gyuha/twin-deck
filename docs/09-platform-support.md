@@ -89,7 +89,7 @@ Favorites 등에서 쓰는 경로 변수는 OS별로 해석한다.
 | 항목 | 방식 |
 |---|---|
 | 인수 | `td [폴더 [폴더]]`, 예: `td .` (CLI-01, 이슈 #45). 첫 경로는 왼쪽 패널, 둘째는 오른쪽 패널에 **새 탭**으로 열고(같은 폴더 탭이 있으면 그 탭을 활성으로), 파일이면 그 폴더를 열고 커서를 파일에 둔다. 없는 경로는 종료 코드 1, 3개 이상·옵션은 사용법과 종료 코드 2. `--existing-tab`·`--new-window`는 아직 없다 |
-| 단일 인스턴스 | 이미 실행 중이면 그 인스턴스로 경로를 전달하고 창을 앞으로 가져온다(`tauri-plugin-single-instance` 2.x). 개발·시험으로 여러 개를 띄울 때는 `TWIN_DECK_MULTI=1` |
+| 단일 인스턴스 | 이미 실행 중이면 그 인스턴스로 경로를 전달하고 창을 앞으로 가져온다(`tauri-plugin-single-instance` 2.x). 설정 `environment.single_instance`를 끄면(앱 재시작 후) 여러 개를 띄운다. 개발·시험으로는 `TWIN_DECK_MULTI=1`도 같다 |
 | 터미널에서 떨어져 나오기 | unix: 실행 파일이 `td`라는 이름(`argv[0]`)으로 불렸을 때만 인수를 검사하고 자기 자신을 새 프로세스로 다시 실행(`TD_DETACHED=1`)한 뒤 끝난다. Windows는 GUI 앱이라 떨어져 나오지 않는다 |
 | 등록 | macOS: Homebrew Cask의 `binary`(`/opt/homebrew/bin/td`)와 앱 안 "명령줄 도구 설치" 액션(`/usr/local/bin/td`, 관리자 암호). Windows: NSIS 설치 파일의 훅(`windows/hooks.nsh`)이 설치 직후 앱을 `--td-install-cli`로 한 번 실행해 `td.cmd`와 사용자 PATH를 등록하고, 제거 직전에 `--td-uninstall-cli`로 지운다(앱 안 액션과 같은 `td-cli` 코드). Linux는 이번 범위 밖 |
 

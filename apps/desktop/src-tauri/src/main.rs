@@ -19,6 +19,7 @@ use commands::{
     TerminalOutput, UsageUpdate,
 };
 use service::{coalesce, SearchMsg};
+use std::path::Path;
 use std::time::Duration;
 use tauri::Manager;
 
@@ -43,6 +44,28 @@ fn handle_second_instance(app: &tauri::AppHandle, argv: Vec<String>, cwd: String
         let _ = w.show();
         let _ = w.set_focus();
     }
+}
+
+/// 앱 식별자. 설정 폴더 이름이며 `tauri.conf.json`의 `identifier`와 같아야 한다(테스트가 확인한다).
+const APP_IDENTIFIER: &str = "dev.twindeck.app";
+
+/// 앱 하나만 띄울지. Tauri가 뜨기 전에 정해야 해서 설정 파일을 직접 읽는다.
+fn single_instance_enabled() -> bool {
+    if std::env::var_os("TWIN_DECK_MULTI").is_some() {
+        return false;
+    }
+    let dir = dirs::config_dir().map(|d| d.join(APP_IDENTIFIER));
+    single_instance_in(dir.as_deref())
+}
+
+fn single_instance_in(dir: Option<&Path>) -> bool {
+    dir.map(|d| {
+        td_config::load_dir(d, td_config::Platform::current())
+            .config
+            .environment
+            .single_instance
+    })
+    .unwrap_or(true)
 }
 
 fn main() {
@@ -72,8 +95,8 @@ fn main() {
         }
     };
     let mut app = tauri::Builder::default();
-    // 이미 떠 있으면 그 앱으로 경로를 넘기고 끝난다. 개발·시험으로 여러 개를 띄워야 하면 TWIN_DECK_MULTI=1.
-    if std::env::var_os("TWIN_DECK_MULTI").is_none() {
+    // 이미 떠 있으면 그 앱으로 경로를 넘기고 끝난다. 설정 `environment.single_instance`를 끄거나 TWIN_DECK_MULTI=1이면 여러 개를 띄운다.
+    if single_instance_enabled() {
         app = app.plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
             handle_second_instance(app, argv, cwd)
         }));
@@ -310,5 +333,43 @@ mod capability_tests {
             );
             existing.push(label);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn single_instance_follows_config_and_defaults_on() {
+        assert!(single_instance_in(None), "설정 폴더를 모르면 켬");
+        let dir = tempfile::tempdir().unwrap();
+        assert!(
+            single_instance_in(Some(dir.path())),
+            "설정 파일이 없으면 켬"
+        );
+        std::fs::write(
+            dir.path().join("config.toml"),
+            "[environment]\nsingle_instance = false\n",
+        )
+        .unwrap();
+        assert!(!single_instance_in(Some(dir.path())));
+        std::fs::write(
+            dir.path().join("config.toml"),
+            "[environment]\nsingle_instance = true\n",
+        )
+        .unwrap();
+        assert!(single_instance_in(Some(dir.path())));
+    }
+
+    /// 설정 폴더는 Tauri가 `config_dir/식별자`로 정한다. 식별자가 바뀌면 일찍 읽는 폴더가 어긋나므로 같이 고치게 한다.
+    #[test]
+    fn app_identifier_matches_tauri_conf() {
+        let conf: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("tauri.conf.json"))
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(conf["identifier"], APP_IDENTIFIER);
     }
 }

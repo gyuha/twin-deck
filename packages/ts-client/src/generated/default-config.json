@@ -47,6 +47,7 @@
     "environment": {
       "text_editor": "",
       "terminal": "default",
+      "single_instance": true,
       "global_hotkey_enabled": true,
       "global_hotkey": "Mod+Alt+O"
     },
