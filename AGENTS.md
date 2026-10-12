@@ -29,7 +29,7 @@ cd apps/desktop && bunx vitest run src/__tests__/drag-drop.test.tsx -t "이동"
 cd apps/desktop && bunx tsc --noEmit
 ```
 
-Known baseline noise (not caused by your change): vitest `pdf-preview` fails (jsdom `Blob` has no `.text()`); `service::tests::coalesce_*` is timing-sensitive and can fail in a parallel `cargo test --workspace` but passes alone; `cargo clippy --all-targets` fails on an old `root.clone()` in `service.rs` tests, so use `cargo clippy -p <crate> -- -D warnings` as the real gate.
+Known baseline noise (not caused by your change): vitest passes in full (the old `Blob`/`@spacedrive` path failures were fixed in `src/test-setup.ts` and `__tests__/spacedrive-path.ts`); `service::tests::coalesce_*` is timing-sensitive and can fail in a parallel `cargo test --workspace` but passes alone; `cargo clippy --all-targets` fails on an old `root.clone()` in `service.rs` tests, so use `cargo clippy -p <crate> -- -D warnings` as the real gate.
 
 Release/version: bump `version` in `apps/desktop/src-tauri/tauri.conf.json` **and** `apps/desktop/src-tauri/Cargo.toml` (+ Cargo.lock). Also add that version's entry to `CHANGELOG.md` in the same commit — `task release:draft`/`release` stop before building if it is missing (see "릴리스 노트(변경 사항 기록)"). `scripts/release.{sh,ps1}` take `draft|publish`; `DRY_RUN=1` skips repo-state checks and only prints mutating `gh` calls. Builds are unsigned (README documents the Gatekeeper workaround).
 

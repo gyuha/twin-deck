@@ -2,13 +2,14 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { THEMES } from "../lib/themes.generated";
+import { spacedriveFile } from "./spacedrive-path";
 import { contrast, DEFAULT_DARK, DEFAULT_LIGHT, inkOn, mix, resolveTheme, THEME_BY_ID, themeVars } from "../lib/themeColors";
 
 const mocha = THEME_BY_ID.get("catppuccin-mocha")!;
 
 describe("themeVars (Warp 테마 → 앱 색 토큰)", () => {
   it("spaceui 토큰이 정의하는 --color-* 이름이 모두 있다(빠진 토큰 없음)", () => {
-    const css = readFileSync(join(__dirname, "../../../../node_modules/@spacedrive/tokens/src/css/theme.css"), "utf8");
+    const css = readFileSync(spacedriveFile("tokens/src/css/theme.css"), "utf8");
     const names = [...new Set([...css.matchAll(/--color-[a-z-]+(?=:)/g)].map((m) => m[0]))].filter((n) => n !== "--color-black" && n !== "--color-white");
     expect(names.length).toBeGreaterThan(40); // 정규식이 아무것도 못 잡아서 통과하는 일이 없게
     const vars = Object.keys(themeVars(mocha));
