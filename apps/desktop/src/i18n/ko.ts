@@ -324,6 +324,8 @@ export const ko = {
   "settings.item.behavior.terminal_font.desc": "내장 터미널의 글꼴(CSS font-family). 미리보기 글꼴과 따로 씁니다. 비우면 기본 고정폭 글꼴. 바꾸면 열려 있는 터미널에 바로 적용됩니다",
   "settings.item.behavior.text_color.title": "글자 색",
   "settings.item.behavior.text_color.desc": "앱 기본 글자색. 색상환으로 고르거나 #rrggbb를 씁니다. 비우면 테마 그대로이고, 흐린 글자는 이 색을 배경 쪽으로 섞어 자동으로 만듭니다. 색은 테마와 무관하게 하나라서, 테마(특히 system)가 바뀌면 읽기 어려울 수 있으니 그때는 비우세요",
+  "settings.item.behavior.global_hotkey.title": "전역 단축키",
+  "settings.item.behavior.global_hotkey.desc": "앱이 뒤에 있거나 창 뒤·최소화 상태여도 누르면 창을 앞으로 불러와, 마우스 커서가 있는 화면에 보여 줍니다. 예: Mod+Alt+O (Mod는 macOS ⌘, 그 밖은 Ctrl). 비우면 끕니다. 다른 앱이 이미 쓰는 키는 등록되지 않습니다",
   "settings.item.behavior.table.icon_size.title": "아이콘 크기",
   "settings.item.behavior.table.icon_size.desc": "파일 목록 행의 아이콘(px)",
   "settings.item.behavior.table.zebra_rows.title": "줄무늬 행",

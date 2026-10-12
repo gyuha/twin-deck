@@ -326,6 +326,8 @@ export const en: Record<Key, string> = {
   "settings.item.behavior.terminal_font.desc": "Font of the built-in terminal (CSS font-family), separate from the preview font. Empty uses the default monospace font. Changes apply to open terminals immediately",
   "settings.item.behavior.text_color.title": "Text color",
   "settings.item.behavior.text_color.desc": "Default text color for the app. Pick on the color wheel or type #rrggbb. Empty keeps the theme as is, and dim text is derived by blending this color toward the background. The color is the same for every theme, so it may become hard to read when the theme (especially system) changes — clear it then",
+  "settings.item.behavior.global_hotkey.title": "Global hotkey",
+  "settings.item.behavior.global_hotkey.desc": "Press it to bring the window to the front — even when the app is in the background, behind other windows or minimized — on the screen where the mouse cursor is. Example: Mod+Alt+O (Mod is ⌘ on macOS, Ctrl elsewhere). Empty turns it off. A key another app already uses cannot be registered",
   "settings.item.behavior.table.icon_size.title": "Icon size",
   "settings.item.behavior.table.icon_size.desc": "Icon size (px) in file list rows",
   "settings.item.behavior.table.zebra_rows.title": "Zebra rows",

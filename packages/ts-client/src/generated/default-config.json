@@ -9,6 +9,7 @@
       "preview_font": "Menlo, Consolas, monospace",
       "terminal_font": "",
       "text_color": "",
+      "global_hotkey": "Mod+Alt+O",
       "table": {
         "icon_size": 16,
         "circular_selection": false,

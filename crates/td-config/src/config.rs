@@ -44,6 +44,8 @@ pub struct Behavior {
     pub terminal_font: String,
     /// 앱 기본 글자색(`#rrggbb` 또는 `#rgb`). 비우면 테마 그대로다. 흐린 글자색은 이 색을 배경 쪽으로 섞어 만든다.
     pub text_color: String,
+    /// 앱이 뒤에 있어도 누르면 창을 앞으로 불러오는 전역 단축키(예: `Mod+Alt+O`). `Mod`는 macOS ⌘, 그 밖은 Ctrl이다. 비우면 끈다.
+    pub global_hotkey: String,
     pub table: BehaviorTable,
     pub quick_select: QuickSelect,
     pub selection: SelectionConfig,

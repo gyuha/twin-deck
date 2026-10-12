@@ -3,6 +3,7 @@
 mod cli;
 mod commands;
 mod epub;
+mod global_hotkey;
 mod preview_handler;
 #[cfg(windows)]
 mod preview_host;
@@ -87,6 +88,7 @@ fn main() {
         })
         .invoke_handler(builder.invoke_handler())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         // 창 위치·크기·최대화를 창 레이블별로 저장하고 다음 실행 때 복원한다.
         .plugin(
             tauri_plugin_window_state::Builder::default()
@@ -142,15 +144,15 @@ fn main() {
                 store,
                 startup_warning,
             });
-            apply_config(
-                &app.state::<AppService>(),
-                &app.state::<ConfigState>().current(),
-            );
+            let current = app.state::<ConfigState>().current();
+            apply_config(&app.state::<AppService>(), &current);
+            global_hotkey::apply(app.handle(), &current.config.behavior.global_hotkey);
             if let Some(rx) = config_rx {
                 let handle = app.handle().clone();
                 std::thread::spawn(move || {
                     while let Ok(loaded) = rx.recv() {
                         apply_config(&handle.state::<AppService>(), &loaded);
+                        global_hotkey::apply(&handle, &loaded.config.behavior.global_hotkey);
                         let _ = ConfigChanged { loaded }.emit(&handle);
                     }
                 });

@@ -49,6 +49,7 @@ Marta에서 확인된 옵션 이름을 그대로 옮길 수 있는 곳은 옮기
 [behavior]
 theme = "system"                  # system·light·dark 또는 테마 이름(예: dracula-default)
 language = "ko"                   # 화면 언어: ko(한국어), en(English)
+global_hotkey = "Mod+Alt+O"       # 앱이 뒤에 있을 때 창을 불러오는 전역 단축키(Mod는 macOS ⌘, 그 밖은 Ctrl). 비우면 끈다
 
 [behavior.table]
 icon_size = 16

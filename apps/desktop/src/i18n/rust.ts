@@ -190,6 +190,8 @@ export const RUST_INTERNAL: readonly string[] = [
   "td: 실행 파일 위치를 알 수 없습니다: {e}",
   "td: Twin Deck을 실행하지 못했습니다: {e}",
   "서비스 초기화 실패",
+  "전역 단축키 `{spec}`를 해석하지 못했습니다: {e}",
+  "전역 단축키 `{spec}`를 등록하지 못했습니다: {e}",
   "twin-deck 실행 중 오류가 발생했습니다",
   "capabilities 디렉터리가 없다",
   "permissions 배열",

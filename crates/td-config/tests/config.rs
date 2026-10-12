@@ -1169,3 +1169,19 @@ fn column_lines_defaults_to_none_and_validates() {
         .any(|w| w.message.contains("column_lines")));
     assert_eq!(l.config.behavior.table.column_lines, "none");
 }
+
+#[test]
+fn global_hotkey_defaults_to_mod_alt_o_and_can_be_cleared() {
+    let d = user_value_dir(None);
+    assert_eq!(
+        load_dir(d.path(), Platform::Linux)
+            .config
+            .behavior
+            .global_hotkey,
+        "Mod+Alt+O"
+    );
+    let d = user_value_dir(Some("[behavior]\nglobal_hotkey = \"\"\n"));
+    let l = load_dir(d.path(), Platform::Linux);
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert_eq!(l.config.behavior.global_hotkey, "");
+}
