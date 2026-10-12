@@ -35,13 +35,13 @@ describe("보기 단축키", () => {
     const help = await screen.findByRole("dialog", { name: "도움말" });
     const rowOf = (title: string) => within(help).getByText(title).parentElement!;
     expect(rowOf("액션바 표시 토글").textContent).toMatch(/Ctrl.*Shift.*A/);
-    expect(rowOf("드라이브 바 표시 토글").textContent).toMatch(/Ctrl.*Shift.*D/);
+    expect(rowOf("드라이브바 표시 토글").textContent).toMatch(/Ctrl.*Shift.*D/);
   });
 
   it("상태 줄의 토글 버튼 툴팁에 단축키가 표시된다(macOS는 Cmd)", async () => {
     await renderApp();
     const status = screen.getByRole("status", { name: "상태 표시줄" });
     expect(within(status).getByRole("button", { name: "액션바 표시" })).toHaveAttribute("title", "액션바 표시 (Ctrl+Shift+A)");
-    expect(within(status).getByRole("button", { name: "드라이브 바 표시" })).toHaveAttribute("title", "드라이브 바 표시 (Ctrl+Shift+D)");
+    expect(within(status).getByRole("button", { name: "드라이브바 표시" })).toHaveAttribute("title", "드라이브바 표시 (Ctrl+Shift+D)");
   });
 });

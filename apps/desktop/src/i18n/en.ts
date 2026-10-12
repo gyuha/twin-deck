@@ -30,6 +30,7 @@ export const en: Record<Key, string> = {
   "menu.file.info": "File Info",
   "menu.view.drive_bar": "Show Drive Bar",
   "status.action_bar": "Action Bar",
+  "status.drive_bar": "Drive Bar",
   "menu.view.action_bar": "Show Action Bar",
   "menu.settings": "Settings…",
   "menu.help_shortcuts": "Keyboard Shortcuts",

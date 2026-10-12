@@ -170,7 +170,7 @@ describe("상단 메뉴바 File 메뉴", () => {
   it("View 메뉴 끝에 드라이브 바와 Action Bar를 켜고 끄는 체크 항목이 붙고 체크 표시는 현재 설정을 따른다", async () => {
     await installFileMenu(() => {}, { driveBar: true, actionBar: false });
     expect(checks.map((c) => [c.id, c.text, c.checked])).toEqual([
-      ["core.view.drive_bar", "드라이브 바 표시", true],
+      ["core.view.drive_bar", "드라이브바 표시", true],
       ["core.view.action_bar", "액션바 표시", false],
     ]);
     expect(viewAdds).toHaveLength(3); // 구분선 + 항목 2개
@@ -180,7 +180,7 @@ describe("상단 메뉴바 File 메뉴", () => {
   it("보기 단축키: keyOf를 주면 View 항목 글자에 키가 붙고 accelerator는 달지 않는다", async () => {
     const keys: Record<string, string> = { "core.view.drive_bar": "Cmd+Shift+D", "core.view.action_bar": "Cmd+Shift+A" };
     await installFileMenu(() => {}, { driveBar: true, actionBar: true }, (id) => keys[id]);
-    expect(checks.map((c) => c.text)).toEqual(["드라이브 바 표시 (Cmd+Shift+D)", "액션바 표시 (Cmd+Shift+A)"]);
+    expect(checks.map((c) => c.text)).toEqual(["드라이브바 표시 (Cmd+Shift+D)", "액션바 표시 (Cmd+Shift+A)"]);
     for (const c of checks) expect(c).not.toHaveProperty("accelerator");
   });
 

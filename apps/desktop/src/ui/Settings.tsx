@@ -365,6 +365,7 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
   useEffect(() => () => onThemePreview?.(null), [onThemePreview]);
   const defaults = defaultLoaded().config;
   const randomTheme = config.behavior.random_theme;
+  const hotkeyOff = !config.environment.global_hotkey_enabled;
   const current = SECTIONS[section];
   const sectionItems: Item[] = current.title === t("settings.section.fkeys.title") ? [...current.items, ...comboKeys.map((k): Item => ({ key: `fkeys.${k}`, title: k, control: { type: "fkey" } }))] : current.items;
   const items = sectionItems.filter((it) => !it.hideOn?.includes(platform));
@@ -507,7 +508,7 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
                       <EditableControl
                         item={item}
                         value={value as string | number}
-                        disabled={!!broken}
+                        disabled={!!broken || (item.key === "environment.global_hotkey" && hotkeyOff)}
                         onCommit={(v) =>
                           void api.setConfigValue(item.key, item.control.type === "int" ? { kind: "int", value: Math.round(Number(v)) } : { kind: "str", value: v })
                         }

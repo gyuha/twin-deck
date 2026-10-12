@@ -145,7 +145,7 @@ function StatusBar() {
         {entryButton(t("settings.aria"), t("settings.aria"), "core.settings.open", () => api.openSettings())}
         {entryButton(t("menu.help_shortcuts"), t("status.shortcuts"), "core.help", () => api.openHelp())}
         {viewToggle(t("status.hidden_aria"), t("status.hidden"), showHidden, () => api.toggleHidden(), "core.view.hidden")}
-        {viewToggle(t("menu.view.drive_bar"), "Drive Bar", showDriveBar, () => api.toggleLayoutFlag("show_drive_bar"), "core.view.drive_bar")}
+        {viewToggle(t("menu.view.drive_bar"), t("status.drive_bar"), showDriveBar, () => api.toggleLayoutFlag("show_drive_bar"), "core.view.drive_bar")}
         {viewToggle(t("menu.view.action_bar"), t("status.action_bar"), showActionBar, () => api.toggleLayoutFlag("show_action_bar"), "core.view.action_bar")}
       </span>
     </footer>

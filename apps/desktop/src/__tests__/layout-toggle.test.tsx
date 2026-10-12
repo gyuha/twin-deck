@@ -41,11 +41,11 @@ describe("드라이브 바·Action Bar 켜고 끄기", () => {
     const b = setup();
     const { user } = await renderApp(b);
     await waitFor(() => expect(driveBars()).toHaveLength(2));
-    await runAction(user, "드라이브 바 표시 토글");
+    await runAction(user, "드라이브바 표시 토글");
     await waitFor(() => expect(driveBars()).toHaveLength(0));
     expect((await flags(b)).show_drive_bar).toBe(false);
     expect(actionBar()).toBeInTheDocument(); // Action Bar는 그대로
-    await runAction(user, "드라이브 바 표시 토글");
+    await runAction(user, "드라이브바 표시 토글");
     await waitFor(() => expect(driveBars()).toHaveLength(2));
     expect((await flags(b)).show_drive_bar).toBe(true);
   });
@@ -61,12 +61,12 @@ describe("드라이브 바·Action Bar 켜고 끄기", () => {
     await waitFor(() => expect(actionBar()).toBeInTheDocument());
   });
 
-  it("설정 화면의 '드라이브 바 표시' 스위치로도 끈다", async () => {
+  it("설정 화면의 '드라이브바 표시' 스위치로도 끈다", async () => {
     const b = setup();
     const { user } = await renderApp(b);
     await user.keyboard("{Control>},{/Control}");
     await screen.findByRole("dialog", { name: "설정" });
-    await user.click(screen.getByRole("switch", { name: "드라이브 바 표시" }));
+    await user.click(screen.getByRole("switch", { name: "드라이브바 표시" }));
     await waitFor(async () => expect((await flags(b)).show_drive_bar).toBe(false));
     await user.keyboard("{Escape}");
     expect(driveBars()).toHaveLength(0);
