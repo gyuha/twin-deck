@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Rect, Virtualizer } from "@tanstack/react-virtual";
 import type { EntryDto } from "@twin-deck/ts-client";
@@ -117,6 +117,18 @@ export function FileTable({ pane }: { pane: PaneId }) {
   const listRef = useRef<HTMLDivElement>(null);
   // `..` 상위 폴더 행(커서 -1)은 목록 맨 위에 두고 가상 스크롤 영역은 그 높이만큼 아래에서 시작한다.
   const parentRow = parentRowVisible(tab, config.behavior.table.show_parent_row);
+  // 헤더는 스크롤 영역 밖이라, 세로 스크롤바가 자리를 차지하면 행만 그만큼 좁아져 컬럼이 어긋난다. 그 폭을 헤더 오른쪽에 더한다.
+  const [scrollbarWidth, setScrollbarWidth] = useState(0);
+  useLayoutEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const measure = () => setScrollbarWidth(el.offsetWidth - el.clientWidth);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [tab.entries.length, multi, parentRow]);
   const virtualizer = useRows(rows, listRef, parentRow ? ROW_HEIGHT : 0);
   const rowId = (i: number) => `${pane}-${tab.id}-row-${i}`;
 
@@ -299,7 +311,7 @@ export function FileTable({ pane }: { pane: PaneId }) {
         <div
           role="row"
           aria-label={t("table.header_aria")}
-          style={{ gridTemplateColumns: gridTemplate(columns, iconSize, showMarks) }}
+          style={{ gridTemplateColumns: gridTemplate(columns, iconSize, showMarks), paddingRight: scrollbarWidth > 0 ? `calc(0.5rem + ${scrollbarWidth}px)` : undefined }}
           className="grid border-b border-l-[3px] border-app-line border-l-transparent px-2 text-xs text-ink-dull"
         >
           {showMarks && <span aria-hidden />}
