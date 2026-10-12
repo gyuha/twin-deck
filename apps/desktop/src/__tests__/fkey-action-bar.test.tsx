@@ -79,12 +79,12 @@ describe("F키 설정의 Action Bar 노출", () => {
     await waitFor(() => expect(backend.launched).toEqual([{ app: "/Applications/Foo.app", paths: ["/home/a/a.txt"] }]));
   });
 
-  it("설정 화면의 'Action Bar에 표시' 스위치가 fkey_bar에 저장되고 바에 나타난다", async () => {
+  it("설정 화면의 '액션바에 표시' 스위치가 fkey_bar에 저장되고 바에 나타난다", async () => {
     const backend = seedBackend();
     const { user } = await renderApp(backend);
     await user.keyboard("{Control>},{/Control}");
     await user.click(await screen.findByRole("tab", { name: "F키" }));
-    await user.click(await screen.findByRole("switch", { name: "F2 Action Bar에 표시" }));
+    await user.click(await screen.findByRole("switch", { name: "F2 액션바에 표시" }));
     await waitFor(async () => expect((await backend.getConfig()).config.fkey_bar.F2).toBe(true));
     await user.keyboard("{Escape}");
     await waitFor(() => expect(buttons()).toEqual([...BASE, "F2이름 변경"]));

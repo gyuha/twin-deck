@@ -93,7 +93,6 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
       { key: "behavior.preview_font", get title() { return translate("settings.item.behavior.preview_font.title"); }, get desc() { return translate("settings.item.behavior.preview_font.desc"); }, control: { type: "text" } },
       { key: "behavior.terminal_font", get title() { return translate("settings.item.behavior.terminal_font.title"); }, get desc() { return translate("settings.item.behavior.terminal_font.desc"); }, control: { type: "text" } },
       { key: "behavior.text_color", get title() { return translate("settings.item.behavior.text_color.title"); }, get desc() { return translate("settings.item.behavior.text_color.desc"); }, control: { type: "color" } },
-      { key: "behavior.global_hotkey", get title() { return translate("settings.item.behavior.global_hotkey.title"); }, get desc() { return translate("settings.item.behavior.global_hotkey.desc"); }, control: { type: "text" } },
       { key: "behavior.table.icon_size", get title() { return translate("settings.item.behavior.table.icon_size.title"); }, get desc() { return translate("settings.item.behavior.table.icon_size.desc"); }, control: { type: "int" } },
       { key: "behavior.table.zebra_rows", get title() { return translate("settings.item.behavior.table.zebra_rows.title"); }, get desc() { return translate("settings.item.behavior.table.zebra_rows.desc"); }, control: { type: "switch" } },
       { key: "behavior.table.show_marks", get title() { return translate("settings.item.behavior.table.show_marks.title"); }, get desc() { return translate("settings.item.behavior.table.show_marks.desc"); }, control: { type: "switch" } },
@@ -169,6 +168,8 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
     items: [
       { key: "environment.text_editor", get title() { return translate("settings.item.environment.text_editor.title"); }, get desc() { return translate("settings.item.environment.text_editor.desc"); }, control: { type: "text" } },
       { key: "environment.terminal", get title() { return translate("settings.item.environment.terminal.title"); }, get desc() { return translate("settings.item.environment.terminal.desc"); }, control: { type: "select", options: TERMINAL_SHELLS } , hideOn: ["mac", "linux"] }, // Windows에서만 쓰는 설정이다
+      { key: "environment.global_hotkey_enabled", get title() { return translate("settings.item.environment.global_hotkey_enabled.title"); }, get desc() { return translate("settings.item.environment.global_hotkey_enabled.desc"); }, control: { type: "switch" } },
+      { key: "environment.global_hotkey", get title() { return translate("settings.item.environment.global_hotkey.title"); }, get desc() { return translate("settings.item.environment.global_hotkey.desc"); }, control: { type: "text" } },
     ],
   },
 ];
@@ -467,7 +468,7 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
                           disabled={!!broken}
                           onCheckedChange={(v) => void api.setConfigValue(`fkey_bar.${item.title}`, { kind: "bool", value: v })}
                         />
-                        Action Bar
+                        {t("status.action_bar")}
                       </label>
                     )}
                     {item.control.type === "select" && (

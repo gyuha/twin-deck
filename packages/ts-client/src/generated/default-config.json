@@ -9,7 +9,6 @@
       "preview_font": "Menlo, Consolas, monospace",
       "terminal_font": "",
       "text_color": "",
-      "global_hotkey": "Mod+Alt+O",
       "table": {
         "icon_size": 16,
         "circular_selection": false,
@@ -47,7 +46,9 @@
     },
     "environment": {
       "text_editor": "",
-      "terminal": "default"
+      "terminal": "default",
+      "global_hotkey_enabled": true,
+      "global_hotkey": "Mod+Alt+O"
     },
     "core": {
       "confirm": {

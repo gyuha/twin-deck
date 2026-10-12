@@ -1176,12 +1176,27 @@ fn global_hotkey_defaults_to_mod_alt_o_and_can_be_cleared() {
     assert_eq!(
         load_dir(d.path(), Platform::Linux)
             .config
-            .behavior
+            .environment
             .global_hotkey,
         "Mod+Alt+O"
     );
-    let d = user_value_dir(Some("[behavior]\nglobal_hotkey = \"\"\n"));
+    let d = user_value_dir(Some("[environment]\nglobal_hotkey = \"\"\n"));
     let l = load_dir(d.path(), Platform::Linux);
     assert!(l.warnings.is_empty(), "{:?}", l.warnings);
-    assert_eq!(l.config.behavior.global_hotkey, "");
+    assert_eq!(l.config.environment.global_hotkey, "");
+}
+
+#[test]
+fn global_hotkey_enabled_defaults_on_and_can_be_turned_off() {
+    let d = user_value_dir(None);
+    assert!(
+        load_dir(d.path(), Platform::Linux)
+            .config
+            .environment
+            .global_hotkey_enabled
+    );
+    let d = user_value_dir(Some("[environment]\nglobal_hotkey_enabled = false\n"));
+    let l = load_dir(d.path(), Platform::Linux);
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert!(!l.config.environment.global_hotkey_enabled);
 }

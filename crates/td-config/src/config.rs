@@ -44,8 +44,6 @@ pub struct Behavior {
     pub terminal_font: String,
     /// 앱 기본 글자색(`#rrggbb` 또는 `#rgb`). 비우면 테마 그대로다. 흐린 글자색은 이 색을 배경 쪽으로 섞어 만든다.
     pub text_color: String,
-    /// 앱이 뒤에 있어도 누르면 창을 앞으로 불러오는 전역 단축키(예: `Mod+Alt+O`). `Mod`는 macOS ⌘, 그 밖은 Ctrl이다. 비우면 끈다.
-    pub global_hotkey: String,
     pub table: BehaviorTable,
     pub quick_select: QuickSelect,
     pub selection: SelectionConfig,
@@ -115,6 +113,10 @@ pub struct Display {
 pub struct Environment {
     pub text_editor: String,
     pub terminal: String,
+    /// 전역 화면 열기 단축키를 쓸지. 끄면 `global_hotkey` 값이 있어도 등록하지 않는다.
+    pub global_hotkey_enabled: bool,
+    /// 앱이 뒤에 있어도 누르면 창을 앞으로 불러오는 전역 단축키(예: `Mod+Alt+O`). `Mod`는 macOS ⌘, 그 밖은 Ctrl이다. 비우면 끈다.
+    pub global_hotkey: String,
 }
 
 /// 미리보기 옵션. 사운드/비디오는 기본으로 자동 재생하지 않고 재생 UI만 띄운다.

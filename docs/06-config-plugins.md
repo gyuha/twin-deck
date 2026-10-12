@@ -49,7 +49,6 @@ Marta에서 확인된 옵션 이름을 그대로 옮길 수 있는 곳은 옮기
 [behavior]
 theme = "system"                  # system·light·dark 또는 테마 이름(예: dracula-default)
 language = "ko"                   # 화면 언어: ko(한국어), en(English)
-global_hotkey = "Mod+Alt+O"       # 앱이 뒤에 있을 때 창을 불러오는 전역 단축키(Mod는 macOS ⌘, 그 밖은 Ctrl). 비우면 끈다
 
 [behavior.table]
 icon_size = 16
@@ -84,6 +83,8 @@ folder_size_on_select = true      # 폴더를 선택하면 하위 파일의 총 
 
 [environment]
 text_editor = "Visual Studio Code" # 편집 액션이 사용할 앱
+global_hotkey_enabled = true      # 전역 화면 열기 단축키 사용 여부
+global_hotkey = "Mod+Alt+O"       # 앱이 뒤에 있을 때 창을 불러오는 전역 단축키(Mod는 macOS ⌘, 그 밖은 Ctrl). 비우면 끈다
 terminal = "default"              # 내장 터미널의 셸(Windows): default(cmd) | cmd | powershell | gitbash(Git for Windows). 다른 OS는 $SHELL
 
 [core.confirm]

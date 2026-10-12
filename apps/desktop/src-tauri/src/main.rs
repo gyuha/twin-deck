@@ -146,13 +146,13 @@ fn main() {
             });
             let current = app.state::<ConfigState>().current();
             apply_config(&app.state::<AppService>(), &current);
-            global_hotkey::apply(app.handle(), &current.config.behavior.global_hotkey);
+            global_hotkey::apply(app.handle(), &current.config.environment);
             if let Some(rx) = config_rx {
                 let handle = app.handle().clone();
                 std::thread::spawn(move || {
                     while let Ok(loaded) = rx.recv() {
                         apply_config(&handle.state::<AppService>(), &loaded);
-                        global_hotkey::apply(&handle, &loaded.config.behavior.global_hotkey);
+                        global_hotkey::apply(&handle, &loaded.config.environment);
                         let _ = ConfigChanged { loaded }.emit(&handle);
                     }
                 });

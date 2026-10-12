@@ -39,7 +39,7 @@ describe("설정 화면 열기와 닫기", () => {
     const tabs = within(screen.getByRole("tablist", { name: "설정 섹션" })).getAllByRole("tab").map((t) => t.textContent);
     expect(tabs).toEqual(["모양", "목록과 선택", "표시 형식", "미리보기", "확인", "폴더 단축키", "F키", "환경"]);
     expect(screen.getByRole("tab", { name: "모양" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("switch", { name: "Action Bar 표시" })).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "액션바 표시" })).toBeInTheDocument();
   });
 });
 
@@ -70,7 +70,7 @@ describe("설정 값 바꾸기", () => {
     expect(screen.getByRole("toolbar", { name: "액션 바" })).toBeInTheDocument();
     await open(user);
     await dialog();
-    await user.click(sw("Action Bar 표시"));
+    await user.click(sw("액션바 표시"));
     await waitFor(() => expect((backend as unknown as { loaded: { config: { behavior: { layout: { show_action_bar: boolean } } } } }).loaded.config.behavior.layout.show_action_bar).toBe(false));
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("toolbar", { name: "액션 바" })).toBeNull();
@@ -198,7 +198,7 @@ describe("설정 파일 문법 오류와 설정 폴더", () => {
     await open(user);
     const d = await dialog();
     expect(within(d).getByRole("alert")).toHaveTextContent("문법 오류");
-    expect(sw("Action Bar 표시")).toBeDisabled();
+    expect(sw("액션바 표시")).toBeDisabled();
   });
 
   it("설정 폴더 열기 버튼이 폴더를 연다", async () => {
@@ -217,7 +217,7 @@ describe("설정 파일 문법 오류와 설정 폴더", () => {
     const { user } = await renderApp(backend);
     await open(user);
     const d = await dialog();
-    await user.click(sw("Action Bar 표시"));
+    await user.click(sw("액션바 표시"));
     expect(await within(d).findByRole("alert")).toHaveTextContent("쓰지 못했습니다");
   });
 });

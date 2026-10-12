@@ -12,7 +12,6 @@ ui_font = ""
 preview_font = "Menlo, Consolas, monospace" # macOS 기본 Menlo, Windows 기본 Consolas, 그 밖은 시스템 고정폭
 terminal_font = "" # 내장 터미널의 글꼴. 비우면 기본 고정폭 글꼴
 text_color = "" # 앱 기본 글자색(#rrggbb). 비우면 테마 그대로
-global_hotkey = "Mod+Alt+O" # 앱이 뒤에 있을 때 창을 불러오는 전역 단축키. Mod는 macOS ⌘, 그 밖은 Ctrl. 비우면 끈다
 
 [behavior.table]
 icon_size = 16
@@ -51,6 +50,8 @@ folder_size_on_select = true
 [environment]
 text_editor = ""
 terminal = "default" # 내장 터미널의 셸(Windows): default(cmd), cmd, powershell, gitbash. 다른 OS는 $SHELL
+global_hotkey_enabled = true # 전역 화면 열기 단축키를 쓴다. false면 아래 단축키를 등록하지 않는다
+global_hotkey = "Mod+Alt+O" # 앱이 뒤에 있을 때 창을 불러오는 전역 단축키. Mod는 macOS ⌘, 그 밖은 Ctrl. 비우면 끈다
 
 [core.confirm]
 delete = true

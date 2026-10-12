@@ -66,7 +66,12 @@ pub fn reveal(app: &AppHandle) {
 }
 
 /// 이전 등록을 모두 풀고 설정값으로 다시 등록한다. 실패(다른 앱이 선점 등)해도 앱은 계속 돈다.
-pub fn apply(app: &AppHandle, spec: &str) {
+pub fn apply(app: &AppHandle, env: &td_config::Environment) {
+    let spec = if env.global_hotkey_enabled {
+        env.global_hotkey.as_str()
+    } else {
+        ""
+    };
     let shortcuts = app.global_shortcut();
     let _ = shortcuts.unregister_all();
     match parse(spec, cfg!(target_os = "macos")) {

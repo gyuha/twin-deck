@@ -53,11 +53,11 @@ describe("드라이브 바·Action Bar 켜고 끄기", () => {
   it("core.view.action_bar 액션이 Action Bar를 끄고 켠다", async () => {
     const b = setup();
     const { user } = await renderApp(b);
-    await runAction(user, "Action Bar 표시 토글");
+    await runAction(user, "액션바 표시 토글");
     await waitFor(() => expect(actionBar()).toBeNull());
     expect((await flags(b)).show_action_bar).toBe(false);
     expect(driveBars()).toHaveLength(2); // 드라이브 바는 그대로
-    await runAction(user, "Action Bar 표시 토글");
+    await runAction(user, "액션바 표시 토글");
     await waitFor(() => expect(actionBar()).toBeInTheDocument());
   });
 

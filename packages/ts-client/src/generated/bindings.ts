@@ -633,11 +633,7 @@ terminal_font: string;
 /**
  * 앱 기본 글자색(`#rrggbb` 또는 `#rgb`). 비우면 테마 그대로다. 흐린 글자색은 이 색을 배경 쪽으로 섞어 만든다.
  */
-text_color: string; 
-/**
- * 앱이 뒤에 있어도 누르면 창을 앞으로 불러오는 전역 단축키(예: `Mod+Alt+O`). `Mod`는 macOS ⌘, 그 밖은 Ctrl이다. 비우면 끈다.
- */
-global_hotkey: string; table: BehaviorTable; quick_select: QuickSelect; selection: SelectionConfig; layout: BehaviorLayout }
+text_color: string; table: BehaviorTable; quick_select: QuickSelect; selection: SelectionConfig; layout: BehaviorLayout }
 export type BehaviorLayout = { show_action_bar: boolean; 
 /**
  * true면 Action Bar가 평소엔 수식키 없는 키만 보이고, Shift/Ctrl/Alt/Cmd를 누르는 동안 그 조합 키의 항목만 보인다.
@@ -794,7 +790,15 @@ mode: number | null; hidden: boolean;
  * 종류(`kind`)는 그대로 링크라서, 이 값은 "폴더처럼 들어갈 수 있는가"만 알려 준다.
  */
 linkIsDir: boolean }
-export type Environment = { text_editor: string; terminal: string }
+export type Environment = { text_editor: string; terminal: string; 
+/**
+ * 전역 화면 열기 단축키를 쓸지. 끄면 `global_hotkey` 값이 있어도 등록하지 않는다.
+ */
+global_hotkey_enabled: boolean; 
+/**
+ * 앱이 뒤에 있어도 누르면 창을 앞으로 불러오는 전역 단축키(예: `Mod+Alt+O`). `Mod`는 macOS ⌘, 그 밖은 Ctrl이다. 비우면 끈다.
+ */
+global_hotkey: string }
 export type EpubChapterDto = { title: string }
 /**
  * epub 한 권의 겉모습. `cover`는 이미지 한도 안일 때만 들어 있다(데이터 주소).
