@@ -677,6 +677,10 @@ show_marks: boolean;
  */
 folder_style: string; 
 /**
+ * 컬럼 사이 세로선: "none" | "solid" | "dash". 헤더와 모든 행에 그린다.
+ */
+column_lines: string; 
+/**
  * 활성 패널의 커서 행을 강조색으로 꽉 채운다.
  */
 cursor_fill: boolean; 

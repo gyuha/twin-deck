@@ -16,6 +16,7 @@
         "zebra_rows": false,
         "show_marks": true,
         "folder_style": "none",
+        "column_lines": "none",
         "cursor_fill": false,
         "show_parent_row": false
       },

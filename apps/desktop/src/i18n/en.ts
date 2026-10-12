@@ -332,6 +332,8 @@ export const en: Record<Key, string> = {
   "settings.item.behavior.table.zebra_rows.desc": "Lightly alternates the row background in file lists",
   "settings.item.behavior.table.show_marks.title": "Mark column",
   "settings.item.behavior.table.show_marks.desc": "The leading column of each row with the selection (●) and folder (▸) marks. When off the column disappears and selection shows only as bold accent-colored text",
+  "settings.item.behavior.table.column_lines.title": "Column lines",
+  "settings.item.behavior.table.column_lines.desc": "Draws vertical lines between columns: none, solid, dash. Applies to the header and every row",
   "settings.item.behavior.table.folder_style.title": "Folder style",
   "settings.item.behavior.table.folder_style.desc": "Decorates folder names: none, brackets [name], parens (name), slash name/. Changes the display only",
   "settings.item.behavior.table.cursor_fill.title": "Fill cursor row",

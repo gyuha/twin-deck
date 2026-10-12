@@ -100,7 +100,7 @@ export function FileTable({ pane }: { pane: PaneId }) {
   const dirSizes = useApp((s) => s.dirSizes);
   const rightClickSelect = config.behavior.table.right_click_select;
   const iconSize = config.behavior.table.icon_size;
-  const { zebra_rows: zebra, show_marks: showMarks, folder_style: folderStyle, cursor_fill: cursorFill } = config.behavior.table;
+  const { zebra_rows: zebra, show_marks: showMarks, folder_style: folderStyle, cursor_fill: cursorFill, column_lines: columnLines } = config.behavior.table;
   const [decoPre, decoPost] = FOLDER_DECOR[folderStyle] ?? ["", ""];
   const parsedColumns = useMemo(() => parseColumns(config.view.table.columns), [config.view.table.columns]);
   // 헤더 경계를 끄는 동안의 너비. 헤더와 모든 행이 같은 열 정의를 쓰므로 여기만 바꾸면 같이 따라온다.
@@ -125,6 +125,13 @@ export function FileTable({ pane }: { pane: PaneId }) {
     if (tab.cursor < 0) virtualizer.scrollToOffset(0);
     else if (tab.entries.length > 0) virtualizer.scrollToIndex(tab.cursor % rows, { align: "auto" });
   }, [tab.cursor, rows, tab.entries.length, virtualizer]);
+
+  /** 이름 뒤 컬럼의 왼쪽 세로선(`behavior.table.column_lines`)과, 다음 컬럼과 붙지 않게 하는 오른쪽 여백. */
+  const columnEdge = (name: ColumnSpec["name"], k: number, last: boolean) =>
+    [
+      last ? "" : "pr-2",
+      name === "name" || k === 0 || columnLines === "none" ? "" : columnLines === "dash" ? "border-l border-dashed border-app-line" : "border-l border-app-line",
+    ].join(" ");
 
   const activate = () => api.activate(pane);
   const drag = useApp((s) => s.drag);
@@ -268,7 +275,7 @@ export function FileTable({ pane }: { pane: PaneId }) {
         {/* 폴더를 가리키는 링크는 폴더 아이콘에 링크 표시를 얹는다(이슈 #47). 파일 링크·끊어진 링크는 파일 아이콘에 링크 표시. */}
         <FileIcon name={e.name} kind={e.kind === "symlink" && e.linkIsDir ? "dir" : e.kind} link={e.kind === "symlink"} size={iconSize} />
         {(multi ? [{ name: "name" } as ColumnSpec] : columns).map((c, k) => (
-          <span key={`${c.name}-${k}`} className={c.name === "name" ? "truncate" : "truncate text-right tabular-nums"}>
+          <span key={`${c.name}-${k}`} className={(c.name === "name" ? "truncate " : "self-stretch truncate text-right leading-6 tabular-nums ") + columnEdge(c.name, multi ? 0 : k, multi || k === columns.length - 1)}>
             {c.name === "name" && tab.quick ? (
               <>
                 {pre}
@@ -310,7 +317,7 @@ export function FileTable({ pane }: { pane: PaneId }) {
                   activate();
                   api.setOrder({ by: c.name as SortKey });
                 }}
-                className={(c.name === "name" ? "" : "relative text-right ") + (sortable ? "cursor-pointer" : "")}
+                className={(c.name === "name" ? "" : "relative text-right ") + columnEdge(c.name, k, k === columns.length - 1) + (sortable ? " cursor-pointer" : "")}
               >
                 {COLUMN_TITLES[c.name]}
                 {active ? (sort.dir === "asc" ? " ▲" : " ▼") : ""}
@@ -321,8 +328,10 @@ export function FileTable({ pane }: { pane: PaneId }) {
                     aria-label={t("table.resize_aria", { name: COLUMN_TITLES[c.name] })}
                     onMouseDown={(ev) => startResize(ev, c, ev.currentTarget.parentElement)}
                     onClick={(ev) => ev.stopPropagation()}
-                    className="absolute inset-y-0 -left-1 w-2 cursor-col-resize hover:bg-accent/40"
-                  />
+                    className="group absolute inset-y-0 -left-1 flex w-2 cursor-col-resize items-center justify-center"
+                  >
+                    <span aria-hidden className={`h-3.5 w-px group-hover:w-0.5 group-hover:bg-accent ${columnLines === "none" ? "bg-app-line" : "bg-transparent"}`} />
+                  </span>
                 )}
               </span>
             );

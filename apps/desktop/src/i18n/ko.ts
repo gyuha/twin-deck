@@ -330,6 +330,8 @@ export const ko = {
   "settings.item.behavior.table.zebra_rows.desc": "파일 목록의 행 배경을 번갈아 옅게 칠합니다",
   "settings.item.behavior.table.show_marks.title": "표시 칸",
   "settings.item.behavior.table.show_marks.desc": "행 맨 앞의 선택(●)·폴더(▸) 표시 칸. 끄면 칸이 사라지고 선택은 굵은 강조색 글씨로만 보입니다",
+  "settings.item.behavior.table.column_lines.title": "컬럼 세로선",
+  "settings.item.behavior.table.column_lines.desc": "컬럼 사이에 세로선을 그립니다: none(없음), solid(실선), dash(점선). 헤더와 모든 행에 적용됩니다",
   "settings.item.behavior.table.folder_style.title": "폴더 모양",
   "settings.item.behavior.table.folder_style.desc": "폴더 이름을 꾸밉니다: none, brackets [이름], parens (이름), slash 이름/. 화면 표시만 바뀝니다",
   "settings.item.behavior.table.cursor_fill.title": "커서 행 꽉 채움",

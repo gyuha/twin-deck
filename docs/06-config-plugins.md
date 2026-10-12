@@ -57,6 +57,7 @@ right_click_select = false
 zebra_rows = false                # 행 배경을 번갈아 옅게 칠한다
 show_marks = true                 # 행 맨 앞 표시 칸(● 선택, ▸ 폴더). false면 칸이 사라진다
 folder_style = "none"             # 폴더 이름 장식: "none" | "brackets" [이름] | "parens" (이름) | "slash" 이름/ (화면 표시만)
+column_lines = "none"             # 컬럼 사이 세로선: "none" | "solid" | "dash" (헤더와 모든 행)
 cursor_fill = false               # 활성 패널의 커서 행을 강조색으로 꽉 채운다
 show_parent_row = false          # 파일 목록 맨 위에 상위 폴더 `..` 행을 보인다(작업 대상에는 들지 않는다)
 

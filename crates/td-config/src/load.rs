@@ -91,7 +91,7 @@ fn syntax_warning(file: &str, src: &str, e: &toml::de::Error) -> Warning {
     }
 }
 
-const ENUMS: [(&str, &str, &[&str]); 7] = [
+const ENUMS: [(&str, &str, &[&str]); 8] = [
     // 내장 터미널의 셸. Windows에서만 의미가 있고(다른 OS는 `$SHELL`), apps/desktop의 Settings.tsx에 같은 목록이 있다.
     (
         "environment",
@@ -112,6 +112,7 @@ const ENUMS: [(&str, &str, &[&str]); 7] = [
         "folder_style",
         &["none", "brackets", "parens", "slash"],
     ),
+    ("behavior.table", "column_lines", &["none", "solid", "dash"]),
     ("behavior.layout", "tab_style", &["underline", "segments"]),
     (
         "display",

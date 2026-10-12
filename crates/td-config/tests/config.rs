@@ -1141,3 +1141,31 @@ fn preview_pdf_direct_defaults_off_and_validates() {
         "문자열은 기본값(꺼짐)으로 돌아간다"
     );
 }
+
+#[test]
+fn column_lines_defaults_to_none_and_validates() {
+    let d = user_value_dir(None);
+    assert_eq!(
+        load_dir(d.path(), Platform::Linux)
+            .config
+            .behavior
+            .table
+            .column_lines,
+        "none"
+    );
+    for ok in ["none", "solid", "dash"] {
+        let d = user_value_dir(Some(&format!(
+            "[behavior.table]\ncolumn_lines = \"{ok}\"\n"
+        )));
+        let l = load_dir(d.path(), Platform::Linux);
+        assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+        assert_eq!(l.config.behavior.table.column_lines, ok);
+    }
+    let d = user_value_dir(Some("[behavior.table]\ncolumn_lines = \"x\"\n"));
+    let l = load_dir(d.path(), Platform::Linux);
+    assert!(l
+        .warnings
+        .iter()
+        .any(|w| w.message.contains("column_lines")));
+    assert_eq!(l.config.behavior.table.column_lines, "none");
+}

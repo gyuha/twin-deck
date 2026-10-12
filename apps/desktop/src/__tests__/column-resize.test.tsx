@@ -83,3 +83,46 @@ describe("컬럼 너비 조절 (이슈 #48)", () => {
     expect(within(headerRow()).getByRole("columnheader", { name: /크기/ })).toHaveAttribute("aria-sort", "none");
   });
 });
+
+describe("컬럼 세로선 (behavior.table.column_lines)", () => {
+  const withLines = (mode?: string) => {
+    const b = seed();
+    if (mode) b.setConfig((l) => (l.config.behavior.table.column_lines = mode));
+    return b;
+  };
+  const cellsOf = (el: HTMLElement) => Array.from(el.children).filter((c) => c.className.includes("text-right"));
+
+  it("기본은 none이라 헤더·행에 세로선이 없다", async () => {
+    await renderApp(withLines());
+    for (const c of cellsOf(headerRow())) expect(c.className).not.toContain("border-l");
+    for (const c of cellsOf(leftPane().getAllByRole("option")[0])) expect(c.className).not.toContain("border-l");
+  });
+
+  it.each([
+    ["solid", "border-l"],
+    ["dash", "border-dashed"],
+  ] as const)("%s는 이름 뒤 컬럼마다 선을 헤더와 모든 행에 그린다", async (mode, cls) => {
+    await renderApp(withLines(mode));
+    for (const el of [headerRow(), ...leftPane().getAllByRole("option")]) {
+      const cells = cellsOf(el);
+      expect(cells.length).toBe(2);
+      for (const c of cells) {
+        expect(c.className).toContain(cls);
+        if (mode === "solid") expect(c.className).not.toContain("border-dashed");
+      }
+    }
+  });
+
+  it("값이 비는 폴더 행에서도 선이 끊기지 않게 셀이 행 높이를 채운다", async () => {
+    await renderApp(withLines("solid"));
+    const folder = leftPane().getAllByRole("option").find((r) => r.textContent?.includes("b"))!;
+    for (const c of cellsOf(folder)) expect(c.className).toContain("self-stretch");
+  });
+
+  it("마지막이 아닌 컬럼 뒤에는 오른쪽 여백이 있다", async () => {
+    await renderApp(withLines());
+    const [size, modified] = cellsOf(headerRow());
+    expect(size.className).toContain("pr-2");
+    expect(modified.className).not.toContain("pr-2");
+  });
+});

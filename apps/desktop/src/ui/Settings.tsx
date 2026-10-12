@@ -78,6 +78,7 @@ const SIZE_FORMATS = ["adaptive", "adaptive_kibi", "bytes", "KB", "MB"] as const
 const TAB_STYLES = ["underline", "segments"] as const;
 // environment.terminal의 허용 값도 td-config의 검증 목록(ENUMS)과 같아야 한다.
 const TERMINAL_SHELLS = ["default", "cmd", "powershell", "gitbash"] as const;
+const COLUMN_LINES = ["none", "solid", "dash"] as const;
 const FOLDER_STYLES =["none", "brackets", "parens", "slash"] as const;
 
 const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
@@ -96,6 +97,7 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
       { key: "behavior.table.zebra_rows", get title() { return translate("settings.item.behavior.table.zebra_rows.title"); }, get desc() { return translate("settings.item.behavior.table.zebra_rows.desc"); }, control: { type: "switch" } },
       { key: "behavior.table.show_marks", get title() { return translate("settings.item.behavior.table.show_marks.title"); }, get desc() { return translate("settings.item.behavior.table.show_marks.desc"); }, control: { type: "switch" } },
       { key: "behavior.table.folder_style", get title() { return translate("settings.item.behavior.table.folder_style.title"); }, get desc() { return translate("settings.item.behavior.table.folder_style.desc"); }, control: { type: "select", options: FOLDER_STYLES } },
+      { key: "behavior.table.column_lines", get title() { return translate("settings.item.behavior.table.column_lines.title"); }, get desc() { return translate("settings.item.behavior.table.column_lines.desc"); }, control: { type: "select", options: COLUMN_LINES } },
       { key: "behavior.table.cursor_fill", get title() { return translate("settings.item.behavior.table.cursor_fill.title"); }, get desc() { return translate("settings.item.behavior.table.cursor_fill.desc"); }, control: { type: "switch" } },
       { key: "behavior.table.show_parent_row", get title() { return translate("settings.item.behavior.table.show_parent_row.title"); }, get desc() { return translate("settings.item.behavior.table.show_parent_row.desc"); }, control: { type: "switch" } },
       { key: "behavior.layout.pane_highlight", get title() { return translate("settings.item.behavior.layout.pane_highlight.title"); }, get desc() { return translate("settings.item.behavior.layout.pane_highlight.desc"); }, control: { type: "switch" } },
