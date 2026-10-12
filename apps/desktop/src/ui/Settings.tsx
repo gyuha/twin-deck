@@ -306,15 +306,21 @@ function FKeyControl({ name, value, disabled }: { name: string; value: string; d
 
 const MODIFIERS = ["Mod", "Ctrl", "Alt", "Shift"] as const;
 
+/** `Mod`는 macOS에서 Cmd로 보여 준다. */
+const modifierLabel = (m: string, platform: Platform) => (m === "Mod" && platform === "mac" ? "Cmd" : m);
+/** Windows·Linux에서는 `Mod`가 `Ctrl`과 같은 키라 `Mod` 체크는 숨긴다. */
+const modifiersFor = (platform: Platform) => (platform === "mac" ? MODIFIERS : MODIFIERS.filter((m) => m !== "Mod"));
+
 /** 조합키 F키 항목 추가: F키 + 수식키(Mod/Ctrl/Alt/Shift)를 골라 `fkeys`에 빈 항목으로 만든다. 같은 조합은 한 번만. */
 function FKeyAdder({ disabled }: { disabled: boolean }) {
   const t = useT();
+  const { platform } = useUi();
   const { api } = useAppStore();
   const existing = useApp((s) => s.loaded.config.fkeys);
   const [f, setF] = useState("F1");
   const [mods, setMods] = useState<string[]>([]);
   const key = [...MODIFIERS.filter((m) => mods.includes(m)), f].join("+");
-  const duplicate = key in existing;
+  const duplicate = key in existing || (platform !== "mac" && key.replace("Ctrl", "Mod") in existing);
   return (
     <div role="group" aria-label={t("settings.fkey.add_combo")} className="flex flex-wrap items-center gap-3 py-2.5">
       <select aria-label={t("settings.section.fkeys.title")} value={f} disabled={disabled} onChange={(e) => setF(e.target.value)} className="rounded border border-app-line bg-app-box px-2 py-1 text-sm">
@@ -324,16 +330,16 @@ function FKeyAdder({ disabled }: { disabled: boolean }) {
           </option>
         ))}
       </select>
-      {MODIFIERS.map((m) => (
+      {modifiersFor(platform).map((m) => (
         <label key={m} className="flex items-center gap-1 text-sm">
           <input
             type="checkbox"
-            aria-label={m}
+            aria-label={modifierLabel(m, platform)}
             checked={mods.includes(m)}
             disabled={disabled}
             onChange={(e) => setMods(e.target.checked ? [...mods, m] : mods.filter((x) => x !== m))}
           />
-          {m}
+          {modifierLabel(m, platform)}
         </label>
       ))}
       <Button type="button" variant="gray" size="sm" disabled={disabled || mods.length === 0 || duplicate} onClick={() => void api.setConfigValue(`fkeys.${key}`, { kind: "str", value: "" })}>
@@ -348,21 +354,24 @@ const HOTKEY_KEYS = [...Array.from({ length: 26 }, (_, i) => String.fromCharCode
 const isFKey = (k: string) => /^F\d+$/.test(k);
 
 /** `Mod+Alt+O`을 (수식키, 키)로 푼다. 수식키 순서가 다르거나 목록에 없는 키면 `null`. */
-function parseHotkey(value: string): { mods: string[]; key: string } | null {
+function parseHotkey(value: string, platform: Platform): { mods: string[]; key: string } | null {
   const parts = value.split("+");
   const key = parts.pop() ?? "";
   if (!HOTKEY_KEYS.includes(key) || parts.some((m) => !(MODIFIERS as readonly string[]).includes(m))) return null;
-  return { mods: parts, key };
+  // Windows·Linux에서는 `Mod`를 `Ctrl`과 같은 체크로 보여 준다.
+  const mods = platform === "mac" ? parts : [...new Set(parts.map((m) => (m === "Mod" ? "Ctrl" : m)))];
+  return { mods, key };
 }
 
 /** 전역 화면 열기 단축키: 수식키 체크 + 키 선택 상자. 글자·숫자는 수식키가 하나 이상일 때만 저장하고, 목록에 없는 값은 고르기 전까지 그대로 둔다. */
 function HotkeyControl({ name, value, disabled, onCommit }: { name: string; value: string; disabled: boolean; onCommit: (v: string) => void }) {
   const t = useT();
-  const parsed = parseHotkey(value);
+  const { platform } = useUi();
+  const parsed = parseHotkey(value, platform);
   const [mods, setMods] = useState<string[]>(parsed?.mods ?? []);
   const [key, setKey] = useState(parsed?.key ?? "");
   useEffect(() => {
-    const p = parseHotkey(value);
+    const p = parseHotkey(value, platform);
     if (p) {
       setMods(p.mods);
       setKey(p.key);
@@ -370,7 +379,7 @@ function HotkeyControl({ name, value, disabled, onCommit }: { name: string; valu
       setKey("");
       if (value !== "") setMods([]);
     }
-  }, [value]);
+  }, [value, platform]);
   const change = (nextMods: string[], nextKey: string) => {
     setMods(nextMods);
     setKey(nextKey);
@@ -380,10 +389,10 @@ function HotkeyControl({ name, value, disabled, onCommit }: { name: string; valu
   };
   return (
     <div className="flex flex-wrap items-center justify-end gap-3">
-      {MODIFIERS.map((m) => (
+      {modifiersFor(platform).map((m) => (
         <label key={m} className="flex items-center gap-1 text-sm">
-          <input type="checkbox" aria-label={m} checked={mods.includes(m)} disabled={disabled} onChange={(e) => change(e.target.checked ? [...mods, m] : mods.filter((x) => x !== m), key)} />
-          {m}
+          <input type="checkbox" aria-label={modifierLabel(m, platform)} checked={mods.includes(m)} disabled={disabled} onChange={(e) => change(e.target.checked ? [...mods, m] : mods.filter((x) => x !== m), key)} />
+          {modifierLabel(m, platform)}
         </label>
       ))}
       <select aria-label={name} value={key} disabled={disabled} onChange={(e) => change(mods, e.target.value)} className="rounded border border-app-line bg-app-box px-2 py-1 text-sm">

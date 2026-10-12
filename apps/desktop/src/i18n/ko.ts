@@ -339,7 +339,7 @@ export const ko = {
   "settings.item.environment.global_hotkey_enabled.title": "전역 화면 열기 단축키 사용",
   "settings.item.environment.global_hotkey_enabled.desc": "끄면 단축키를 눌러도 창을 불러오지 않습니다. 아래 단축키 값은 그대로 남습니다",
   "settings.item.environment.global_hotkey.title": "전역 화면 열기 단축키",
-  "settings.item.environment.global_hotkey.desc": "앱이 뒤에 있거나 창 뒤·최소화 상태여도 누르면 창을 앞으로 불러와, 마우스 커서가 있는 화면에 보여 줍니다. 수식키(Mod는 macOS ⌘, 그 밖은 Ctrl)를 체크하고 키를 고릅니다. 예: Mod+Alt+O. 글자·숫자 키는 수식키가 하나 이상 필요합니다. (없음)을 고르면 끕니다. 다른 앱이 이미 쓰는 키는 등록되지 않습니다",
+  "settings.item.environment.global_hotkey.desc": "앱이 뒤에 있거나 창 뒤·최소화 상태여도 누르면 창을 앞으로 불러와, 마우스 커서가 있는 화면에 보여 줍니다. 수식키를 체크하고 키를 고릅니다(macOS는 Cmd·Ctrl·Alt·Shift, Windows·Linux는 Ctrl·Alt·Shift). 기본값은 macOS Cmd+Alt+O, Windows·Linux Ctrl+Alt+O입니다. 글자·숫자 키는 수식키가 하나 이상 필요합니다. (없음)을 고르면 끕니다. 다른 앱이 이미 쓰는 키는 등록되지 않습니다",
   "settings.item.behavior.table.icon_size.title": "아이콘 크기",
   "settings.item.behavior.table.icon_size.desc": "파일 목록 행의 아이콘(px)",
   "settings.item.behavior.table.zebra_rows.title": "줄무늬 행",

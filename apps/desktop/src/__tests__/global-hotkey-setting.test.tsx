@@ -3,27 +3,38 @@ import { describe, expect, it } from "vitest";
 import { renderApp, seedBackend } from "./helpers";
 
 describe("전역 단축키 설정 (environment.global_hotkey)", () => {
-  const openEnv = async () => {
-    const r = await renderApp();
-    await r.user.keyboard("{Control>},{/Control}");
+  const openEnv = async (platform: "linux" | "mac" | "windows" = "linux") => {
+    const r = await renderApp(undefined, platform);
+    await r.user.keyboard(platform === "mac" ? "{Meta>},{/Meta}" : "{Control>},{/Control}");
     await screen.findByRole("dialog", { name: "설정" });
     await r.user.click(screen.getByRole("tab", { name: "환경" }));
     const key = await screen.findByRole("combobox", { name: "전역 화면 열기 단축키" });
     return { ...r, key, hotkey: async () => (await r.backend.getConfig()).config.environment.global_hotkey };
   };
 
-  it("설정 화면에 항목이 있고 기본값 Mod+Alt+O가 체크와 선택 상자로 보인다", async () => {
-    const { key } = await openEnv();
+  it("macOS에서는 기본값 Mod+Alt+O가 Cmd·Ctrl·Alt·Shift 체크와 선택 상자로 보인다", async () => {
+    const { key } = await openEnv("mac");
     expect(key).toHaveValue("O");
-    expect(screen.getByRole("checkbox", { name: "Mod" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Cmd" })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: "Alt" })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: "Ctrl" })).not.toBeChecked();
     expect(screen.getByRole("checkbox", { name: "Shift" })).not.toBeChecked();
+    expect(screen.queryByRole("checkbox", { name: "Mod" })).not.toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "전역 화면 열기 단축키 사용" })).toBeChecked();
   });
 
+  it("Windows·Linux에서는 Mod가 Ctrl과 같은 키라 Ctrl·Alt·Shift만 보이고 기본값은 Ctrl이 체크된다", async () => {
+    const { key } = await openEnv("windows");
+    expect(key).toHaveValue("O");
+    expect(screen.getByRole("checkbox", { name: "Ctrl" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Alt" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Shift" })).not.toBeChecked();
+    expect(screen.queryByRole("checkbox", { name: "Mod" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Cmd" })).not.toBeInTheDocument();
+  });
+
   it("체크와 키를 고르면 Mod, Ctrl, Alt, Shift 순서의 문자열로 바로 저장한다", async () => {
-    const { user, key, hotkey } = await openEnv();
+    const { user, key, hotkey } = await openEnv("mac");
     await user.click(screen.getByRole("checkbox", { name: "Alt" })); // Mod+O
     await waitFor(async () => expect(await hotkey()).toBe("Mod+O"));
     await user.click(screen.getByRole("checkbox", { name: "Shift" })); // Mod+Shift+O
@@ -32,8 +43,8 @@ describe("전역 단축키 설정 (environment.global_hotkey)", () => {
   });
 
   it("글자·숫자는 수식키 없이는 저장하지 않고 안내하며, F키는 수식키 없이도 저장한다", async () => {
-    const { user, key, hotkey } = await openEnv();
-    await user.click(screen.getByRole("checkbox", { name: "Mod" }));
+    const { user, key, hotkey } = await openEnv("mac");
+    await user.click(screen.getByRole("checkbox", { name: "Cmd" }));
     await user.click(screen.getByRole("checkbox", { name: "Alt" })); // 수식키 없음 + O
     expect(await screen.findByText("글자·숫자 키는 수식키를 하나 이상 골라야 합니다")).toBeInTheDocument();
     expect(await hotkey()).toBe("Alt+O"); // 마지막으로 저장된 값 그대로
@@ -43,7 +54,7 @@ describe("전역 단축키 설정 (environment.global_hotkey)", () => {
   });
 
   it("(없음)을 고르면 빈 문자열로 저장하고, 이어서 키를 고르면 다시 저장한다", async () => {
-    const { user, key, hotkey } = await openEnv();
+    const { user, key, hotkey } = await openEnv("mac");
     await user.selectOptions(key, "");
     await waitFor(async () => expect(await hotkey()).toBe(""));
     await user.selectOptions(key, "F1");
@@ -65,9 +76,9 @@ describe("전역 단축키 설정 (environment.global_hotkey)", () => {
   });
 
   it("사용 스위치를 끄면 체크와 선택 상자가 비활성화되고, 켜면 다시 쓸 수 있다", async () => {
-    const { user, key } = await openEnv();
+    const { user, key } = await openEnv("mac");
     const sw = screen.getByRole("switch", { name: "전역 화면 열기 단축키 사용" });
-    const boxes = ["Mod", "Ctrl", "Alt", "Shift"].map((n) => screen.getByRole("checkbox", { name: n }));
+    const boxes = ["Cmd", "Ctrl", "Alt", "Shift"].map((n) => screen.getByRole("checkbox", { name: n }));
     expect(key).toBeEnabled();
     await user.click(sw);
     await waitFor(() => expect(key).toBeDisabled());

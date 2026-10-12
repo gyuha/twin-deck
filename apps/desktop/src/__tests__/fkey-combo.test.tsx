@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { FakeBackend } from "@twin-deck/ts-client";
 import { renderApp, seedBackend } from "./helpers";
@@ -41,6 +41,20 @@ describe("F키 설정의 조합키 항목", () => {
     await user.click(within(adder()).getByRole("checkbox", { name: "Alt" }));
     expect(within(adder()).getByRole("button", { name: "추가" })).toBeDisabled();
     expect(within(adder()).getByText("이미 있는 조합입니다")).toBeInTheDocument();
+  });
+
+  it("macOS에서는 Mod 체크가 Cmd로 보이고, Windows·Linux에서는 Mod 체크 없이 Ctrl·Alt·Shift만 보인다", async () => {
+    const mac = await renderApp(seedBackend(), "mac");
+    await mac.user.keyboard("{Meta>},{/Meta}");
+    await mac.user.click(await screen.findByRole("tab", { name: "F키" }));
+    expect(within(adder()).getByRole("checkbox", { name: "Cmd" })).toBeInTheDocument();
+    expect(within(adder()).queryByRole("checkbox", { name: "Mod" })).not.toBeInTheDocument();
+    cleanup();
+    const win = await renderApp(seedBackend(), "windows");
+    await openFKeys(win.user);
+    expect(within(adder()).queryByRole("checkbox", { name: "Mod" })).not.toBeInTheDocument();
+    expect(within(adder()).queryByRole("checkbox", { name: "Cmd" })).not.toBeInTheDocument();
+    expect(within(adder()).getByRole("checkbox", { name: "Ctrl" })).toBeInTheDocument();
   });
 
   it("수식키 없이는 추가할 수 없다", async () => {

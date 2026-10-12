@@ -341,7 +341,7 @@ export const en: Record<Key, string> = {
   "settings.item.environment.global_hotkey_enabled.title": "Use global open-window hotkey",
   "settings.item.environment.global_hotkey_enabled.desc": "When off, pressing the hotkey does not bring the window back. The hotkey value below is kept",
   "settings.item.environment.global_hotkey.title": "Global open-window hotkey",
-  "settings.item.environment.global_hotkey.desc": "Press it to bring the window to the front — even when the app is in the background, behind other windows or minimized — on the screen where the mouse cursor is. Check the modifiers (Mod is ⌘ on macOS, Ctrl elsewhere) and pick a key. Example: Mod+Alt+O. Letter and digit keys need at least one modifier. Choosing (none) turns it off. A key another app already uses cannot be registered",
+  "settings.item.environment.global_hotkey.desc": "Press it to bring the window to the front — even when the app is in the background, behind other windows or minimized — on the screen where the mouse cursor is. Check the modifiers (Cmd, Ctrl, Alt, Shift on macOS; Ctrl, Alt, Shift on Windows/Linux) and pick a key. The default is Cmd+Alt+O on macOS and Ctrl+Alt+O on Windows/Linux. Letter and digit keys need at least one modifier. Choosing (none) turns it off. A key another app already uses cannot be registered",
   "settings.item.behavior.table.icon_size.title": "Icon size",
   "settings.item.behavior.table.icon_size.desc": "Icon size (px) in file list rows",
   "settings.item.behavior.table.zebra_rows.title": "Zebra rows",
