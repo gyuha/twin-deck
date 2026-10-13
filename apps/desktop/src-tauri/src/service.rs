@@ -783,19 +783,50 @@ impl IconSource {
     }
 }
 
-/// 항목의 시스템 아이콘 소스. 폴더는 일반 폴더 아이콘이고(디스크 위 `.app` 번들은 자기 아이콘), 파일은 이름의 확장자(소문자)로 종류 아이콘을 얻는다.
+/// 디스크 위 파일 중 자기 아이콘을 가진 확장자(Windows). 프런트의 `lib/systemIcons.ts`와 같은 목록이다.
+const OWN_ICON_EXTS: [&str; 5] = ["exe", "lnk", "ico", "scr", "cur"];
+
+/// 항목의 시스템 아이콘 소스. 폴더는 일반 폴더 아이콘이고(macOS의 디스크 위 `.app` 번들은 자기 아이콘), 파일은 이름의 확장자(소문자)로 종류 아이콘을 얻는다
+/// (Windows는 디스크 위 `exe`·`lnk`·`ico` 같은 자기 아이콘이 있는 파일만 경로로 얻는다).
 /// 압축 안 항목(`x.zip!/a.txt`)은 실제 파일이 아니므로 늘 확장자다. 점으로 시작하는 이름(`.bashrc`)은 확장자가 없다.
 fn icon_source(path: &str, is_dir: bool, in_archive: bool) -> IconSource {
+    icon_source_with(
+        path,
+        is_dir,
+        in_archive,
+        cfg!(target_os = "macos"),
+        cfg!(windows),
+    )
+}
+
+/// `icon_source`의 규칙. `mac_apps`는 `.app` 폴더를 자기 아이콘으로, `own_icons`는 `OWN_ICON_EXTS` 파일을 자기 아이콘으로 얻을지다(OS별로 켠다).
+fn icon_source_with(
+    path: &str,
+    is_dir: bool,
+    in_archive: bool,
+    mac_apps: bool,
+    own_icons: bool,
+) -> IconSource {
     let name = path.rsplit(['/', '\\']).next().unwrap_or(path);
     if is_dir {
         let app = name.to_ascii_lowercase().ends_with(".app");
-        if app && !in_archive && Path::new(path).is_dir() {
+        if mac_apps && app && !in_archive && Path::new(path).is_dir() {
             return IconSource::Path(PathBuf::from(path));
         }
         return IconSource::Folder;
     }
     match name.rfind('.') {
-        Some(i) if i > 0 => IconSource::Extension(td_icons::normalize_ext(&name[i + 1..])),
+        Some(i) if i > 0 => {
+            let ext = td_icons::normalize_ext(&name[i + 1..]);
+            if own_icons
+                && !in_archive
+                && OWN_ICON_EXTS.contains(&ext.as_str())
+                && Path::new(path).is_file()
+            {
+                return IconSource::Path(PathBuf::from(path));
+            }
+            IconSource::Extension(ext)
+        }
         _ => IconSource::Extension(String::new()),
     }
 }
@@ -3046,6 +3077,51 @@ mod tests {
         // 디스크에 없는 .app 이름이나 압축 안 .app은 일반 폴더다.
         assert_eq!(icon_source("/no/such/Thing.app", true, false), Folder);
         assert_eq!(icon_source("/a/x.zip!/Thing.app", true, true), Folder);
+    }
+
+    #[test]
+    fn system_icon_source_rules_for_each_os() {
+        use super::IconSource::*;
+        let t = tempfile::tempdir().unwrap();
+        let exe = t.path().join("Tool.EXE");
+        std::fs::write(&exe, "").unwrap();
+        let txt = t.path().join("a.txt");
+        std::fs::write(&txt, "").unwrap();
+        let app = t.path().join("My.app");
+        std::fs::create_dir(&app).unwrap();
+        let (exe, txt, app) = (
+            exe.to_str().unwrap(),
+            txt.to_str().unwrap(),
+            app.to_str().unwrap(),
+        );
+        // Windows: 디스크 위 exe는 자기 아이콘(경로), 일반 파일은 확장자, 없는 파일·압축 안은 확장자.
+        assert_eq!(
+            icon_source_with(exe, false, false, false, true),
+            Path(exe.into())
+        );
+        assert_eq!(
+            icon_source_with(txt, false, false, false, true),
+            Extension("txt".into())
+        );
+        assert_eq!(
+            icon_source_with("/no/x.exe", false, false, false, true),
+            Extension("exe".into())
+        );
+        assert_eq!(
+            icon_source_with(&format!("{exe}!/in.exe"), false, true, false, true),
+            Extension("exe".into())
+        );
+        // macOS 규칙이 꺼진 곳에서는 .app 폴더도 일반 폴더, 자기 아이콘 규칙이 꺼진 곳에서는 exe도 확장자.
+        assert_eq!(icon_source_with(app, true, false, false, true), Folder);
+        assert_eq!(
+            icon_source_with(exe, false, false, true, false),
+            Extension("exe".into())
+        );
+        // macOS: 디스크 위 .app은 경로.
+        assert_eq!(
+            icon_source_with(app, true, false, true, false),
+            Path(app.into())
+        );
     }
 
     #[test]

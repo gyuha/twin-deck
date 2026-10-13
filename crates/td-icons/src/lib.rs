@@ -1,11 +1,16 @@
 //! 운영체제가 파일 종류에 쓰는 아이콘을 PNG로 얻는다(파일 목록의 "시스템 아이콘" 옵션).
 //! macOS는 `NSWorkspace`, Windows는 `SHGetFileInfoW`로 얻고, 그 밖의 OS는 아이콘이 없다(`None`).
+//! Windows는 `HICON`의 실제 비트맵 크기(16·32)대로 PNG를 만들므로 요청한 크기와 다를 수 있다(화면이 맞춰 그린다).
 //! 이 크레이트는 UI·Tauri를 모른다. 어떤 소스로 얻을지(폴더·확장자·경로)는 부르는 쪽이 정한다.
 
 use std::path::Path;
 
 #[cfg(target_os = "macos")]
 mod mac;
+#[cfg(windows)]
+mod win;
+
+pub mod pixels;
 
 /// 아이콘을 얻을 곳.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -34,7 +39,12 @@ fn render(source: IconSource, size_px: u32) -> Option<Vec<u8>> {
     mac::render(source, size_px)
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(windows)]
+fn render(source: IconSource, size_px: u32) -> Option<Vec<u8>> {
+    win::render(source, size_px)
+}
+
+#[cfg(not(any(target_os = "macos", windows)))]
 fn render(_source: IconSource, _size_px: u32) -> Option<Vec<u8>> {
     None
 }
