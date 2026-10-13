@@ -100,6 +100,7 @@ export function FileTable({ pane }: { pane: PaneId }) {
   const dirSizes = useApp((s) => s.dirSizes);
   const rightClickSelect = config.behavior.table.right_click_select;
   const iconSize = config.behavior.table.icon_size;
+  const systemIcons = config.behavior.table.system_icons;
   const { zebra_rows: zebra, show_marks: showMarks, folder_style: folderStyle, cursor_fill: cursorFill, column_lines: columnLines } = config.behavior.table;
   const [decoPre, decoPost] = FOLDER_DECOR[folderStyle] ?? ["", ""];
   const parsedColumns = useMemo(() => parseColumns(config.view.table.columns), [config.view.table.columns]);
@@ -285,7 +286,7 @@ export function FileTable({ pane }: { pane: PaneId }) {
           </span>
         )}
         {/* 폴더를 가리키는 링크는 폴더 아이콘에 링크 표시를 얹는다(이슈 #47). 파일 링크·끊어진 링크는 파일 아이콘에 링크 표시. */}
-        <FileIcon name={e.name} kind={e.kind === "symlink" && e.linkIsDir ? "dir" : e.kind} link={e.kind === "symlink"} size={iconSize} />
+        <FileIcon name={e.name} kind={e.kind === "symlink" && e.linkIsDir ? "dir" : e.kind} link={e.kind === "symlink"} size={iconSize} path={e.path} systemIcons={systemIcons} />
         {(multi ? [{ name: "name" } as ColumnSpec] : columns).map((c, k) => (
           <span key={`${c.name}-${k}`} className={(c.name === "name" ? "truncate " : "self-stretch truncate text-right leading-6 tabular-nums ") + columnEdge(c.name, multi ? 0 : k, multi || k === columns.length - 1)}>
             {c.name === "name" && tab.quick ? (

@@ -11,6 +11,7 @@
       "text_color": "",
       "table": {
         "icon_size": 16,
+        "system_icons": false,
         "circular_selection": false,
         "right_click_select": false,
         "zebra_rows": false,

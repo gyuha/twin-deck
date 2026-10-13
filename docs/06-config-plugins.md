@@ -52,6 +52,7 @@ language = "ko"                   # 화면 언어: ko(한국어), en(English)
 
 [behavior.table]
 icon_size = 16
+system_icons = false              # 켜면 목록의 아이콘을 운영체제가 쓰는 파일 아이콘으로 보여 준다(macOS·Windows). 얻지 못하면 기본 아이콘
 circular_selection = false        # 끝에서 처음으로 순환
 right_click_select = false
 zebra_rows = false                # 행 배경을 번갈아 옅게 칠한다

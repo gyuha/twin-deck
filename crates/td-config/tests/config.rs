@@ -1143,6 +1143,25 @@ fn preview_pdf_direct_defaults_off_and_validates() {
 }
 
 #[test]
+fn behavior_table_system_icons_defaults_off_and_validates() {
+    let none = load_from_strs(None, None, Platform::Linux);
+    assert!(!none.config.behavior.table.system_icons);
+    let on = load("[behavior.table]\nsystem_icons = true\n");
+    assert!(on.warnings.is_empty(), "{:?}", on.warnings);
+    assert!(on.config.behavior.table.system_icons);
+    let bad = load("[behavior.table]\nsystem_icons = \"켜\"\n");
+    assert!(!bad.warnings.is_empty());
+    assert!(
+        !bad.config.behavior.table.system_icons,
+        "문자열은 기본값(꺼짐)으로 돌아간다"
+    );
+    assert_eq!(
+        bad.config.behavior.table.icon_size, 16,
+        "다른 키는 영향을 받지 않는다"
+    );
+}
+
+#[test]
 fn column_lines_defaults_to_none_and_validates() {
     let d = user_value_dir(None);
     assert_eq!(

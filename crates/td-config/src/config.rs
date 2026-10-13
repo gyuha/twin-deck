@@ -53,6 +53,8 @@ pub struct Behavior {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct BehaviorTable {
     pub icon_size: u32,
+    /// 목록 행의 아이콘을 운영체제가 쓰는 파일 아이콘으로 보인다(macOS·Windows). 얻지 못하면 기본 아이콘이다.
+    pub system_icons: bool,
     /// 끝에서 처음으로 순환 (NAV-06).
     pub circular_selection: bool,
     pub right_click_select: bool,

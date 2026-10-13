@@ -344,6 +344,8 @@ export const ko = {
   "settings.item.environment.global_hotkey.desc": "앱이 뒤에 있거나 창 뒤·최소화 상태여도 누르면 창을 앞으로 불러와, 마우스 커서가 있는 화면에 보여 줍니다. 수식키를 체크하고 키를 고릅니다(macOS는 Cmd·Ctrl·Alt·Shift, Windows·Linux는 Ctrl·Alt·Shift). 기본값은 macOS Cmd+Alt+O, Windows·Linux Ctrl+Alt+O입니다. 글자·숫자 키는 수식키가 하나 이상 필요합니다. (없음)을 고르면 끕니다. 다른 앱이 이미 쓰는 키는 등록되지 않습니다",
   "settings.item.behavior.table.icon_size.title": "아이콘 크기",
   "settings.item.behavior.table.icon_size.desc": "파일 목록 행의 아이콘(px)",
+  "settings.item.behavior.table.system_icons.title": "시스템 아이콘 사용",
+  "settings.item.behavior.table.system_icons.desc": "켜면 파일 목록의 아이콘을 운영체제가 파일 종류에 쓰는 아이콘(Finder·탐색기와 같은 것)으로 보여 줍니다. macOS와 Windows에서만 동작하고, 아이콘을 얻지 못하면 기본 아이콘이 그대로 보입니다.",
   "settings.item.behavior.table.zebra_rows.title": "줄무늬 행",
   "settings.item.behavior.table.zebra_rows.desc": "파일 목록의 행 배경을 번갈아 옅게 칠합니다",
   "settings.item.behavior.table.show_marks.title": "표시 칸",

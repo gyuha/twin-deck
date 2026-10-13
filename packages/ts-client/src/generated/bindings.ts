@@ -689,6 +689,10 @@ tab_style: string;
 tab_close_button: boolean }
 export type BehaviorTable = { icon_size: number; 
 /**
+ * 목록 행의 아이콘을 운영체제가 쓰는 파일 아이콘으로 보인다(macOS·Windows). 얻지 못하면 기본 아이콘이다.
+ */
+system_icons: boolean; 
+/**
  * 끝에서 처음으로 순환 (NAV-06).
  */
 circular_selection: boolean; right_click_select: boolean; 

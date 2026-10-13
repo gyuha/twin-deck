@@ -202,7 +202,7 @@ To find folders that take a lot of space, press `Alt+T` on a folder. Subfolders 
   | ![Light theme](docs/screenshots/theme-light.png) | ![Dracula theme](docs/screenshots/theme-dracula.png) |
 
 - **Fonts and text color**: set the screen font and preview font separately, and change the app's default text color.
-- **List appearance**: choose icon size, zebra rows, folder name decoration, tab style, active pane border highlight, and more.
+- **List appearance**: choose icon size, zebra rows, folder name decoration, tab style, active pane border highlight, and more. Turn on **Use system icons** (off by default) to show the real file icons Finder or File Explorer use in the list (macOS and Windows; the default icon stays when one can't be obtained).
 - **F-keys**: assign a built-in action or an external program to each of `F1`~`F12` (including modifier combinations) and choose whether it shows in the bar at the bottom.
 - **Changing keys**: edit shortcuts in `keybindings.toml` in the settings folder.
 

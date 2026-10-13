@@ -2133,6 +2133,10 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     quickLookPreview(path: string, seq: number) {
       return backend.quickLookPreview(path, seq);
     },
+    /** 항목의 시스템 파일 아이콘(데이터 주소, 이 OS가 못 주면 null). 설정 `behavior.table.system_icons`가 켜졌을 때만 부른다. */
+    systemIcon(path: string, isDir: boolean, size: number) {
+      return backend.systemIcon(path, isDir, size);
+    },
     /** epub의 제목·저자·표지·챕터 목록. */
     epubOpen(path: string) {
       return backend.epubOpen(path);
