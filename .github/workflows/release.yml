@@ -55,6 +55,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      # update-tap.mjs가 tap 저장소에 커밋하므로 러너에 git 작성자 정보가 있어야 한다
+      - run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
       - run: node scripts/publish-draft.mjs
         env:
           TAP_URL: https://x-access-token:${{ secrets.TAP_GITHUB_TOKEN }}@github.com/gyuha/homebrew-tap.git
