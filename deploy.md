@@ -2,27 +2,39 @@
 
 Twin Deck의 새 버전을 만들어 GitHub 릴리스에 올리는 방법입니다. 앱을 만드는 사람을 위한 문서이고, 사용하는 사람은 [README](README.md)만 보면 됩니다.
 
-배포 파일은 OS마다 그 OS에서 만듭니다(macOS는 macOS에서, Windows는 Windows에서). 두 OS의 파일을 한 비공개 초안에 모은 뒤, 둘 다 있을 때 공개합니다. 공개하면 태그가 만들어지고 Homebrew tap도 새 버전으로 바뀝니다.
+평소에는 GitHub Actions가 macOS와 Windows를 각각 빌드해 한 비공개 초안에 모읍니다. 사람이 승인하면 초안을 공개하고(태그 생성) Homebrew tap도 새 버전으로 바꿉니다. 각 OS에서 직접 올리는 `task release:draft` / `task release`는 비상용으로 남아 있습니다.
 
 ## 배포 순서
 
-1. 버전을 정하고 `CHANGELOG.md`에 그 버전의 항목을 씁니다. 같은 커밋에서 `apps/desktop/src-tauri/tauri.conf.json`과 `apps/desktop/src-tauri/Cargo.toml`(와 `Cargo.lock`)의 `version`을 올리고 push합니다. 변경 사항을 쓰는 방법은 [AGENTS.md](AGENTS.md)의 "릴리스 노트(변경 사항 기록)"에 있습니다.
-2. 각 OS에서 `task release:draft`를 실행합니다. 번들을 만들어 비공개 초안 릴리스에 올립니다. 공개하지 않고 태그도 만들지 않습니다.
-3. 초안에 macOS용과 Windows용 파일이 모두 올라온 뒤 `task release`를 실행합니다. 초안을 공개하고(태그 생성) Homebrew tap의 Cask를 새 버전으로 갱신합니다. 한쪽 OS 파일만 있으면 공개하지 않고 멈춥니다.
+1. 버전을 정하고 `CHANGELOG.md`에 그 버전의 항목을 씁니다. 같은 커밋에서 `apps/desktop/src-tauri/tauri.conf.json`과 `apps/desktop/src-tauri/Cargo.toml`(와 `Cargo.lock`)의 `version`을 올리고 `main`에 push합니다. 변경 사항을 쓰는 방법은 [AGENTS.md](AGENTS.md)의 "릴리스 노트(변경 사항 기록)"에 있습니다.
+2. `task deploy`를 실행합니다. main 브랜치·깨끗한 작업 트리·`origin/main`과 같은 커밋·CHANGELOG 항목·미공개 버전·Environment `release`의 승인자를 먼저 점검하고, 통과하면 Actions의 `release` 워크플로를 시작합니다.
+3. 워크플로가 `mac` → `windows` 순서로 빌드해 같은 초안에 올립니다. 진행은 `gh run watch`로 봅니다.
+4. 두 OS 업로드가 끝나면 GitHub가 Environment `release`의 승인을 요청합니다. 승인하면 `publish` job이 초안을 공개하고 Homebrew tap의 Cask를 갱신합니다.
 
 ```
-CHANGELOG 쓰기 + 버전 올리기 → push → 각 OS에서 task release:draft → task release → 공개 + tap 갱신
-                                                        ↓ macOS·Windows 파일 중 하나라도 없으면
-                                                   공개하지 않고 종료 (코드 3)
+CHANGELOG 쓰기 + 버전 올리기 → push → task deploy → Actions: mac → windows → (승인) → 공개 + tap 갱신
+                                          ↓ 점검 실패
+                                    시작하지 않고 종료
 ```
 
-공개는 되돌릴 수 없습니다. 공개 흐름의 전체 단계와 실패했을 때 다시 하는 방법은 [AGENTS.md](AGENTS.md)의 "릴리스 공개 흐름"에 있습니다.
+공개는 되돌릴 수 없습니다. `publish` job은 초안의 대상 커밋이 지금 커밋이고, macOS·Windows 파일과 `latest.json`의 두 플랫폼 항목이 모두 있을 때만 공개합니다(`scripts/publish-draft.mjs`). 공개 흐름의 전체 단계와 실패했을 때 다시 하는 방법은 [AGENTS.md](AGENTS.md)의 "릴리스 공개 흐름"에 있습니다.
+
+## 처음 한 번 준비할 것
+
+GitHub 저장소 Settings에서 아래를 만듭니다.
+
+- Secrets and variables → Actions → Repository secrets
+  - `TAURI_SIGNING_PRIVATE_KEY`: 업데이트 서명 키의 내용(`~/.tauri/twin-deck.key` 파일 내용)
+  - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`: 키에 비밀번호가 있을 때만
+  - `TAP_GITHUB_TOKEN`: `gyuha/homebrew-tap` 저장소 한 곳에만 Contents 읽기·쓰기 권한을 준 fine-grained PAT
+- Environments → `release` 만들기 → Required reviewers에 본인 추가. 이 Environment가 없으면 GitHub이 보호 없이 자동으로 만들어 승인 없이 공개되므로, `task deploy`는 승인자가 없으면 시작하지 않습니다.
 
 ## 명령
 
 ```sh
-task release:draft  # 드래프트 배포: 이 OS의 파일을 비공개 초안에 올린다(공개·태그 없음. gh 로그인 필요)
-task release        # 배포: 이 OS의 파일을 올리고 공개한다(macOS·Windows 파일이 모두 있을 때만, 태그가 만들어진다)
+task deploy         # Actions 배포: 점검 뒤 release 워크플로를 시작한다(승인하면 공개 + tap 갱신. gh 로그인 필요)
+task release:draft  # 비상용 드래프트 배포: 이 OS의 파일을 비공개 초안에 올린다(공개·태그 없음. gh 로그인 필요)
+task release        # 비상용 배포: 이 OS의 파일을 올리고 공개한다(macOS·Windows 파일이 모두 있을 때만, 태그가 만들어진다)
 ```
 
 ## 앱 안 업데이트와 서명 키

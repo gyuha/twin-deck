@@ -16,6 +16,7 @@ task check            # fmt --check, clippy --all-targets -D warnings, typecheck
 task gen-types        # regenerate TS bindings + default-config.json (see below)
 task bundle           # macOS .app / Windows NSIS installer
 task install          # bundle + install to /Applications (macOS) / NSIS silent (Windows)
+task deploy           # GitHub Actions로 배포: 점검 뒤 release 워크플로 시작 → mac·Windows 빌드 → Environment 승인 → 공개 + tap 갱신 (평소 경로)
 task release:draft    # upload this OS's bundle to a private draft GitHub release (no tag)
 task release          # same, then publish — only if both macOS and Windows assets are present; then updates the Homebrew tap (see "릴리스 공개 흐름")
 ```
@@ -47,6 +48,25 @@ Release/version: bump `version` in `apps/desktop/src-tauri/tauri.conf.json` **an
 6. 버전 올리기(`tauri.conf.json`, `Cargo.toml`, `Cargo.lock`)와 같은 커밋에 넣고 push한 뒤 배포한다. 초안은 비공개라 작성한 내용을 사용자에게 요약해 보여 주고, 공개 전에 고칠 수 있다.
 
 스크립트가 하는 일: `scripts/release-notes.mjs`가 항목을 뽑고(`--check`는 빌드 전 확인, `--plain`은 `latest.json`용), 이전 태그를 `vX.Y.Z` 숫자 순서로 골라 전체 변경 내역 비교 링크를 붙인다. `bun test scripts/release-notes.test.mjs`로 시험한다. 이미 공개된 릴리스의 본문은 스크립트가 고치지 않는다. 오타를 바로잡을 때는 `gh release edit v<버전> --notes-file <파일>`을 직접 쓰되, 사용자에게 보이는 일이라 요청이 있을 때만 한다.
+
+## "배포해줘" 요청 처리 (Actions 배포)
+
+사용자가 "배포해줘"라고 하면 아래를 **끊지 말고 이어서** 한다. 이 말은 `task deploy` 실행에 대한 명시적 요청이다. "드래프트 배포"는 이와 달리 이 OS에서 직접 올리는 `task release:draft`를 뜻한다.
+
+1. 버전을 정한다. 사용자가 말하지 않았으면 이전 태그 이후 변경(위 "릴리스 노트" 2번)을 보고 마이너/패치를 권하며 **한 번만 확인**한다. 이미 공개된 버전이면 올려야 한다.
+2. `CHANGELOG.md`에 그 버전 항목을 쓴다("릴리스 노트(변경 사항 기록)" 절차 3~5번을 따른다). 내용은 사용자에게 요약해 보여 준다.
+3. `tauri.conf.json`·`Cargo.toml`의 `version`을 올리고 `Cargo.lock`을 맞춘다(`cargo check -p twin-deck-desktop`).
+4. 한 커밋으로 묶어 `main`에 push한다(커밋 메시지는 한글, `Co-Authored-By` 트레일러 포함). `main`이 아니거나 관련 없는 변경이 섞여 있으면 멈추고 알린다.
+5. `task deploy --yes`를 실행한다. 점검에서 막히면(Environment `release` 승인자 없음 등) 이유를 그대로 전하고 멈춘다. 우회하지 않는다.
+6. `gh run watch`로 두 OS 빌드를 지켜본다. 실패하면 로그의 실패 단계와 원인을 보고하고, 공개된 것이 없다는 점을 함께 말한다.
+7. 승인 요청이 오면 사용자에게 **GitHub Actions에서 Review deployments → Approve를 눌러 달라고 안내**하고 기다린다. 공개는 되돌릴 수 없으므로 에이전트가 대신 승인하지 않는다.
+8. 사용자가 승인해 `publish` job이 끝나면 릴리스 URL과 tap 갱신 결과(`gh release view v<버전>`, tap 커밋)를 확인해 보고한다.
+
+```
+버전 확인 → CHANGELOG → 버전 올리기 → 커밋·push → task deploy --yes → 빌드 감시 → (사용자 승인) → 공개·tap 확인
+                                                    ↓ 점검·빌드 실패
+                                              이유 보고 후 멈춤
+```
 
 ## 릴리스 "공개" 흐름 (`task release`)
 
@@ -94,7 +114,7 @@ flowchart TD
 - 5단계가 실패해도 공개는 되돌리지 않는다. 같은 명령을 다시 실행해도 안전하다(이미 반영돼 있으면 아무것도 바꾸지 않는다). tap을 건너뛰는 경우는 macOS ZIP이 없을 때, 이 저장소의 최신 릴리스가 아닐 때(옛 버전이 tap을 되돌리지 않게), sha256이 다를 때(이때는 tap을 바꾸지 않고 오류로 끝낸다)다.
 - Windows에서 공개해도 같은 5단계가 돈다(`node`와 `git`, `gh`가 필요하고 tap push 권한이 있어야 한다). 그래서 어느 OS에서 `task release`를 마지막에 실행하든 tap이 갱신된다.
 - 시험: `DRY_RUN=1`이면 GitHub를 바꾸는 명령은 출력만 하고, `DRY_RUN=1 node scripts/update-tap.mjs <이미 공개된 버전>`은 push 없이 5단계를 읽기 전용으로 점검한다. 단위 테스트는 `bun test scripts/update-tap.test.mjs`(로컬 bare 저장소를 tap으로 쓰므로 GitHub를 건드리지 않는다).
-- **에이전트는 사용자가 명시적으로 요청하기 전에는 `task release`, `release.sh publish`, `node scripts/update-tap.mjs`를 `DRY_RUN` 없이 실행하지 않는다.** 공개된 릴리스와 tap push는 다른 사람이 곧바로 받아 쓰는 것이라 되돌릴 수 없다.
+- **에이전트는 사용자가 명시적으로 요청하기 전에는 `task deploy`(Actions 시작), `task release`, `release.sh publish`, `node scripts/publish-draft.mjs`, `node scripts/update-tap.mjs`를 `DRY_RUN` 없이 실행하지 않는다.** 공개된 릴리스와 tap push는 다른 사람이 곧바로 받아 쓰는 것이라 되돌릴 수 없다.
 
 ## Architecture
 

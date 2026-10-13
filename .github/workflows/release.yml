@@ -1,0 +1,60 @@
+name: release
+
+# 수동 실행만 한다. `task deploy`가 사전 점검 뒤 이 워크플로를 시작한다.
+# 흐름: mac 빌드·초안 업로드 → windows 빌드·초안 업로드 → (Environment `release` 승인) → 공개 + Homebrew tap 갱신
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+  TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+jobs:
+  mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+      - run: bun install --frozen-lockfile
+      - run: node scripts/release-notes.mjs --check
+      - run: bun run --cwd apps/desktop tauri build --bundles app --config '{"bundle":{"createUpdaterArtifacts":true}}'
+      - run: scripts/release.sh draft
+
+  windows:
+    needs: mac
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run --cwd apps/desktop tauri build --bundles nsis --config '{"bundle":{"createUpdaterArtifacts":true}}'
+      - run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 -Mode draft
+
+  publish:
+    needs: windows
+    runs-on: ubuntu-latest
+    # 공개는 되돌릴 수 없어서 Environment `release`의 Required reviewers 승인을 거친다
+    environment: release
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: node scripts/publish-draft.mjs
+        env:
+          TAP_URL: https://x-access-token:${{ secrets.TAP_GITHUB_TOKEN }}@github.com/gyuha/homebrew-tap.git
