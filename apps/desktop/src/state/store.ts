@@ -1594,6 +1594,17 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       });
     },
 
+    /** Shift+PageUp/PageDown/Home/End: 커서 항목부터 도착 항목까지(양 끝 포함)를 선택에 더하고 커서를 옮긴다. 반전하지 않으므로 연속으로 눌러도 선택이 끊기지 않는다. */
+    shiftSelectTo(delta: number) {
+      patchActive((t) => {
+        if (t.entries.length === 0) return {};
+        const to = clamp(t.cursor + delta, t.entries.length);
+        const sel = new Set(t.selection);
+        for (let i = Math.max(Math.min(t.cursor, to), 0); i <= Math.max(t.cursor, to); i++) sel.add(t.entries[i].path);
+        return { cursor: to, selection: sel };
+      });
+    },
+
     selectAll() {
       patchActive((t) => ({ selection: new Set(t.entries.map((e) => e.path)) }));
     },

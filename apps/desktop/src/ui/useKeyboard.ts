@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { actionContext, activeTab, scopeStack } from "../state/store";
+import { actionContext, activeTab, PAGE_SIZE, scopeStack } from "../state/store";
 import type { AppStore } from "../state/store";
 import type { ActionRegistry } from "@twin-deck/actions";
 import type { ActionContext } from "@twin-deck/actions";
@@ -33,6 +33,19 @@ export function useKeyboard({ app, keymap, registry }: Options) {
         e.preventDefault();
         api.shiftMove(e.key === "ArrowUp" ? -1 : 1);
         return;
+      }
+      // Shift+PageUp/PageDown은 한 페이지, Shift+Home/End는 목록 처음/끝까지, 도착 항목까지 포함해 선택에 더한다(이슈 #51).
+      // macOS에는 Home/End 키가 없어 Cmd+Shift+↑/↓가 그 자리다(Cmd+↑/↓는 core.move.home/end 기본 키).
+      if ((top === "pane" || top === "quickSelect") && e.shiftKey && !e.ctrlKey && !e.altKey) {
+        const keys: Record<string, number> = e.metaKey
+          ? { ArrowUp: -Infinity, ArrowDown: Infinity }
+          : { Home: -Infinity, End: Infinity, PageUp: -PAGE_SIZE, PageDown: PAGE_SIZE };
+        const delta = keys[e.key];
+        if (delta !== undefined) {
+          e.preventDefault();
+          api.shiftSelectTo(delta);
+          return;
+        }
       }
       if (top === "quickSelect" && plain && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
         e.preventDefault();

@@ -342,6 +342,9 @@ export const DEFAULT_BINDINGS_BY_PLATFORM: Record<"mac" | "other", Binding[]> = 
     b("pane", "core.tab.prev", "Alt+Mod+Left"),
     b("terminal", "core.tab.next", "Alt+Mod+Right"),
     b("terminal", "core.tab.prev", "Alt+Mod+Left"),
+    // macOS 키보드에는 Home/End가 없다. Cmd+↑/↓가 그 자리다(Cmd+Shift+↑/↓는 범위 선택, useKeyboard).
+    b("pane", "core.move.home", "Mod+Up"),
+    b("pane", "core.move.end", "Mod+Down"),
   ],
   other: [
     b("pane", "core.go.up", "Alt+Up"),

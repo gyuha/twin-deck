@@ -125,7 +125,7 @@ Marta에서는 수정자 없는 단일 키 바인딩이 Quick Select에 가로�
 | `core.move.left` / `core.move.right` | 여러 컬럼 보기: 컬럼 좌/우. 그 밖: `Left`는 상위 폴더, `Right`는 폴더면 들어가고 파일이면 미리보기 | `Left` / `Right` | 같음 | `left`는 ID 확인, `right`는 추정 |
 | `core.move.page_up` / `page_down` | 페이지 이동 | `PageUp` / `PageDown` | 같음 | 자체 |
 | `core.move.half_page_up` / `half_page_down` | 반 페이지 | `Alt+PageUp` / `Alt+PageDown` | 같음 | 자체 ID, 키 확인 |
-| `core.move.home` / `core.move.end` | 처음/끝 | `Home` / `End` | 같음 | 자체 |
+| `core.move.home` / `core.move.end` | 처음/끝 | `Home` / `End`, `Mod+Up` / `Mod+Down` | `Home` / `End` | 자체. macOS 키보드에는 Home/End가 없어 Cmd+↑/↓가 같은 자리다 |
 | `core.pane.switch` | 활성 패널 전환 | `Tab` | `Tab` | 자체 ID, 키 확인 |
 | `core.pane.swap` | 좌우 패널 바꾸기 | `Mod+U` | `Ctrl+U` | 자체 ID. 탭·폴더·커서·선택을 통째로 맞바꾸고 활성 패널은 내용을 따라간다. Ctrl+U는 Total·Double·Midnight Commander의 "패널 맞바꾸기" 키와 같다 |
 | `core.menu.volumes` | Volumes 메뉴 | `Alt+1` | `Alt+1` | 자체 ID, 키 확인 |
@@ -148,7 +148,7 @@ Windows/Linux에서 `Alt+숫자`는 일부 데스크톱 환경이나 앱과 충�
 | `core.select.invert_current` | 현재 항목 반전 | 없음 | 없음 | 자체 |
 | `core.select.group` / `core.deselect.group` | 그룹 선택/해제 | 없음 | 없음 | 자체 |
 
-Shift+이동 키(범위의 선택 반전)는 액션이 아니라 `pane` 스코프의 입력 규칙이다. 패널의 `selection.shift_mode` 설정(`invert` 또는 `extend`)으로 Marta 방식과 일반 방식을 전환한다.
+Shift+이동 키(범위의 선택 반전)는 액션이 아니라 `pane` 스코프의 입력 규칙이다. `Shift+Up`/`Shift+Down`은 한 칸씩 반전한다. `Shift+PageUp`/`Shift+PageDown`은 한 페이지, `Shift+Home`/`Shift+End`는 목록 처음/끝까지이며, 반전하지 않고 시작 항목부터 도착 항목까지(양 끝 포함) 선택에 더한다. macOS에서는 `Cmd+Shift+Up`/`Cmd+Shift+Down`이 `Shift+Home`/`Shift+End`와 같다(이슈 #51). 패널의 `selection.shift_mode` 설정(`invert` 또는 `extend`)으로 Marta 방식과 일반 방식을 전환한다.
 
 ### 5.4 탭, 창
 
