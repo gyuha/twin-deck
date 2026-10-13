@@ -591,7 +591,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
           entries,
           error: null,
           restoreCursor: undefined,
-          cursor: idx >= 0 ? idx : Math.min(t.cursor, Math.max(entries.length - 1, 0)),
+          // 항목이 하나도 없으면 `..` 행(켜져 있을 때)에 둔다 — 갈 곳이 그것뿐이다.
+          cursor: idx >= 0 ? idx : entries.length === 0 && parentRowVisible(t, cfg().behavior.table.show_parent_row) ? -1 : Math.min(t.cursor, Math.max(entries.length - 1, 0)),
           selection: new Set([...t.selection].filter((p) => paths.has(p))),
         };
       });

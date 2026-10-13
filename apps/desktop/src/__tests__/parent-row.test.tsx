@@ -70,6 +70,24 @@ describe("상위 행", () => {
   });
 });
 
+describe("상위 행: 빈 폴더", () => {
+  it("항목이 없는 폴더에 들어가면 `..` 행이 선택된다", async () => {
+    const b = new FakeBackend().seed({ "/home/a/empty": null, "/home/b/x.txt": "x" });
+    b.setConfig((l) => {
+      l.config.behavior.table.show_parent_row = true;
+      for (const k of Object.keys(l.config.fkey_bar)) l.config.fkey_bar[k] = false;
+    });
+    await renderApp(b, "linux", { left: "/home/a/empty", right: "/home/b" });
+    await waitFor(() => expect(parentOpt()).toHaveAttribute("data-cursor", "true"));
+  });
+
+  it("옵션이 꺼져 있으면 빈 폴더에서 `..` 행이 없다", async () => {
+    const b = new FakeBackend().seed({ "/home/a/empty": null, "/home/b/x.txt": "x" });
+    await renderApp(b, "linux", { left: "/home/a/empty", right: "/home/b" }, { emptyLeft: true });
+    expect(parentOpt()).toBeNull();
+  });
+});
+
 describe("상위 행 예외 처리", () => {
   it("예외: 전체 선택 뒤 복사 확인 창은 `..`를 빼고 센다", async () => {
     const b = backend();
