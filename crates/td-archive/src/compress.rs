@@ -133,7 +133,21 @@ pub fn compress_skipping(
         use std::os::unix::fs::PermissionsExt;
         fs::set_permissions(tmp.path(), fs::Permissions::from_mode(0o644))?;
     }
-    tmp.persist_noclobber(dest)
-        .map_err(|e| ArchiveError::Io(e.error))?;
+    // `persist_noclobber`는 하드링크로 이름을 붙이는데 exFAT·FAT32 같은 볼륨은 하드링크를 지원하지 않는다(USB 등).
+    // 그때는 이미 있는지 확인한 뒤 이름을 바꿔 붙인다.
+    match tmp.persist_noclobber(dest) {
+        Ok(_) => {}
+        Err(e) if e.error.kind() == io::ErrorKind::AlreadyExists => {
+            return Err(ArchiveError::Exists(dest.display().to_string()));
+        }
+        Err(e) => {
+            if dest.exists() {
+                return Err(ArchiveError::Exists(dest.display().to_string()));
+            }
+            e.file
+                .persist(dest)
+                .map_err(|e| ArchiveError::Io(e.error))?;
+        }
+    }
     Ok(report)
 }
