@@ -119,6 +119,9 @@ fn valid_name(name: &str) -> Result<()> {
     }
 }
 
+/// 치워 둔 임시 이름의 최대 바이트 수. 흔한 파일시스템의 파일 이름 한도(255)다.
+const ASIDE_NAME_MAX: usize = 255;
+
 /// rename이 다른 볼륨 사이라 실패한 오류인가(유닉스 EXDEV, Windows ERROR_NOT_SAME_DEVICE).
 fn crosses_devices(e: &std::io::Error) -> bool {
     if e.kind() == std::io::ErrorKind::CrossesDevices {
@@ -229,11 +232,20 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
 
     /// `path`가 `root` 자신이거나 그 안에 있는가. 문자열 접두어가 아니라 실제 위치로 판단한다.
     fn is_within(&self, path: &VfsPath, root: &VfsPath) -> bool {
-        Self::canonical(path).starts_with(Self::canonical(root))
-            || path
-                .as_path()
-                .ancestors()
-                .any(|a| self.same_entry(&VfsPath::new(a.to_path_buf()), root))
+        if Self::canonical(path).starts_with(Self::canonical(root)) {
+            return true;
+        }
+        // 대소문자·정규화만 다른 철자는 정규화한 경로로는 안 잡히므로 file_id로 조상을 훑는다(root는 한 번만 읽는다).
+        let Some(root_id) = self.vfs.stat(root).ok().and_then(|e| e.file_id) else {
+            return false;
+        };
+        path.as_path().ancestors().any(|a| {
+            self.vfs
+                .stat(&VfsPath::new(a.to_path_buf()))
+                .ok()
+                .and_then(|e| e.file_id)
+                .is_some_and(|id| id.dev == root_id.dev && id.ino == root_id.ino)
+        })
     }
 
     /// 새 폴더. 중첩 경로도 만든다 (OP-01).
@@ -257,8 +269,21 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
         let dir = dest
             .parent()
             .ok_or_else(|| OpsError::InvalidName(dest.to_string()))?;
+        // 점으로 시작해 평소 목록에는 안 보이게 하되, 원래 이름을 담아 둔다. 작업이 비정상 종료돼 남아도 무엇의 옛 내용인지 알 수 있다.
+        let name = dest
+            .file_name()
+            .ok_or_else(|| OpsError::InvalidName(dest.to_string()))?;
         let aside = (0u32..)
-            .map(|n| dir.join(&format!(".td-replaced-{}-{n}", std::process::id())))
+            .map(|n| {
+                let suffix = format!(".td-replaced-{}-{n}", std::process::id());
+                // 이름 한도(255바이트)를 넘지 않게 원래 이름은 글자 경계에서 자른다.
+                let room = ASIDE_NAME_MAX - 1 - suffix.len();
+                let mut end = name.len().min(room);
+                while !name.is_char_boundary(end) {
+                    end -= 1;
+                }
+                dir.join(&format!(".{}{suffix}", &name[..end]))
+            })
             .find(|c| !self.exists(c))
             .expect("무한 반복자");
         self.vfs.rename(dest, &aside)?;
@@ -576,7 +601,12 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
         };
         let paths: Vec<std::path::PathBuf> =
             sources.iter().map(|s| s.as_path().to_path_buf()).collect();
-        match td_archive::compress(&paths, dest.as_path(), &mut |p| {
+        // 압축 결과를 원본 폴더 안에 두면 치워 둔 옛 압축 파일도 그 폴더에 있다. 새 압축 파일에 섞이지 않게 건너뛴다.
+        let aside: Vec<std::path::PathBuf> = displaced
+            .iter()
+            .map(|d| d.aside.as_path().to_path_buf())
+            .collect();
+        match td_archive::compress_skipping(&paths, dest.as_path(), &aside, &mut |p| {
             ctl.on_item(&VfsPath::new(p));
             !ctl.should_stop()
         }) {
@@ -724,9 +754,9 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
                     }
                     Err(e) => return Err(self.rollback(&dest, displaced, e)),
                 }
-                // 복사가 끝났으니 옛 대상은 더 필요 없다. 원본 삭제가 실패해도 새 결과는 이미 자리를 잡았다.
-                self.discard(displaced);
+                // 원본을 지운 뒤에야 옛 대상을 버린다. 원본 삭제가 실패하면(새 결과는 이미 자리를 잡았다) 옛 내용을 치워 둔 채로 남겨 잃지 않게 한다.
                 self.remove_any(src)?;
+                self.discard(displaced);
             }
             Err(e) => return Err(self.rollback(&dest, displaced, e.into())),
         }

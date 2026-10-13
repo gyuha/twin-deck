@@ -357,3 +357,64 @@ fn rename_policy_with_collected_item_errors_still_returns_ok() {
     assert!(r.is_ok(), "{r:?}");
     assert_eq!(read(&f.b.join("d/ok.txt")), "ok");
 }
+
+/// 압축 결과를 원본 폴더 안에 두고 Overwrite하면, 치워 둔 옛 zip이 같은 폴더에 있어서 새 zip에 들어갔다.
+#[test]
+fn compress_overwrite_into_own_folder_does_not_pack_displaced_zip() {
+    let f = fixture();
+    f.ops.mkdir(&f.a.join("X")).unwrap();
+    write(&f.a.join("X/other.txt"), "data");
+    write(&f.a.join("X/X.zip"), "OLD ZIP BYTES");
+    let out = f
+        .ops
+        .compress_with(
+            &[f.a.join("X")],
+            &f.a.join("X"),
+            None,
+            ConflictPolicy::Overwrite,
+            &NoControl,
+        )
+        .unwrap();
+    assert_eq!(out, td_ops::Outcome::Done(f.a.join("X/X.zip")));
+    let archive = td_archive::Archive::open(f.a.join("X/X.zip").as_path(), &[]).unwrap();
+    let names: Vec<String> = archive.entries().iter().map(|e| e.name.clone()).collect();
+    assert!(
+        names
+            .iter()
+            .all(|n| !n.contains("td-replaced") && !n.ends_with("X.zip")),
+        "{names:?}"
+    );
+    assert!(names.iter().any(|n| n.ends_with("other.txt")), "{names:?}");
+    // 치워 뒀던 임시 이름이 남지 않는다.
+    let mut left: Vec<String> = std::fs::read_dir(f.a.join("X").as_path())
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    left.sort();
+    assert_eq!(left, ["X.zip", "other.txt"]);
+}
+
+/// 치워 둔 임시 이름이 원래 이름에 접미사를 붙이므로, 이름이 한도(255바이트)에 가까우면 그대로는 `ENAMETOOLONG`이 난다.
+#[test]
+fn overwrite_works_for_names_near_the_length_limit() {
+    let f = fixture();
+    for name in [
+        format!("{}.txt", "a".repeat(240)),
+        format!("{}.txt", "한".repeat(80)), // 3바이트 글자 80개 = 240바이트
+    ] {
+        write(&f.a.join(&name), "NEW");
+        write(&f.b.join(&name), "OLD");
+        f.ops
+            .copy(&f.a.join(&name), &f.b, ConflictPolicy::Overwrite)
+            .unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert_eq!(read(&f.b.join(&name)), "NEW");
+        // 치워 뒀던 임시 이름이 남지 않는다.
+        assert!(std::fs::read_dir(f.b.as_path()).unwrap().all(|e| !e
+            .unwrap()
+            .file_name()
+            .to_string_lossy()
+            .contains("td-replaced")));
+        std::fs::remove_file(f.b.join(&name).as_path()).unwrap();
+        std::fs::remove_file(f.a.join(&name).as_path()).unwrap();
+    }
+}

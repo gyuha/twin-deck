@@ -12,7 +12,7 @@ mod writer;
 
 pub use archive::{Archive, EntryInfo, ExtractReport};
 pub use composite::CompositeFs;
-pub use compress::{compress, CompressReport};
+pub use compress::{compress, compress_skipping, CompressReport};
 pub use edit_session::{start_edit, EditSession};
 pub use error::{ArchiveError, Result};
 pub use kind::{kind_for_name, sniff_kind, Kind, ZIP_EXTS};

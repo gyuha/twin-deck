@@ -75,6 +75,17 @@ pub fn compress(
     dest: &Path,
     progress: &mut dyn FnMut(&Path) -> bool,
 ) -> Result<CompressReport> {
+    compress_skipping(sources, dest, &[], progress)
+}
+
+/// `compress`와 같지만 `extra_skip`에 든 경로는 원본 폴더 안에 있어도 넣지 않는다.
+/// 호출한 쪽이 결과 파일 옆에 치워 둔 임시 항목(덮어쓰기로 밀려난 옛 압축 파일 등)이 새 압축 파일에 섞이지 않게 한다.
+pub fn compress_skipping(
+    sources: &[PathBuf],
+    dest: &Path,
+    extra_skip: &[PathBuf],
+    progress: &mut dyn FnMut(&Path) -> bool,
+) -> Result<CompressReport> {
     if dest.exists() {
         return Err(ArchiveError::Exists(dest.display().to_string()));
     }
@@ -104,7 +115,10 @@ pub fn compress(
             zip: zip::ZipWriter::new(tmp.as_file()),
             report: CompressReport::default(),
             progress,
-            skip: vec![tmp.path().to_path_buf(), dest.to_path_buf()],
+            skip: [tmp.path().to_path_buf(), dest.to_path_buf()]
+                .into_iter()
+                .chain(extra_skip.iter().cloned())
+                .collect(),
         };
         for (src, name) in sources.iter().zip(&names) {
             w.add(src, name)?;

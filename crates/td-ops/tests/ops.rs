@@ -234,7 +234,11 @@ impl Vfs for NoRenameFs {
     fn create_file(&self, path: &VfsPath) -> td_vfs::Result<()> {
         LocalFs.create_file(path)
     }
-    fn rename(&self, from: &VfsPath, _to: &VfsPath) -> td_vfs::Result<()> {
+    fn rename(&self, from: &VfsPath, to: &VfsPath) -> td_vfs::Result<()> {
+        // 실제 교차 볼륨에서도 같은 폴더 안의 이름 바꾸기(덮어쓰기로 기존 대상을 치워 두는 것)는 된다.
+        if from.parent() == to.parent() {
+            return LocalFs.rename(from, to);
+        }
         Err(VfsError::Io {
             path: from.clone(),
             // 실제 EXDEV가 std에서 매겨지는 종류. 이동은 이 오류일 때만 복사 후 삭제로 넘어간다.
@@ -415,4 +419,71 @@ fn copy_reports_bytes_for_small_file_too() {
         .copy_with(&f.a.join("s.txt"), &f.b, ConflictPolicy::Rename, &log)
         .unwrap();
     assert_eq!(log.0.into_inner().unwrap().last(), Some(&(5, 5)));
+}
+
+/// 교차 볼륨 이동(복사 후 삭제)에서 복사는 되지만 원본 폴더에 쓸 수 없어 원본 삭제가 실패하는 Overwrite 이동을 돌린다.
+/// 쓸 수 없는 폴더를 못 만드는 환경(root 등)이면 None.
+#[cfg(unix)]
+fn move_overwrite_where_source_removal_fails(
+) -> Option<(tempfile::TempDir, VfsPath, td_ops::Result<td_ops::Outcome>)> {
+    use std::os::unix::fs::PermissionsExt;
+    let tmp = tempfile::tempdir().unwrap();
+    let (p, q) = (tmp.path().join("p"), tmp.path().join("q"));
+    std::fs::create_dir_all(&p).unwrap();
+    std::fs::create_dir_all(&q).unwrap();
+    std::fs::write(p.join("x.txt"), "NEW").unwrap();
+    std::fs::write(q.join("x.txt"), "OLD").unwrap();
+    std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o555)).unwrap();
+    if std::fs::File::create(p.join("probe")).is_ok() {
+        std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o755)).unwrap();
+        eprintln!("건너뜀: 이 환경에서는 읽기 전용 폴더에 쓸 수 있다(root?)");
+        return None;
+    }
+    let ops = Ops::new(
+        NoRenameFs,
+        FakeTrash {
+            bin: q.clone(),
+            trashed: Default::default(),
+        },
+    );
+    let res = ops.move_to(
+        &VfsPath::new(p.join("x.txt")),
+        &VfsPath::new(q.clone()),
+        ConflictPolicy::Overwrite,
+    );
+    std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o755)).unwrap();
+    Some((tmp, VfsPath::new(q), res))
+}
+
+#[cfg(unix)]
+#[test]
+fn move_overwrite_across_devices_keeps_old_target_when_source_removal_fails() {
+    let Some((_tmp, q, res)) = move_overwrite_where_source_removal_fails() else {
+        return;
+    };
+    assert!(res.is_err(), "{res:?}");
+    assert_eq!(read(&q.join("x.txt")), "NEW", "복사는 끝났다");
+    // 원본이 그대로 남았으니 옛 대상은 지우지 않고 치워 둔 항목에 남겨 둔다.
+    let kept: Vec<_> = std::fs::read_dir(q.as_path())
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| p.file_name().unwrap() != "x.txt")
+        .collect();
+    assert_eq!(kept.len(), 1, "{kept:?}");
+    assert_eq!(std::fs::read_to_string(&kept[0]).unwrap(), "OLD");
+}
+
+/// 치워 둔 임시 이름은 점으로 시작해 평소 목록에는 안 보이지만, 원래 이름을 담아 남았을 때 무엇의 옛 내용인지 알 수 있다.
+#[cfg(unix)]
+#[test]
+fn displaced_name_is_hidden_but_keeps_original_name() {
+    let Some((_tmp, q, _res)) = move_overwrite_where_source_removal_fails() else {
+        return;
+    };
+    let name = std::fs::read_dir(q.as_path())
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .find(|n| n != "x.txt")
+        .expect("치워 둔 항목");
+    assert!(name.starts_with(".x.txt.td-replaced-"), "{name}");
 }
