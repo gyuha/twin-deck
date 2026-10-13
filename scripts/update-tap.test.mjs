@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -55,8 +55,55 @@ const caskOf = (bare, root) => {
   return readFileSync(join(c, "Casks", "twin-deck.rb"), "utf8");
 };
 const env = { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" };
+const envKeys = [...Object.keys(env), "GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM"];
+let savedEnv;
+beforeEach(() => {
+  savedEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
+});
+afterEach(() => {
+  for (const [key, value] of Object.entries(savedEnv)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+});
+
+// 개발자의 전역 git 설정과 작성자 환경 변수에 기대지 않고 GitHub 러너 환경을 재현한다.
+function isolateGitIdentity(root, config = "") {
+  for (const key of Object.keys(env)) delete process.env[key];
+  process.env.GIT_CONFIG_NOSYSTEM = "1";
+  process.env.GIT_CONFIG_GLOBAL = join(root, "gitconfig");
+  writeFileSync(process.env.GIT_CONFIG_GLOBAL, config);
+}
+const authorOf = (bare) => execFileSync("git", ["--git-dir", bare, "log", "-1", "--format=%an <%ae>|%cn <%ce>"], { encoding: "utf8" }).trim();
 
 describe("updateTap (로컬 bare tap)", () => {
+  test("작성자 없는 러너에서도 봇 작성자로 커밋·push하고 전역 설정은 건드리지 않는다", () => {
+    const { root, bare } = makeTap();
+    isolateGitIdentity(root);
+    const zip = makeZip(root, "0.5.1");
+    expect(updateTap({ tapUrl: bare, zipPath: zip, version: "0.5.1", dry: false, workDir: mkdtempSync(join(tmpdir(), "w-")) })).toBe("pushed");
+    const bot = "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>";
+    expect(authorOf(bare)).toBe(`${bot}|${bot}`);
+    expect(readFileSync(process.env.GIT_CONFIG_GLOBAL, "utf8")).toBe("");
+  });
+  test("기존 git 작성자 설정을 보존한다", () => {
+    const { root, bare } = makeTap();
+    const config = "[user]\n\tname = 기존 작성자\n\temail = existing@example.com\n";
+    isolateGitIdentity(root, config);
+    const zip = makeZip(root, "0.5.1");
+    expect(updateTap({ tapUrl: bare, zipPath: zip, version: "0.5.1", dry: false, workDir: mkdtempSync(join(tmpdir(), "w-")) })).toBe("pushed");
+    expect(authorOf(bare)).toBe("기존 작성자 <existing@example.com>|기존 작성자 <existing@example.com>");
+    expect(readFileSync(process.env.GIT_CONFIG_GLOBAL, "utf8")).toBe(config);
+  });
+  test("비어 있는 이름만 보완하고 기존 이메일은 유지한다", () => {
+    const { root, bare } = makeTap();
+    const config = "[user]\n\tname =\n\temail = existing@example.com\n";
+    isolateGitIdentity(root, config);
+    const zip = makeZip(root, "0.5.1");
+    expect(updateTap({ tapUrl: bare, zipPath: zip, version: "0.5.1", dry: false, workDir: mkdtempSync(join(tmpdir(), "w-")) })).toBe("pushed");
+    expect(authorOf(bare)).toBe("github-actions[bot] <existing@example.com>|github-actions[bot] <existing@example.com>");
+    expect(readFileSync(process.env.GIT_CONFIG_GLOBAL, "utf8")).toBe(config);
+  });
   test("Cask의 버전과 sha256을 바꿔 커밋·push한다", () => {
     Object.assign(process.env, env);
     const { root, bare } = makeTap();

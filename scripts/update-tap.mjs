@@ -29,6 +29,22 @@ export const sha256Of = (path) => createHash("sha256").update(readFileSync(path)
 
 const git = (cwd, ...args) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 
+// 작성자가 없는 러너에서도 커밋할 수 있게 한다. 기존 설정은 유지하고 새로 받은 tap의 로컬 설정만 채운다.
+function ensureGitIdentity(tap) {
+  for (const [key, fallback] of [
+    ["user.name", "github-actions[bot]"],
+    ["user.email", "41898282+github-actions[bot]@users.noreply.github.com"],
+  ]) {
+    let value;
+    try {
+      value = git(tap, "config", "--get", key);
+    } catch (e) {
+      if (e.status !== 1) throw e;
+    }
+    if (!value) git(tap, "config", "--local", key, fallback);
+  }
+}
+
 /**
  * tap 저장소를 새로 받아 Cask를 갱신하고, 바뀌었으면 커밋해서 push한다(dry면 push는 하지 않는다).
  * 돌려주는 값: "unchanged"(이미 최신) | "dry"(커밋까지 하고 push는 안 함) | "pushed".
@@ -40,6 +56,7 @@ export function updateTap({ tapUrl, zipPath, version, dry, workDir }) {
   execFileSync("node", [join(here, "update-homebrew-cask.mjs"), "--version", version, "--zip", zipPath, "--out", out], { stdio: ["ignore", "inherit", "inherit"] });
   git(tap, "add", "Casks/twin-deck.rb");
   if (git(tap, "status", "--porcelain") === "") return "unchanged";
+  ensureGitIdentity(tap);
   git(tap, "commit", "--quiet", "-m", `Twin Deck ${version} Homebrew Cask 갱신`);
   if (dry) {
     console.log(`[DRY_RUN] git push (${tapUrl})\n${git(tap, "show", "--stat", "--format=%s", "HEAD")}`);
