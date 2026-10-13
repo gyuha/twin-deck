@@ -242,6 +242,8 @@ export const en: Record<Key, string> = {
   "store.transfer.ask_many": "{verb} the {count} selected items?",
   "store.transfer.dest_label": "Destination folder",
   "store.transfer.start": "Start",
+  "store.transfer.failed": "{verb} failed: {message}",
+  "store.transfer.failed_more": "{verb} failed: {message} ({more} more)",
   "store.drop.virtual": "Files cannot be dropped on a virtual tab such as search results",
   "store.drop.already_here": "These items are already in this folder",
   "store.drag.archive": "Items inside an archive cannot be dragged to another app",

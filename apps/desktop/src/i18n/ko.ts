@@ -240,6 +240,8 @@ export const ko = {
   "store.transfer.ask_many": "선택한 {count}개 항목을 {verb}하시겠습니까?",
   "store.transfer.dest_label": "대상 폴더",
   "store.transfer.start": "시작",
+  "store.transfer.failed": "{verb} 실패: {message}",
+  "store.transfer.failed_more": "{verb} 실패: {message} (외 {more}건)",
   "store.drop.virtual": "검색 결과 같은 가상 탭에는 파일을 놓을 수 없습니다",
   "store.drop.already_here": "이미 이 폴더에 있는 항목입니다",
   "store.drag.archive": "아카이브 안의 항목은 다른 앱으로 끌어 갈 수 없습니다",

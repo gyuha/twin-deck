@@ -1020,7 +1020,12 @@ export class FakeBackend implements Backend {
     return true;
   }
 
+  /** 테스트용: 다음에 넣는 작업(즉시 실행 모드)의 항목이 모두 이 문구의 오류로 실패한다. 한 작업에만 쓰이고 비워진다. */
+  nextJobError: string | null = null;
+
   async enqueue(kind: JobKindDto, items: QueueItemDto[]) {
+    const forcedError = this.nextJobError;
+    this.nextJobError = null;
     const id = this.nextJobId++;
     const job: FakeJob = {
       items,
@@ -1033,6 +1038,7 @@ export class FakeBackend implements Backend {
       for (const item of items) {
         job.dto.current = item.src;
         try {
+          if (forcedError) throw new Error(forcedError);
           await this.runItem(kind, item);
         } catch (e) {
           job.dto.errors.push({ path: item.src, message: e instanceof Error ? e.message : String(e) });

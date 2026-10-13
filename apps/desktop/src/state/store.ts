@@ -1111,6 +1111,21 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       applyQueue(jobs);
       const job = jobs.find((j) => j.id === jobId);
       if (!job || !isActiveJob(job)) {
+        // 진행 창이 뜨기 전에(또는 사용자가 닫은 뒤에) 실패로 끝나면 오류가 큐 패널에만 쌓여 알 길이 없으니 알림으로 올린다.
+        // 진행 창이 이 작업을 보이고 있으면 창이 오류 목록을 남겨 두므로 따로 알리지 않는다.
+        const d = get().dialog;
+        const shownHere = d?.kind === "progress" && d.jobId === jobId;
+        if (job?.status === "failed" && !shownHere) {
+          const first = job.errors[0];
+          const message = first ? `${first.path}: ${rustText(first.message)}` : "";
+          const more = job.errors.length - 1;
+          set({
+            notice:
+              more > 0
+                ? tr("store.transfer.failed_more", { verb, message, more })
+                : tr("store.transfer.failed", { verb, message }),
+          });
+        }
         await reloadAll();
         return;
       }
