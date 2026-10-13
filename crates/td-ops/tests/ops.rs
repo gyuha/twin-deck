@@ -237,7 +237,8 @@ impl Vfs for NoRenameFs {
     fn rename(&self, from: &VfsPath, _to: &VfsPath) -> td_vfs::Result<()> {
         Err(VfsError::Io {
             path: from.clone(),
-            source: std::io::Error::other("cross-device"),
+            // 실제 EXDEV가 std에서 매겨지는 종류. 이동은 이 오류일 때만 복사 후 삭제로 넘어간다.
+            source: std::io::ErrorKind::CrossesDevices.into(),
         })
     }
     fn remove_file(&self, path: &VfsPath) -> td_vfs::Result<()> {

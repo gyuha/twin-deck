@@ -85,6 +85,26 @@ pub struct Ops<V: Vfs, T: Trasher> {
     trasher: T,
 }
 
+/// 덮어쓰기로 옆에 치워 둔 기존 대상이 놓인 임시 경로.
+struct Displaced {
+    aside: VfsPath,
+}
+
+/// 충돌 정책을 적용해 정한 쓸 경로. Overwrite였다면 치워 둔 기존 대상이 같이 든다.
+struct Target {
+    path: VfsPath,
+    displaced: Option<Displaced>,
+}
+
+impl Target {
+    fn new(path: VfsPath) -> Self {
+        Self {
+            path,
+            displaced: None,
+        }
+    }
+}
+
 fn valid_name(name: &str) -> Result<()> {
     let bad = name.is_empty()
         || name == "."
@@ -97,6 +117,19 @@ fn valid_name(name: &str) -> Result<()> {
     } else {
         Ok(())
     }
+}
+
+/// rename이 다른 볼륨 사이라 실패한 오류인가(유닉스 EXDEV, Windows ERROR_NOT_SAME_DEVICE).
+fn crosses_devices(e: &std::io::Error) -> bool {
+    if e.kind() == std::io::ErrorKind::CrossesDevices {
+        return true;
+    }
+    #[cfg(unix)]
+    return e.raw_os_error() == Some(18);
+    #[cfg(windows)]
+    return e.raw_os_error() == Some(17);
+    #[cfg(not(any(unix, windows)))]
+    false
 }
 
 /// `name (1).ext` 형태로 겹치지 않는 이름을 만든다.
@@ -174,6 +207,35 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
         Ok(())
     }
 
+    /// 로컬 경로면 심볼릭 링크를 풀어 정규화한 경로, 아니면(아카이브 안 등) 그대로.
+    fn canonical(path: &VfsPath) -> std::path::PathBuf {
+        std::fs::canonicalize(path.as_path()).unwrap_or_else(|_| path.as_path().to_path_buf())
+    }
+
+    /// 두 경로가 같은 항목인가. 철자가 달라도(대소문자, NFC/NFD, 심볼릭 링크 경유, 하드 링크) 같은 파일이면 true다.
+    fn same_entry(&self, a: &VfsPath, b: &VfsPath) -> bool {
+        if a == b {
+            return true;
+        }
+        if let (Ok(ea), Ok(eb)) = (self.vfs.stat(a), self.vfs.stat(b)) {
+            if let (Some(x), Some(y)) = (ea.file_id, eb.file_id) {
+                if x.dev == y.dev && x.ino == y.ino {
+                    return true;
+                }
+            }
+        }
+        Self::canonical(a) == Self::canonical(b)
+    }
+
+    /// `path`가 `root` 자신이거나 그 안에 있는가. 문자열 접두어가 아니라 실제 위치로 판단한다.
+    fn is_within(&self, path: &VfsPath, root: &VfsPath) -> bool {
+        Self::canonical(path).starts_with(Self::canonical(root))
+            || path
+                .as_path()
+                .ancestors()
+                .any(|a| self.same_entry(&VfsPath::new(a.to_path_buf()), root))
+    }
+
     /// 새 폴더. 중첩 경로도 만든다 (OP-01).
     pub fn mkdir(&self, path: &VfsPath) -> Result<()> {
         Ok(self.vfs.mkdir(path)?)
@@ -190,35 +252,75 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
         self.exists(&dest).then_some(dest)
     }
 
+    /// 덮어쓰기로 옆에 치워 둔 기존 대상. 작업이 성공하면 `discard`, 실패하거나 중단되면 `rollback`한다.
+    fn displace(&self, dest: &VfsPath) -> Result<Displaced> {
+        let dir = dest
+            .parent()
+            .ok_or_else(|| OpsError::InvalidName(dest.to_string()))?;
+        let aside = (0u32..)
+            .map(|n| dir.join(&format!(".td-replaced-{}-{n}", std::process::id())))
+            .find(|c| !self.exists(c))
+            .expect("무한 반복자");
+        self.vfs.rename(dest, &aside)?;
+        Ok(Displaced { aside })
+    }
+
+    /// 새 결과가 자리를 잡았으니 치워 둔 옛 대상을 지운다. 지우지 못해도 작업 자체는 성공이라 오류로 치지 않는다.
+    fn discard(&self, displaced: Option<Displaced>) {
+        if let Some(d) = displaced {
+            let _ = self.remove_any(&d.aside);
+        }
+    }
+
+    /// 실패·중단한 작업이 만든 부분 결과를 치우고 치워 둔 옛 대상을 제자리로 돌린다. `cause`를 그대로 돌려준다.
+    fn rollback(&self, dest: &VfsPath, displaced: Option<Displaced>, cause: OpsError) -> OpsError {
+        let Some(d) = displaced else {
+            return cause;
+        };
+        if self.exists(dest) {
+            let _ = self.remove_any(dest);
+        }
+        match self.vfs.rename(&d.aside, dest) {
+            Ok(()) => cause,
+            Err(e) => OpsError::RestoreFailed {
+                cause: cause.to_string(),
+                aside: d.aside,
+                restore: e.to_string(),
+            },
+        }
+    }
+
     /// 충돌 정책을 적용해 실제로 쓸 경로를 정한다. `None`이면 건너뛴다.
+    /// Overwrite면 기존 대상을 지우지 않고 옆으로 치워 두고, 호출한 쪽이 `discard`/`rollback`으로 마무리한다.
     fn resolve_dest(
         &self,
         src: &VfsPath,
         dest_dir: &VfsPath,
         policy: ConflictPolicy,
-    ) -> Result<Option<VfsPath>> {
+    ) -> Result<Option<Target>> {
         let name = src
             .file_name()
             .ok_or_else(|| OpsError::InvalidName(src.to_string()))?;
         let dest = dest_dir.join(&name);
         if !self.exists(&dest) {
-            return Ok(Some(dest));
+            return Ok(Some(Target::new(dest)));
         }
         match policy {
             ConflictPolicy::Skip => Ok(None),
             ConflictPolicy::Overwrite => {
-                if &dest == src {
-                    return Err(OpsError::SameFile(dest));
-                }
-                self.remove_any(&dest)?;
-                Ok(Some(dest))
+                self.check_overwritable(&dest, std::slice::from_ref(src))?;
+                let displaced = self.displace(&dest)?;
+                Ok(Some(Target {
+                    path: dest,
+                    displaced: Some(displaced),
+                }))
             }
             ConflictPolicy::Rename => {
                 let mut n = 1;
                 loop {
                     let candidate = dest_dir.join(&numbered(&name, n));
                     if !self.exists(&candidate) {
-                        return Ok(Some(candidate));
+                        return Ok(Some(Target::new(candidate)));
                     }
                     n += 1;
                 }
@@ -227,28 +329,34 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
     }
 
     /// 이미 이름이 정해진 결과물(`압축 파일`, `추출 폴더`)의 충돌 처리. `None`이면 건너뛴다.
+    /// `sources`는 이 결과물을 만드는 데 읽을 원본이라, Overwrite가 그 원본 자신이나 조상을 지우지 못하게 막는 데 쓴다.
     fn resolve_name(
         &self,
         dest_dir: &VfsPath,
         name: &str,
         policy: ConflictPolicy,
-    ) -> Result<Option<VfsPath>> {
+        sources: &[VfsPath],
+    ) -> Result<Option<Target>> {
         let dest = dest_dir.join(name);
         if !self.exists(&dest) {
-            return Ok(Some(dest));
+            return Ok(Some(Target::new(dest)));
         }
         match policy {
             ConflictPolicy::Skip => Ok(None),
             ConflictPolicy::Overwrite => {
-                self.remove_any(&dest)?;
-                Ok(Some(dest))
+                self.check_overwritable(&dest, sources)?;
+                let displaced = self.displace(&dest)?;
+                Ok(Some(Target {
+                    path: dest,
+                    displaced: Some(displaced),
+                }))
             }
             ConflictPolicy::Rename => {
                 let mut n = 1;
                 loop {
                     let candidate = dest_dir.join(&numbered(name, n));
                     if !self.exists(&candidate) {
-                        return Ok(Some(candidate));
+                        return Ok(Some(Target::new(candidate)));
                     }
                     n += 1;
                 }
@@ -256,10 +364,21 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
         }
     }
 
+    /// `dest`를 덮어써도 `sources` 중 하나를 잃지 않는지 본다. 같은 파일이거나(철자가 달라도), `dest`가 원본의 조상이면 거부한다.
+    fn check_overwritable(&self, dest: &VfsPath, sources: &[VfsPath]) -> Result<()> {
+        for src in sources {
+            if self.same_entry(dest, src) {
+                return Err(OpsError::SameFile(dest.clone()));
+            }
+            if self.is_within(src, dest) {
+                return Err(OpsError::SourceInsideDest(dest.clone()));
+            }
+        }
+        Ok(())
+    }
+
     fn check_not_inside(&self, src: &VfsPath, dest_dir: &VfsPath) -> Result<()> {
-        if self.vfs.stat(src)?.kind == EntryKind::Dir
-            && dest_dir.as_path().starts_with(src.as_path())
-        {
+        if self.vfs.stat(src)?.kind == EntryKind::Dir && self.is_within(dest_dir, src) {
             return Err(OpsError::DestInsideSource(dest_dir.clone()));
         }
         Ok(())
@@ -377,12 +496,25 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
         ctl: &dyn Control,
     ) -> Result<Outcome> {
         self.check_not_inside(src, dest_dir)?;
-        let Some(dest) = self.resolve_dest(src, dest_dir, policy)? else {
+        let entry = self.vfs.stat(src)?;
+        let Some(Target {
+            path: dest,
+            displaced,
+        }) = self.resolve_dest(src, dest_dir, policy)?
+        else {
             return Ok(Outcome::Skipped);
         };
-        let entry = self.vfs.stat(src)?;
-        self.copy_entry(&entry, &dest, ctl)?;
-        Ok(Outcome::Done(dest))
+        match self.copy_entry(&entry, &dest, ctl) {
+            // 오류를 모으는 작업 큐에서는 일부 항목이 실패해도 Ok가 온다. 기존 대상을 이미 치웠다면 되돌린다.
+            Ok(failed) if failed > 0 && displaced.is_some() => {
+                Err(self.rollback(&dest, displaced, OpsError::OverwriteRolledBack(failed)))
+            }
+            Ok(_) => {
+                self.discard(displaced);
+                Ok(Outcome::Done(dest))
+            }
+            Err(e) => Err(self.rollback(&dest, displaced, e)),
+        }
     }
 
     /// 심볼릭 링크 만들기 (OP-12): `dest_dir`에 `src`를 가리키는 링크를 만든다. 이름이 겹치면 `policy`를 따른다.
@@ -394,11 +526,20 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
         policy: ConflictPolicy,
     ) -> Result<Outcome> {
         let is_dir = self.vfs.stat(src)?.kind == EntryKind::Dir;
-        let Some(dest) = self.resolve_dest(src, dest_dir, policy)? else {
+        let Some(Target {
+            path: dest,
+            displaced,
+        }) = self.resolve_dest(src, dest_dir, policy)?
+        else {
             return Ok(Outcome::Skipped);
         };
-        self.vfs.symlink(src, &dest, is_dir)?;
-        Ok(Outcome::Done(dest))
+        match self.vfs.symlink(src, &dest, is_dir) {
+            Ok(()) => {
+                self.discard(displaced);
+                Ok(Outcome::Done(dest))
+            }
+            Err(e) => Err(self.rollback(&dest, displaced, e.into())),
+        }
     }
 
     /// 압축 (OP-11): `sources`(로컬 파일/폴더)를 `dest_dir`의 ZIP 하나로 묶는다. 원본은 그대로 둔다.
@@ -422,19 +563,29 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
             }
             None => default_zip_name(sources, dest_dir, first),
         };
-        let Some(dest) = self.resolve_name(dest_dir, &file_name, policy)? else {
+        // 원본이 없으면 기존 결과물을 건드리기 전에 실패한다.
+        for src in sources {
+            self.vfs.stat(src)?;
+        }
+        let Some(Target {
+            path: dest,
+            displaced,
+        }) = self.resolve_name(dest_dir, &file_name, policy, sources)?
+        else {
             return Ok(Outcome::Skipped);
         };
         let paths: Vec<std::path::PathBuf> =
             sources.iter().map(|s| s.as_path().to_path_buf()).collect();
-        for src in sources {
-            self.vfs.stat(src)?;
-        }
-        td_archive::compress(&paths, dest.as_path(), &mut |p| {
+        match td_archive::compress(&paths, dest.as_path(), &mut |p| {
             ctl.on_item(&VfsPath::new(p));
             !ctl.should_stop()
-        })?;
-        Ok(Outcome::Done(dest))
+        }) {
+            Ok(_) => {
+                self.discard(displaced);
+                Ok(Outcome::Done(dest))
+            }
+            Err(e) => Err(self.rollback(&dest, displaced, e.into())),
+        }
     }
 
     /// 추출 (OP-11): 로컬 아카이브 `src`를 `dest_dir` 아래의 새 폴더에 안전하게 푼다(경로 탈출, 절대 경로, 링크 거부).
@@ -459,7 +610,11 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
             None => archive_stem(&src_name),
         };
         let archive = open_archive_for_extract(src)?;
-        let Some(dest) = self.resolve_name(dest_dir, &folder_name, policy)? else {
+        let Some(Target {
+            path: dest,
+            displaced,
+        }) = self.resolve_name(dest_dir, &folder_name, policy, std::slice::from_ref(src))?
+        else {
             return Ok(Outcome::Skipped);
         };
         // 항목을 처리하기 직전에 불리므로, 앞서 처리한 파일은 다음 호출(또는 끝)에서 "끝났다"고 알린다.
@@ -483,11 +638,15 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
                 if pending_file {
                     ctl.on_file_done();
                 }
+                self.discard(displaced);
                 Ok(Outcome::Done(dest))
             }
             Err(e) => {
-                let _ = std::fs::remove_dir_all(dest.as_path());
-                Err(e.into())
+                // 만들다 만 폴더를 치우고(`rollback`이 치운다) 기존 폴더가 있었다면 되돌린다.
+                if displaced.is_none() {
+                    let _ = std::fs::remove_dir_all(dest.as_path());
+                }
+                Err(self.rollback(&dest, displaced, e.into()))
             }
         }
     }
@@ -535,25 +694,41 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
         ctl: &dyn Control,
     ) -> Result<Outcome> {
         self.check_not_inside(src, dest_dir)?;
-        if src.parent().as_ref() == Some(dest_dir) {
+        if src
+            .parent()
+            .is_some_and(|parent| self.same_entry(&parent, dest_dir))
+        {
             // 같은 폴더로의 이동은 아무 일도 하지 않는다.
             return Ok(Outcome::Skipped);
         }
-        let Some(dest) = self.resolve_dest(src, dest_dir, policy)? else {
+        let Some(Target {
+            path: dest,
+            displaced,
+        }) = self.resolve_dest(src, dest_dir, policy)?
+        else {
             return Ok(Outcome::Skipped);
         };
         match self.vfs.rename(src, &dest) {
-            Ok(()) => {}
-            Err(VfsError::Io { .. }) => {
-                let entry = self.vfs.stat(src)?;
+            Ok(()) => self.discard(displaced),
+            // 볼륨이 달라 rename이 안 될 때만 복사 후 삭제로 넘어간다. 권한 오류 같은 다른 실패는 그대로 알린다.
+            Err(VfsError::Io { source, .. }) if crosses_devices(&source) => {
+                let entry = match self.vfs.stat(src) {
+                    Ok(entry) => entry,
+                    Err(e) => return Err(self.rollback(&dest, displaced, e.into())),
+                };
                 // 일부라도 복사하지 못했으면 원본을 지우지 않는다(지우면 복사되지 않은 파일을 잃는다).
-                let failed = self.copy_entry(&entry, &dest, ctl)?;
-                if failed > 0 {
-                    return Err(OpsError::PartialCopy(failed));
+                match self.copy_entry(&entry, &dest, ctl) {
+                    Ok(0) => {}
+                    Ok(failed) => {
+                        return Err(self.rollback(&dest, displaced, OpsError::PartialCopy(failed)))
+                    }
+                    Err(e) => return Err(self.rollback(&dest, displaced, e)),
                 }
+                // 복사가 끝났으니 옛 대상은 더 필요 없다. 원본 삭제가 실패해도 새 결과는 이미 자리를 잡았다.
+                self.discard(displaced);
                 self.remove_any(src)?;
             }
-            Err(e) => return Err(e.into()),
+            Err(e) => return Err(self.rollback(&dest, displaced, e.into())),
         }
         Ok(Outcome::Done(dest))
     }
