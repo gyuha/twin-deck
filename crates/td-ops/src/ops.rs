@@ -193,6 +193,14 @@ fn archive_stem(name: &str) -> String {
     }
 }
 
+/// 지우려던 대상이 이미 없으면(`NotFound`) 목적을 이룬 것으로 보고 성공으로 친다.
+fn ignore_vanished(r: std::result::Result<(), VfsError>) -> std::result::Result<(), VfsError> {
+    match r {
+        Err(VfsError::NotFound(_)) => Ok(()),
+        other => other,
+    }
+}
+
 impl<V: Vfs, T: Trasher> Ops<V, T> {
     pub fn new(vfs: V, trasher: T) -> Self {
         Self { vfs, trasher }
@@ -880,9 +888,10 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
             for child in self.vfs.list(&entry.path, &opts)? {
                 self.delete_entry(&child, ctl)?;
             }
-            self.vfs.remove_dir_all(&entry.path)?;
+            // 목록을 읽은 뒤 사라진 항목은 이미 지워진 것이다. macOS는 exFAT·FAT32·SMB에서 원본을 지우면 `._이름` 보조 파일도 함께 지운다.
+            ignore_vanished(self.vfs.remove_dir_all(&entry.path))?;
         } else {
-            self.vfs.remove_file(&entry.path)?;
+            ignore_vanished(self.vfs.remove_file(&entry.path))?;
             ctl.on_file_done();
         }
         Ok(())

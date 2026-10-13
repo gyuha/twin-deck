@@ -143,6 +143,37 @@ fn permanent_delete() {
     assert!(f.bin.read_dir().unwrap().next().is_none());
 }
 
+/// 파일을 지우려는 순간 그 옆의 `._이름` 보조 파일을 먼저 지운다. macOS가 exFAT·FAT32·SMB에서 원본을 지울 때 보조 파일도 함께 지우는 동작을 흉내 낸다.
+struct DropCompanion;
+
+impl td_ops::Control for DropCompanion {
+    fn on_item(&self, p: &td_vfs::VfsPath) {
+        let path = p.as_path();
+        let companion =
+            path.with_file_name(format!("._{}", path.file_name().unwrap().to_string_lossy()));
+        let _ = std::fs::remove_file(companion);
+    }
+    fn should_stop(&self) -> bool {
+        false
+    }
+}
+
+#[test]
+fn delete_with_ignores_companion_removed_during_delete() {
+    let f = fixture();
+    f.ops.mkdir(&f.a.join("d/sub")).unwrap();
+    for n in ["d/a.txt", "d/._a.txt", "d/sub/b.txt", "d/sub/._b.txt"] {
+        write(&f.a.join(n), "x");
+    }
+    f.ops.delete_with(&f.a.join("d"), &DropCompanion).unwrap();
+    assert!(!f.a.join("d").as_path().exists());
+    // 처음부터 없는 대상은 지금처럼 오류다.
+    assert!(f
+        .ops
+        .delete_with(&f.a.join("missing"), &DropCompanion)
+        .is_err());
+}
+
 struct StopAfter(std::cell::Cell<usize>);
 
 impl td_ops::Control for StopAfter {
