@@ -46,7 +46,8 @@ SHA="$(git rev-parse HEAD)"
 if [[ "${DRY_RUN:-}" != "1" ]]; then
   [[ "$(git branch --show-current)" == "main" ]] || { echo "main 브랜치에서만 릴리스합니다" >&2; exit 1; }
   [[ -z "$(git status --porcelain)" ]] || { echo "커밋하지 않은 변경이 있습니다" >&2; exit 1; }
-  [[ "$SHA" == "$(git rev-parse origin/main)" ]] || { echo "origin/main과 다릅니다 (push 또는 pull 먼저)" >&2; exit 1; }
+  # GitHub Actions는 시작한 커밋에 고정돼 있고 task deploy가 시작 전에 확인했다. 빌드가 도는 동안 main이 움직여도 막지 않는다.
+  [[ "${GITHUB_ACTIONS:-}" == "true" || "$SHA" == "$(git rev-parse origin/main)" ]] || { echo "origin/main과 다릅니다 (push 또는 pull 먼저)" >&2; exit 1; }
 fi
 [[ -d "$APP" ]] || { echo "번들이 없습니다: $APP (task bundle 먼저)" >&2; exit 1; }
 

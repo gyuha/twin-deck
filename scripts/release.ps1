@@ -39,7 +39,8 @@ if ((git branch --show-current) -ne "main") { throw "main 브랜치에서만 릴
 if (git status --porcelain) { throw "커밋하지 않은 변경이 있습니다" }
 git fetch -q origin main
 $Sha = (git rev-parse HEAD)
-if ($Sha -ne (git rev-parse origin/main)) { throw "origin/main과 다릅니다 (push 또는 pull 먼저)" }
+# GitHub Actions는 시작한 커밋에 고정돼 있고 task deploy가 시작 전에 확인했다. 빌드가 도는 동안 main이 움직여도 막지 않는다.
+if ($env:GITHUB_ACTIONS -ne "true" -and $Sha -ne (git rev-parse origin/main)) { throw "origin/main과 다릅니다 (push 또는 pull 먼저)" }
 
 $setup = Get-ChildItem "target\release\bundle\nsis\*_${Version}_*-setup.exe" -ErrorAction SilentlyContinue |
   Sort-Object LastWriteTime -Descending | Select-Object -First 1
