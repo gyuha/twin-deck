@@ -756,8 +756,48 @@ pub struct Service<T: Trasher> {
     preview_limits: Mutex<td_vfs::PreviewLimits>,
     /// (시험) 디스크 PDF를 읽지 않고 파일 주소로 열게 한다(`preview.pdf_direct`).
     pdf_direct: std::sync::atomic::AtomicBool,
+    /// 시스템 아이콘 캐시: (소스 키, 한 변 픽셀) → 데이터 주소(얻지 못했으면 None). 경로 키가 쌓이지 않게 `ICON_CACHE_MAX`를 넘으면 비운다.
+    icons: Mutex<HashMap<(String, u32), Option<String>>>,
     /// 내장 터미널의 pty 세션들.
     terminals: Terminals,
+}
+
+/// 시스템 아이콘 캐시의 최대 항목 수.
+const ICON_CACHE_MAX: usize = 512;
+
+/// 시스템 아이콘을 얻을 곳(소유 값). 프런트의 `lib/systemIcons.ts`가 같은 규칙으로 요청 키를 만든다 — 한쪽을 바꾸면 다른 쪽도 맞춘다.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum IconSource {
+    Folder,
+    Extension(String),
+    Path(PathBuf),
+}
+
+impl IconSource {
+    fn key(&self) -> String {
+        match self {
+            IconSource::Folder => "dir".into(),
+            IconSource::Extension(e) => format!("ext:{e}"),
+            IconSource::Path(p) => format!("path:{}", p.display()),
+        }
+    }
+}
+
+/// 항목의 시스템 아이콘 소스. 폴더는 일반 폴더 아이콘이고(디스크 위 `.app` 번들은 자기 아이콘), 파일은 이름의 확장자(소문자)로 종류 아이콘을 얻는다.
+/// 압축 안 항목(`x.zip!/a.txt`)은 실제 파일이 아니므로 늘 확장자다. 점으로 시작하는 이름(`.bashrc`)은 확장자가 없다.
+fn icon_source(path: &str, is_dir: bool, in_archive: bool) -> IconSource {
+    let name = path.rsplit(['/', '\\']).next().unwrap_or(path);
+    if is_dir {
+        let app = name.to_ascii_lowercase().ends_with(".app");
+        if app && !in_archive && Path::new(path).is_dir() {
+            return IconSource::Path(PathBuf::from(path));
+        }
+        return IconSource::Folder;
+    }
+    match name.rfind('.') {
+        Some(i) if i > 0 => IconSource::Extension(td_icons::normalize_ext(&name[i + 1..])),
+        _ => IconSource::Extension(String::new()),
+    }
 }
 
 /// 설정의 MB 한도를 바이트로. 0은 제한 없음이다.
@@ -791,6 +831,7 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
                 quicklook: QuickLook::new("/usr/bin/qlmanage", Duration::from_secs(10)),
                 preview_limits: Mutex::new(td_vfs::PreviewLimits::default()),
                 pdf_direct: std::sync::atomic::AtomicBool::new(false),
+                icons: Mutex::new(HashMap::new()),
                 terminals,
             },
             Channels {
@@ -1314,6 +1355,38 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
             return Err("압축 파일 안의 epub은 미리 볼 수 없습니다".into());
         }
         crate::epub::chapter(Path::new(path), index, self.limits().image_bytes)
+    }
+
+    /// 항목의 시스템 아이콘(`data:image/png;base64,…`). 이 OS에서 얻을 수 없거나 크기가 0이면 `None`이고 오류가 아니다.
+    /// 결과는 (소스, 크기)별로 캐시한다.
+    pub fn system_icon(
+        &self,
+        path: &str,
+        is_dir: bool,
+        size: u32,
+    ) -> ServiceResult<Option<String>> {
+        if size == 0 {
+            return Ok(None);
+        }
+        let source = icon_source(path, is_dir, self.fs.is_archive_path(&vp(path)));
+        let key = (source.key(), size);
+        if let Some(hit) = self.icons.lock().map_err(|e| e.to_string())?.get(&key) {
+            return Ok(hit.clone());
+        }
+        let url = match &source {
+            IconSource::Folder => td_icons::icon_png(td_icons::IconSource::Folder, size),
+            IconSource::Extension(e) => {
+                td_icons::icon_png(td_icons::IconSource::Extension(e), size)
+            }
+            IconSource::Path(p) => td_icons::icon_png(td_icons::IconSource::Path(p), size),
+        }
+        .and_then(|png| td_vfs::image_data_url("icon.png", &png));
+        let mut cache = self.icons.lock().map_err(|e| e.to_string())?;
+        if cache.len() >= ICON_CACHE_MAX {
+            cache.clear();
+        }
+        cache.insert(key, url.clone());
+        Ok(url)
     }
 
     /// `pattern`과 일치하는 이름의 인덱스 (Select Group).
@@ -2944,6 +3017,94 @@ mod tests {
                 "{name}: 0은 제한 없음"
             );
         }
+    }
+
+    #[test]
+    fn system_icon_source_rules() {
+        use super::IconSource::*;
+        assert_eq!(
+            icon_source("/a/b/doc.TXT", false, false),
+            Extension("txt".into())
+        );
+        assert_eq!(
+            icon_source("/a/x.zip!/in/pic.PNG", false, true),
+            Extension("png".into())
+        );
+        assert_eq!(
+            icon_source("C:\\a\\b.Md", false, false),
+            Extension("md".into())
+        );
+        assert_eq!(
+            icon_source("/a/.bashrc", false, false),
+            Extension(String::new())
+        );
+        assert_eq!(
+            icon_source("/a/Makefile", false, false),
+            Extension(String::new())
+        );
+        assert_eq!(icon_source("/a/dir", true, false), Folder);
+        // 디스크에 없는 .app 이름이나 압축 안 .app은 일반 폴더다.
+        assert_eq!(icon_source("/no/such/Thing.app", true, false), Folder);
+        assert_eq!(icon_source("/a/x.zip!/Thing.app", true, true), Folder);
+    }
+
+    #[test]
+    fn system_icon_size_zero_is_none_and_caches_per_source_and_size() {
+        let (_t, svc, _ch, _root) = setup();
+        assert_eq!(svc.system_icon("/a/b.txt", false, 0).unwrap(), None);
+        assert_eq!(
+            svc.icons.lock().unwrap().len(),
+            0,
+            "크기 0은 캐시도 만들지 않는다"
+        );
+        let a = svc.system_icon("/a/b.txt", false, 32).unwrap();
+        let b = svc.system_icon("/other/c.TXT", false, 32).unwrap();
+        assert_eq!(a, b);
+        assert_eq!(
+            svc.icons.lock().unwrap().len(),
+            1,
+            "같은 확장자·크기는 한 항목만 만든다"
+        );
+        svc.system_icon("/a/b.txt", false, 64).unwrap();
+        assert_eq!(
+            svc.icons.lock().unwrap().len(),
+            2,
+            "크기가 다르면 따로 캐시한다"
+        );
+    }
+
+    #[test]
+    fn system_icon_cache_is_cleared_when_it_grows_past_the_limit() {
+        let (_t, svc, _ch, _root) = setup();
+        for i in 0..(ICON_CACHE_MAX + 3) {
+            svc.system_icon(&format!("/a/f.ext{i}"), false, 16).unwrap();
+        }
+        assert!(svc.icons.lock().unwrap().len() <= ICON_CACHE_MAX);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn system_icon_returns_png_data_urls_that_differ_by_kind() {
+        let (_t, svc, _ch, root) = setup();
+        let prefix = "data:image/png;base64,";
+        let txt = svc.system_icon("/a/x.txt", false, 32).unwrap().unwrap();
+        let png = svc.system_icon("/a/x.png", false, 32).unwrap().unwrap();
+        let dir = svc.system_icon("/a/dir", true, 32).unwrap().unwrap();
+        for u in [&txt, &png, &dir] {
+            assert!(u.starts_with(prefix), "{u}");
+        }
+        assert_ne!(txt, png);
+        assert_ne!(txt, dir);
+        // 압축 안 경로도 확장자로 얻는다(안의 파일이 실제로 없어도).
+        let zip = format!("{root}/a.zip");
+        let mut z = td_archive::ZipEdit::create(Path::new(&zip)).unwrap();
+        z.add_file("x.txt", td_archive::Source::Bytes(b"hi".to_vec()));
+        z.commit().unwrap();
+        let inner = svc
+            .system_icon(&format!("{zip}!/x.txt"), false, 32)
+            .unwrap()
+            .unwrap();
+        assert_eq!(inner, txt);
     }
 
     #[test]

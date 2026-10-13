@@ -384,6 +384,19 @@ export class FakeBackend implements Backend {
     return { html: n.content, dir: `/tmp/ql${path}.qlpreview`, sheets: [] };
   }
 
+  /** `systemIcon` 호출 기록. */
+  readonly systemIconCalls: Array<{ path: string; isDir: boolean; size: number }> = [];
+  /** 테스트용: 시스템 아이콘 응답을 바꾼다(지연·null·거부 흉내). 없으면 확장자(폴더는 `dir`)별로 다른 PNG 데이터 주소를 돌려준다. */
+  systemIconResponder: ((path: string, isDir: boolean, size: number) => Promise<string | null>) | null = null;
+
+  async systemIcon(path: string, isDir: boolean, size: number): Promise<string | null> {
+    this.systemIconCalls.push({ path, isDir, size });
+    if (this.systemIconResponder) return this.systemIconResponder(path, isDir, size);
+    const name = baseName(path);
+    const ext = isDir ? "dir" : name.lastIndexOf(".") > 0 ? name.slice(name.lastIndexOf(".") + 1).toLowerCase() : "";
+    return `data:image/png;base64,${btoa(`icon:${ext}:${size}`)}`;
+  }
+
   /** 테스트용: 시드한 epub. 경로가 파일로도 있어야 목록에 보인다(`seed`). `error`가 있으면 열 때 그 오류로 거부된다. */
   readonly epubs = new Map<string, { title?: string; author?: string; cover?: string; chapters: Array<{ title: string; html: string }>; error?: string }>();
   /** `epubOpen`·`epubChapter` 호출 기록. */

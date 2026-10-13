@@ -84,6 +84,17 @@ async epubOpen(path: string) : Promise<Result<EpubInfoDto, string>> {
 }
 },
 /**
+ * 항목의 시스템 파일 아이콘(데이터 주소). 이 OS가 못 주면 null이다. 아이콘을 그리므로 메인 스레드가 아닌 곳에서 돌린다.
+ */
+async systemIcon(path: string, isDir: boolean, size: number) : Promise<Result<string | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("system_icon", { path, isDir, size }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * epub의 한 챕터 HTML.
  */
 async epubChapter(path: string, index: number) : Promise<Result<string, string>> {

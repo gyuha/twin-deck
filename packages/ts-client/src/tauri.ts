@@ -157,6 +157,9 @@ export class TauriBackend implements Backend {
   async quickLookPreview(path: string, seq: number): Promise<QuickLookDto> {
     return unwrap(await commands.quicklookPreview(path, seq));
   }
+  async systemIcon(path: string, isDir: boolean, size: number): Promise<string | null> {
+    return unwrap(await commands.systemIcon(path, isDir, size));
+  }
   async epubOpen(path: string): Promise<EpubInfoDto> {
     return unwrap(await commands.epubOpen(path));
   }

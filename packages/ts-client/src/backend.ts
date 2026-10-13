@@ -81,6 +81,11 @@ export interface Backend {
    * 더 큰 순번의 요청이 오면 이전 요청은 취소 오류로 끝나고, 늦게 들어온 작은 순번의 요청은 바로 취소된다.
    */
   quickLookPreview(path: string, seq: number): Promise<QuickLookDto>;
+  /**
+   * 항목의 시스템 파일 아이콘(`data:image/png;base64,…`). 파일 목록의 "시스템 아이콘" 옵션이 켜져 있을 때만 부른다.
+   * 이 OS가 못 주면 null이다(화면은 기본 아이콘을 그대로 둔다). 폴더는 `isDir`, 압축 안 항목도 확장자로 얻는다. `size`는 한 변 픽셀이다.
+   */
+  systemIcon(path: string, isDir: boolean, size: number): Promise<string | null>;
   /** 디스크 위 epub의 제목·저자·표지(데이터 주소, 이미지 한도 안일 때만)·챕터 목록. 압축 파일 안의 epub·DRM·깨진 파일은 오류로 거부된다. */
   epubOpen(path: string): Promise<EpubInfoDto>;
   /** epub의 `index`번째 챕터 HTML(안의 이미지·스타일은 넣고 스크립트는 뺐다). 범위 밖이거나 너무 크면 거부된다. */

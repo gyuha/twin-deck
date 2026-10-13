@@ -429,6 +429,18 @@ pub fn quicklook_preview(
     svc.quicklook_preview(&path, seq)
 }
 
+/// 항목의 시스템 파일 아이콘(데이터 주소). 이 OS가 못 주면 null이다. 아이콘을 그리므로 메인 스레드가 아닌 곳에서 돌린다.
+#[tauri::command(async)]
+#[specta::specta]
+pub fn system_icon(
+    svc: State<'_, AppService>,
+    path: String,
+    is_dir: bool,
+    size: u32,
+) -> ServiceResult<Option<String>> {
+    svc.system_icon(&path, is_dir, size)
+}
+
 /// epub의 제목·저자·표지·챕터 목록. 파일을 열어 읽으므로 메인 스레드가 아닌 곳에서 돌린다.
 #[tauri::command(async)]
 #[specta::specta]
@@ -1005,6 +1017,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             preview_file,
             quicklook_preview,
             epub_open,
+            system_icon,
             epub_chapter,
             preview_handler_show,
             preview_handler_set_rect,
