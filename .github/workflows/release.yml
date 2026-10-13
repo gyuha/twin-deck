@@ -21,7 +21,7 @@ jobs:
   mac:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: oven-sh/setup-bun@v2
@@ -36,7 +36,7 @@ jobs:
     needs: mac
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: oven-sh/setup-bun@v2
@@ -52,7 +52,7 @@ jobs:
     # 공개는 되돌릴 수 없어서 Environment `release`의 Required reviewers 승인을 거친다
     environment: release
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       # update-tap.mjs가 tap 저장소에 커밋하므로 러너에 git 작성자 정보가 있어야 한다
