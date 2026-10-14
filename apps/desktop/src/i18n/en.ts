@@ -335,7 +335,7 @@ export const en: Record<Key, string> = {
   "settings.item.behavior.preview_font.title": "Preview font",
   "settings.item.behavior.preview_font.desc": "Font for the body of text, code, JSON, and Markdown previews. Empty uses the default font",
   "settings.item.behavior.terminal_font.title": "Terminal font",
-  "settings.item.behavior.terminal_font.desc": "Font of the built-in terminal (CSS font-family), separate from the preview font. Empty uses the default monospace font. Changes apply to open terminals immediately",
+  "settings.item.behavior.terminal_font.desc": "Font of the built-in terminal (CSS font-family), separate from the preview font. A monospace font is recommended. Empty or missing fonts fall back to the default monospace font. Proportional fonts may appear widely spaced within terminal cells. Changes also apply to open terminals",
   "settings.item.behavior.text_color_dark.title": "Text color (dark theme)",
   "settings.item.behavior.text_color_dark.desc": "Default text color for dark themes. Pick on the color wheel or type #rrggbb. Empty keeps the theme as is, and dim text is derived by blending this color toward the background",
   "settings.item.behavior.text_color_light.title": "Text color (light theme)",

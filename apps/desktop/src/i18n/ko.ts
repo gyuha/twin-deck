@@ -333,7 +333,7 @@ export const ko = {
   "settings.item.behavior.preview_font.title": "미리보기 글꼴",
   "settings.item.behavior.preview_font.desc": "텍스트·코드·JSON·Markdown 미리보기 본문의 글꼴. 비우면 기본 글꼴",
   "settings.item.behavior.terminal_font.title": "터미널 글꼴",
-  "settings.item.behavior.terminal_font.desc": "내장 터미널의 글꼴(CSS font-family). 미리보기 글꼴과 따로 씁니다. 비우면 기본 고정폭 글꼴. 바꾸면 열려 있는 터미널에 바로 적용됩니다",
+  "settings.item.behavior.terminal_font.desc": "내장 터미널의 글꼴(CSS font-family). 미리보기와 별도로 적용하며 고정폭 글꼴을 권장합니다. 비우거나 지정한 글꼴이 없으면 기본 고정폭 글꼴을 씁니다. 비고정폭 글꼴은 터미널 칸에 맞춰 간격이 넓어질 수 있습니다. 변경은 열린 터미널에도 반영됩니다",
   "settings.item.behavior.text_color_dark.title": "글자 색 (다크 테마)",
   "settings.item.behavior.text_color_dark.desc": "다크 테마일 때의 앱 기본 글자색. 색상환으로 고르거나 #rrggbb를 씁니다. 비우면 테마 그대로이고, 흐린 글자는 이 색을 배경 쪽으로 섞어 자동으로 만듭니다",
   "settings.item.behavior.text_color_light.title": "글자 색 (라이트 테마)",

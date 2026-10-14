@@ -18,18 +18,37 @@ export interface TerminalEngine {
   dispose(): void;
 }
 
-/** 설정 `behavior.preview_font`가 비었을 때 쓰는 글꼴(미리보기 본문의 `font-mono`와 같은 계열). */
+/** 설정 `behavior.terminal_font`가 비었거나 지정한 글꼴이 없을 때 쓰는 고정폭 글꼴. */
 export const DEFAULT_TERMINAL_FONT = "ui-monospace, Menlo, Consolas, monospace";
 
-/** xterm.js를 처음 쓸 때 불러 엔진을 만든다. `fontFamily`는 미리보기 글꼴 설정이고 비면 기본 글꼴이다. 패널 크기가 바뀌면 칸 수를 다시 맞춘다. */
+/** 사용자 글꼴을 못 찾더라도 비고정폭 기본 글꼴로 떨어져 칸 폭이 늘어나지 않게 한다. */
+export function terminalFontFamily(font: string): string {
+  return font.trim() ? `${font.trim()}, ${DEFAULT_TERMINAL_FONT}` : DEFAULT_TERMINAL_FONT;
+}
+
+/** 실제 글꼴이 준비된 뒤 xterm이 문자 칸을 측정하게 한다. 로드 실패 시에는 대체 글꼴로 계속 연다. */
+async function loadFont(font: string): Promise<void> {
+  try {
+    // 화면 문구가 아닌 영문·한글 글리프 로드 표본이다.
+    await document.fonts?.load(`13px ${font}`, "MW\uD55C\uAE00");
+  } catch {
+    // 없는 글꼴이나 잘못된 CSS 명세 때문에 터미널 전체가 열리지 않는 일은 막는다.
+  }
+}
+
+/** xterm.js를 처음 쓸 때 불러 엔진을 만든다. `fontFamily`는 터미널 글꼴 설정이며 패널 크기에 맞춰 칸 수를 조절한다. */
 export async function createTerminalEngine(fontFamily = ""): Promise<TerminalEngine> {
+  const initialFont = terminalFontFamily(fontFamily);
   const [{ Terminal }, { FitAddon }] = await Promise.all([import("@xterm/xterm"), import("@xterm/addon-fit"), import("@xterm/xterm/css/xterm.css")]);
-  const term = new Terminal({ fontSize: 13, fontFamily: fontFamily.trim() || DEFAULT_TERMINAL_FONT, cursorBlink: true });
+  await loadFont(initialFont);
+  const term = new Terminal({ fontSize: 13, fontFamily: initialFont, cursorBlink: true });
   const fit = new FitAddon();
   term.loadAddon(fit);
   let observer: ResizeObserver | null = null;
   let removeIme: (() => void) | null = null;
   let sendData: (data: string) => void = () => {};
+  let disposed = false;
+  let fontRequest = 0;
   return {
     open(el) {
       // 한글 조합은 xterm이 아니라 직접 받는다(WebKit에서 모음이 빠지는 문제). 확정된 글은 일반 입력과 같은 길로 보낸다.
@@ -54,12 +73,18 @@ export async function createTerminalEngine(fontFamily = ""): Promise<TerminalEng
       return term.rows;
     },
     setFontFamily(font) {
-      term.options.fontFamily = font.trim() || DEFAULT_TERMINAL_FONT;
-      fit.fit();
-      if (term.rows > 0) term.refresh(0, term.rows - 1); // 새 글꼴로 이미 그린 줄을 다시 그린다
+      const family = terminalFontFamily(font);
+      const request = ++fontRequest;
+      void loadFont(family).then(() => {
+        if (disposed || request !== fontRequest) return;
+        term.options.fontFamily = family;
+        fit.fit();
+        if (term.rows > 0) term.refresh(0, term.rows - 1);
+      });
     },
     focus: () => term.focus(),
     dispose: () => {
+      disposed = true;
       observer?.disconnect();
       removeIme?.();
       fit.dispose();

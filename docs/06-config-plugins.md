@@ -49,6 +49,7 @@ Marta에서 확인된 옵션 이름을 그대로 옮길 수 있는 곳은 옮기
 [behavior]
 theme = "system"                  # system·light·dark 또는 테마 이름(예: dracula-default)
 language = "ko"                   # 화면 언어: ko(한국어), en(English)
+terminal_font = ""                # 내장 터미널의 CSS font-family. 비우거나 글꼴이 없으면 기본 고정폭 글꼴
 
 [behavior.table]
 icon_size = 16
@@ -154,6 +155,14 @@ columns = ["name", ">extension:50", "size", "modified"]
 설정 → 모양 → **확장자 컬럼 표시**로 `extension` 컬럼을 켜고 끈다(기본 OFF). 켜면 이름 컬럼 뒤에 확장자 헤더가 생기며, 클릭할 때마다 확장자 오름차순·내림차순으로 정렬한다. 폴더는 항상 먼저 두고, 확장자가 같으면 이름순으로 정렬한다. 켜져 있으면 파일은 이름 컬럼에서 확장자를 빼고 확장자 컬럼에 표시하며, 폴더는 이름을 그대로 두고 확장자 셀을 비운다. 컬럼이 꺼져 있어도 기존 `Alt+Shift+E` 확장자 정렬 단축키를 쓸 수 있다.
 
 스위치는 별도 불리언 키 없이 `view.table.columns`의 `extension` 유무를 저장한다. 직접 지정한 `>extension:50` 같은 명세도 ON으로 인식한다. 끄거나 이 항목을 기본값으로 복원하면 확장자 명세만 제거하며, 다른 컬럼의 순서·너비·정렬 표시는 유지한다. 현재 탭에서 직접 선택한 정렬은 컬럼을 숨겨도 유지된다.
+
+### 4.3 터미널 글꼴과 한글 출력
+
+`behavior.terminal_font`는 미리보기 글꼴과 별개다. 지정한 글꼴 뒤에 `ui-monospace, Menlo, Consolas, monospace` 대체 목록을 붙이므로 글꼴을 찾지 못해도 고정폭 글꼴로 표시한다. 글꼴 로드를 기다린 뒤 터미널 칸 수를 다시 계산하며, 이미 열린 터미널에도 변경을 반영한다.
+
+터미널은 커서 위치와 표 정렬을 위해 고정폭 칸을 사용한다. Jetendard 같은 고정폭 글꼴을 권장하며, Wanted Sans 같은 비고정폭 글꼴은 설치돼 있어도 좁은 글자 주변의 간격이 넓어질 수 있다. 글꼴 이름은 OS에 등록된 패밀리 이름을 사용한다.
+
+macOS·Linux에서 앱을 GUI로 실행해 locale이 없거나 `C`/`POSIX`인 경우, 새 PTY 세션의 문자 환경을 UTF-8로 보완한다(macOS `en_US.UTF-8`, 그 밖의 Unix `C.UTF-8`). 기존 `LANG`이 UTF-8이면 그 지역 설정을 재사용한다. 명시적인 다른 locale과 앱 밖의 환경은 바꾸지 않는다. 셸 시작 스크립트가 이후에 locale을 다시 바꾸거나 레거시 인코딩을 지정한 경우는 별도로 조정해야 한다. 이미 열린 세션에는 소급 적용되지 않으므로 터미널 탭을 새로 연다.
 
 ## 5. `keybindings.toml`
 

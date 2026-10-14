@@ -24,6 +24,43 @@ fn pty_err(e: impl std::fmt::Display) -> TerminalError {
     TerminalError::Pty(e.to_string())
 }
 
+/// GUI에서 실행하면 locale이 없거나 C라서 ls가 한글 파일명을 '?'로 바꾼다.
+/// 자식 PTY의 ASCII 기본 환경만 보완하며 명시적인 지역/인코딩 설정은 유지한다.
+#[cfg(unix)]
+fn ensure_utf8_locale(cmd: &mut CommandBuilder) {
+    let effective = ["LC_ALL", "LC_CTYPE", "LANG"]
+        .into_iter()
+        .filter_map(|key| cmd.get_env(key).and_then(|value| value.to_str()))
+        .find(|value| !value.is_empty());
+    if effective.is_some_and(|value| value != "C" && value != "POSIX") {
+        return;
+    }
+    let fallback = if cfg!(target_os = "macos") {
+        "en_US.UTF-8"
+    } else {
+        "C.UTF-8"
+    };
+    let locale = cmd
+        .get_env("LANG")
+        .and_then(|value| value.to_str())
+        .filter(|value| value.to_ascii_lowercase().replace('-', "").contains("utf8"))
+        .unwrap_or(fallback)
+        .to_owned();
+    if cmd
+        .get_env("LANG")
+        .is_none_or(|value| value.is_empty() || value == "C" || value == "POSIX")
+    {
+        cmd.env("LANG", &locale);
+    }
+    cmd.env("LC_CTYPE", &locale);
+    if cmd
+        .get_env("LC_ALL")
+        .is_some_and(|value| value == "C" || value == "POSIX")
+    {
+        cmd.env("LC_ALL", &locale);
+    }
+}
+
 /// 세션이 밖으로 내보내는 이벤트.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TermEvent {
@@ -124,14 +161,20 @@ impl Terminals {
         cols: u16,
         rows: u16,
     ) -> Result<u32> {
-        let pair = native_pty_system()
-            .openpty(size(cols, rows))
-            .map_err(pty_err)?;
         let mut cmd = CommandBuilder::new(program);
         cmd.args(args);
         cmd.cwd(cwd);
+        self.open_pty(cmd, cols, rows)
+    }
+
+    fn open_pty(&self, mut cmd: CommandBuilder, cols: u16, rows: u16) -> Result<u32> {
+        let pair = native_pty_system()
+            .openpty(size(cols, rows))
+            .map_err(pty_err)?;
         cmd.env("TERM", "xterm-256color");
         cmd.env("COLORTERM", "truecolor");
+        #[cfg(unix)]
+        ensure_utf8_locale(&mut cmd);
         let mut child = pair.slave.spawn_command(cmd).map_err(pty_err)?;
         drop(pair.slave);
         let killer = child.clone_killer();
@@ -470,6 +513,82 @@ mod tests {
             }
         }
         panic!("종료 이벤트가 오지 않았다");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn locale이_없거나_ascii이면_자식_명령만_utf8로_보완한다() {
+        for locale in [None, Some(""), Some("C"), Some("POSIX")] {
+            let mut cmd = CommandBuilder::new("/bin/sh");
+            cmd.env_clear();
+            if let Some(locale) = locale {
+                cmd.env("LC_ALL", locale);
+            }
+            ensure_utf8_locale(&mut cmd);
+            let expected = if cfg!(target_os = "macos") {
+                "en_US.UTF-8"
+            } else {
+                "C.UTF-8"
+            };
+            assert_eq!(cmd.get_env("LANG"), Some(expected.as_ref()));
+            assert_eq!(cmd.get_env("LC_CTYPE"), Some(expected.as_ref()));
+            if matches!(locale, Some("C" | "POSIX")) {
+                assert_eq!(cmd.get_env("LC_ALL"), Some(expected.as_ref()));
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn 명시한_locale은_우선순위대로_보존한다() {
+        for (key, locale) in [
+            ("LANG", "ko_KR.UTF-8"),
+            ("LC_CTYPE", "UTF-8"),
+            ("LC_ALL", "ja_JP.UTF-8"),
+            ("LC_CTYPE", "ko_KR.EUC-KR"),
+        ] {
+            let mut cmd = CommandBuilder::new("/bin/sh");
+            cmd.env_clear();
+            cmd.env("LANG", "C");
+            cmd.env(key, locale);
+            ensure_utf8_locale(&mut cmd);
+            assert_eq!(cmd.get_env(key), Some(locale.as_ref()));
+            if key != "LANG" {
+                assert_eq!(cmd.get_env("LANG"), Some("C".as_ref()));
+            }
+        }
+        let mut cmd = CommandBuilder::new("/bin/sh");
+        cmd.env_clear();
+        cmd.env("LANG", "ko_KR.UTF-8");
+        cmd.env("LC_CTYPE", "C");
+        ensure_utf8_locale(&mut cmd);
+        assert_eq!(cmd.get_env("LC_CTYPE"), Some("ko_KR.UTF-8".as_ref()));
+        assert_eq!(cmd.get_env("LANG"), Some("ko_KR.UTF-8".as_ref()));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn gui처럼_locale이_없어도_pty의_ls는_한글_파일명을_보존한다() {
+        let dir = tempfile::tempdir().unwrap();
+        for name in ["한글폴더", "한글"] {
+            std::fs::create_dir(dir.path().join(name)).unwrap();
+        }
+        for key in [None, Some("LANG"), Some("LC_CTYPE"), Some("LC_ALL")] {
+            let mut cmd = CommandBuilder::new("/bin/sh");
+            cmd.args(["-c", "/bin/ls -1; printf '\\n__TD_DONE__\\n'"]);
+            cmd.env_clear();
+            cmd.env("PATH", "/usr/bin:/bin");
+            if let Some(key) = key {
+                cmd.env(key, "C");
+            }
+            cmd.cwd(dir.path());
+            let (t, rx) = Terminals::new();
+            let id = t.open_pty(cmd, 80, 24).unwrap();
+            let out = collect_until(&rx, id, "__TD_DONE__");
+            assert!(out.contains("한글폴더"), "{key:?}: {out:?}");
+            assert!(out.contains("한글"), "{key:?}: {out:?}");
+            assert!(!out.contains('?'), "{key:?}: {out:?}");
+        }
     }
 
     #[cfg(unix)]
