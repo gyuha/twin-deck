@@ -273,7 +273,7 @@ fn size(cols: u16, rows: u16) -> PtySize {
 }
 
 /// `environment.terminal` 값을 실행할 프로그램과 인수로 푼다. `env`는 환경 변수, `exists`는 파일 존재 여부(시험에서 바꿔 끼운다).
-/// Windows에서만 `cmd`·`powershell`·`gitbash`를 고를 수 있고, 그 밖의 값(`default` 포함)과 다른 OS는 `$SHELL`(없으면 `/bin/sh`, Windows는 `COMSPEC`)이다.
+/// Windows에서만 `cmd`·`powershell`·`gitbash`를 고를 수 있고, 그 밖의 값(`default` 포함)과 다른 OS는 `$SHELL`(없으면 `/bin/sh`, Windows는 `COMSPEC`)을 로그인 셸(`-l`)로 연다.
 pub fn resolve_shell(
     choice: &str,
     windows: bool,
@@ -285,7 +285,8 @@ pub fn resolve_shell(
         let shell = env("SHELL")
             .filter(|s| !s.is_empty())
             .unwrap_or_else(|| "/bin/sh".into());
-        return Ok((shell, vec![]));
+        // 로그인 셸로 연다: Finder·Dock으로 띄운 앱은 최소 PATH만 받아서, `.zprofile`의 Homebrew 경로 등이 있어야 brew로 설치한 도구를 찾는다(이슈 #64).
+        return Ok((shell, vec!["-l".into()]));
     }
     match choice {
         "cmd" => Ok((comspec(), vec![])),
@@ -500,6 +501,50 @@ mod tests {
                 .0,
             "/bin/sh"
         );
+    }
+
+    #[test]
+    fn resolve_shell_unix_args_are_login() {
+        let env = env_of(&[("SHELL", "/bin/zsh")]);
+        assert_eq!(
+            resolve_shell("default", false, &env, &|_| true).unwrap(),
+            ("/bin/zsh".to_string(), vec!["-l".to_string()])
+        );
+        assert_eq!(
+            resolve_shell("default", false, &env_of(&[]), &|_| true).unwrap(),
+            ("/bin/sh".to_string(), vec!["-l".to_string()])
+        );
+    }
+
+    /// 이슈 #64: 로그인 셸이어야 `.zprofile`(Homebrew `brew shellenv` 등)도 적용된다.
+    #[cfg(unix)]
+    #[test]
+    fn login_shell_loads_zprofile_and_zshrc() {
+        if !Path::new("/bin/zsh").exists() {
+            return;
+        }
+        let home = tempfile::tempdir().unwrap();
+        std::fs::write(
+            home.path().join(".zprofile"),
+            "export TD_PROFILE=from_profile\n",
+        )
+        .unwrap();
+        std::fs::write(home.path().join(".zshrc"), "export TD_RC=from_rc\n").unwrap();
+        let (program, args) =
+            resolve_shell("default", false, &env_of(&[("SHELL", "/bin/zsh")]), &|_| {
+                true
+            })
+            .unwrap();
+        let mut cmd = CommandBuilder::new(program);
+        cmd.args(args);
+        cmd.env("HOME", home.path());
+        cmd.env("ZDOTDIR", home.path());
+        cmd.cwd(home.path());
+        let (t, rx) = Terminals::new();
+        let id = t.open_pty(cmd, 80, 24).unwrap();
+        t.write(id, b"echo P=$TD_PROFILE R=$TD_RC\r").unwrap();
+        collect_until(&rx, id, "P=from_profile R=from_rc");
+        t.close(id).unwrap();
     }
 
     fn wait_exit(rx: &Receiver<TermEvent>, id: u32) -> Option<u32> {
