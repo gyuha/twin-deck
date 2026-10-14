@@ -100,6 +100,22 @@ describe("F1 도움말 검색 (이슈 #56)", () => {
     expect(titles(dialog).every((t) => t?.includes("닫기") || t?.includes("탭"))).toBe(true);
   });
 
+  it("한글은 자소 단위로 찾는다: 조합 중인 글자도 일치하고 글자 전체를 강조한다", async () => {
+    const { user, dialog } = await openHelp();
+    await user.keyboard("ㅂ");
+    expect(titles(dialog)).toContain("복사");
+    await user.clear(search());
+    await user.keyboard("보");
+    expect(titles(dialog)).toContain("복사");
+    await user.clear(search());
+    await user.keyboard("복ㅅ");
+    expect(titles(dialog)).toContain("복사");
+    expect(marks(dialog)).toContain("복사");
+    await user.clear(search());
+    await user.keyboard("복ㅂ");
+    expect(titles(dialog)).not.toContain("복사");
+  });
+
   it("일치하는 단축키가 없으면 안내 문구를 보인다", async () => {
     const { user, dialog } = await openHelp();
     await user.keyboard("없는기능zz");
