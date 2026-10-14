@@ -32,6 +32,8 @@ export function Pane({ pane, onThemePreview }: { pane: PaneId; onThemePreview?: 
   const terminals = terminalKey ? terminalKey.split(",").map((x) => ({ tab: Number(x.split(":")[0]), session: Number(x.split(":")[1]) })) : [];
   const activeTerminalTab = useApp((s) => (activeTab(s, pane).virtual?.kind === "terminal" ? activeTab(s, pane).id : null));
   const hasSettings = useApp((s) => s.settingsOpen && s.settingsPane === pane); // 설정이 이 패널 자리에 떠 있다
+  // 탭 막대 위치(이슈 #67): "bottom"이면 파일 목록 뒤(패널 하단)에 그린다. 위치는 CSS order가 아니라 렌더 순서로 정한다.
+  const tabsBottom = useApp((s) => s.loaded.config.behavior.layout.tab_position === "bottom");
   const otherHasSettings = useApp((s) => s.settingsOpen && s.settingsPane !== pane); // 설정은 반대쪽에 있고 이 패널은 결과를 보여 준다(누름 무시)
   // 반대쪽 패널은 눌러도(클릭·더블클릭·우클릭·끌기 시작) 아무 일도 하지 않는다. 캡처 단계에서 막아 안쪽 행·탭이 받지 못하게 한다. 휠 스크롤은 막지 않는다.
   const block = otherHasSettings
@@ -65,7 +67,7 @@ export function Pane({ pane, onThemePreview }: { pane: PaneId; onThemePreview?: 
       {!hasSettings && (
         <>
           <DriveBar pane={pane} />
-          <TabBar pane={pane} />
+          {!tabsBottom && <TabBar pane={pane} />}
         </>
       )}
       {/* 설정이 이 패널 자리에 떠 있어도 터미널은 지우지 않고 숨겨 둔다(지우면 열려 있는 터미널 화면이 사라진다). */}
@@ -78,6 +80,7 @@ export function Pane({ pane, onThemePreview }: { pane: PaneId; onThemePreview?: 
           {treemap ? <UsageTreemap pane={pane} /> : <FileTable pane={pane} />}
         </>
       )}
+      {!hasSettings && tabsBottom && <TabBar pane={pane} />}
     </section>
   );
 }

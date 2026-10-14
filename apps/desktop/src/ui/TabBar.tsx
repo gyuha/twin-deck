@@ -11,6 +11,7 @@ export function TabBar({ pane }: { pane: PaneId }) {
   const tr = useT();
   const { tabs, active } = useApp((s) => s.panes[pane]);
   const segments = useApp((s) => s.loaded.config.behavior.layout.tab_style === "segments");
+  const bottom = useApp((s) => s.loaded.config.behavior.layout.tab_position === "bottom"); // 막대가 목록 아래면 경계선·활성 탭 강조선을 위쪽(목록 쪽)에 둔다(이슈 #67)
   const { api } = useAppStore();
   const closeable = useApp((s) => s.loaded.config.behavior.layout.tab_close_button);
   const [hover, setHover] = useState<number | null>(null); // 호버한 탭(닫기 버튼이 켜졌을 때 ✕를 보일 탭)
@@ -130,7 +131,11 @@ export function TabBar({ pane }: { pane: PaneId }) {
       onDoubleClick={(e) => {
         if (e.target === e.currentTarget) void api.newTabIn(pane);
       }}
-      className={segments ? "flex border-b border-app-line text-sm" : "flex gap-1 border-b border-app-line px-1 text-sm"}>
+      className={
+        segments
+          ? `flex ${bottom ? "border-t" : "border-b"} border-app-line text-sm`
+          : `flex gap-1 ${bottom ? "border-t" : "border-b"} border-app-line px-1 text-sm`
+      }>
       {tabs.map((t, i) => {
         const name = t.virtual ? t.virtual.title : baseName(t.path) || t.path;
         const pad = closeable ? "px-6" : "px-2";
@@ -167,7 +172,7 @@ export function TabBar({ pane }: { pane: PaneId }) {
                   (closeable ? "min-w-0 flex-1 truncate px-6 py-1 text-center " : "min-w-0 flex-1 truncate border-r border-app-line px-2 py-1 text-center last:border-r-0 ") +
                   (i === active ? "bg-app-selected font-semibold" : "text-ink-faint")
                 : i === active
-                  ? `border-b-2 border-accent ${pad} py-1 font-semibold`
+                  ? `${bottom ? "border-t-2" : "border-b-2"} border-accent ${pad} py-1 font-semibold`
                   : `${pad} py-1 text-ink-faint`)
             }
           >
