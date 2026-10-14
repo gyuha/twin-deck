@@ -379,6 +379,8 @@ export const ko = {
   "settings.item.behavior.layout.pane_highlight.desc": "활성 패널을 강조색 테두리로 둘러쌉니다. 끄면 커서 행으로만 구분됩니다",
   "settings.item.behavior.layout.tab_style.title": "탭 모양",
   "settings.item.behavior.layout.tab_style.desc": "underline은 글자 + 활성 탭 밑줄, segments는 탭이 폭을 똑같이 나누고 활성 탭은 배경으로 구분합니다",
+  "settings.item.behavior.layout.tab_position.title": "탭 위치",
+  "settings.item.behavior.layout.tab_position.desc": "top은 탭 막대를 파일 목록 위에, bottom은 파일 목록 아래(패널 하단)에 둡니다. 두 패널 모두 따릅니다",
   "settings.item.behavior.layout.tab_close_button.title": "탭 닫기 버튼",
   "settings.item.behavior.layout.tab_close_button.desc": "마우스를 올린 탭의 오른쪽에 ✕를 보이고 누르면 닫습니다. 켜면 모든 탭의 좌우 여백이 넓어집니다. 탭이 하나뿐이면 보이지 않습니다",
   "settings.item.behavior.layout.show_action_bar.title": "액션바 표시",

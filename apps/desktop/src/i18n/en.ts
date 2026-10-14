@@ -381,6 +381,8 @@ export const en: Record<Key, string> = {
   "settings.item.behavior.layout.pane_highlight.desc": "Surrounds the active pane with an accent-colored border. When off, only the cursor row tells them apart",
   "settings.item.behavior.layout.tab_style.title": "Tab style",
   "settings.item.behavior.layout.tab_style.desc": "\"underline\" shows text with an underline on the active tab; \"segments\" divides the width equally and marks the active tab with a background",
+  "settings.item.behavior.layout.tab_position.title": "Tab position",
+  "settings.item.behavior.layout.tab_position.desc": "\"top\" puts the tab bar above the file list; \"bottom\" puts it below the file list (at the bottom of the pane). Both panes follow it",
   "settings.item.behavior.layout.tab_close_button.title": "Tab close button",
   "settings.item.behavior.layout.tab_close_button.desc": "Shows ✕ on the right of the hovered tab and closes it when clicked. When on, every tab gets wider side padding. Hidden when there is only one tab",
   "settings.item.behavior.layout.show_action_bar.title": "Show Action Bar",

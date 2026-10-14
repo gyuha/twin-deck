@@ -1101,6 +1101,35 @@ fn pane_tab_appearance_defaults_round_trip_and_validate_tab_style() {
 }
 
 #[test]
+fn tab_position_defaults_top_and_validates() {
+    use td_config::{set_user_value, ConfigValue};
+    let none = load("");
+    assert!(none.warnings.is_empty(), "{:?}", none.warnings);
+    assert_eq!(none.config.behavior.layout.tab_position, "top");
+
+    let dir = tempfile::tempdir().unwrap();
+    set_user_value(
+        dir.path(),
+        "behavior.layout.tab_position",
+        ConfigValue::Str("bottom".into()),
+    )
+    .unwrap();
+    let l = load_dir(dir.path(), Platform::Linux);
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert_eq!(l.config.behavior.layout.tab_position, "bottom");
+
+    let l = load("[behavior.layout]\ntab_position = \"side\"\n");
+    assert!(
+        l.warnings
+            .iter()
+            .any(|w| w.message.contains("tab_position")),
+        "{:?}",
+        l.warnings
+    );
+    assert_eq!(l.config.behavior.layout.tab_position, "top");
+}
+
+#[test]
 fn tab_close_button_defaults_off_and_round_trips() {
     use td_config::{set_user_value, ConfigValue};
     let none = load("");

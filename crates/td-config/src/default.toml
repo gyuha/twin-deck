@@ -43,6 +43,7 @@ show_drive_bar = true
 pane_highlight = true
 tab_style = "underline"
 tab_close_button = false
+tab_position = "top" # 탭 막대 위치: top(파일 목록 위), bottom(파일 목록 아래)
 
 [display]
 relative_date = true

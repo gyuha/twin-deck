@@ -38,7 +38,8 @@
         "show_drive_bar": true,
         "pane_highlight": true,
         "tab_style": "underline",
-        "tab_close_button": false
+        "tab_close_button": false,
+        "tab_position": "top"
       }
     },
     "display": {

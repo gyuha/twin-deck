@@ -694,7 +694,11 @@ tab_style: string;
 /**
  * 탭 닫기 버튼: 켜면 모든 탭에 좌우 대칭 패딩을 두고, 마우스를 올린 탭의 오른쪽에 ✕가 보인다(탭이 하나뿐이면 숨김).
  */
-tab_close_button: boolean }
+tab_close_button: boolean; 
+/**
+ * 탭 막대 위치: "top"(파일 목록 위) | "bottom"(파일 목록 아래, 이슈 #67). 패널마다 탭 막대가 하나씩이라 두 패널 모두 따른다.
+ */
+tab_position: string }
 export type BehaviorTable = { icon_size: number; 
 /**
  * 목록 행의 아이콘을 운영체제가 쓰는 파일 아이콘으로 보인다(macOS·Windows). 얻지 못하면 기본 아이콘이다.

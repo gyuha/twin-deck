@@ -82,6 +82,8 @@ const SIZE_FORMATS = ["adaptive", "adaptive_kibi", "bytes", "KB", "MB"] as const
 // folder_style의 허용 값도 td-config의 검증 목록(ENUMS)과 같아야 한다.
 // tab_style의 허용 값도 td-config의 검증 목록(ENUMS)과 같아야 한다.
 const TAB_STYLES = ["underline", "segments"] as const;
+// tab_position의 허용 값도 td-config의 검증 목록(ENUMS)과 같아야 한다.
+const TAB_POSITIONS = ["top", "bottom"] as const;
 // environment.terminal의 허용 값도 td-config의 검증 목록(ENUMS)과 같아야 한다.
 const TERMINAL_SHELLS = ["default", "cmd", "powershell", "gitbash"] as const;
 const COLUMN_LINES = ["none", "solid", "dash"] as const;
@@ -103,6 +105,7 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
       { key: "behavior.text_color", get title() { return translate("settings.item.behavior.text_color.title"); }, get desc() { return translate("settings.item.behavior.text_color.desc"); }, control: { type: "color" }, hideWhenEmpty: true },
       { key: "behavior.layout.pane_highlight", get title() { return translate("settings.item.behavior.layout.pane_highlight.title"); }, get desc() { return translate("settings.item.behavior.layout.pane_highlight.desc"); }, control: { type: "switch" } },
       { key: "behavior.layout.tab_style", get title() { return translate("settings.item.behavior.layout.tab_style.title"); }, get desc() { return translate("settings.item.behavior.layout.tab_style.desc"); }, control: { type: "select", options: TAB_STYLES } },
+      { key: "behavior.layout.tab_position", get title() { return translate("settings.item.behavior.layout.tab_position.title"); }, get desc() { return translate("settings.item.behavior.layout.tab_position.desc"); }, control: { type: "select", options: TAB_POSITIONS } },
       { key: "behavior.layout.tab_close_button", get title() { return translate("settings.item.behavior.layout.tab_close_button.title"); }, get desc() { return translate("settings.item.behavior.layout.tab_close_button.desc"); }, control: { type: "switch" } },
       { key: "behavior.layout.show_action_bar", get title() { return translate("settings.item.behavior.layout.show_action_bar.title"); }, get desc() { return translate("settings.item.behavior.layout.show_action_bar.desc"); }, control: { type: "switch" } },
       { key: "behavior.layout.action_bar_by_modifier", get title() { return translate("settings.item.behavior.layout.action_bar_by_modifier.title"); }, get desc() { return translate("settings.item.behavior.layout.action_bar_by_modifier.desc"); }, control: { type: "switch" } },

@@ -305,3 +305,16 @@ describe("패널·탭 모양 설정 항목", () => {
     await waitFor(() => expect((backend as unknown as { loaded: { config: { behavior: { layout: { pane_highlight: boolean } } } } }).loaded.config.behavior.layout.pane_highlight).toBe(false));
   });
 });
+
+describe("탭 위치 설정 항목 (이슈 #67)", () => {
+  it("모양 탭의 탭 위치는 기본 top이고 bottom으로 바꾸면 저장된다", async () => {
+    const { user, backend } = await renderApp();
+    await open(user);
+    await dialog();
+    const group = screen.getByRole("group", { name: "탭 위치" });
+    expect(within(group).getByRole("combobox")).toHaveTextContent("top");
+    await user.click(within(group).getByRole("combobox"));
+    await user.click(await screen.findByRole("option", { name: "bottom" }));
+    await waitFor(async () => expect((await backend.getConfig()).config.behavior.layout.tab_position).toBe("bottom"));
+  });
+});

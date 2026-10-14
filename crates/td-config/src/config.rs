@@ -105,6 +105,8 @@ pub struct BehaviorLayout {
     pub tab_style: String,
     /// 탭 닫기 버튼: 켜면 모든 탭에 좌우 대칭 패딩을 두고, 마우스를 올린 탭의 오른쪽에 ✕가 보인다(탭이 하나뿐이면 숨김).
     pub tab_close_button: bool,
+    /// 탭 막대 위치: "top"(파일 목록 위) | "bottom"(파일 목록 아래, 이슈 #67). 패널마다 탭 막대가 하나씩이라 두 패널 모두 따른다.
+    pub tab_position: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
