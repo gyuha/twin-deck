@@ -153,12 +153,12 @@ describe("←/→와 Return (영구 삭제 확인으로 확인)", () => {
 });
 
 describe("도움말", () => {
-  it("열리면 검색창에 포커스가 가고 Esc로 닫힌다(Return은 커서 줄 실행, 이슈 #56)", async () => {
+  it("열리면 검색창에 포커스가 가고 Return으로 닫힌다(이슈 #56)", async () => {
     const { user } = await renderApp(seed());
     await user.keyboard("{F1}");
     const d = await dlg("도움말");
     await waitFor(() => expect(focused()).toBe(within(d).getByRole("textbox", { name: "단축키 검색" })));
-    await user.keyboard("{Escape}");
+    await user.keyboard("{Enter}");
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "도움말" })).toBeNull());
   });
 });

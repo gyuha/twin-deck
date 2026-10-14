@@ -68,28 +68,23 @@ function Keys({ keys, terms }: { keys: string; terms: readonly string[] }) {
 /**
  * 도움말 화면(F1): 키보드 단축키를 분류별로 2단으로 나열한다. 화면을 어둡게 덮는 패널이고 Esc/F1/배경 클릭으로 닫는다(help 스코프).
  * 메인 화면에서 쓰는 단축키(pane/global 스코프)만 보여 준다(카탈로그가 이미 그렇게 거른다). 대화상자·메뉴 안에서만 쓰는 내부 키는 없다.
- * 맨 위 검색창(스크롤해도 늘 보인다)으로 설명·키·분류를 거르고, ↑↓로 고른 줄을 Return으로 실행한다(이슈 #56).
+ * 맨 위 검색창(스크롤해도 늘 보인다)으로 설명·키·분류를 거르고 일치한 글자를 강조한다(이슈 #56).
  */
 export function Help() {
   const help = useApp((s) => s.help);
   const { api } = useAppStore();
   const t = useT();
   const search = useRef<HTMLInputElement>(null);
-  const list = useRef<HTMLDivElement>(null);
   const open = help !== null;
-  // 열리면 검색창에 포커스를 둔다. 글자는 검색창이 받고 ↑↓·Return·Esc는 help 스코프 키로 간다.
+  // 열리면 검색창에 포커스를 둔다. 글자는 검색창이 받고 Return·Esc·F1은 help 스코프 키(닫기)로 간다.
   useEffect(() => {
     if (open) search.current?.focus();
   }, [open]);
-  // 커서 줄이 스크롤 영역 밖이면 보이게 한다.
-  useEffect(() => {
-    list.current?.querySelector("[data-help-cursor]")?.scrollIntoView?.({ block: "nearest" });
-  }, [help?.cursor, help?.query]);
   if (!help) return null;
   const terms = helpTerms(help.query);
   const items = api.helpView();
-  const groups = new Map<string, { item: CatalogItem; index: number }[]>();
-  items.forEach((item, index) => groups.set(item.category, [...(groups.get(item.category) ?? []), { item, index }]));
+  const groups = new Map<string, CatalogItem[]>();
+  for (const i of items) groups.set(i.category, [...(groups.get(i.category) ?? []), i]);
   return (
     <div className="fixed inset-0 z-40 bg-black/50 p-8" onMouseDown={() => api.closeHelp()}>
       <div
@@ -114,7 +109,7 @@ export function Help() {
             {t("help.close")}
           </button>
         </header>
-        <div ref={list} className="td-thin-scroll min-h-0 flex-1 overflow-auto px-5 py-4 text-sm">
+        <div className="td-thin-scroll min-h-0 flex-1 overflow-auto px-5 py-4 text-sm">
           {items.length === 0 ? (
             <p className="text-ink-faint">{t("help.none")}</p>
           ) : (
@@ -126,16 +121,8 @@ export function Help() {
                     <h3 className="mb-1.5 font-semibold text-status-warning">
                       <Marked text={title} ranges={highlightRanges(title, terms)} />
                     </h3>
-                    {rows.map(({ item: i, index }) => (
-                      <div
-                        key={i.id}
-                        data-help-cursor={index === help.cursor ? "" : undefined}
-                        aria-current={index === help.cursor ? "true" : undefined}
-                        className={[
-                          "grid grid-cols-[minmax(9rem,13rem)_auto_1fr] items-baseline gap-x-2 border-l-4 py-0.5 pr-1",
-                          index === help.cursor ? "border-accent bg-app-selected" : "border-transparent",
-                        ].join(" ")}
-                      >
+                    {rows.map((i) => (
+                      <div key={i.id} className="grid grid-cols-[minmax(9rem,13rem)_auto_1fr] items-baseline gap-x-2 py-0.5">
                         <Keys keys={i.keys} terms={terms} />
                         <span className="text-ink-faint">:</span>
                         <span>

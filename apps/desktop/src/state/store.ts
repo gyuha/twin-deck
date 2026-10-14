@@ -266,10 +266,9 @@ export interface CatalogItem {
   applicable: boolean;
 }
 
-/** 도움말(단축키 목록) 화면의 검색어와 커서 (이슈 #56). */
+/** 도움말(단축키 목록) 화면의 검색어 (이슈 #56). */
 export interface HelpState {
   query: string;
-  cursor: number;
 }
 
 export interface PaletteState {
@@ -3081,14 +3080,14 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
 
     /** 설정 화면 열기/닫기 (`Mod+,`). */
     openHelp() {
-      set({ help: { query: "", cursor: 0 } });
+      set({ help: { query: "" } });
     },
     closeHelp() {
       set({ help: null });
     },
     /**
      * 도움말 화면에 보일 줄: 키가 걸린 액션만, Actions Panel과 같은 카탈로그에서 가져온다.
-     * 검색어로 설명·키·분류를 거르고(이슈 #56), 화면 순서(분류별로 묶은 순서)로 돌려준다. 커서는 이 순서를 따른다.
+     * 검색어로 설명·키·분류를 거르고(이슈 #56), 화면 순서(분류별로 묶은 순서)로 돌려준다.
      */
     helpView(): CatalogItem[] {
       const terms = helpTerms(get().help?.query ?? "");
@@ -3100,20 +3099,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       return [...groups.values()].flat();
     },
     helpSetQuery(query: string) {
-      set((s) => (s.help ? { help: { query, cursor: 0 } } : {}));
-    },
-    helpMove(delta: 1 | -1) {
-      const n = api.helpView().length;
-      set((s) => (s.help ? { help: { ...s.help, cursor: clamp(s.help.cursor + delta, n) } } : {}));
-    },
-    /** 커서 줄의 동작을 실행한다. 지금 실행할 수 없는 동작이면 화면을 닫지 않고 아무것도 하지 않는다. */
-    async helpRun() {
-      const h = get().help;
-      if (!h) return;
-      const item = api.helpView()[h.cursor];
-      if (!item?.applicable) return;
-      set({ help: null });
-      await runFn(item.id);
+      set((s) => (s.help ? { help: { query } } : {}));
     },
     /**
      * F키 등에 지정한 애플리케이션으로 연다.

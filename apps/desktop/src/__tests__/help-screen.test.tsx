@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { renderApp } from "./helpers";
 
@@ -38,7 +38,6 @@ describe("F1 도움말 화면", () => {
     expect(within(dialog).queryByText("메뉴: 위로")).toBeNull();
     expect(within(dialog).queryByText("큐: 위로")).toBeNull();
     expect(within(dialog).queryByText("도움말 닫기")).toBeNull();
-    expect(within(dialog).queryByText("도움말: 실행")).toBeNull();
   });
 
   it("닫기 버튼과 바깥(배경) 클릭으로 닫힌다", async () => {
@@ -64,7 +63,6 @@ describe("F1 도움말 검색 (이슈 #56)", () => {
       .queryAllByRole("region")
       .flatMap((r) => [...r.querySelectorAll(":scope > div")].map((row) => row.lastElementChild?.textContent));
   const marks = (dialog: HTMLElement) => [...dialog.querySelectorAll("mark[data-help-match]")].map((m) => m.textContent);
-  const cursorRow = (dialog: HTMLElement) => dialog.querySelector("[data-help-cursor]")?.lastElementChild?.textContent;
 
   it("열면 검색창에 포커스가 있고, 글자는 단축키가 아니라 검색창에 들어간다", async () => {
     const { user } = await openHelp();
@@ -109,20 +107,11 @@ describe("F1 도움말 검색 (이슈 #56)", () => {
     expect(regions(dialog)).toEqual([]);
   });
 
-  it("↑↓로 줄을 고르고 Return으로 그 동작을 실행하며 도움말은 닫힌다", async () => {
-    const { user, dialog } = await openHelp();
-    await user.keyboard("폴더");
-    const first = cursorRow(dialog);
-    await user.keyboard("{ArrowDown}");
-    expect(cursorRow(dialog)).not.toBe(first);
-    await user.keyboard("{ArrowUp}");
-    expect(cursorRow(dialog)).toBe(first);
-    await user.clear(search());
-    await user.keyboard("새 폴더");
-    expect(cursorRow(dialog)).toBe("새 폴더");
-    await user.keyboard("{Enter}");
+  it("검색 중에도 Return은 도움말을 닫기만 하고 동작을 실행하지 않는다", async () => {
+    const { user } = await openHelp();
+    await user.keyboard("새 폴더{Enter}");
     expect(screen.queryByRole("dialog", { name: "도움말" })).toBeNull();
-    await waitFor(() => expect(screen.getByRole("dialog", { name: "새 폴더" })).toBeInTheDocument());
+    expect(screen.queryByRole("dialog", { name: "새 폴더" })).toBeNull();
   });
 
   it("Esc로 닫고 다시 열면 검색어가 비어 있다", async () => {
