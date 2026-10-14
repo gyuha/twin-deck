@@ -324,37 +324,46 @@ fn config_watch_ignores_unrelated_files() {
 
 #[test]
 fn text_color_is_validated() {
-    let color = |v: &str| load(&format!("[behavior]\ntext_color = \"{v}\"\n"));
-    for ok in ["#1a2b3c", "#abc", "#ABCDEF", ""] {
-        let l = color(ok);
-        assert!(l.warnings.is_empty(), "{ok:?}: {:?}", l.warnings);
-        assert_eq!(l.config.behavior.text_color, ok);
-    }
-    for bad in [
-        "red",
-        "#12345",
-        "#gggggg",
-        "javascript:1",
-        "#abc; background:url(x)",
-        " #abc",
-    ] {
-        let l = color(bad);
-        assert_eq!(l.warnings.len(), 1, "{bad:?}: {:?}", l.warnings);
-        assert!(
-            l.warnings[0].message.contains("text_color"),
-            "{:?}",
-            l.warnings
-        );
+    // 이전 키와 테마별 키(이슈 #58)가 같은 규칙으로 검사된다.
+    let get = |b: &td_config::Behavior, key: &str| match key {
+        "text_color" => b.text_color.clone(),
+        "text_color_dark" => b.text_color_dark.clone(),
+        _ => b.text_color_light.clone(),
+    };
+    for key in ["text_color", "text_color_dark", "text_color_light"] {
+        let color = |v: &str| load(&format!("[behavior]\n{key} = \"{v}\"\n"));
+        for ok in ["#1a2b3c", "#abc", "#ABCDEF", ""] {
+            let l = color(ok);
+            assert!(l.warnings.is_empty(), "{key} {ok:?}: {:?}", l.warnings);
+            assert_eq!(get(&l.config.behavior, key), ok);
+        }
+        for bad in [
+            "red",
+            "#12345",
+            "#gggggg",
+            "javascript:1",
+            "#abc; background:url(x)",
+            " #abc",
+        ] {
+            let l = color(bad);
+            assert_eq!(l.warnings.len(), 1, "{key} {bad:?}: {:?}", l.warnings);
+            assert!(
+                l.warnings[0].message.contains(&format!("behavior.{key}:")),
+                "{:?}",
+                l.warnings
+            );
+            assert_eq!(
+                get(&l.config.behavior, key),
+                "",
+                "{key} {bad:?}는 기본값(빈 문자열)으로 돌아간다"
+            );
+        }
         assert_eq!(
-            l.config.behavior.text_color, "",
-            "{bad:?}는 기본값(빈 문자열)으로 돌아간다"
+            get(&load("").config.behavior, key),
+            "",
+            "기본값은 테마 그대로"
         );
     }
-    assert_eq!(
-        load("").config.behavior.text_color,
-        "",
-        "기본값은 테마 그대로"
-    );
 }
 
 #[test]

@@ -14,11 +14,19 @@ export function useUiFont(font: string) {
 
 const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
+interface TextColors {
+  text_color: string;
+  text_color_dark: string;
+  text_color_light: string;
+}
+
 /**
- * 설정 `behavior.text_color`(`#rgb`/`#rrggbb`)를 앱 기본 글자색으로 쓴다. 비었거나 색이 아니면 테마 그대로다.
+ * 지금 테마(`dark`)에 맞는 글자색 설정(`#rgb`/`#rrggbb`)을 앱 기본 글자색으로 쓴다. 다크 테마는 `text_color_dark`, 라이트 테마는 `text_color_light`이고,
+ * 그 값이 비면 이전 버전의 공통 값 `text_color`를 쓴다(이슈 #58). 모두 비었거나 색이 아니면 테마 그대로다.
  * 흐린 글자색(`dull`·`faint`)은 고른 색을 배경색(`--color-app`) 쪽으로 섞어 만든다. `<body>`에 덧써서 모든 테마에서 작동한다.
  */
-export function useTextColor(color: string) {
+export function useTextColor(colors: TextColors, dark: boolean) {
+  const color = (dark ? colors.text_color_dark : colors.text_color_light).trim() || colors.text_color;
   useEffect(() => {
     const c = color.trim();
     if (!HEX_COLOR.test(c)) return;
