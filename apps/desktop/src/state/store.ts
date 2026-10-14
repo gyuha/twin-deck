@@ -3237,6 +3237,10 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       set({ settingsSection });
     },
     /** 화면 요소(Action Bar, 드라이브 바)를 켜고 끈다. 설정 파일에 저장되어 다음 실행에도 유지된다. */
+    /** 수정일 구간 묶기를 켜고 끈다(이슈 #69). 설정 화면의 "수정일로 묶어 보기" 스위치와 같은 값이다. */
+    async toggleGroupByModified() {
+      await api.setConfigValue("behavior.table.group_by_modified", { kind: "bool", value: !get().loaded.config.behavior.table.group_by_modified });
+    },
     async toggleLayoutFlag(flag: "show_action_bar" | "show_drive_bar") {
       await api.setConfigValue(`behavior.layout.${flag}`, { kind: "bool", value: !get().loaded.config.behavior.layout[flag] });
     },

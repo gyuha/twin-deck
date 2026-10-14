@@ -725,6 +725,8 @@ export const en: Record<Key, string> = {
   "status.shortcuts": "Shortcuts",
   "status.hidden_aria": "Show hidden files",
   "status.hidden": "Hidden files",
+  "status.group_aria": "Group by date modified",
+  "status.group": "Group",
   "status.aria": "Status bar",
   "status.summary": "Selected: {selected} / {total}, Files: {filesSelected}/{filesTotal}, Folders: {dirsSelected}/{dirsTotal}",
   "status.warnings": "⚠ {count} config warnings",

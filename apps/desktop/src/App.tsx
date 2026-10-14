@@ -101,6 +101,7 @@ function StatusBar() {
   const showActionBar = useApp((s) => s.loaded.config.behavior.layout.show_action_bar);
   const showDriveBar = useApp((s) => s.loaded.config.behavior.layout.show_drive_bar);
   const showHidden = useApp((s) => s.showHidden);
+  const groupByModified = useApp((s) => s.loaded.config.behavior.table.group_by_modified);
   const { api } = useAppStore();
   const { keymap, platform } = useUi();
   const warnings = fileWarnings + keymapWarnings;
@@ -148,6 +149,7 @@ function StatusBar() {
         {entryButton(t("settings.aria"), t("settings.aria"), "core.settings.open", () => api.openSettings())}
         {entryButton(t("menu.help_shortcuts"), t("status.shortcuts"), "core.help", () => api.openHelp())}
         {viewToggle(t("status.hidden_aria"), t("status.hidden"), showHidden, () => api.toggleHidden(), "core.view.hidden")}
+        {viewToggle(t("status.group_aria"), t("status.group"), groupByModified, () => api.toggleGroupByModified(), "")}
         {viewToggle(t("menu.view.drive_bar"), t("status.drive_bar"), showDriveBar, () => api.toggleLayoutFlag("show_drive_bar"), "core.view.drive_bar")}
         {viewToggle(t("menu.view.action_bar"), t("status.action_bar"), showActionBar, () => api.toggleLayoutFlag("show_action_bar"), "core.view.action_bar")}
       </span>

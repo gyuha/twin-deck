@@ -723,6 +723,8 @@ export const ko = {
   "status.shortcuts": "단축키",
   "status.hidden_aria": "숨김 파일 표시",
   "status.hidden": "숨김 파일",
+  "status.group_aria": "수정일로 묶어 보기",
+  "status.group": "묶어보기",
   "status.aria": "상태 표시줄",
   "status.summary": "선택: {selected} / {total}, 파일: {filesSelected}/{filesTotal}, 폴더: {dirsSelected}/{dirsTotal}",
   "status.warnings": "⚠ 설정 경고 {count}개",
