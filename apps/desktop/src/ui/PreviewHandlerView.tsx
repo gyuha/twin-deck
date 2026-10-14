@@ -5,7 +5,7 @@ import type { AppState } from "../state/store";
 
 /** 화면 위에 뭔가 떠 있나. 그동안 네이티브 처리기 창은 웹 화면 위에 그려지므로 숨겨야 한다. */
 const covered = (s: AppState) =>
-  !!(s.dialog || s.menu || s.ctxMenu || s.palette || s.find || s.settingsOpen || s.helpOpen || s.queueOpen || s.drag || s.tabDropTarget);
+  !!(s.dialog || s.menu || s.ctxMenu || s.palette || s.find || s.settingsOpen || s.help || s.queueOpen || s.drag || s.tabDropTarget);
 
 /** 항목을 빠르게 넘길 때 문서를 하나하나 읽지 않도록, 이 시간 동안 항목이 그대로일 때만 처리기를 띄운다. */
 const SETTLE_MS = 150;

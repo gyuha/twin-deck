@@ -167,5 +167,8 @@ export function paletteHandlers({ api }: AppStore): Partial<ActionHandlers> {
     "core.help": () => api.openHelp(),
     "core.app.check_update": () => api.checkForUpdate(),
     "core.help.close": () => api.closeHelp(),
+    "core.help.up": () => api.helpMove(-1),
+    "core.help.down": () => api.helpMove(1),
+    "core.help.run": () => api.helpRun(),
   };
 }
