@@ -35,6 +35,35 @@ const header = (name: RegExp) => within(headerRow()!).getByRole("columnheader", 
 const rowText = (name: string) => screen.getAllByRole("option", { name: new RegExp(name.replace(".", "\\.")) })[0].textContent;
 
 describe("CFG-06 컬럼", () => {
+  it("설정에서 확장자 헤더를 켜면 파일명과 빈 셀을 유지하며 양방향 정렬한다", async () => {
+    const b = seed();
+    b.seed({ "/home/b/z.md": "z", "/home/b/a.txt": "a" });
+    const { user } = await renderApp(b);
+    expect(headers()).not.toContain("확장자");
+    await user.keyboard("{Control>},{/Control}");
+    await user.click(await screen.findByRole("switch", { name: "확장자 컬럼 표시" }));
+    await user.keyboard("{Escape}");
+    expect(headers()).toEqual(["이름 ▲", "확장자", "크기", "수정"]);
+    for (const name of ["a.txt", "b.md", "c.zip", "d.txt"]) {
+      expect(within(list("left")).getByText(name).nextElementSibling).toBeEmptyDOMElement();
+    }
+    await user.keyboard("{ArrowDown}{ArrowDown}");
+    expect(cursorName("left")).toBe("a.txt");
+    await user.click(header(/확장자/));
+    await waitFor(() => expect(entryNames("left")).toEqual(["docs", "src", "b.md", "a.txt", "d.txt", "c.zip"]));
+    expect(header(/확장자/)).toHaveAttribute("aria-sort", "ascending");
+    expect(cursorName("left")).toBe("a.txt");
+    expect(entryNames("right")).toEqual(["a.txt", "z.md"]);
+    await user.click(header(/확장자/));
+    await waitFor(() => expect(entryNames("left")).toEqual(["docs", "src", "c.zip", "a.txt", "d.txt", "b.md"]));
+    expect(header(/확장자/)).toHaveAttribute("aria-sort", "descending");
+    await user.keyboard("{Control>},{/Control}");
+    await user.click(await screen.findByRole("switch", { name: "확장자 컬럼 표시" }));
+    await user.keyboard("{Escape}");
+    expect(headers()).toEqual(["이름", "크기", "수정"]);
+    expect(entryNames("left")).toEqual(["docs", "src", "c.zip", "a.txt", "d.txt", "b.md"]);
+  });
+
   it("기본 컬럼은 이름/크기/수정일이고 포맷 설정을 따른다", async () => {
     await renderApp(seed());
     expect(headers()).toEqual(["이름 ▲", "크기", "수정"]); // 기본 정렬(이름 오름차순) 표시

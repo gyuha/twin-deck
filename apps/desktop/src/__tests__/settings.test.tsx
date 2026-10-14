@@ -1,4 +1,4 @@
-import { act, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { cursorName, renderApp, seedBackend } from "./helpers";
 
@@ -65,6 +65,42 @@ describe("환경 섹션: 터미널 셸은 Windows에서만 보인다", () => {
 });
 
 describe("설정 값 바꾸기", () => {
+  it("확장자 컬럼 설정은 다시 로드해도 유지되고 해제·기본값 복원은 다른 컬럼을 보존한다", async () => {
+    const backend = seedBackend();
+    const original = ["<name:220", "size:90", "modified:130", "permissions"];
+    backend.setConfig((l) => { l.config.view.table.columns = original; });
+    let app = await renderApp(backend);
+    await open(app.user);
+    await dialog();
+    expect(sw("확장자 컬럼 표시")).toHaveAttribute("aria-checked", "false");
+    await app.user.click(sw("확장자 컬럼 표시"));
+    await waitFor(async () => expect((await backend.getConfig()).config.view.table.columns).toEqual([original[0], "extension", ...original.slice(1)]));
+    cleanup();
+    app = await renderApp(backend);
+    await open(app.user);
+    await dialog();
+    expect(sw("확장자 컬럼 표시")).toHaveAttribute("aria-checked", "true");
+    await app.user.click(sw("확장자 컬럼 표시"));
+    await waitFor(async () => expect((await backend.getConfig()).config.view.table.columns).toEqual(original));
+    await app.user.click(sw("확장자 컬럼 표시"));
+    const group = screen.getByRole("group", { name: "확장자 컬럼 표시" });
+    await app.user.click(await within(group).findByRole("button", { name: "기본값으로" }));
+    await waitFor(async () => expect((await backend.getConfig()).config.view.table.columns).toEqual(original));
+    expect(sw("확장자 컬럼 표시")).toHaveAttribute("aria-checked", "false");
+  });
+
+  it("직접 지정한 정렬·너비가 있는 확장자 컬럼도 켜진 상태로 인식하고 해제한다", async () => {
+    const backend = seedBackend();
+    backend.setConfig((l) => { l.config.view.table.columns = ["name:210", ">extension:65", "size:90"]; });
+    const { user } = await renderApp(backend);
+    await open(user);
+    await dialog();
+    expect(sw("확장자 컬럼 표시")).toHaveAttribute("aria-checked", "true");
+    expect((await backend.getConfig()).config.view.table.columns).toEqual(["name:210", ">extension:65", "size:90"]);
+    await user.click(sw("확장자 컬럼 표시"));
+    await waitFor(async () => expect((await backend.getConfig()).config.view.table.columns).toEqual(["name:210", "size:90"]));
+  });
+
   it("스위치는 바꾸는 즉시 저장되고 화면에 반영된다", async () => {
     const { user, backend } = await renderApp();
     expect(screen.getByRole("toolbar", { name: "액션 바" })).toBeInTheDocument();

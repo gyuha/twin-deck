@@ -24,7 +24,14 @@ describe("PDF 미리보기", () => {
     const frame = await dlg.findByTitle("PDF 미리보기: d.pdf");
     expect(frame.getAttribute("src")).toBe("blob:pdf-1");
     expect(created[0].type).toBe("application/pdf");
-    expect(await created[0].text()).toBe("%PDF-1.4 hello");
+    // jsdom의 Blob에는 text()가 없어 브라우저 FileReader로 실제 내용을 확인한다.
+    const text = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(created[0]);
+    });
+    expect(text).toBe("%PDF-1.4 hello");
     await user.keyboard("{Escape}");
     await waitFor(() => expect(revoked).toEqual(["blob:pdf-1"]));
   });

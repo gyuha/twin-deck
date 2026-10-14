@@ -1,7 +1,6 @@
 import { t as translate } from "../i18n";
 import type { Config, EntryDto } from "@twin-deck/ts-client";
 import type { ColumnName } from "./columns";
-import { extensionOf } from "./sort";
 
 const SI = ["B", "KB", "MB", "GB", "TB"];
 const IEC = ["B", "KiB", "MiB", "GiB", "TiB"];
@@ -155,7 +154,7 @@ export function cellText(e: EntryDto, column: ColumnName, display: Display, now?
     case "added":
       return "—"; // 파일시스템에서 얻을 수 없다(macOS 'Date Added'는 Spotlight 메타데이터)
     case "extension":
-      return e.kind === "dir" ? "" : extensionOf(e.name);
+      return ""; // 확장자는 파일명에 유지하고 이 컬럼은 헤더 정렬에만 쓴다.
     case "permissions":
       return formatPermissions(e.mode);
     case "permissions_octal":

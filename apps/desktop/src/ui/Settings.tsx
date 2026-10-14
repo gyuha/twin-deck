@@ -13,10 +13,12 @@ import { Combobox } from "./Combobox";
 import type { ComboOption } from "./Combobox";
 import { Switch } from "./Switch";
 import { TagInput } from "./TagInput";
+import { parseColumn, withExtensionColumn } from "../lib/columns";
 import { useUi } from "./uiContext";
 
 type Control =
   | { type: "switch" }
+  | { type: "extension-column" }
   | { type: "int" }
   | { type: "text" }
   | { type: "color" }
@@ -101,6 +103,7 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
       { key: "behavior.table.show_marks", get title() { return translate("settings.item.behavior.table.show_marks.title"); }, get desc() { return translate("settings.item.behavior.table.show_marks.desc"); }, control: { type: "switch" } },
       { key: "behavior.table.folder_style", get title() { return translate("settings.item.behavior.table.folder_style.title"); }, get desc() { return translate("settings.item.behavior.table.folder_style.desc"); }, control: { type: "select", options: FOLDER_STYLES } },
       { key: "behavior.table.column_lines", get title() { return translate("settings.item.behavior.table.column_lines.title"); }, get desc() { return translate("settings.item.behavior.table.column_lines.desc"); }, control: { type: "select", options: COLUMN_LINES } },
+      { key: "view.table.columns", get title() { return translate("settings.extension_column.title"); }, get desc() { return translate("settings.extension_column.desc"); }, control: { type: "extension-column" } },
       { key: "behavior.table.cursor_fill", get title() { return translate("settings.item.behavior.table.cursor_fill.title"); }, get desc() { return translate("settings.item.behavior.table.cursor_fill.desc"); }, control: { type: "switch" } },
       { key: "behavior.table.show_parent_row", get title() { return translate("settings.item.behavior.table.show_parent_row.title"); }, get desc() { return translate("settings.item.behavior.table.show_parent_row.desc"); }, control: { type: "switch" } },
       { key: "behavior.layout.pane_highlight", get title() { return translate("settings.item.behavior.layout.pane_highlight.title"); }, get desc() { return translate("settings.item.behavior.layout.pane_highlight.desc"); }, control: { type: "switch" } },
@@ -494,8 +497,9 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
             {items.map((item) => {
               const combo = item.key.startsWith("fkeys.") && item.title.includes("+") && item.title in config.fkeys;
               // 설정 파일에 없는 내장 조합키는 값이 없다 → 기본값("")으로 본다.
-              const value = (valueAt(config, item.key) ?? (item.control.type === "fkey" ? "" : undefined)) as string | number | boolean;
-              const isDefault = value === (valueAt(defaults, item.key) ?? (item.control.type === "fkey" ? "" : undefined));
+              const extensionColumn = item.control.type === "extension-column";
+              const value = (extensionColumn ? config.view.table.columns.some((s) => parseColumn(s)?.name === "extension") : valueAt(config, item.key) ?? (item.control.type === "fkey" ? "" : undefined)) as string | number | boolean;
+              const isDefault = extensionColumn ? !value : value === (valueAt(defaults, item.key) ?? (item.control.type === "fkey" ? "" : undefined));
               const wide = item.control.type === "text" || item.control.type === "fkey" || item.control.type === "tags" || item.control.type === "hotkey";
               return (
                 <div key={item.key} role="group" aria-label={item.title} className="flex items-center justify-between gap-4 border-b border-app-line py-2.5">
@@ -509,7 +513,11 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
                     {(combo || !isDefault) && !broken && (
                       <button type="button" className="whitespace-nowrap text-xs text-accent hover:underline" onClick={() =>
                           void (async () => {
-                            await api.resetConfigValue(item.key);
+                            if (extensionColumn) {
+                              await api.setConfigValue(item.key, { kind: "strList", value: withExtensionColumn(config.view.table.columns, false) });
+                            } else {
+                              await api.resetConfigValue(item.key);
+                            }
                             // F키는 지정한 앱 경로도 함께 비운다.
                             if (item.control.type === "fkey") {
                               await api.resetConfigValue(item.key.replace("fkeys.", "fkey_apps."));
@@ -521,12 +529,12 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
                         {combo ? t("settings.delete") : t("settings.reset")}
                       </button>
                     )}
-                    {item.control.type === "switch" && (
+                    {(item.control.type === "switch" || extensionColumn) && (
                       <Switch
                         aria-label={item.title}
                         checked={value as boolean}
                         disabled={!!broken}
-                        onCheckedChange={(v) => void api.setConfigValue(item.key, { kind: "bool", value: v })}
+                        onCheckedChange={(v) => void api.setConfigValue(item.key, extensionColumn ? { kind: "strList", value: withExtensionColumn(config.view.table.columns, v) } : { kind: "bool", value: v })}
                       />
                     )}
                     {item.control.type === "hotkey" && (

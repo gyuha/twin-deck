@@ -57,6 +57,16 @@ export function parseColumns(specs: readonly string[]): ColumnSpec[] {
   return cols;
 }
 
+/** 확장자 컬럼만 켜거나 끈다. 기존 컬럼 명세(순서·정렬·너비)는 보존한다. */
+export function withExtensionColumn(specs: readonly string[], visible: boolean): string[] {
+  if (!visible) return specs.filter((s) => parseColumn(s)?.name !== "extension");
+  if (specs.some((s) => parseColumn(s)?.name === "extension")) return [...specs];
+  const next = [...specs];
+  const nameIndex = next.findIndex((s) => parseColumn(s)?.name === "name");
+  next.splice(nameIndex + 1, 0, "extension");
+  return next;
+}
+
 export const MIN_COLUMN_WIDTH = 40;
 export const MAX_COLUMN_WIDTH = 600;
 

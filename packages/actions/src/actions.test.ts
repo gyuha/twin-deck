@@ -19,8 +19,10 @@ const ctx = (o: Partial<ActionContext> = {}): ActionContext => ({
   canGoBack: false,
   canGoForward: false,
   cursorIsDir: false,
+  cursorIsArchive: false,
   multiColumn: false,
   virtualTab: false,
+  usageTab: false,
   searching: false,
   ...o,
 });

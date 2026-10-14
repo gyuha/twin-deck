@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { transferableAbortController } from "node:util";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { Box3, BufferGeometry, Float32BufferAttribute, Mesh } from "three";
 import draco3d from "draco3d";
 import { loadModel, modelKindOf, normalize } from "../lib/model";
@@ -11,7 +13,13 @@ const bytes = (file: string) => {
   return Uint8Array.from(b).buffer; // jsdom 환경의 ArrayBuffer로 만든다(로더가 instanceof로 구분한다)
 };
 // jsdom에서는 occt의 wasm을 파일 주소로 불러올 수 없어서 바이트를 직접 넘긴다.
-const occt = { wasmBinary: readFileSync(resolve(__dirname, "../../node_modules/occt-import-js/dist/occt-import-js.wasm")) };
+const occt = { wasmBinary: readFileSync(createRequire(import.meta.url).resolve("occt-import-js/dist/occt-import-js.wasm")) };
+
+// Three.js의 FileLoader는 Node Request를 쓰므로 취소 신호도 Node 구현이어야 한다.
+beforeAll(() => {
+  vi.stubGlobal("AbortController", function () { return transferableAbortController(); });
+});
+afterAll(() => vi.unstubAllGlobals());
 
 /** 브라우저의 DRACOLoader(웹 워커)를 대신하는 노드용 디코더. GLTFLoader의 Draco 확장이 부르는 인터페이스만 흉내 낸다. */
 async function nodeDraco() {
