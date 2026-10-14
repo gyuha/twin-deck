@@ -52,6 +52,7 @@ import { categoryTitle, helpMatches, helpTerms } from "../lib/helpSearch";
 import { isInside, volumeOf } from "../lib/volumes";
 import { formatDateTime, formatOctal, formatPermissions, formatSize } from "../lib/format";
 import { DEFAULT_SORT, SORT_KEYS, sortEntries, sortFromColumns } from "../lib/sort";
+import { dateGroup } from "../lib/dateGroups";
 import type { SortKey, SortState } from "../lib/sort";
 
 export type PaneId = "left" | "right";
@@ -398,6 +399,17 @@ export const SELECTION_SAVE_LIMIT = 5000;
 export function effectiveSort(tab: TabState, columns: readonly string[]): SortState {
   return tab.sort ?? sortFromColumns(parseColumns(columns)) ?? DEFAULT_SORT;
 }
+
+/** 수정일 구간 그룹핑이 이 탭에 적용되는가(이슈 #62): 설정이 켜져 있고, 실제 폴더이고, 단일 컬럼 목록 보기일 때만이다. */
+export function groupingActive(tab: Pick<TabState, "virtual" | "view">, enabled: boolean): boolean {
+  return enabled && !tab.virtual && tab.view.mode === "table";
+}
+
+/** 정렬한 항목을 수정일 구간 순서(최신 구간이 위)로 안정하게 다시 배열한다. 구간 안은 정렬 순서를 그대로 따른다. */
+function groupByModified<T extends { modifiedMs: number | null }>(entries: T[], now = Date.now()): T[] {
+  const rank = new Map(entries.map((e) => [e, dateGroup(e.modifiedMs, now).rank]));
+  return [...entries].sort((a, b) => rank.get(a)! - rank.get(b)!);
+}
 export const SPLIT_MIN = 0.15;
 const clampSplit = (r: number) => Math.min(1 - SPLIT_MIN, Math.max(SPLIT_MIN, Number.isFinite(r) ? r : 0.5));
 
@@ -606,7 +618,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const listed = await backend.listDir(tab.path, get().showHidden);
       if (reloadSeq.get(key) !== seq) return;
       patchTab(pane, tabId, (t) => {
-        const entries = sortEntries(listed, effectiveSort(t, cfg().view.table.columns));
+        const sorted = sortEntries(listed, effectiveSort(t, cfg().view.table.columns));
+        const entries = groupingActive(t, cfg().behavior.table.group_by_modified) ? groupByModified(sorted) : sorted;
         const idx = keepName ? entries.findIndex((e) => e.name === keepName) : -1;
         const paths = new Set(entries.map((e) => e.path));
         return {
@@ -1572,7 +1585,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const sort: SortState = { key, dir };
       patchActive((t) => {
         const cursorPath = t.entries[t.cursor]?.path;
-        const entries = sortEntries(t.entries, sort);
+        const sorted = sortEntries(t.entries, sort);
+        const entries = groupingActive(t, cfg().behavior.table.group_by_modified) ? groupByModified(sorted) : sorted;
         const idx = cursorPath ? entries.findIndex((e) => e.path === cursorPath) : -1;
         return { sort, entries, cursor: idx >= 0 ? idx : 0 };
       });
@@ -1590,7 +1604,15 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
             ? { mode: "columns", count: Number(asked.slice(-1)) as 1 | 2 | 3 }
             : null;
       if (!view) return fail(tr("store.mode.unknown", { mode: asked }));
-      patchActive({ view });
+      // 구간 그룹핑은 단일 컬럼 목록 보기에서만 적용되니, 보기가 바뀌면 항목 순서도 그에 맞춰 다시 배열한다(이슈 #62).
+      patchActive((t) => {
+        if (!cfg().behavior.table.group_by_modified || t.virtual) return { view };
+        const cursorPath = t.entries[t.cursor]?.path;
+        const sorted = sortEntries(t.entries, effectiveSort(t, cfg().view.table.columns));
+        const entries = groupingActive({ virtual: t.virtual, view }, true) ? groupByModified(sorted) : sorted;
+        const idx = cursorPath ? entries.findIndex((e) => e.path === cursorPath) : -1;
+        return { view, entries, cursor: idx >= 0 ? idx : t.cursor };
+      });
     },
     cursorHome() {
       patchActive({ cursor: 0 });

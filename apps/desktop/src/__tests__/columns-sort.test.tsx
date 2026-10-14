@@ -41,6 +41,7 @@ describe("CFG-06 컬럼", () => {
     const { user } = await renderApp(b);
     expect(headers()).not.toContain("확장자");
     await user.keyboard("{Control>},{/Control}");
+    await user.click(await screen.findByRole("tab", { name: "목록과 선택" }));
     await user.click(await screen.findByRole("switch", { name: "확장자 컬럼 표시" }));
     await user.keyboard("{Escape}");
     expect(headers()).toEqual(["이름 ▲", "확장자", "크기", "수정"]);
@@ -61,6 +62,7 @@ describe("CFG-06 컬럼", () => {
     await waitFor(() => expect(entryNames("left")).toEqual(["docs", "src", "c", "a", "d", "b"]));
     expect(header(/확장자/)).toHaveAttribute("aria-sort", "descending");
     await user.keyboard("{Control>},{/Control}");
+    await user.click(await screen.findByRole("tab", { name: "목록과 선택" }));
     await user.click(await screen.findByRole("switch", { name: "확장자 컬럼 표시" }));
     await user.keyboard("{Escape}");
     expect(headers()).toEqual(["이름", "크기", "수정"]);

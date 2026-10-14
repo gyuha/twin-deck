@@ -26,6 +26,7 @@ folder_style = "none"
 column_lines = "none"
 cursor_fill = false
 show_parent_row = false
+group_by_modified = false # 켜면 목록을 수정일 구간(오늘·어제·이전 7일·이전 30일·월·연도)으로 나눠 구간 제목을 보인다. 단일 컬럼 목록 보기에만 적용
 
 [behavior.quick_select]
 match_only_prefix = false

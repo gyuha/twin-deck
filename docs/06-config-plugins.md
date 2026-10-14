@@ -62,6 +62,7 @@ folder_style = "none"             # 폴더 이름 장식: "none" | "brackets" [�
 column_lines = "none"             # 컬럼 사이 세로선: "none" | "solid" | "dash" (헤더와 모든 행)
 cursor_fill = false               # 활성 패널의 커서 행을 강조색으로 꽉 채운다
 show_parent_row = false          # 파일 목록 맨 위에 상위 폴더 `..` 행을 보인다(작업 대상에는 들지 않는다)
+group_by_modified = false         # 켜면 목록을 수정일 구간(오늘·어제·이전 7일·이전 30일·월·연도)으로 나눠 구간 제목을 보인다(단일 컬럼 목록 보기에만 적용)
 
 [behavior.quick_select]
 match_only_prefix = false
@@ -152,7 +153,7 @@ columns = ["name", ">extension:50", "size", "modified"]
 
 컬럼 이름: `name`(항상 존재), `size`, `created`, `modified`, `added`, `extension`, `permissions`(rwx), `permissions_octal`. Marta 문서는 권한 컬럼 두 개를 같은 이름으로 나열해 오타로 보이므로 twin-deck은 이름을 분리했다 `[중간]`. `permissions*`는 Windows에서 의미가 다르다([09](09-platform-support.md)).
 
-설정 → 모양 → **확장자 컬럼 표시**로 `extension` 컬럼을 켜고 끈다(기본 OFF). 켜면 이름 컬럼 뒤에 확장자 헤더가 생기며, 클릭할 때마다 확장자 오름차순·내림차순으로 정렬한다. 폴더는 항상 먼저 두고, 확장자가 같으면 이름순으로 정렬한다. 켜져 있으면 파일은 이름 컬럼에서 확장자를 빼고 확장자 컬럼에 표시하며, 폴더는 이름을 그대로 두고 확장자 셀을 비운다. 컬럼이 꺼져 있어도 기존 `Alt+Shift+E` 확장자 정렬 단축키를 쓸 수 있다.
+설정 → 목록과 선택 → **확장자 컬럼 표시**로 `extension` 컬럼을 켜고 끈다(기본 OFF). 켜면 이름 컬럼 뒤에 확장자 헤더가 생기며, 클릭할 때마다 확장자 오름차순·내림차순으로 정렬한다. 폴더는 항상 먼저 두고, 확장자가 같으면 이름순으로 정렬한다. 켜져 있으면 파일은 이름 컬럼에서 확장자를 빼고 확장자 컬럼에 표시하며, 폴더는 이름을 그대로 두고 확장자 셀을 비운다. 컬럼이 꺼져 있어도 기존 `Alt+Shift+E` 확장자 정렬 단축키를 쓸 수 있다.
 
 스위치는 별도 불리언 키 없이 `view.table.columns`의 `extension` 유무를 저장한다. 직접 지정한 `>extension:50` 같은 명세도 ON으로 인식한다. 끄거나 이 항목을 기본값으로 복원하면 확장자 명세만 제거하며, 다른 컬럼의 순서·너비·정렬 표시는 유지한다. 현재 탭에서 직접 선택한 정렬은 컬럼을 숨겨도 유지된다.
 

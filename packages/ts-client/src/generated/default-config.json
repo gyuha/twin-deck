@@ -21,7 +21,8 @@
         "folder_style": "none",
         "column_lines": "none",
         "cursor_fill": false,
-        "show_parent_row": false
+        "show_parent_row": false,
+        "group_by_modified": false
       },
       "quick_select": {
         "match_only_prefix": false,

@@ -727,7 +727,11 @@ cursor_fill: boolean;
 /**
  * 파일 목록 맨 위에 상위 폴더로 가는 `..` 행을 보인다. 전체 선택·복사·이동 같은 작업 대상에는 들지 않는다.
  */
-show_parent_row: boolean }
+show_parent_row: boolean; 
+/**
+ * 파일 목록을 수정일 구간(오늘·어제·이전 7일·이전 30일·월·연도)으로 나눠 구간 제목 행을 보인다(이슈 #62). 단일 컬럼 목록 보기에만 적용된다.
+ */
+group_by_modified: boolean }
 /**
  * 사용자 키바인딩 한 줄. `action`이 None이면 기본 바인딩 해제(`"F5" = "none"`).
  */

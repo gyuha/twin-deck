@@ -10,7 +10,9 @@ import { SORT_KEYS, splitExtension } from "../lib/sort";
 import { FileIcon } from "./FileIcon";
 import type { SortKey } from "../lib/sort";
 import { useApp, useAppStore, useT } from "../state/context";
-import { activeTab, effectiveSort, isFolderEntry, parentRowVisible } from "../state/store";
+import { activeTab, effectiveSort, groupingActive, isFolderEntry, parentRowVisible } from "../state/store";
+import { dateGroup } from "../lib/dateGroups";
+import type { DateGroup } from "../lib/dateGroups";
 import type { PaneId } from "../state/store";
 
 const ROW_HEIGHT = 24;
@@ -150,7 +152,28 @@ export function FileTable({ pane }: { pane: PaneId }) {
   // 확장자 컬럼이 보이면 파일 이름에서는 확장자를 뺀다(그 컬럼이 보여 준다).
   const hasExtColumn = !multi && columns.some((c) => c.name === "extension");
   const colCount = tab.view.mode === "columns" ? tab.view.count : 1;
-  const rows = Math.max(1, Math.ceil(tab.entries.length / colCount));
+  // 수정일 구간 그룹핑(이슈 #62): 구간이 바뀌는 곳에 제목 행을 끼운다. 제목 행은 항목이 아니라 커서·선택 번호는 그대로 `tab.entries`의 번호다.
+  const grouping = groupingActive(tab, config.behavior.table.group_by_modified);
+  const language = config.behavior.language;
+  const layout = useMemo(() => {
+    if (!grouping) return null;
+    const now = Date.now();
+    const lines: ({ header: DateGroup } | { index: number })[] = [];
+    const rowOfEntry: number[] = [];
+    let last = "";
+    tab.entries.forEach((e, i) => {
+      const g = dateGroup(e.modifiedMs, now);
+      if (g.id !== last) {
+        lines.push({ header: g });
+        last = g.id;
+      }
+      rowOfEntry.push(lines.length);
+      lines.push({ index: i });
+    });
+    return { lines, rowOfEntry };
+    // 언어가 바뀌면 구간 제목도 다시 만든다.
+  }, [grouping, tab.entries, language]);
+  const rows = layout ? Math.max(1, layout.lines.length) : Math.max(1, Math.ceil(tab.entries.length / colCount));
   const listRef = useRef<HTMLDivElement>(null);
   // `..` 상위 폴더 행(커서 -1)은 목록 맨 위에 두고 가상 스크롤 영역은 그 높이만큼 아래에서 시작한다.
   const parentRow = parentRowVisible(tab, config.behavior.table.show_parent_row);
@@ -177,8 +200,8 @@ export function FileTable({ pane }: { pane: PaneId }) {
   // 커서가 화면 밖이면 스크롤한다 (열 우선 배치: index = 열 * rows + 행).
   useEffect(() => {
     if (tab.cursor < 0) virtualizer.scrollToOffset(0);
-    else if (tab.entries.length > 0) virtualizer.scrollToIndex(tab.cursor % rows, { align: "auto" });
-  }, [tab.cursor, rows, tab.entries.length, virtualizer]);
+    else if (tab.entries.length > 0) virtualizer.scrollToIndex(layout ? (layout.rowOfEntry[tab.cursor] ?? 0) : tab.cursor % rows, { align: "auto" });
+  }, [tab.cursor, rows, tab.entries.length, virtualizer, layout]);
 
   /** 이름 뒤 컬럼의 왼쪽 세로선(`behavior.table.column_lines`)과, 다음 컬럼과 붙지 않게 하는 오른쪽 여백. */
   const columnEdge = (name: ColumnSpec["name"], k: number, last: boolean) =>
@@ -429,11 +452,24 @@ export function FileTable({ pane }: { pane: PaneId }) {
                 gridTemplateColumns: multi ? `repeat(${colCount}, minmax(0,1fr))` : undefined,
               }}
             >
-              {Array.from({ length: colCount }, (_, c) => {
-                const i = c * rows + v.index;
-                const e = tab.entries[i];
-                return e ? renderRow(e, i) : null;
-              })}
+              {layout
+                ? (() => {
+                    const line = layout.lines[v.index];
+                    if (!line) return null;
+                    if ("header" in line) {
+                      return (
+                        <div data-group-header data-group-id={line.header.id} className="flex h-6 items-end border-l-[3px] border-transparent px-2 pb-0.5 text-xs font-semibold text-ink-dull">
+                          {line.header.title}
+                        </div>
+                      );
+                    }
+                    return renderRow(tab.entries[line.index], line.index);
+                  })()
+                : Array.from({ length: colCount }, (_, c) => {
+                    const i = c * rows + v.index;
+                    const e = tab.entries[i];
+                    return e ? renderRow(e, i) : null;
+                  })}
             </div>
           ))}
         </div>

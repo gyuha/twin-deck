@@ -147,13 +147,13 @@ describe("시스템 아이콘 옵션", () => {
     const { user, backend } = await renderApp(seed(false));
     await user.keyboard("{Control>},{/Control}");
     let dialog = await screen.findByRole("dialog", { name: "설정" });
-    await user.click(within(dialog).getByRole("tab", { name: "모양" }));
+    await user.click(within(dialog).getByRole("tab", { name: "목록과 선택" }));
     expect(within(dialog).getByRole("group", { name: "시스템 아이콘 사용" })).toBeTruthy();
     await user.keyboard("{Escape}");
     await backend.setConfigValue("behavior.language", { kind: "str", value: "en" });
     await user.keyboard("{Control>},{/Control}");
     dialog = await screen.findByRole("dialog", { name: "Settings" });
-    await user.click(within(dialog).getByRole("tab", { name: "Appearance" }));
+    await user.click(within(dialog).getByRole("tab", { name: "List and selection" }));
     const row = within(dialog).getByRole("group", { name: "Use system icons" });
     expect(row.textContent).not.toMatch(/[가-힣]/);
     await user.click(within(row).getByRole("switch"));

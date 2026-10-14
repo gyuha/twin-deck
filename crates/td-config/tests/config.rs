@@ -975,6 +975,25 @@ fn show_parent_row_defaults_off_and_user_can_turn_it_on() {
 }
 
 #[test]
+fn group_by_modified_defaults_off_and_user_can_turn_it_on() {
+    use td_config::{set_user_value, ConfigValue};
+    let none = load("");
+    assert!(none.warnings.is_empty(), "{:?}", none.warnings);
+    assert!(!none.config.behavior.table.group_by_modified);
+
+    let dir = tempfile::tempdir().unwrap();
+    set_user_value(
+        dir.path(),
+        "behavior.table.group_by_modified",
+        ConfigValue::Bool(true),
+    )
+    .unwrap();
+    let l = load_dir(dir.path(), Platform::Linux);
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert!(l.config.behavior.table.group_by_modified);
+}
+
+#[test]
 fn list_appearance_defaults_round_trip_and_validate_folder_style() {
     use td_config::{set_user_value, ConfigValue};
     // 기본값은 지금 모양과 같다

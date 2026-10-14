@@ -5,6 +5,8 @@ import { cursorName, renderApp, seedBackend } from "./helpers";
 const open = (user: Awaited<ReturnType<typeof renderApp>>["user"]) => user.keyboard("{Control>},{/Control}");
 const dialog = () => screen.findByRole("dialog", { name: "설정" });
 const sw = (name: string) => screen.getByRole("switch", { name });
+/** 목록 모양·확장자 컬럼 같은 항목은 "목록과 선택" 탭에 있다. */
+const listTab = (user: Awaited<ReturnType<typeof renderApp>>["user"]) => user.click(screen.getByRole("tab", { name: "목록과 선택" }));
 
 describe("설정 화면 열기와 닫기", () => {
   it("Mod+,로 열고 Esc로 닫는다", async () => {
@@ -72,6 +74,7 @@ describe("설정 값 바꾸기", () => {
     let app = await renderApp(backend);
     await open(app.user);
     await dialog();
+    await listTab(app.user);
     expect(sw("확장자 컬럼 표시")).toHaveAttribute("aria-checked", "false");
     await app.user.click(sw("확장자 컬럼 표시"));
     await waitFor(async () => expect((await backend.getConfig()).config.view.table.columns).toEqual([original[0], "extension", ...original.slice(1)]));
@@ -79,6 +82,7 @@ describe("설정 값 바꾸기", () => {
     app = await renderApp(backend);
     await open(app.user);
     await dialog();
+    await listTab(app.user);
     expect(sw("확장자 컬럼 표시")).toHaveAttribute("aria-checked", "true");
     await app.user.click(sw("확장자 컬럼 표시"));
     await waitFor(async () => expect((await backend.getConfig()).config.view.table.columns).toEqual(original));
@@ -95,6 +99,7 @@ describe("설정 값 바꾸기", () => {
     const { user } = await renderApp(backend);
     await open(user);
     await dialog();
+    await listTab(user);
     expect(sw("확장자 컬럼 표시")).toHaveAttribute("aria-checked", "true");
     expect((await backend.getConfig()).config.view.table.columns).toEqual(["name:210", ">extension:65", "size:90"]);
     await user.click(sw("확장자 컬럼 표시"));
@@ -184,6 +189,7 @@ describe("설정 값 바꾸기", () => {
     const { user, backend } = await renderApp();
     await open(user);
     await dialog();
+    await listTab(user);
     const input = screen.getByRole("spinbutton", { name: "아이콘 크기" });
     await user.clear(input);
     await user.type(input, "24{Enter}");
@@ -210,6 +216,7 @@ describe("기본값으로", () => {
     const { user } = await renderApp(backend);
     await open(user);
     await dialog();
+    await listTab(user);
     const row = screen.getByRole("group", { name: "아이콘 크기" });
     expect(within(row).getByRole("spinbutton")).toHaveValue(20);
     await user.click(within(row).getByRole("button", { name: "기본값으로" }));
@@ -269,10 +276,11 @@ describe("키 설정", () => {
 });
 
 describe("파일 목록 모양 설정 항목", () => {
-  it("모양 탭에 줄무늬·표시 칸·폴더 모양·커서 행 꽉 채움이 있고 바꾸면 저장된다", async () => {
+  it("목록과 선택 탭에 줄무늬·표시 칸·폴더 모양·커서 행 꽉 채움이 있고 바꾸면 저장된다", async () => {
     const { user, backend } = await renderApp();
     await open(user);
     await dialog();
+    await listTab(user);
     expect(screen.getByRole("group", { name: "폴더 모양" })).toBeInTheDocument();
     expect(sw("줄무늬 행")).toHaveAttribute("aria-checked", "false");
     expect(sw("표시 칸")).toHaveAttribute("aria-checked", "true");
