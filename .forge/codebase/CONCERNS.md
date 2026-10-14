@@ -1,5 +1,5 @@
 ---
-last_mapped_commit: 1a05fb67dd1370370ed7a22974d30ed6dc35eb9b
+last_mapped_commit: 8a4f46c193d6d3ec7cab83bab41bfbf703e170c8
 mapped: 2026-10-14
 ---
 
@@ -19,7 +19,7 @@ mapped: 2026-10-14
 
 ## 변경 영향이 큰 파일
 
-- `apps/desktop/src/state/store.ts`는 3,452줄에 상태와 큰 `api` 객체를 담는다. 탐색, 선택, 설정, 전송, 미리보기의 변경이 같은 파일에서 만나는 구조이므로 인접 비동기 흐름과 상태 복원을 함께 확인한다.
+- `apps/desktop/src/state/store.ts`는 3,470줄에 상태와 큰 `api` 객체를 담는다. 탐색, 선택, 설정, 전송, 미리보기의 변경이 같은 파일에서 만나는 구조이므로 인접 비동기 흐름과 상태 복원을 함께 확인한다.
 - `apps/desktop/src-tauri/src/service.rs`는 테스트 포함 3,316줄이다. 파일 작업, 큐, 감시, 검색, 미리보기 기능의 연결점이므로 단순 명령 래퍼만 시험해서는 서비스 동작을 확인할 수 없다.
 - `apps/desktop/src/ui/useKeyboard.ts`, `apps/desktop/src/actions.ts`, `packages/actions/src/defaults.ts`가 키 처리 책임을 나눈다. 대화상자의 특수 처리와 액션 범위를 건너뛰면 같은 키가 다른 화면에서 다르게 처리될 수 있다.
 - 타입·명령 변경은 `apps/desktop/src-tauri/src/commands.rs`, `packages/ts-client/src/generated/bindings.ts`, `packages/ts-client/src/backend.ts`, `packages/ts-client/src/tauri.ts`, `packages/ts-client/src/fake.ts`를 함께 맞춰야 한다. 자동 생성 파일만 수동으로 고치면 이후 생성 결과와 어긋난다.
@@ -55,3 +55,19 @@ mapped: 2026-10-14
 
 - `apps/desktop/src/ui/Settings.tsx`의 확장자 컬럼 스위치는 독립 불리언이 아니라 `view.table.columns` 배열을 수정한다. 다른 컬럼의 순서와 설정을 보존하는지가 후속 변경의 확인 지점이다.
 - `apps/desktop/src/ui/FileTable.tsx`와 `apps/desktop/src/__tests__/columns-sort.test.tsx`에서 헤더 정렬, 빈 확장자 셀, 확장자를 유지한 파일명을 함께 유지한다. 컬럼 표시 여부와 이미 선택된 정렬 기준을 같은 상태로 취급하지 않는다.
+- 확장자 컬럼 적용 범위: `apps/desktop/src/ui/FileTable.tsx`의 `hasExtColumn`은 여러 열 보기(`multi`)에서 꺼져 있어 이름에서 확장자를 빼지 않는다. 빠른 선택 중에는 `QuickHighlight`가 `e.name` 전체를 그려 확장자를 포함해 보여 준다. 두 경로가 일반 표 행과 이름 표시 방식이 다르므로 이름 표시를 바꿀 때 함께 확인한다.
+
+## 배포와 공개 경계
+
+- `.github/workflows/release.yml`의 `publish` job은 `environment: release`를 쓰지만 Required reviewers가 없어, 두 OS 업로드가 끝나면 승인 없이 곧바로 공개하고 Homebrew tap을 갱신한다. 공개는 되돌릴 수 없다. `Taskfile.yml`의 `deploy`도 Required reviewers 존재 점검을 없앴으므로 환경 보호 설정이 빠져 있어도 막지 않는다. 승인 단계는 Environment 설정에서 다시 지정해야만 되살아난다.
+- `AGENTS.md`의 "배포해줘" 절차(7번)는 승인 없이 공개되는 현재 워크플로에 맞춰져 있고, 에이전트가 `task deploy`를 사용자 요청 없이 실행하지 않는다는 규칙이 공개 전 유일한 사람 확인(요청 자체와 `task deploy`의 `[y/N]` 프롬프트)이다.
+
+## 터미널과 설정 호환
+
+- `crates/td-terminal/src/lib.rs`의 `resolve_shell`은 Unix에서 `$SHELL`(없으면 `/bin/sh`)을 로그인 셸(`-l`)로 연다. 사용자의 `.zprofile`/`.zshrc`가 실행되므로 느리거나 출력을 내는 프로필이 터미널 시작에 영향을 줄 수 있다. 시험은 `/bin/zsh`가 있을 때만 프로필 로딩을 확인한다. Windows 셸 선택 경로는 그대로이며 이 환경에서 실행 검증되지 않았다.
+- 같은 파일의 `ensure_utf8_locale`은 locale이 비었거나 `C`/`POSIX`일 때만 자식 PTY에 UTF-8 locale(macOS `en_US.UTF-8`, 그 밖 `C.UTF-8`)을 채운다. 해당 locale이 대상 시스템에 설치돼 있는지는 시험하지 않는다.
+- 글자색은 `behavior.text_color_dark`/`text_color_light`와 이전 공통 키 `text_color`가 공존한다(`crates/td-config/src/config.rs`, `apps/desktop/src/ui/fonts.ts`의 `useTextColor`). 테마 키가 비면 `text_color`로 폴백하고, 세 키 모두 `crates/td-config/src/load.rs`의 `validate_text_color`가 검증한다. 설정 화면은 `text_color`를 `hideWhenEmpty`로 숨기므로 값이 있는 기존 사용자만 보인다. 폴백 규칙을 바꾸면 `default.toml`, 생성 파일, 설정 화면을 함께 맞춘다.
+
+## 도움말 검색
+
+- `apps/desktop/src/lib/helpSearch.ts`는 `es-hangul`의 `disassemble`로 자소 단위 비교를 한다. 매 호출마다 모든 필드를 다시 분해(`helpMatches`)하므로 도움말 항목이 많거나 입력이 잦으면 비용이 늘 수 있다. 측정한 문제는 아니다. 외부 의존성(`apps/desktop/package.json`)이 추가되었으며 하이라이트 위치 계산은 `starts` 매핑에 의존하므로, 서로게이트 쌍과 NFC 정규화 경계는 `apps/desktop/src/__tests__/help-screen.test.tsx`로 확인한다.

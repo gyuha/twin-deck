@@ -1,5 +1,5 @@
 ---
-last_mapped_commit: 1a05fb67dd1370370ed7a22974d30ed6dc35eb9b
+last_mapped_commit: 8a4f46c193d6d3ec7cab83bab41bfbf703e170c8
 mapped: 2026-10-14
 ---
 
@@ -13,7 +13,7 @@ mapped: 2026-10-14
 | `crates/` | 파일시스템·작업·설정 등 Rust 워크스페이스 라이브러리 |
 | `packages/` | 공용 TypeScript 패키지와 아이콘 자산 |
 | `scripts/` | 설치·릴리스·업데이트 매니페스트·테마·아이콘 생성 스크립트 |
-| `.github/workflows/release.yml` | macOS·Windows 빌드 및 승인 후 공개 워크플로 |
+| `.github/workflows/release.yml` | macOS·Windows 빌드 후 승인 없이 공개하는 워크플로 |
 | `docs/` | 제품 명세, 기술 문서, ADR, 스크린샷 |
 | `.forge/` | 작업 기록·계획·결정 및 코드베이스 지도 |
 | `AGENTS.md`, `CLAUDE.md` | 저장소 작업 지침과 Claude용 가져오기 |
@@ -45,7 +45,7 @@ mapped: 2026-10-14
 
 ### 화면 보조 코드
 
-- `apps/desktop/src/lib/columns.ts`, `sort.ts`, `names.ts`, `format.ts`에 컬럼 명세·정렬·이름·표시 형식을 둔다.
+- `apps/desktop/src/lib/columns.ts`, `sort.ts`, `names.ts`, `format.ts`에 컬럼 명세·정렬·이름·표시 형식을 둔다. `helpSearch.ts`는 도움말 검색, `terminalEngine.ts`는 터미널 화면 엔진 계약·글꼴 처리다.
 - `apps/desktop/src/lib/themeColors.ts`, `themes.generated.ts`는 테마 해석과 생성 데이터다.
 - `apps/desktop/src/lib/office/`, `apps/desktop/src/lib/model/`은 문서·모델 형식 처리 코드다.
 - `apps/desktop/src/i18n/`에는 `ko.ts`, `en.ts`, `locales.ts`, `index.ts`, `rust.ts`, 번역 검사 허용 목록이 있다.

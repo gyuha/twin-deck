@@ -1,5 +1,5 @@
 ---
-last_mapped_commit: 1a05fb67dd1370370ed7a22974d30ed6dc35eb9b
+last_mapped_commit: 8a4f46c193d6d3ec7cab83bab41bfbf703e170c8
 mapped: 2026-10-14
 ---
 # 외부 통합
@@ -19,7 +19,7 @@ mapped: 2026-10-14
 | 파일 복사·삭제 | 로컬 파일 시스템과 OS 휴지통; macOS 이름 정규화 재시도 (`crates/td-vfs/src/local.rs`, `crates/td-ops/src/trasher.rs`) |
 | 볼륨 | OS별 마운트/용량 탐지, macOS `diskutil`, Linux `umount`, Windows 셸 꺼내기·`net use` (`crates/td-volumes/src/detect.rs`, `crates/td-volumes/src/space.rs`, `crates/td-volumes/src/unmount.rs`) |
 | 파일 변경 | notify 기반 OS 파일 감시 (`crates/td-watch/src/lib.rs`) |
-| 터미널 | portable-pty로 실제 셸 생성, Windows cmd/PowerShell/Git Bash 선택; 그 외 기본 셸 환경변수 사용 (`crates/td-terminal/src/lib.rs`) |
+| 터미널 | portable-pty로 실제 셸 생성, Windows cmd/PowerShell/Git Bash 선택; 그 외 `$SHELL`을 로그인 셸(`-l`)로 열어 `.zprofile`의 PATH를 적용하고, Unix에서는 locale이 없거나 C면 자식에 UTF-8 locale을 주입 (`crates/td-terminal/src/lib.rs`) |
 | 클립보드·드래그 | Tauri clipboard-manager, clipboard-rs, drag 크레이트 (`apps/desktop/src-tauri/Cargo.toml`, `apps/desktop/src-tauri/src/commands.rs`) |
 | 앱 창·단축키 | single-instance, window-state, global-shortcut 플러그인 (`apps/desktop/src-tauri/src/main.rs`, `apps/desktop/src-tauri/src/global_hotkey.rs`) |
 | 네이티브 아이콘 | macOS AppKit, Windows Shell/GDI (`crates/td-icons/Cargo.toml`, `crates/td-icons/src/`) |
@@ -39,8 +39,8 @@ mapped: 2026-10-14
 
 ## CI·Homebrew
 
-- `.github/workflows/release.yml`은 `workflow_dispatch` 전용이다. macOS 빌드/초안 업로드 → Windows 빌드/초안 업로드 → `release` Environment 승인 후 Ubuntu 공개 순서다.
-- `task deploy`는 main 브랜치, 깨끗한 작업 트리, origin/main 일치, 변경 노트, 미공개 버전, Environment 승인자 설정을 검사한 뒤 GitHub CLI로 워크플로를 시작한다 (`Taskfile.yml`).
+- `.github/workflows/release.yml`은 `workflow_dispatch` 전용이다. macOS 빌드/초안 업로드 → Windows 빌드/초안 업로드 → Ubuntu 공개 순서다. `publish` job은 `release` Environment를 참조하지만 Required reviewers가 없어 승인 없이 곧바로 공개한다.
+- `task deploy`는 main 브랜치, 깨끗한 작업 트리, origin/main 일치, 변경 노트, 미공개 버전을 검사한 뒤(Environment 승인자 검사는 제거됨) GitHub CLI로 워크플로를 시작한다 (`Taskfile.yml`).
 - GitHub 인증은 워크플로의 `GH_TOKEN`, tap 저장소 쓰기 인증은 별도 GitHub secret을 사용한다. 지도에는 값이나 인증 URL을 보관하지 않는다 (`.github/workflows/release.yml`).
 - 공개 후 `scripts/update-tap.mjs`가 최신 공개 릴리스와 macOS ZIP의 SHA-256을 확인하고 `gyuha/homebrew-tap`의 `Casks/twin-deck.rb`를 갱신·push한다. Cask 문자열 생성은 `scripts/update-homebrew-cask.mjs`가 담당한다.
 - 외부 웹훅 수신 서버나 사용자 로그인 흐름은 조사한 앱 진입점·배포 구성에서 확인되지 않았다 (`apps/desktop/src-tauri/src/main.rs`, `.github/workflows/release.yml`).

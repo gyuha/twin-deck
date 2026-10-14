@@ -1,5 +1,5 @@
 ---
-last_mapped_commit: 1a05fb67dd1370370ed7a22974d30ed6dc35eb9b
+last_mapped_commit: 8a4f46c193d6d3ec7cab83bab41bfbf703e170c8
 mapped: 2026-10-14
 ---
 
@@ -20,7 +20,7 @@ mapped: 2026-10-14
 | 스크립트 단위 테스트 | `bun test scripts/release-notes.test.mjs` 등 파일을 명시해 실행 |
 
 - 루트 JS 스크립트는 Bun 워크스페이스의 test 스크립트를 호출한다. `scripts/*.test.mjs`는 해당 목록에 자동 포함되는 것으로 가정하지 않는다.
-- `.github/workflows/`에서 확인한 워크플로는 `release.yml`이다. 로컬 `task check`/`task test`가 일반 CI에서 자동 실행된다고 가정하지 않는다.
+- `.github/workflows/`에서 확인한 워크플로는 `release.yml`이다(배포 승인 단계는 없어졌고 빌드 후 `publish`가 자동 공개한다). 로컬 `task check`/`task test`가 일반 CI에서 자동 실행된다고 가정하지 않는다.
 
 ## UI 테스트 구성
 
@@ -41,6 +41,7 @@ mapped: 2026-10-14
 - clipboard, trashed, savedStates 등 관측 가능한 기록으로 외부 호출의 의도를 검증한다. 실제 OS 부작용을 증명하는 기록은 아니다.
 - `defaultLoaded()`는 `packages/ts-client/src/generated/default-config.json`을 복제한다. Rust 기본값과 UI fixture의 연결은 생성 파일 최신성 테스트가 보증한다.
 - `packages/ts-client/src/client.test.ts`, `filedrop.test.ts`, `terminal.test.ts`, `cli-install.test.ts`는 브리지 기능을 별도로 검사한다.
+- `apps/desktop/src/__tests__/terminal-engine.test.ts`는 `vi.hoisted`와 `vi.mock`으로 `@xterm/xterm`의 `Terminal`·`@xterm/addon-fit`의 `FitAddon`을 가짜 클래스로 바꾸고, `document.fonts`를 `Object.defineProperty`로 대체한 뒤 `afterEach`에서 원래 descriptor로 복원한다.
 - `packages/actions/src/actions.test.ts`, `packages/keybinds/src/keybinds.test.ts`는 액션/키 처리의 패키지 단위 검증이다.
 
 ## 주요 회귀 테스트 위치
@@ -55,6 +56,8 @@ mapped: 2026-10-14
 | 언어 키·번역·Rust 오류 | `apps/desktop/src/__tests__/i18n-keys.test.ts`, `i18n-backend-errors.test.ts`, `i18n-rust-messages.test.ts` |
 | 문서 미리보기 정제 | `apps/desktop/src/__tests__/office-sanitize.test.ts` |
 | F 키 목록 | `apps/desktop/src/__tests__/fkey-bindings.test.tsx` |
+| 도움말 검색 | `apps/desktop/src/__tests__/help-screen.test.tsx` (`apps/desktop/src/lib/helpSearch.ts`) |
+| 터미널 엔진·글꼴 | `apps/desktop/src/__tests__/terminal-engine.test.ts` |
 
 - 확장자 컬럼 테스트는 기본 OFF, 빈 확장자 셀, 확장자를 포함한 파일명, 양방향 정렬, 커서 보존, 반대 패널 독립성을 검증한다.
 - 설정 테스트는 기존 컬럼의 정렬·너비 명세 보존과 다시 로드한 ON 상태를 검증한다. Rust TOML 컬럼 파싱은 `crates/td-config/tests/config.rs`에서 별도로 검사한다.
@@ -66,6 +69,7 @@ mapped: 2026-10-14
 - `crates/td-ops/tests/overwrite_safety.rs`, `archive_ops.rs`, `normalize.rs`, `scenario.rs`는 덮어쓰기·압축·이름 정규화·복합 작업을 다룬다.
 - `apps/desktop/src-tauri/src/service.rs` 내부 테스트는 GUI 실행 없이 서비스 계층을 검증한다. 파일 fixture에도 `tempfile`을 사용한다.
 - `apps/desktop/src-tauri/src/commands.rs`의 `bindings_are_up_to_date`, `default_config_fixture_is_up_to_date`는 생성 결과와 저장소 파일의 일치를 확인한다.
+- `crates/td-terminal/src/lib.rs`의 `#[cfg(unix)]` 테스트는 `tempfile::tempdir()`을 임시 `HOME`·`ZDOTDIR`로 지정하고 `.zprofile`·`.zshrc`를 써 둔 뒤 `resolve_shell`이 돌려준 로그인 셸을 실제 pty(`Terminals::open_pty`)로 띄워 `echo` 출력을 `collect_until`로 확인한다(이슈 #64). `/bin/zsh`가 없으면 테스트를 건너뛰고 반환한다. 종료 이벤트는 `wait_exit`로 기다린다.
 - `scripts/update-tap.test.mjs`는 로컬 bare 저장소를 사용한다. `scripts/publish-draft.test.mjs`, `update-manifest.test.mjs`, `update-homebrew-cask.test.mjs`도 배포 보조 코드의 별도 테스트다.
 
 ## 한계와 검증 해석

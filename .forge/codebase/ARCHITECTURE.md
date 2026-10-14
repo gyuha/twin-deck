@@ -1,5 +1,5 @@
 ---
-last_mapped_commit: 1a05fb67dd1370370ed7a22974d30ed6dc35eb9b
+last_mapped_commit: 8a4f46c193d6d3ec7cab83bab41bfbf703e170c8
 mapped: 2026-10-14
 ---
 
@@ -18,7 +18,7 @@ mapped: 2026-10-14
 2. 같은 파일의 `setup`은 설정 저장소, OS 이벤트, 디렉터리 변경, 큐·검색·터미널 이벤트를 연결한다. 단일 인스턴스 설정을 끄거나 `TWIN_DECK_MULTI`를 지정하면 별도 인스턴스를 허용한다.
 3. `apps/desktop/src/main.tsx`는 스타일을 읽고 `apps/desktop/src/bootstrap.tsx`의 `start`를 호출한다.
 4. `bootstrap.tsx`는 저장된 상태와 홈 경로를 읽어 `App`에 전달한다. 시작 실패는 빈 화면 대신 오류 요소로 렌더링한다.
-5. `apps/desktop/src/App.tsx`는 저장소, 액션 레지스트리, 플랫폼별 키맵, 테마·언어 및 화면 컨텍스트를 조립한다.
+5. `apps/desktop/src/App.tsx`는 저장소, 액션 레지스트리, 플랫폼별 키맵, 테마·언어 및 화면 컨텍스트를 조립한다(`useTheme`가 다크 여부를 반환한다).
 6. 창 위치·크기는 Tauri window-state 플러그인, 탭 등 앱 상태는 `crates/td-state/src/snapshot.rs`와 `apps/desktop/src/state/store.ts`의 스냅샷 흐름으로 나뉜다.
 
 ## Rust 계층과 경계
@@ -34,6 +34,7 @@ mapped: 2026-10-14
 
 - 설정은 `crates/td-config/src/load.rs`, `merge.rs`, `store.rs`에서 기본 TOML과 사용자 설정을 병합하고 파일 변경을 감시한다.
 - 검색·사용량 분석은 `crates/td-search/src/search.rs`, `find.rs`, `usage.rs`, 디렉터리 감시는 `crates/td-watch/src/lib.rs`에서 담당한다.
+- 내장 터미널(`crates/td-terminal/src/lib.rs`)은 PTY를 열 때 UTF-8 로캘을 보완하고, Unix 셸은 로그인 셸(`-l`)로 실행한다. 화면 엔진은 `apps/desktop/src/lib/terminalEngine.ts`(xterm.js, 글꼴 로드·대체)이고 `apps/desktop/src/ui/TerminalView.tsx`가 사용한다.
 - OS 실행·볼륨·터미널·아이콘·CLI 설치 기능은 각각 `crates/td-launch/`, `crates/td-volumes/`, `crates/td-terminal/`, `crates/td-icons/`, `crates/td-cli/`로 분리한다.
 
 ## 명령과 이벤트 데이터 흐름
@@ -58,6 +59,7 @@ mapped: 2026-10-14
 - 기본값의 원본은 `crates/td-config/src/default.toml`, UI·테스트용 생성본은 `packages/ts-client/src/generated/default-config.json`이다.
 - 확장자 컬럼 토글은 별도 boolean 필드가 아니라 `view.table.columns`를 수정한다. `apps/desktop/src/lib/columns.ts`의 `withExtensionColumn`이 기존 순서·정렬 표시·너비를 보존하며 추가·제거한다.
 - `apps/desktop/src/ui/FileTable.tsx`의 헤더는 `api.setOrder`를 호출한다. `apps/desktop/src/lib/sort.ts`가 폴더 우선·동률 이름순을 유지하며 확장자 등 선택한 키로 정렬한다.
+- 도움말은 `store.ts`의 `help: { query } | null` 상태(`helpView`·`helpSetQuery`)로 열림과 검색어를 함께 들고, `apps/desktop/src/ui/Help.tsx`가 그리며 `apps/desktop/src/lib/helpSearch.ts`가 한글 자소 단위 낱말 검색·강조 구간을 계산한다.
 - 확장자 컬럼이 표시되어도 셀은 비워 두고 파일명에는 확장자를 유지한다. 관련 계약은 `apps/desktop/src/__tests__/columns-sort.test.tsx`가 다룬다.
 
 ## 키보드와 액션

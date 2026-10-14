@@ -1,5 +1,5 @@
 ---
-last_mapped_commit: 1a05fb67dd1370370ed7a22974d30ed6dc35eb9b
+last_mapped_commit: 8a4f46c193d6d3ec7cab83bab41bfbf703e170c8
 mapped: 2026-10-14
 ---
 # 기술 스택
@@ -18,7 +18,8 @@ mapped: 2026-10-14
 | 번들·개발 서버 | Vite 5 + React SWC 플러그인, 포트 1420 고정 (`apps/desktop/vite.config.ts`) |
 | 스타일 | Tailwind CSS 4 Vite 플러그인, Spacedrive primitives/tokens (`apps/desktop/package.json`) |
 | 상태·긴 목록 | Zustand 5, TanStack React Virtual 3 (`apps/desktop/src/state/store.ts`, `apps/desktop/package.json`) |
-| 터미널 | xterm 6와 addon-fit, 초기 개발 의존성 사전 번들 (`apps/desktop/src/ui/TerminalView.tsx`, `apps/desktop/vite.config.ts`) |
+| 터미널 | xterm 6와 addon-fit, 초기 개발 의존성 사전 번들. 글꼴은 설정 `behavior.terminal_font` 뒤에 고정폭 대체 글꼴을 붙이고 로드 후 칸을 측정한다 (`apps/desktop/src/ui/TerminalView.tsx`, `apps/desktop/src/lib/terminalEngine.ts`, `apps/desktop/vite.config.ts`) |
+| 도움말 검색 | es-hangul 2.4로 한글을 자소 단위로 풀어 조합 중인 글자도 일치시킨다 (`apps/desktop/src/lib/helpSearch.ts`, `apps/desktop/package.json`) |
 | 문서 | react-markdown/remark-gfm, highlight.js, DOMPurify, Mammoth, JSZip, SheetJS (`apps/desktop/src/ui/Preview.tsx`, `apps/desktop/src/ui/OfficeView.tsx`) |
 | 3D | Three.js, occt-import-js, Draco 도구 (`apps/desktop/src/ui/ModelView.tsx`, `apps/desktop/package.json`) |
 | 테스트 | Vitest 2 + jsdom 25 + Testing Library (`apps/desktop/vite.config.ts`, `apps/desktop/src/test-setup.ts`) |
@@ -31,7 +32,7 @@ mapped: 2026-10-14
 - 루트 Cargo 워크스페이스에는 앱과 `td-vfs`, `td-archive`, `td-ops`, `td-queue`, `td-config`, `td-search`, `td-volumes`, `td-watch`, `td-state`, `td-launch`, `td-terminal`, `td-cli`, `td-icons`가 있다 (`Cargo.toml`).
 - 공통 직렬화는 serde/serde_json, 오류는 thiserror를 쓴다. 설정은 toml 0.8과 주석 보존 편집용 toml_edit 0.22다 (`Cargo.toml`, `crates/td-config/Cargo.toml`).
 - 압축은 zip 8.6, tar, flate2, bzip2 및 Unicode 정규화를 사용한다 (`crates/td-archive/Cargo.toml`).
-- 파일 감시는 notify 8, 터미널은 portable-pty 0.9, 휴지통은 trash 크레이트를 사용한다 (`crates/td-watch/Cargo.toml`, `crates/td-terminal/Cargo.toml`, `crates/td-ops/src/trasher.rs`).
+- 파일 감시는 notify 8, 터미널은 portable-pty 0.9(기본 셸은 `-l` 로그인 셸, Unix에서는 자식 PTY의 locale을 UTF-8로 보완), 휴지통은 trash 크레이트를 사용한다 (`crates/td-watch/Cargo.toml`, `crates/td-terminal/Cargo.toml`, `crates/td-ops/src/trasher.rs`).
 - macOS 네이티브 API는 objc2/AppKit/Foundation, Windows는 windows/windows-sys를 조건부 의존성으로 둔다 (`apps/desktop/src-tauri/Cargo.toml`, `crates/td-icons/Cargo.toml`, `crates/td-volumes/Cargo.toml`).
 
 ## 타입·설정·생성물
