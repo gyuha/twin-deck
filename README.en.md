@@ -122,7 +122,7 @@ You can see every shortcut as a list by pressing `F1` (or the **Shortcuts** butt
 - **Copy, move, delete**: `F5` copy, `F6` move, `F7` new folder, `Shift+F7` new file, `F8` trash, `Shift+F8` permanent delete.
 - **Long jobs**: you see progress in the progress window. `Return` sends it to the background so you can keep working, and `Esc` aborts. If some files fail while copying a folder, the rest keep copying and the failed items are listed.
 - **When names collide**: choose overwrite, skip, or copy with a new name. Turn on "apply the same choice to the remaining items" so it does not ask again.
-- **Rename**: `F2` renames one. With two or more selected, `F2` (or `Mod+Shift+R`) opens a window to rename them all at once.
+- **Rename**: `F2` renames one right in the list. The name before the extension starts selected; `Enter` saves, `Esc` cancels, and `↑`/`↓` save and move on to the item above/below. With two or more selected, `F2` (or `Mod+Shift+R`) opens a window to rename them all at once.
 - **Archives**: zip-family archives open like folders, and compressing and extracting run in the background like copying.
 - **Drag and drop**: drag files to another pane or folder to copy, and hold `Ctrl` while dropping to move. A copy (`+`) or move (`−`) badge appears next to the cursor while dragging.
 

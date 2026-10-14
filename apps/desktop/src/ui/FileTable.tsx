@@ -91,12 +91,46 @@ function QuickHighlight({ name, input, prefixOnly }: { name: string; input: stri
   );
 }
 
+/** 목록 안 이름 변경 입력칸(이슈 #65). 시작할 때 파일은 `.` + 확장자 앞까지, 폴더는 이름 전체를 선택한다. 포커스를 잃으면 저장한다. */
+function RenameInput({ path, folder }: { path: string; folder: boolean }) {
+  const t = useT();
+  const { api } = useAppStore();
+  const value = useApp((s) => s.rename?.value ?? "");
+  const input = useRef<HTMLInputElement>(null);
+  useLayoutEffect(() => {
+    const el = input.current;
+    if (!el) return;
+    el.focus();
+    const dot = el.value.lastIndexOf(".");
+    el.setSelectionRange(0, !folder && dot > 0 ? dot : el.value.length);
+  }, [path, folder]);
+  // 행의 클릭·더블클릭(열기)·드래그 시작이 입력칸 안의 마우스 조작으로 일어나지 않게 막는다.
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+  return (
+    <input
+      ref={input}
+      data-rename-input
+      aria-label={t("table.rename_aria")}
+      spellCheck={false}
+      value={value}
+      onChange={(e) => api.renameSetValue(e.target.value)}
+      onBlur={() => void api.renameCommit(0, path)}
+      onMouseDown={stop}
+      onClick={stop}
+      onDoubleClick={stop}
+      onContextMenu={stop}
+      className="w-full min-w-0 rounded-sm border border-accent bg-app-box px-1 text-ink outline-none"
+    />
+  );
+}
+
 export function FileTable({ pane }: { pane: PaneId }) {
   const t = useT();
   const { api } = useAppStore();
   const tab = useApp((s) => activeTab(s, pane));
   const isActive = useApp((s) => s.activePane === pane);
   const config = useApp((s) => s.loaded.config);
+  const rename = useApp((s) => (s.rename?.pane === pane && s.rename.tabId === activeTab(s, pane).id ? s.rename : null));
   const dirSizes = useApp((s) => s.dirSizes);
   const rightClickSelect = config.behavior.table.right_click_select;
   const iconSize = config.behavior.table.icon_size;
@@ -134,6 +168,11 @@ export function FileTable({ pane }: { pane: PaneId }) {
   }, [tab.entries.length, multi, parentRow]);
   const virtualizer = useRows(rows, listRef, parentRow ? ROW_HEIGHT : 0);
   const rowId = (i: number) => `${pane}-${tab.id}-row-${i}`;
+
+  // 이름을 바꾸던 항목이 밖에서 지워지거나 옮겨져 목록에서 사라지면 편집을 끝낸다(입력칸이 없는데 키만 막히지 않게).
+  useEffect(() => {
+    if (rename && !rename.busy && !tab.entries.some((e) => e.path === rename.path)) api.renameCancel();
+  }, [rename, tab.entries, api]);
 
   // 커서가 화면 밖이면 스크롤한다 (열 우선 배치: index = 열 * rows + 행).
   useEffect(() => {
@@ -291,7 +330,9 @@ export function FileTable({ pane }: { pane: PaneId }) {
         <FileIcon name={e.name} kind={e.kind === "symlink" && e.linkIsDir ? "dir" : e.kind} link={e.kind === "symlink"} size={iconSize} path={e.path} systemIcons={systemIcons} />
         {(multi ? [{ name: "name" } as ColumnSpec] : columns).map((c, k) => (
           <span key={`${c.name}-${k}`} className={(c.name === "name" ? "truncate " : "self-stretch truncate text-right leading-6 tabular-nums ") + columnEdge(c.name, multi ? 0 : k, multi || k === columns.length - 1)}>
-            {c.name === "name" && tab.quick ? (
+            {c.name === "name" && rename?.path === e.path ? (
+              <RenameInput path={e.path} folder={isFolderEntry(e)} />
+            ) : c.name === "name" && tab.quick ? (
               <>
                 {pre}
                 <QuickHighlight name={e.name} input={tab.quick} prefixOnly={config.behavior.quick_select.match_only_prefix} />

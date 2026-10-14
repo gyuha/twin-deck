@@ -10,20 +10,20 @@ const button = async (name: string) => within(await dlg()).getByRole("button", {
 const noDialog = () => waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 
 describe("다이얼로그의 확인·취소 버튼", () => {
-  it("이름 입력: 확인 버튼으로 이름을 바꾸고, 취소 버튼은 아무것도 바꾸지 않는다", async () => {
+  it("이름 입력(새 폴더): 확인 버튼으로 만들고, 취소 버튼은 아무것도 만들지 않는다", async () => {
     const backend = seed();
     const { user } = await renderApp(backend);
-    await user.keyboard("{Shift>}{F6}{/Shift}");
+    await user.keyboard("{F7}");
+    await user.keyboard("new");
     await user.click(await button("취소"));
     await noDialog();
-    expect(backend.exists("/home/a/a.txt")).toBe(true);
+    expect(backend.exists("/home/a/new")).toBe(false);
 
-    await user.keyboard("{Shift>}{F6}{/Shift}");
+    await user.keyboard("{F7}");
     await dlg();
-    await user.keyboard("{Control>}a{/Control}new.txt");
+    await user.keyboard("new");
     await user.click(await button("확인"));
-    await waitFor(() => expect(backend.exists("/home/a/new.txt")).toBe(true));
-    expect(backend.exists("/home/a/a.txt")).toBe(false);
+    await waitFor(() => expect(backend.exists("/home/a/new")).toBe(true));
   });
 
   it("확인 창(영구 삭제): 취소는 지우지 않고 확인은 지운다", async () => {

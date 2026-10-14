@@ -185,7 +185,7 @@ describe("가상 탭의 항목도 일반 항목처럼 다룬다", () => {
   it("이름 변경은 원래 파일의 이름을 바꾸고 결과 항목도 새 이름으로 바뀐다", async () => {
     const { user, backend } = await lookupReport();
     await user.keyboard("{ArrowDown}{ArrowDown}{Shift>}{F6}{/Shift}"); // report.txt
-    await screen.findByRole("dialog");
+    await screen.findByRole("textbox", { name: "새 이름" });
     await user.keyboard("{Control>}a{/Control}final.txt{Enter}");
     await waitFor(() => expect(backend.exists("/home/a/final.txt")).toBe(true));
     expect(backend.exists("/home/a/report.txt")).toBe(false);

@@ -27,10 +27,10 @@ describe("다중 이름 바꾸기 도구", () => {
     ]);
   });
 
-  it("선택이 없으면 기존 단일 이름 변경 창이 열린다", async () => {
+  it("선택이 없으면 목록 안 단일 이름 변경이 시작된다", async () => {
     const { user } = await renderApp(seed());
     await user.keyboard("{Shift>}{F6}{/Shift}");
-    expect(await screen.findByRole("dialog", { name: "이름 변경" })).toBeTruthy();
+    expect(await screen.findByRole("textbox", { name: "새 이름" })).toBeTruthy();
     expect(screen.queryByRole("dialog", { name: "다중 이름 바꾸기 도구" })).toBeNull();
   });
 
@@ -207,10 +207,10 @@ describe("다중 이름 바꾸기 단축키와 F2", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("F2는 이름 변경이다: 선택이 없으면 단일 이름 변경 창, 2개 이상이면 다중 이름 바꾸기", async () => {
+  it("F2는 이름 변경이다: 선택이 없으면 목록 안 단일 이름 변경, 2개 이상이면 다중 이름 바꾸기", async () => {
     const one = await renderApp(seed());
     await one.user.keyboard("{F2}");
-    expect(await screen.findByRole("dialog", { name: "이름 변경" })).toBeTruthy();
+    expect(await screen.findByRole("textbox", { name: "새 이름" })).toBeTruthy();
   });
 
   it("F2로 2개 이상 선택했을 때는 다중 이름 바꾸기 도구가 열린다", async () => {

@@ -66,7 +66,7 @@ describe("파일 행 컨텍스트 메뉴", () => {
     expect(cursorName("left")).toBe("a.txt");
   });
 
-  it("항목 클릭이 액션을 실행한다: 이동·복사는 대화상자, 삭제는 휴지통, 이름 바꾸기는 이름 대화상자", async () => {
+  it("항목 클릭이 액션을 실행한다: 이동·복사는 대화상자, 삭제는 휴지통, 이름 바꾸기는 목록 안 입력칸", async () => {
     const backend = seed();
     const { user } = await renderApp(backend);
     rightClick(1);
@@ -80,8 +80,9 @@ describe("파일 행 컨텍스트 메뉴", () => {
     await user.keyboard("{Escape}");
     rightClick(1);
     await user.click(item("이름 바꾸기"));
-    expect(await screen.findByRole("dialog")).toBeTruthy();
+    expect(await screen.findByRole("textbox", { name: "새 이름" })).toHaveFocus();
     await user.keyboard("{Escape}");
+    expect(screen.queryByRole("textbox", { name: "새 이름" })).toBeNull();
     rightClick(1);
     await user.click(item("삭제"));
     // F8과 같은 경로: 휴지통 확인 설정의 기본값이 꺼짐이라 바로 휴지통으로 간다.
