@@ -129,11 +129,11 @@ describe("권한 표시", () => {
     expect(formatOctal(0o4755)).toBe("755");
     expect(formatOctal(0o7)).toBe("007");
   });
-  it("파일명에는 확장자를 유지하고 확장자 셀은 비운다", () => {
+  it("확장자 셀은 파일만 확장자를 보여 주고 폴더는 비운다", () => {
     const f = entry("Report.TXT", { size: 2048, mode: 0o644 });
     const dir = entry("d", { kind: "dir", mode: 0o755 });
     expect(cellText(f, "name", display())).toBe("Report.TXT");
-    expect(cellText(f, "extension", display())).toBe("");
+    expect(cellText(f, "extension", display())).toBe("TXT");
     expect(cellText(dir, "extension", display())).toBe("");
     expect(cellText(dir, "size", display())).toBe("");
     expect(cellText(f, "size", display())).toBe("2.0 KB");

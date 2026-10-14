@@ -17,6 +17,12 @@ export function extensionOf(name: string): string {
   return i > 0 ? name.slice(i + 1).toLowerCase() : "";
 }
 
+/** 이름을 확장자 앞뒤로 나눈다(원래 대소문자 유지). 확장자 정의는 `extensionOf`와 같다. */
+export function splitExtension(name: string): [string, string] {
+  const i = name.lastIndexOf(".");
+  return i > 0 ? [name.slice(0, i), name.slice(i + 1)] : [name, ""];
+}
+
 /** 컬럼 명세에서 첫 정렬 표시(`<`,`>`)가 있는 컬럼의 정렬. 없으면 null. */
 export function sortFromColumns(cols: readonly ColumnSpec[]): SortState | null {
   const c = cols.find((c) => c.sort && (SORT_KEYS as readonly string[]).includes(c.name));

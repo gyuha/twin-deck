@@ -6,7 +6,7 @@ import { parseColumns, withColumnWidth, MAX_COLUMN_WIDTH, MIN_COLUMN_WIDTH } fro
 import type { ColumnSpec } from "../lib/columns";
 import { COLUMN_TITLES, cellText } from "../lib/format";
 import { quickMatchRange } from "../lib/names";
-import { SORT_KEYS } from "../lib/sort";
+import { SORT_KEYS, splitExtension } from "../lib/sort";
 import { FileIcon } from "./FileIcon";
 import type { SortKey } from "../lib/sort";
 import { useApp, useAppStore, useT } from "../state/context";
@@ -113,6 +113,8 @@ export function FileTable({ pane }: { pane: PaneId }) {
   const sort = effectiveSort(tab, config.view.table.columns);
 
   const multi = tab.view.mode === "columns";
+  // 확장자 컬럼이 보이면 파일 이름에서는 확장자를 뺀다(그 컬럼이 보여 준다).
+  const hasExtColumn = !multi && columns.some((c) => c.name === "extension");
   const colCount = tab.view.mode === "columns" ? tab.view.count : 1;
   const rows = Math.max(1, Math.ceil(tab.entries.length / colCount));
   const listRef = useRef<HTMLDivElement>(null);
@@ -296,7 +298,7 @@ export function FileTable({ pane }: { pane: PaneId }) {
                 {post}
               </>
             ) : c.name === "name" ? (
-              `${pre}${cellText(e, c.name, config.display, undefined, tab.virtual?.kind === "usage", dirSizes[e.path])}${post}`
+              `${pre}${hasExtColumn && !(e.kind === "dir" || (e.kind === "symlink" && e.linkIsDir)) ? splitExtension(e.name)[0] : cellText(e, c.name, config.display, undefined, tab.virtual?.kind === "usage", dirSizes[e.path])}${post}`
             ) : (
               cellText(e, c.name, config.display, undefined, tab.virtual?.kind === "usage", dirSizes[e.path])
             )}
