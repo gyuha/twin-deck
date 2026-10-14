@@ -49,13 +49,13 @@ export function Dialog() {
 
   if (!dialog) return null;
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/30">
+    <div className="fixed inset-0 flex items-center justify-center bg-black/30 p-4">
       <div
         ref={root}
         role="dialog"
         aria-modal="true"
         aria-label={dialog.title}
-        className={`${dialog.kind === "multirename" ? "w-[56rem]" : "w-96"} max-w-full rounded border border-app-line bg-app-box p-4 text-sm shadow-lg`}
+        className={`${dialog.kind === "multirename" ? "w-[56rem]" : "w-96"} flex max-h-full max-w-full flex-col rounded border border-app-line bg-app-box p-4 text-sm shadow-lg`}
       >
         <h2 className="mb-2 font-semibold">{dialog.title}</h2>
         {dialog.kind === "name" && (
@@ -161,7 +161,7 @@ export function Dialog() {
           );
         })()}
         {(dialog.kind === "confirm" || dialog.kind === "info") && (
-          <ul className="mb-1 list-inside list-disc">
+          <ul className="mb-1 min-h-0 list-inside list-disc overflow-y-auto">
             {dialog.lines.map((l) => (
               <li key={l}>{l}</li>
             ))}
