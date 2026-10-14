@@ -91,7 +91,7 @@ describe("폴더 모양 (behavior.table.folder_style)", () => {
   it("장식은 화면 표시만 바꾼다: 이름 바꾸기 입력창의 처음 값은 장식 없는 이름이다", async () => {
     const { user } = await renderApp(withTable({ folder_style: "brackets" }));
     await user.keyboard("{F2}"); // 커서는 docs
-    expect(await screen.findByRole("textbox", { name: "이름" })).toHaveValue("docs");
+    expect(await screen.findByRole("textbox", { name: "새 이름" })).toHaveValue("docs");
   });
 
   it("빠른 선택의 일치 글자 강조는 이름 부분에만 걸린다", async () => {

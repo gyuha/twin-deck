@@ -271,6 +271,17 @@ export interface HelpState {
   query: string;
 }
 
+/** 파일 목록 안에서 바로 하는 이름 변경(이슈 #65). 대상은 목록 위치가 아니라 경로로 기억한다(편집 중 목록이 다시 읽혀도 따라간다). */
+export interface RenameState {
+  pane: PaneId;
+  tabId: number;
+  path: string;
+  /** 입력칸의 현재 값. */
+  value: string;
+  /** 이름을 바꾸는 중이면 true. 그동안 들어온 저장·이동은 무시한다(↑/↓를 누르고 있어도 겹치지 않게). */
+  busy: boolean;
+}
+
 export interface PaletteState {
   query: string;
   cursor: number;
@@ -350,6 +361,8 @@ export interface AppState {
   settingsPane: PaneId;
   /** 도움말(단축키 목록) 화면. 닫혀 있으면 null. */
   help: HelpState | null;
+  /** 목록 안에서 이름을 바꾸는 중인 항목. 아니면 null. */
+  rename: RenameState | null;
   /** 파일 찾기 다이얼로그. 닫혀 있으면 null. `error`는 시작을 거부당한 이유(잘못된 정규식 등). */
   find: { form: FindForm; error: string | null } | null;
   /** 직전에 시작한 파일 찾기 조건("마지막 검색"). 메모리에만 보관한다. */
@@ -453,6 +466,8 @@ export function actionContext(s: AppState): ActionContext {
 
 export function scopeStack(s: AppState): Scope[] {
   if (s.dialog) return ["dialog", "pane", "global"];
+  // 목록 안 이름 변경: 글자는 입력칸이 받고, Return·Esc·↑/↓만 rename 스코프가 받는다(모달).
+  if (s.rename) return ["rename"];
   // 설정 화면은 활성 패널 자리에 뜨지만 키는 설정이 받는다(settings 스코프).
   if (s.settingsOpen) return ["settings", "global"];
   // 도움말(단축키 목록)도 메인 창을 덮는 모달이다(help 스코프).
@@ -537,6 +552,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     previewEdit: null,
     previewSheet: null,
     help: null,
+    rename: null,
     find: null,
     lastFind: null,
     settingsSection: 0,
@@ -1968,31 +1984,70 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       }
     },
     /** 이름 변경 (OP-05). 커서 항목 하나가 대상이며 확장자를 뺀 부분이 처음에 선택된다. */
+    /** 커서 항목의 이름 칸을 입력칸으로 바꾼다(이슈 #65). 2개 이상 선택하면 다중 이름 바꾸기. */
     async renameCursor() {
       const s = get();
       const tab = activeTab(s);
-      // 2개 이상 선택하면 다중 이름 바꾸기, 아니면 커서 항목 하나의 이름을 바꾼다.
       if (tab.selection.size >= 2) return api.multiRename();
       const entry = cursorEntry(tab);
       if (!entry) return;
-      const name = await ask<string>({ kind: "name", title: tr("store.rename"), value: entry.name, error: null, selectStem: true });
-      if (name === null || name === entry.name) return;
-      set({ notice: null });
-      try {
-        const dest = await backend.rename(entry.path, name.trim());
+      set({ notice: null, rename: { pane: s.activePane, tabId: tab.id, path: entry.path, value: entry.name, busy: false } });
+    },
+    renameSetValue(value: string) {
+      const r = get().rename;
+      if (r) set({ rename: { ...r, value } });
+    },
+    renameCancel() {
+      set({ rename: null });
+    },
+    /**
+     * 입력한 이름으로 바꾼다. `move`가 있으면 저장한 뒤 **편집 전 위치** 기준 위(-1)/아래(1) 항목의 이름 편집으로 넘어간다
+     * (맨 위·맨 아래면 저장만 하고 끝낸다). 실패하면(중복·쓸 수 없는 문자) 이동하지 않고 편집을 이어 간다.
+     * `blurPath`는 입력칸이 포커스를 잃어 저장할 때 준다: 그 항목을 편집 중일 때만 저장하고(입력칸이 사라지며 늦게 온 blur가
+     * 다음 항목을 저장하지 않게), 실패하면 편집을 끝낸다(이미 다른 곳을 누른 뒤라 입력칸으로 되돌아가지 않는다).
+     */
+    async renameCommit(move: -1 | 0 | 1 = 0, blurPath?: string) {
+      const r = get().rename;
+      if (!r || r.busy || (blurPath !== undefined && r.path !== blurPath)) return;
+      const tab = get().panes[r.pane].tabs.find((t) => t.id === r.tabId);
+      const idx = tab ? tab.entries.findIndex((e) => e.path === r.path) : -1;
+      if (!tab || idx < 0) return set({ rename: null });
+      const entry = tab.entries[idx];
+      const next = move === 0 ? undefined : tab.entries[idx + move];
+      const name = r.value.trim();
+      const cursorBefore = tab.cursor;
+      let dest = entry.path;
+      if (name !== entry.name) {
+        set({ notice: null, rename: { ...r, busy: true } });
+        try {
+          dest = await backend.rename(entry.path, name);
+        } catch (e) {
+          set((s) => ({ rename: blurPath === undefined && s.rename ? { ...s.rename, busy: false } : null }));
+          return fail(e);
+        }
         if (tab.virtual) {
           // 가상 탭은 다시 읽을 폴더가 없으니 결과 항목만 새 이름으로 바꾼다
-          patchTab(s.activePane, tab.id, (t) => ({
+          patchTab(r.pane, r.tabId, (t) => ({
             entries: t.entries.map((e) => (e.path === entry.path ? { ...e, name: baseName(dest), path: dest } : e)),
             selection: new Set([...t.selection].map((p) => (p === entry.path ? dest : p))),
           }));
-        } else {
-          await reload(s.activePane, tab.id, baseName(dest));
         }
         await reloadAll();
-      } catch (e) {
-        fail(e);
       }
+      const after = get().panes[r.pane].tabs.find((t) => t.id === r.tabId);
+      const indexOf = (p: string) => (after?.entries ?? []).findIndex((x) => x.path === p);
+      if (!next) {
+        // 커서가 편집 전 자리에 그대로 있으면 새 이름으로 옮긴다. 다른 행을 눌러 저장했으면 커서는 그 행에 남는다.
+        // 경로가 아니라 위치로 본다: 다시 읽은 목록에서 옛 경로는 사라지고 커서는 같은 위치에 남는다. 다 읽은 뒤에 정해야
+        // 늦게 끝난 다시 읽기가 사용자가 누른 행을 덮어쓰지 않는다.
+        const at = indexOf(dest);
+        if (after && at >= 0 && cursorBefore === idx && after.cursor === cursorBefore) patchTab(r.pane, r.tabId, { cursor: at });
+        return set({ rename: null });
+      }
+      const at = indexOf(next.path);
+      if (at < 0) return set({ rename: null });
+      patchTab(r.pane, r.tabId, { cursor: at });
+      set({ rename: { pane: r.pane, tabId: r.tabId, path: next.path, value: next.name, busy: false } });
     },
     /** 다중 이름 바꾸기 (`core.rename.multi`): 선택한 항목의 이름을 마스크·찾기/바꾸기·카운터로 한꺼번에 바꾼다. */
     async multiRename() {

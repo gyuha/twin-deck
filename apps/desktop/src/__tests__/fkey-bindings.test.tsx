@@ -8,7 +8,7 @@ import { fkeyBindings } from "../lib/fkeys";
 const openSettings = (user: Awaited<ReturnType<typeof renderApp>>["user"]) => user.keyboard("{Control>},{/Control}");
 
 const settle = () => act(() => new Promise<void>((r) => setTimeout(r, 50)));
-const nameBox = () => screen.findByRole("textbox", { name: "이름" });
+const nameBox = () => screen.findByRole("textbox", { name: "새 이름" });
 const setFKeys = (backend: FakeBackend, fkeys: Record<string, string>, apps: Record<string, string> = {}) =>
   backend.setConfig((l) => {
     Object.assign(l.config.fkeys, fkeys);
@@ -58,7 +58,8 @@ describe("F키 설정이 키맵에 반영된다", () => {
     await toATxt(user);
     await user.keyboard("{F2}");
     // 새 폴더 입력창이 열리고(값이 비어 있다) 이름 바꾸기(a.txt)가 아니다
-    expect(await nameBox()).toHaveValue("");
+    expect(await screen.findByRole("textbox", { name: "이름" })).toHaveValue("");
+    expect(screen.queryByRole("textbox", { name: "새 이름" })).toBeNull();
   });
 
   it("설정이 비어 있으면 기존 F키 기본 바인딩이 그대로다", () => {

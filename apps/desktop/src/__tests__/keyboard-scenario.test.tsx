@@ -48,7 +48,7 @@ describe("키보드 전용 종단 시나리오", () => {
     await user.keyboard("{ArrowDown}"); // notes.md → readme (1).md
     expect(cursorName("right")).toBe("readme (1).md");
     await user.keyboard("{Shift>}{F6}{/Shift}");
-    await screen.findByRole("dialog");
+    await screen.findByRole("textbox", { name: "새 이름" });
     await user.keyboard("renamed{Enter}"); // 확장자 앞부분만 선택되어 있으므로 renamed.md
     await waitFor(() => expect(backend.exists("/home/b/renamed.md")).toBe(true));
     expect(backend.exists("/home/b/readme (1).md")).toBe(false);

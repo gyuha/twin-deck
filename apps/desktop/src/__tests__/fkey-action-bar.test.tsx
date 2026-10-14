@@ -68,7 +68,7 @@ describe("F키 설정의 Action Bar 노출", () => {
     await user.keyboard("{ArrowDown}{ArrowDown}"); // a.txt
     expect(cursorName("left")).toBe("a.txt");
     await user.click(within(screen.getByRole("toolbar", { name: "액션 바" })).getByRole("button", { name: /이름 변경/ }));
-    expect(await screen.findByRole("textbox", { name: "이름" })).toHaveValue("a.txt");
+    expect(await screen.findByRole("textbox", { name: "새 이름" })).toHaveValue("a.txt");
   });
 
   it("앱 실행 줄은 그 줄의 앱 경로를 인수로 실행한다", async () => {

@@ -124,8 +124,8 @@ describe("파일 클립보드: Mod+C/X/V", () => {
     const { user, backend } = await renderApp();
     backend.fileClipboard = ["/home/a/b.txt"];
     await toA(user);
-    await user.keyboard("{Shift>}{F6}{/Shift}"); // 이름 변경 창(입력창)
-    await screen.findByRole("dialog");
+    await user.keyboard("{Shift>}{F6}{/Shift}"); // 목록 안 이름 변경 입력칸
+    await screen.findByRole("textbox", { name: "새 이름" });
     await user.keyboard(CTRL("c"));
     await user.keyboard(CTRL("x"));
     expect(backend.fileClipboard).toEqual(["/home/a/b.txt"]);

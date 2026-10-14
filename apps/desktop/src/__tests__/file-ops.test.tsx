@@ -120,11 +120,13 @@ describe("다이얼로그 스코프", () => {
 });
 
 describe("OP-05 이름 변경", () => {
-  it("Shift+F6: 확장자를 뺀 부분이 선택된 상태로 열리고 새 이름이 적용된다", async () => {
+  it("Shift+F6: 목록 안에서 확장자를 뺀 부분이 선택된 상태로 열리고 새 이름이 적용된다", async () => {
     const { user, backend } = await renderApp();
     await user.keyboard("{ArrowDown}{ArrowDown}"); // a.txt
     await user.keyboard("{Shift>}{F6}{/Shift}");
-    const input = await screen.findByRole("textbox", { name: "이름" });
+    const input = await screen.findByRole("textbox", { name: "새 이름" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(input.closest("[data-path]")).toHaveAttribute("data-path", "/home/a/a.txt");
     expect(input).toHaveValue("a.txt");
     expect((input as HTMLInputElement).selectionStart).toBe(0);
     expect((input as HTMLInputElement).selectionEnd).toBe(1);
@@ -134,13 +136,14 @@ describe("OP-05 이름 변경", () => {
     await waitFor(() => expect(cursorName("left")).toBe("zzz.txt"));
   });
 
-  it("경로 구분자가 든 이름은 거부된다", async () => {
+  it("경로 구분자가 든 이름은 거부되고 편집이 이어진다", async () => {
     const { user, backend } = await renderApp();
     await user.keyboard("{ArrowDown}{ArrowDown}{Shift>}{F6}{/Shift}");
-    await dialog();
+    await screen.findByRole("textbox", { name: "새 이름" });
     await user.keyboard("{Control>}a{/Control}x/y{Enter}");
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(backend.exists("/home/a/a.txt")).toBe(true);
+    expect(screen.getByRole("textbox", { name: "새 이름" })).toHaveValue("x/y");
   });
 });
 
