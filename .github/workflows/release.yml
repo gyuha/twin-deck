@@ -1,7 +1,7 @@
 name: release
 
 # 수동 실행만 한다. `task deploy`가 사전 점검 뒤 이 워크플로를 시작한다.
-# 흐름: mac 빌드·초안 업로드 → windows 빌드·초안 업로드 → (Environment `release` 승인) → 공개 + Homebrew tap 갱신
+# 흐름: mac 빌드·초안 업로드 → windows 빌드·초안 업로드 → 공개 + Homebrew tap 갱신 (승인 단계 없음)
 on:
   workflow_dispatch:
 
@@ -49,7 +49,8 @@ jobs:
   publish:
     needs: windows
     runs-on: ubuntu-latest
-    # 공개는 되돌릴 수 없어서 Environment `release`의 Required reviewers 승인을 거친다
+    # Environment `release`에는 Required reviewers가 없어서 두 OS 업로드가 끝나면 승인 없이 곧바로 공개한다.
+    # 승인 단계를 되살리려면 Settings → Environments → release에서 Required reviewers를 다시 지정한다
     environment: release
     steps:
       - uses: actions/checkout@v7

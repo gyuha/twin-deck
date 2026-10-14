@@ -16,7 +16,7 @@ task check            # fmt --check, clippy --all-targets -D warnings, typecheck
 task gen-types        # regenerate TS bindings + default-config.json (see below)
 task bundle           # macOS .app / Windows NSIS installer
 task install          # bundle + install to /Applications (macOS) / NSIS silent (Windows)
-task deploy           # GitHub Actions로 배포: 점검 뒤 release 워크플로 시작 → mac·Windows 빌드 → Environment 승인 → 공개 + tap 갱신 (평소 경로)
+task deploy           # GitHub Actions로 배포: 점검 뒤 release 워크플로 시작 → mac·Windows 빌드 → 승인 없이 공개 + tap 갱신 (평소 경로)
 task release:draft    # upload this OS's bundle to a private draft GitHub release (no tag)
 task release          # same, then publish — only if both macOS and Windows assets are present; then updates the Homebrew tap (see "릴리스 공개 흐름")
 ```
@@ -57,13 +57,13 @@ Release/version: bump `version` in `apps/desktop/src-tauri/tauri.conf.json` **an
 2. `CHANGELOG.md`에 그 버전 항목을 쓴다("릴리스 노트(변경 사항 기록)" 절차 3~5번을 따른다). 내용은 사용자에게 요약해 보여 준다.
 3. `tauri.conf.json`·`Cargo.toml`의 `version`을 올리고 `Cargo.lock`을 맞춘다(`cargo check -p twin-deck-desktop`).
 4. 한 커밋으로 묶어 `main`에 push한다(커밋 메시지는 한글, `Co-Authored-By` 트레일러 포함). `main`이 아니거나 관련 없는 변경이 섞여 있으면 멈추고 알린다.
-5. `task deploy --yes`를 실행한다. 점검에서 막히면(Environment `release` 승인자 없음 등) 이유를 그대로 전하고 멈춘다. 우회하지 않는다.
+5. `task deploy --yes`를 실행한다. 점검에서 막히면(`main`이 아님, 버전이 이미 공개됨 등) 이유를 그대로 전하고 멈춘다. 우회하지 않는다.
 6. `gh run watch`로 두 OS 빌드를 지켜본다. 실패하면 로그의 실패 단계와 원인을 보고하고, 공개된 것이 없다는 점을 함께 말한다.
-7. 승인 요청이 오면 사용자에게 **GitHub Actions에서 Review deployments → Approve를 눌러 달라고 안내**하고 기다린다. 공개는 되돌릴 수 없으므로 에이전트가 대신 승인하지 않는다.
-8. 사용자가 승인해 `publish` job이 끝나면 릴리스 URL과 tap 갱신 결과(`gh release view v<버전>`, tap 커밋)를 확인해 보고한다.
+7. Environment `release`에는 Required reviewers가 없어서 두 OS 빌드가 끝나면 `publish` job이 승인 없이 곧바로 공개한다. 공개는 되돌릴 수 없으므로 **"배포해줘"를 받기 전에는 `task deploy`를 시작하지 않는다.**
+8. `publish` job이 끝나면 릴리스 URL과 tap 갱신 결과(`gh release view v<버전>`, tap 커밋)를 확인해 보고한다.
 
 ```
-버전 확인 → CHANGELOG → 버전 올리기 → 커밋·push → task deploy --yes → 빌드 감시 → (사용자 승인) → 공개·tap 확인
+버전 확인 → CHANGELOG → 버전 올리기 → 커밋·push → task deploy --yes → 빌드 감시 → 자동 공개 → 공개·tap 확인
                                                     ↓ 점검·빌드 실패
                                               이유 보고 후 멈춤
 ```

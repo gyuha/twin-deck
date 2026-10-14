@@ -127,8 +127,8 @@ tasks:
       - bun run --cwd apps/desktop tauri build --bundles nsis --config '{"bundle":{"createUpdaterArtifacts":true}}'
 
   deploy:
-    desc: "[Actions 배포] 사전 점검 뒤 GitHub Actions의 release 워크플로를 시작한다. 두 OS 빌드·초안 업로드 후 승인하면 공개하고 Homebrew tap까지 갱신한다"
-    prompt: "[Actions 배포] GitHub Actions가 macOS와 Windows를 빌드해 초안에 올립니다. 이어서 Environment release에서 승인하면 공개(되돌릴 수 없음)하고 Homebrew tap을 갱신합니다. 계속할까요?"
+    desc: "[Actions 배포] 사전 점검 뒤 GitHub Actions의 release 워크플로를 시작한다. 두 OS 빌드·초안 업로드가 끝나면 승인 없이 곧바로 공개하고 Homebrew tap까지 갱신한다"
+    prompt: "[Actions 배포] GitHub Actions가 macOS와 Windows를 빌드해 초안에 올립니다. 빌드가 끝나면 승인 없이 곧바로 공개(되돌릴 수 없음)하고 Homebrew tap을 갱신합니다. 계속할까요?"
     cmds:
       - |
         set -e
@@ -141,13 +141,9 @@ tasks:
         VERSION="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' apps/desktop/src-tauri/tauri.conf.json | head -1)"
         PUBLISHED="$(gh api "repos/{owner}/{repo}/releases?per_page=100" --jq "[.[] | select(.tag_name==\"v$VERSION\" and .draft==false)] | length")"
         [ "$PUBLISHED" = "0" ] || fail "v$VERSION은 이미 공개된 릴리스입니다. 버전을 올리세요"
-        # gh api는 404일 때도 오류 본문을 표준 출력에 찍으므로, 실패하면 출력을 버리고 0으로 본다
-        if REVIEWERS="$(gh api "repos/{owner}/{repo}/environments/release" --jq '[.protection_rules[] | select(.type=="required_reviewers")] | length' 2>/dev/null)"; then :; else REVIEWERS=0; fi
-        case "$REVIEWERS" in ''|*[!0-9]*) REVIEWERS=0 ;; esac
-        [ "$REVIEWERS" -ge 1 ] || fail "Environment release가 없거나 Required reviewers가 없습니다 (Settings → Environments). 없으면 승인 없이 공개됩니다"
         gh workflow run release.yml --ref main
         echo "release 워크플로를 시작했습니다 (v$VERSION). 진행: gh run watch"
-        echo "두 OS 업로드가 끝나면 GitHub에서 release Environment 승인 요청이 옵니다. 승인하면 공개합니다"
+        echo "두 OS 업로드가 끝나면 승인 없이 공개하고 tap을 갱신합니다"
 
   release:draft:
     desc: "[드래프트 배포] 이 OS의 파일을 비공개 초안(draft) 릴리스에 올린다. 공개하지 않고 태그도 만들지 않는다. macOS와 Windows에서 각각 실행하면 같은 초안에 모인다"
