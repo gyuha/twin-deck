@@ -48,6 +48,7 @@ import { parseColumns } from "../lib/columns";
 import { neighborTile, OTHER } from "../lib/treemap";
 import type { Dir, Tile } from "../lib/treemap";
 import { rankBy } from "../lib/fuzzy";
+import { categoryTitle, helpMatches, helpTerms } from "../lib/helpSearch";
 import { isInside, volumeOf } from "../lib/volumes";
 import { formatDateTime, formatOctal, formatPermissions, formatSize } from "../lib/format";
 import { DEFAULT_SORT, SORT_KEYS, sortEntries, sortFromColumns } from "../lib/sort";
@@ -265,6 +266,11 @@ export interface CatalogItem {
   applicable: boolean;
 }
 
+/** 도움말(단축키 목록) 화면의 검색어 (이슈 #56). */
+export interface HelpState {
+  query: string;
+}
+
 export interface PaletteState {
   query: string;
   cursor: number;
@@ -342,8 +348,8 @@ export interface AppState {
   settingsOpen: boolean;
   /** 설정이 떠 있는 패널(열 때의 활성 패널). 설정은 그 패널 자리에 뜬다. */
   settingsPane: PaneId;
-  /** 도움말(단축키 목록) 화면이 열려 있는지. */
-  helpOpen: boolean;
+  /** 도움말(단축키 목록) 화면. 닫혀 있으면 null. */
+  help: HelpState | null;
   /** 파일 찾기 다이얼로그. 닫혀 있으면 null. `error`는 시작을 거부당한 이유(잘못된 정규식 등). */
   find: { form: FindForm; error: string | null } | null;
   /** 직전에 시작한 파일 찾기 조건("마지막 검색"). 메모리에만 보관한다. */
@@ -450,7 +456,7 @@ export function scopeStack(s: AppState): Scope[] {
   // 설정 화면은 활성 패널 자리에 뜨지만 키는 설정이 받는다(settings 스코프).
   if (s.settingsOpen) return ["settings", "global"];
   // 도움말(단축키 목록)도 메인 창을 덮는 모달이다(help 스코프).
-  if (s.helpOpen) return ["help", "global"];
+  if (s.help) return ["help", "global"];
   // 파일 찾기 다이얼로그도 모달이다(find 스코프).
   if (s.find) return ["find", "global"];
   // Actions Panel은 입력창이 있는 모달이다(palette 스코프).
@@ -530,7 +536,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     settingsPane: "left",
     previewEdit: null,
     previewSheet: null,
-    helpOpen: false,
+    help: null,
     find: null,
     lastFind: null,
     settingsSection: 0,
@@ -3074,14 +3080,26 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
 
     /** 설정 화면 열기/닫기 (`Mod+,`). */
     openHelp() {
-      set({ helpOpen: true });
+      set({ help: { query: "" } });
     },
     closeHelp() {
-      set({ helpOpen: false });
+      set({ help: null });
     },
-    /** 도움말 화면에 보일 줄: 키가 걸린 액션만, Actions Panel과 같은 카탈로그에서 가져온다. */
-    helpItems(): CatalogItem[] {
-      return catalogFn().filter((i) => i.keys !== "");
+    /**
+     * 도움말 화면에 보일 줄: 키가 걸린 액션만, Actions Panel과 같은 카탈로그에서 가져온다.
+     * 검색어로 설명·키·분류를 거르고(이슈 #56), 화면 순서(분류별로 묶은 순서)로 돌려준다.
+     */
+    helpView(): CatalogItem[] {
+      const terms = helpTerms(get().help?.query ?? "");
+      const groups = new Map<string, CatalogItem[]>();
+      for (const i of catalogFn()) {
+        if (i.keys === "" || !helpMatches(terms, [i.title, i.keys, categoryTitle(i.category)])) continue;
+        groups.set(i.category, [...(groups.get(i.category) ?? []), i]);
+      }
+      return [...groups.values()].flat();
+    },
+    helpSetQuery(query: string) {
+      set((s) => (s.help ? { help: { query } } : {}));
     },
     /**
      * F키 등에 지정한 애플리케이션으로 연다.

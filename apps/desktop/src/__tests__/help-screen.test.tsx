@@ -53,3 +53,73 @@ describe("F1 도움말 화면", () => {
     expect(screen.queryByRole("dialog", { name: "도움말" })).toBeNull();
   });
 });
+
+describe("F1 도움말 검색 (이슈 #56)", () => {
+  const search = () => screen.getByRole("textbox", { name: "단축키 검색" });
+  const regions = (dialog: HTMLElement) => within(dialog).queryAllByRole("region").map((r) => r.getAttribute("aria-label"));
+  /** 화면에 보이는 줄의 설명(마지막 칸) 목록. */
+  const titles = (dialog: HTMLElement) =>
+    within(dialog)
+      .queryAllByRole("region")
+      .flatMap((r) => [...r.querySelectorAll(":scope > div")].map((row) => row.lastElementChild?.textContent));
+  const marks = (dialog: HTMLElement) => [...dialog.querySelectorAll("mark[data-help-match]")].map((m) => m.textContent);
+
+  it("열면 검색창에 포커스가 있고, 글자는 단축키가 아니라 검색창에 들어간다", async () => {
+    const { user } = await openHelp();
+    expect(search()).toHaveFocus();
+    await user.keyboard("{F7}u3");
+    expect(search()).toHaveValue("u3");
+    expect(screen.queryByRole("dialog", { name: "새 폴더" })).toBeNull();
+  });
+
+  it("설명으로 거르고, 결과가 없는 분류는 숨기고, 일치한 글자를 강조한다", async () => {
+    const { user, dialog } = await openHelp();
+    await user.keyboard("복사");
+    expect(titles(dialog).length).toBeGreaterThan(0);
+    expect(titles(dialog).every((t) => t?.includes("복사"))).toBe(true);
+    expect(regions(dialog)).not.toContain("탭");
+    expect(marks(dialog).length).toBeGreaterThan(0);
+    expect(new Set(marks(dialog))).toEqual(new Set(["복사"]));
+  });
+
+  it("키 표기로도 찾고, 키 칩 안의 일치 부분을 강조한다", async () => {
+    const { user, dialog } = await openHelp();
+    await user.keyboard("shift+f6");
+    expect(titles(dialog)).toContain("이름 변경");
+    const kbd = within(dialog).getByText("이름 변경").closest("div")!.querySelectorAll("kbd");
+    // `Shift`와 `F6` 칩이 강조되고 대안 키 `F2`는 강조되지 않는다
+    expect([...kbd].map((k) => k.querySelector("mark")?.textContent ?? null)).toEqual(["Shift", "F6", null]);
+  });
+
+  it("분류 이름으로 거르고 낱말은 모두 들어 있어야 한다", async () => {
+    const { user, dialog } = await openHelp();
+    await user.keyboard("탭");
+    expect(regions(dialog)).toContain("탭");
+    await user.keyboard(" 닫기");
+    expect(titles(dialog).length).toBeGreaterThan(0);
+    expect(titles(dialog).every((t) => t?.includes("닫기") || t?.includes("탭"))).toBe(true);
+  });
+
+  it("일치하는 단축키가 없으면 안내 문구를 보인다", async () => {
+    const { user, dialog } = await openHelp();
+    await user.keyboard("없는기능zz");
+    expect(within(dialog).getByText("일치하는 단축키가 없습니다.")).toBeInTheDocument();
+    expect(regions(dialog)).toEqual([]);
+  });
+
+  it("검색 중에도 Return은 도움말을 닫기만 하고 동작을 실행하지 않는다", async () => {
+    const { user } = await openHelp();
+    await user.keyboard("새 폴더{Enter}");
+    expect(screen.queryByRole("dialog", { name: "도움말" })).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "새 폴더" })).toBeNull();
+  });
+
+  it("Esc로 닫고 다시 열면 검색어가 비어 있다", async () => {
+    const { user } = await openHelp();
+    await user.keyboard("복사{Escape}");
+    expect(screen.queryByRole("dialog", { name: "도움말" })).toBeNull();
+    await user.keyboard("{F1}");
+    await screen.findByRole("dialog", { name: "도움말" });
+    expect(search()).toHaveValue("");
+  });
+});
