@@ -8,8 +8,8 @@ export function PopupMenu() {
   if (!menu) return null;
   let n = 0;
   return (
-    <div className="fixed inset-0 flex items-start justify-center bg-black/20 pt-16">
-      <div role="dialog" aria-label={menu.title} className="w-[28rem] max-w-full rounded border border-app-line bg-app-box p-3 text-sm shadow-lg">
+    <div className="fixed inset-0 flex items-start justify-center bg-black/20 p-4 pt-16">
+      <div role="dialog" aria-label={menu.title} className="flex max-h-full w-[28rem] max-w-full flex-col rounded border border-app-line bg-app-box p-3 text-sm shadow-lg">
         <h2 className="mb-2 font-semibold">{menu.title}</h2>
         {(menu.kind === "recent" || menu.kind === "favorites") && (
           <input
@@ -24,7 +24,7 @@ export function PopupMenu() {
         {menu.items.length === 0 ? (
           <p className="text-ink-faint">{menu.filter ? t("popup.no_match") : t("popup.empty")}</p>
         ) : (
-          <div role="listbox" aria-label={t("popup.list_aria", { title: menu.title })}>
+          <div className="min-h-0 overflow-y-auto" role="listbox" aria-label={t("popup.list_aria", { title: menu.title })}>
             {menu.items.map((it, i) => {
               if (it.separator) return <hr key={i} role="separator" className="my-1 border-app-line" />;
               if (it.path === undefined) {
@@ -41,6 +41,7 @@ export function PopupMenu() {
                   key={i}
                   role="option"
                   aria-selected={i === menu.cursor}
+                  ref={i === menu.cursor ? (el) => el?.scrollIntoView?.({ block: "nearest" }) : undefined}
                   className={i === menu.cursor ? "border-l-4 border-accent bg-app-selected px-2 py-0.5" : "border-l-4 border-transparent px-2 py-0.5"}
                 >
                   <span className="mr-2 inline-block w-3 text-ink-faint">{hint}</span>
