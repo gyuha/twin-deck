@@ -229,7 +229,7 @@ working_directory = "${active.folder.path}"
 
 텍스트(앞 64KB)·비디오(파일 주소로 스트리밍)·3D·Office의 한도는 이 키와 별개다.
 
-**(시험) `preview.pdf_direct`**(기본 `false`): 켜면 디스크의 PDF를 데이터로 싣지 않고 파일 주소로 웹뷰의 PDF 뷰어가 직접 읽는다. Rust가 파일을 읽지 않고 base64·Blob 복사도 없어 큰 PDF가 빨리 열리며, 이 경로에서는 `pdf_max_mb`를 쓰지 않는다. 쪽 수를 모르므로 PageDown의 위쪽 제한이 없다. 압축 안 PDF는 영향이 없다. 웹뷰가 파일 주소의 PDF를 열고 `#page=N` 이동이 되는지는 실제 앱에서 확인한 뒤 기본값을 정한다.
+**(시험) `preview.pdf_direct`**(기본 `false`): 켜면 디스크의 PDF를 데이터로 싣지 않고 파일 주소로 웹뷰의 PDF 뷰어가 직접 읽는다. Rust가 파일을 읽지 않고 base64·Blob 복사도 없어 큰 PDF가 빨리 열리며, 이 경로에서는 `pdf_max_mb`를 쓰지 않는다. 쪽 수를 모르므로 PageDown의 위쪽 제한이 없다. 압축 안 PDF는 영향이 없다. 맨 앞이 `%PDF`가 아닌 파일(예: 앞에 업로드 본문 머리가 붙은 PDF)은 이 경로를 쓰지 않고 기존 방식(데이터로 싣기, `pdf_max_mb` 한도 적용)으로 연다. 자산 프로토콜이 맨 앞 바이트로 형식을 정해서 이런 파일을 HTML로 내보내기 때문이다. 웹뷰가 파일 주소의 PDF를 열고 `#page=N` 이동이 되는지는 실제 앱에서 확인한 뒤 기본값을 정한다.
 
 ## 6.9 화면 언어 (`behavior.language`)
 

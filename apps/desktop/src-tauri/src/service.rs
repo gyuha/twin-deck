@@ -734,6 +734,16 @@ impl FileClipboard for SystemFileClipboard {
     }
 }
 
+/// 파일 맨 앞 4바이트가 `%PDF`인가. 열지 못하거나 짧으면 아니다.
+fn starts_with_pdf_header(path: &str) -> bool {
+    use std::io::Read;
+    let mut head = [0u8; 4];
+    std::fs::File::open(path)
+        .and_then(|mut f| f.read_exact(&mut head))
+        .is_ok()
+        && &head == b"%PDF"
+}
+
 pub struct Service<T: Trasher> {
     /// 즉시 실행하는 짧은 작업(폴더/파일 만들기, 이름 변경, 충돌 확인).
     ops: Ops<CompositeFs, T>,
@@ -1326,9 +1336,12 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
             return Ok(cbz_preview(path, self.limits().image_bytes).into());
         }
         // (시험) 디스크 PDF는 읽지 않고 "PDF임"만 알린다. 프런트가 파일 주소로 직접 연다. 한도(`pdf_max_mb`)도 쓰지 않는다.
+        // 단, 맨 앞이 `%PDF`가 아닌 파일은 직접 열지 않는다: 자산 프로토콜이 맨 앞 바이트로 형식을 정해서(`infer`) 이런 파일을
+        // `text/html`로 내보내면 웹뷰가 PDF를 HTML 글로 그린다. 이런 파일은 `application/pdf`를 명시하는 기존 데이터 경로로 연다.
         if self.pdf_direct.load(std::sync::atomic::Ordering::Relaxed)
             && path.to_ascii_lowercase().ends_with(".pdf")
             && !self.fs.is_archive_path(&vp(path))
+            && starts_with_pdf_header(path)
         {
             if let Ok(m) = std::fs::metadata(path) {
                 if m.is_file() {
@@ -3278,6 +3291,12 @@ mod tests {
         let (_t, svc, _ch, root) = setup();
         let p = format!("{root}/big.pdf");
         sparse(&p, 11);
+        // 직접 열기 대상은 맨 앞이 `%PDF`인 파일이다(그렇지 않으면 기존 데이터 경로로 간다).
+        {
+            use std::io::Write;
+            let mut f = std::fs::OpenOptions::new().write(true).open(&p).unwrap();
+            f.write_all(b"%PDF-1.7").unwrap();
+        }
         svc.set_preview_limits(&direct_cfg(false, 10));
         let off = svc.preview(&p).unwrap();
         assert!(
@@ -3292,6 +3311,43 @@ mod tests {
             "켜짐: 읽지 않고 한도도 무시"
         );
         assert_eq!(on.size, 11.0 * 1024.0 * 1024.0);
+    }
+
+    /// 앞에 `multipart/form-data` 업로드 머리가 붙은 PDF(이슈: 자산 프로토콜이 맨 앞 바이트로 형식을 정해 `text/html`로 내보낸다).
+    const UPLOAD_PDF: &[u8] = b"--alamofire.boundary.x\r\nContent-Disposition: form-data; name=\"files[]\"\r\n\r\n%PDF-1.7\r\n%%EOF\r\n--alamofire.boundary.x--\r\n";
+
+    #[test]
+    fn pdf_direct_falls_back_to_data_when_header_is_not_first() {
+        let (_t, svc, _ch, root) = setup();
+        let p = format!("{root}/upload.pdf");
+        std::fs::write(&p, UPLOAD_PDF).unwrap();
+        svc.set_preview_limits(&direct_cfg(true, 10));
+        let on = svc.preview(&p).unwrap();
+        assert_eq!(on.kind, PreviewKindDto::Pdf);
+        assert!(
+            on.data_url
+                .as_deref()
+                .is_some_and(|u| u.starts_with("data:application/pdf;base64,")),
+            "맨 앞이 %PDF가 아니면 직접 열기 대신 데이터로 싣는다"
+        );
+        assert!(!on.truncated);
+    }
+
+    #[test]
+    fn pdf_direct_falls_back_still_applies_the_size_limit() {
+        use std::io::Write;
+        let (_t, svc, _ch, root) = setup();
+        let p = format!("{root}/big-upload.pdf");
+        sparse(&p, 11);
+        let mut f = std::fs::OpenOptions::new().write(true).open(&p).unwrap();
+        f.write_all(UPLOAD_PDF).unwrap();
+        svc.set_preview_limits(&direct_cfg(true, 10));
+        let on = svc.preview(&p).unwrap();
+        assert_eq!(on.kind, PreviewKindDto::Pdf);
+        assert!(
+            on.truncated && on.data_url.is_none(),
+            "기존 방식이라 pdf_max_mb 한도를 넘으면 너무 큼"
+        );
     }
 
     #[test]
