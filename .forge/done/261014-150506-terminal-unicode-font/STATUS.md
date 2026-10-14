@@ -4,5 +4,5 @@ status: done
 executed: 2026-10-14
 completed: 2026-10-14
 verified: yes (JS 1380개·Rust 13개, 타입·clippy·fmt·diff 검사 통과; 실제 PTY 및 Chromium 렌더링 확인)
-retro: skipped (fg-loop 자동 진행 — 학습은 run.md에 보존, 추후 fg-learn에서 반영)
+retro: .forge/retro/261014-150656-terminal-unicode-font.md (사후 회고 2026-10-14)
 docs updated: none
