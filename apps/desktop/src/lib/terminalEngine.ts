@@ -49,6 +49,14 @@ export async function createTerminalEngine(fontFamily = ""): Promise<TerminalEng
   let sendData: (data: string) => void = () => {};
   let disposed = false;
   let fontRequest = 0;
+  // macOS의 Cmd+Backspace(줄 처음까지 지우기): Terminal.app은 이 시스템 명령을 Ctrl+U로 셸에 보내지만, xterm.js는 이 키를 바이트로 바꾸지 않는다(이슈 #63).
+  // 한글 입력 브리지와 같은 길(`sendData`)로 보내고, xterm이 다시 처리하지 않게 막는다. 지워지는 범위는 셸의 ^U 설정을 따른다.
+  term.attachCustomKeyEventHandler((e) => {
+    if (e.type !== "keydown" || e.isComposing || e.key !== "Backspace" || !e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return true;
+    e.preventDefault();
+    sendData("\x15");
+    return false;
+  });
   return {
     open(el) {
       // 한글 조합은 xterm이 아니라 직접 받는다(WebKit에서 모음이 빠지는 문제). 확정된 글은 일반 입력과 같은 길로 보낸다.

@@ -82,6 +82,7 @@ Favorites 등에서 쓰는 경로 변수는 OS별로 해석한다.
 
 - pty는 `portable-pty`가 3개 OS를 지원한다. Windows에서는 ConPTY를 쓴다.
 - 기본 셸: macOS는 `$SHELL`(zsh), Linux는 `$SHELL`을 로그인 셸(`-l`)로 연다. 그래서 `.zprofile`·`.zshrc` 설정이 모두 적용된다(이슈 #64). Windows는 PowerShell 또는 설정값.
+- macOS의 `Cmd+Backspace`는 셸에 `Ctrl+U`를 보낸다(이슈 #63). Terminal.app이 하는 동작과 같고 xterm.js는 이 키를 바이트로 바꾸지 않아 앱이 대신한다. 지워지는 범위는 셸 설정을 따른다(zsh 기본은 줄 전체, bash는 커서 앞).
 - **cwd 동기화**(TERM-03)는 셸 통합이 필요하다. 셸이 프롬프트마다 현재 디렉터리를 알리는 방식(예: OSC 7 시퀀스)을 쓰는 안을 우선 검토한다. zsh/bash/fish/PowerShell별로 훅이 다르고, Marta는 중첩 셸과 ssh를 제외한다 `[높음]`. twin-deck의 방식은 M3 착수 시 시험으로 확정한다 `[낮음]`.
 
 ## 9. 앱 실행과 CLI

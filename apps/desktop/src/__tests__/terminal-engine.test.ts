@@ -4,6 +4,7 @@ import { createTerminalEngine, DEFAULT_TERMINAL_FONT, terminalFontFamily } from 
 const mocks = vi.hoisted(() => ({
   terminals: [] as { options: { fontFamily: string }; refresh: ReturnType<typeof vi.fn>; dispose: ReturnType<typeof vi.fn> }[],
   fit: vi.fn(),
+  keyHandlers: [] as ((e: KeyboardEvent) => boolean)[],
 }));
 vi.mock("@xterm/xterm", () => ({
   Terminal: class {
@@ -13,6 +14,8 @@ vi.mock("@xterm/xterm", () => ({
     dispose = vi.fn();
     constructor(public options: { fontFamily: string }) { mocks.terminals.push(this); }
     loadAddon() {}
+    attachCustomKeyEventHandler(handler: (e: KeyboardEvent) => boolean) { mocks.keyHandlers.push(handler); }
+    onData() {}
   },
 }));
 vi.mock("@xterm/addon-fit", () => ({ FitAddon: class { fit = mocks.fit; dispose() {} } }));
@@ -21,6 +24,7 @@ const fontDescriptor = Object.getOwnPropertyDescriptor(document, "fonts");
 const load = vi.fn<(...args: unknown[]) => Promise<unknown>>();
 beforeEach(() => {
   mocks.terminals.length = 0;
+  mocks.keyHandlers.length = 0;
   mocks.fit.mockClear();
   load.mockReset().mockResolvedValue([]);
   Object.defineProperty(document, "fonts", { configurable: true, value: { load } });
@@ -100,5 +104,45 @@ describe("터미널 글꼴 적용", () => {
     const fallback = await createTerminalEngine();
     expect(mocks.terminals[1].options.fontFamily).toBe(DEFAULT_TERMINAL_FONT);
     fallback.dispose();
+  });
+});
+
+describe("터미널 Cmd+Backspace (이슈 #63)", () => {
+  async function open() {
+    const engine = await createTerminalEngine();
+    const sent: string[] = [];
+    engine.onData((data) => sent.push(data));
+    const handler = mocks.keyHandlers[0];
+    expect(handler).toBeDefined();
+    return { engine, sent, handler };
+  }
+  const key = (init: KeyboardEventInit, type = "keydown") => new KeyboardEvent(type, { key: "Backspace", cancelable: true, ...init });
+
+  it("Cmd+Backspace는 셸에 Ctrl+U를 보내고 xterm이 다시 처리하지 않게 한다", async () => {
+    const { engine, sent, handler } = await open();
+    const event = key({ metaKey: true });
+    expect(handler(event)).toBe(false);
+    expect(sent).toEqual(["\x15"]);
+    expect(event.defaultPrevented).toBe(true);
+    engine.dispose();
+  });
+
+  it("일반 Backspace와 다른 수정키 조합, 다른 Cmd 키는 건드리지 않는다", async () => {
+    const { engine, sent, handler } = await open();
+    expect(handler(key({}))).toBe(true);
+    for (const mod of [{ ctrlKey: true }, { altKey: true }, { shiftKey: true }]) {
+      expect(handler(key({ metaKey: true, ...mod }))).toBe(true);
+    }
+    expect(handler(key({ metaKey: true, key: "c" }))).toBe(true);
+    expect(sent).toEqual([]);
+    engine.dispose();
+  });
+
+  it("keyup과 IME 조합 중에는 보내지 않는다", async () => {
+    const { engine, sent, handler } = await open();
+    expect(handler(key({ metaKey: true }, "keyup"))).toBe(true);
+    expect(handler(key({ metaKey: true, isComposing: true }))).toBe(true);
+    expect(sent).toEqual([]);
+    engine.dispose();
   });
 });
