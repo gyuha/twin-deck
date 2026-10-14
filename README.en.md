@@ -145,6 +145,7 @@ Put the cursor on a file and press `→` (or `Mod+Y`) to see its contents right 
 | Folder | Sub-items as a tree list |
 | Sound, video | A player. Press play to start |
 | 3D models (GLB, OBJ, STL, etc.) | A 3D rendering |
+| HWP·HWPX | Hangul documents drawn page by page in their real layout. Switch pages with `Ctrl+Tab`/`Ctrl+Shift+Tab` (files on disk only; files over 20 MB and password-protected files are not supported) |
 | epub | Cover, title, author, table of contents, and chapter text. Switch chapters with `Ctrl+Tab`/`Ctrl+Shift+Tab` or the contents box (files on disk only; DRM-protected files are not supported) |
 
 ![cbz preview](docs/screenshots/preview-cbz.png)

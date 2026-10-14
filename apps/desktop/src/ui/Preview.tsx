@@ -21,6 +21,7 @@ import { officeKindOf, quickLookKindOf, usesPreviewHandler } from "../lib/office
 import { PreviewHandlerView } from "./PreviewHandlerView";
 import type { HandlerUnavailable } from "./PreviewHandlerView";
 import { EpubView } from "./EpubView";
+import { HwpView } from "./HwpView";
 import { QuickLookView } from "./QuickLookView";
 import { useUi } from "./uiContext";
 
@@ -119,6 +120,8 @@ export function Preview() {
   const native = ql !== null || hKind !== null;
   // epub은 디스크 위 파일만 앱이 읽어 보여 준다(압축 안은 읽지 않고 "미리 볼 수 없는 형식"). 3D·Office·네이티브 미리보기와 겹치지 않는다.
   const epub = !p.isDir && !model && !native && !isArchivePath(p.path) && /\.epub$/i.test(p.name);
+  // HWP·HWPX도 디스크 위 파일만 앱이 쪽 단위로 그려 보여 준다(압축 안은 "미리 볼 수 없는 형식").
+  const hwp = !p.isDir && !model && !native && !isArchivePath(p.path) && /\.hwpx?$/i.test(p.name);
   const officeKind = p.isDir || model || native ? null : officeKindOf(p.name);
   // Office 문서도 같은 방식으로 kind와 무관하게 보여 준다. 설정 `preview.office`가 꺼져 있으면(기본) 미리 볼 수 없는 형식으로 둔다.
   const office = previewConfig.office ? officeKind : null;
@@ -240,6 +243,7 @@ export function Preview() {
           {d && model && fresh && <ModelView path={p.path} name={p.name} size={d.size} fallback={d.kind === "text" ? textBody : undefined} />}
           {d && office && fresh && <OfficeView path={p.path} kind={office} fileSize={d.size} sizeText={size(d.size)} />}
           {epub && <EpubView key={p.path} path={p.path} name={p.name} />}
+          {hwp && d && fresh && <HwpView path={p.path} fileSize={d.size} sizeText={size(d.size)} />}
           {ql && <QuickLookView key={p.path} path={p.path} name={p.name} fit={ql === "document"} />}
           {hKind && <PreviewHandlerView key={p.path} path={p.path} suspended={live !== null} onUnavailable={(why) => setHandlerFailed({ path: p.path, ...why })} />}
           {d?.kind === "text" && !model && !office && !native &&
@@ -289,7 +293,7 @@ export function Preview() {
             ) : (
               <p className="text-ink-faint">{t("preview.pdf_too_big", { size: size(d.size) })}</p>
             ))}
-          {(d?.kind === "directory" || (d?.kind === "other" && !model && !office && !native && !epub)) && (
+          {(d?.kind === "directory" || (d?.kind === "other" && !model && !office && !native && !epub && !hwp)) && (
             <p className="text-ink-faint">
               {kindLabel(d.kind)} — {officeOff ? t("preview.office_off") : t("preview.unsupported")}
               {d.kind === "other" ? ` (${size(d.size)})` : ""}

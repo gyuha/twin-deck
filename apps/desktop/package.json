@@ -10,6 +10,7 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@rhwp/core": "^0.8.7",
     "@spacedrive/primitives": "^0.2.4",
     "@spacedrive/tokens": "^0.2.3",
     "@tanstack/react-virtual": "^3.14.13",
