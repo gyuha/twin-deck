@@ -37,6 +37,8 @@ interface Item {
   control: Control;
   /** 이 플랫폼에서는 설정 화면에 보이지 않는다(값은 설정 파일에 그대로 있다). */
   hideOn?: readonly Platform[];
+  /** 값이 비어 있으면 설정 화면에 보이지 않는다. 남아 있는 이전 설정을 지울 수 있게만 보여 줄 때 쓴다. */
+  hideWhenEmpty?: boolean;
 }
 
 /** 긴 설명을 ⓘ 아이콘에 숨기고, 마우스를 올리거나 포커스하면 말풍선으로 보인다(글자는 DOM에 있어 보조 기기에도 읽힌다). */
@@ -96,7 +98,9 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
       { key: "behavior.ui_font", get title() { return translate("settings.item.behavior.ui_font.title"); }, get desc() { return translate("settings.item.behavior.ui_font.desc"); }, control: { type: "text" } },
       { key: "behavior.preview_font", get title() { return translate("settings.item.behavior.preview_font.title"); }, get desc() { return translate("settings.item.behavior.preview_font.desc"); }, control: { type: "text" } },
       { key: "behavior.terminal_font", get title() { return translate("settings.item.behavior.terminal_font.title"); }, get desc() { return translate("settings.item.behavior.terminal_font.desc"); }, control: { type: "text" } },
-      { key: "behavior.text_color", get title() { return translate("settings.item.behavior.text_color.title"); }, get desc() { return translate("settings.item.behavior.text_color.desc"); }, control: { type: "color" } },
+      { key: "behavior.text_color_dark", get title() { return translate("settings.item.behavior.text_color_dark.title"); }, get desc() { return translate("settings.item.behavior.text_color_dark.desc"); }, control: { type: "color" } },
+      { key: "behavior.text_color_light", get title() { return translate("settings.item.behavior.text_color_light.title"); }, get desc() { return translate("settings.item.behavior.text_color_light.desc"); }, control: { type: "color" } },
+      { key: "behavior.text_color", get title() { return translate("settings.item.behavior.text_color.title"); }, get desc() { return translate("settings.item.behavior.text_color.desc"); }, control: { type: "color" }, hideWhenEmpty: true },
       { key: "behavior.table.icon_size", get title() { return translate("settings.item.behavior.table.icon_size.title"); }, get desc() { return translate("settings.item.behavior.table.icon_size.desc"); }, control: { type: "int" } },
       { key: "behavior.table.system_icons", get title() { return translate("settings.item.behavior.table.system_icons.title"); }, get desc() { return translate("settings.item.behavior.table.system_icons.desc"); }, control: { type: "switch" } },
       { key: "behavior.table.zebra_rows", get title() { return translate("settings.item.behavior.table.zebra_rows.title"); }, get desc() { return translate("settings.item.behavior.table.zebra_rows.desc"); }, control: { type: "switch" } },
@@ -440,7 +444,7 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
   const hotkeyOff = !config.environment.global_hotkey_enabled;
   const current = SECTIONS[section];
   const sectionItems: Item[] = current.title === t("settings.section.fkeys.title") ? [...current.items, ...comboKeys.map((k): Item => ({ key: `fkeys.${k}`, title: k, control: { type: "fkey" } }))] : current.items;
-  const items = sectionItems.filter((it) => !it.hideOn?.includes(platform));
+  const items = sectionItems.filter((it) => !it.hideOn?.includes(platform) && !(it.hideWhenEmpty && !valueAt(config, it.key)));
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-app text-ink">
       <div role="dialog" aria-label={t("settings.aria")} className="flex min-h-0 flex-1 flex-col">

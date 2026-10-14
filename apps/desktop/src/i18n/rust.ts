@@ -84,7 +84,7 @@ export const RUST_MESSAGES: readonly (readonly [ko: string, en: string])[] = [
   ["TOML 문법 오류: {}", "TOML syntax error: {}"],
   ["{section}.{key}: '{v}'는 허용되지 않는 값입니다 ({}{})", "{section}.{key}: '{v}' is not an allowed value ({}{})"],
   [" 또는 테마 이름(apps/desktop/themes의 파일 이름, 예: catppuccin-mocha)", " or a theme name (file name in apps/desktop/themes, e.g. catppuccin-mocha)"],
-  ["behavior.text_color: '{v}'는 색이 아닙니다 (#rrggbb 또는 #rgb, 비우면 테마 그대로)", "behavior.text_color: '{v}' is not a color (#rrggbb or #rgb; empty keeps the theme)"],
+  ["behavior.{key}: '{v}'는 색이 아닙니다 (#rrggbb 또는 #rgb, 비우면 테마 그대로)", "behavior.{key}: '{v}' is not a color (#rrggbb or #rgb; empty keeps the theme)"],
   ["테이블이어야 합니다", "must be a table"],
   ["name과 path가 필요합니다", "name and path are required"],
   ["그룹에는 name이 필요합니다", "A group needs a name"],

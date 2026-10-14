@@ -659,9 +659,17 @@ preview_font: string;
  */
 terminal_font: string; 
 /**
- * 앱 기본 글자색(`#rrggbb` 또는 `#rgb`). 비우면 테마 그대로다. 흐린 글자색은 이 색을 배경 쪽으로 섞어 만든다.
+ * 이전 버전의 앱 기본 글자색(`#rrggbb` 또는 `#rgb`, 모든 테마 공통). 테마별 키(`text_color_dark`/`text_color_light`)가 비어 있을 때만 쓴다(이슈 #58).
  */
-text_color: string; table: BehaviorTable; quick_select: QuickSelect; selection: SelectionConfig; layout: BehaviorLayout }
+text_color: string; 
+/**
+ * 다크 테마의 앱 기본 글자색(`#rrggbb` 또는 `#rgb`). 비우면 `text_color`, 그것도 비면 테마 그대로다. 흐린 글자색은 이 색을 배경 쪽으로 섞어 만든다.
+ */
+text_color_dark: string; 
+/**
+ * 라이트 테마의 앱 기본 글자색. 규칙은 `text_color_dark`와 같다.
+ */
+text_color_light: string; table: BehaviorTable; quick_select: QuickSelect; selection: SelectionConfig; layout: BehaviorLayout }
 export type BehaviorLayout = { show_action_bar: boolean; 
 /**
  * true면 Action Bar가 평소엔 수식키 없는 키만 보이고, Shift/Ctrl/Alt/Cmd를 누르는 동안 그 조합 키의 항목만 보인다.

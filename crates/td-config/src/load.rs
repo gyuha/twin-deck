@@ -181,27 +181,30 @@ fn validate_enums(merged: &mut Table, defaults: &Table, warnings: &mut Vec<Warni
     }
 }
 
-/// `behavior.text_color`는 비었거나 `#rgb`/`#rrggbb`여야 한다. 아니면 비운(테마 그대로) 값으로 되돌리고 경고한다.
+/// 글자색 키(`behavior.text_color`, `text_color_dark`, `text_color_light`)는 비었거나 `#rgb`/`#rrggbb`여야 한다.
+/// 아니면 비운(테마 그대로) 값으로 되돌리고 경고한다.
 fn validate_text_color(merged: &mut Table, warnings: &mut Vec<Warning>) {
     let Some(behavior) = merged.get_mut("behavior").and_then(Value::as_table_mut) else {
         return;
     };
-    let Some(v) = behavior.get("text_color").and_then(Value::as_str) else {
-        return;
-    };
-    let hex = v
-        .strip_prefix('#')
-        .is_some_and(|h| matches!(h.len(), 3 | 6) && h.chars().all(|c| c.is_ascii_hexdigit()));
-    if v.is_empty() || hex {
-        return;
+    for key in ["text_color", "text_color_dark", "text_color_light"] {
+        let Some(v) = behavior.get(key).and_then(Value::as_str) else {
+            continue;
+        };
+        let hex = v
+            .strip_prefix('#')
+            .is_some_and(|h| matches!(h.len(), 3 | 6) && h.chars().all(|c| c.is_ascii_hexdigit()));
+        if v.is_empty() || hex {
+            continue;
+        }
+        warnings.push(Warning::new(
+            "config.toml",
+            format!(
+                "behavior.{key}: '{v}'는 색이 아닙니다 (#rrggbb 또는 #rgb, 비우면 테마 그대로)"
+            ),
+        ));
+        behavior.insert(key.to_string(), Value::String(String::new()));
     }
-    warnings.push(Warning::new(
-        "config.toml",
-        format!(
-            "behavior.text_color: '{v}'는 색이 아닙니다 (#rrggbb 또는 #rgb, 비우면 테마 그대로)"
-        ),
-    ));
-    behavior.insert("text_color".to_string(), Value::String(String::new()));
 }
 
 fn parse_favorites(value: Option<Value>, warnings: &mut Vec<Warning>) -> Vec<FavoriteDto> {
