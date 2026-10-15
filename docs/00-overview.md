@@ -37,6 +37,7 @@ twin-deck은 키보드 중심으로 조작하는 듀얼 패널 파일 탐색기�
 - 파일 작업(복사, 이동, 이름 변경, 새 폴더/파일, 휴지통, 영구 삭제, 복제, 심볼릭 링크)과 작업 큐
 - 탐색 보조 기능(Volumes, Favorites, Recent Locations, Hierarchy, Go To Path, Quick Select)
 - SMB 연결 관리(저장된 서버를 OS에 마운트, [ADR-0018](adr/0018-smb-via-os-mount.md))
+- SFTP·FTP 연결 관리(저장한 서버에 접속하면 패널이 원격 폴더로 들어가고 복사·이동·삭제는 로컬과 같다. 앱 안의 원격 클라이언트, [ADR-0019](adr/0019-remote-fs-in-process.md))
 - 컬럼 설정, 정렬, 숨김 파일
 - 아카이브를 폴더처럼 열기, Look Up, Flatten, Disk Usage
 - 내장 터미널, CLI 실행 인자
@@ -47,7 +48,8 @@ twin-deck은 키보드 중심으로 조작하는 듀얼 패널 파일 탐색기�
 - Spacedrive의 VDFS 기능 전반: 라이브러리, 태그, 동기화, P2P, 클라우드 스토리지, 벡터 검색, AI
 - 모바일 앱
 - Marta의 Marco 설정 형식과의 호환 ([ADR-0006](adr/0006-toml-config.md))
-- SFTP 등 자체 원격 파일시스템(OS 마운트로 붙이는 공유 연결은 위 포함 항목 — [ADR-0018](adr/0018-smb-via-os-mount.md))
+- 자체 SMB 클라이언트(SMB는 OS 마운트로 붙인다 — [ADR-0018](adr/0018-smb-via-os-mount.md))
+- FTPS(TLS)와 SSH 개인키·에이전트 인증, SFTP 호스트 키 영구 신뢰(known_hosts): SFTP·FTP는 비밀번호 인증과 평문 FTP만 지원한다([ADR-0019](adr/0019-remote-fs-in-process.md))
 - Marta의 소스, 에셋, 테마, 문서 문장 복제
 
 ## 5. 확정된 결정 요약
@@ -65,6 +67,7 @@ twin-deck은 키보드 중심으로 조작하는 듀얼 패널 파일 탐색기�
 | 라이선스 | 출처 추적과 재검토 조건 | [0009](adr/0009-license-and-provenance.md) |
 | 키 매핑 | Cmd→Ctrl, Opt→Alt 기본 매핑 | [0010](adr/0010-cross-platform-keymap.md) |
 | SMB 연결 | OS 마운트(macOS NetFS, Windows 네트워크 드라이브), 비밀번호는 OS 키체인, 자체 원격 FS 없음 | [0018](adr/0018-smb-via-os-mount.md) |
+| SFTP·FTP 연결 | 앱 안의 원격 클라이언트(`td-remote`)를 `Vfs`로 감싸 패널에 통합, 경로는 `sftp://<연결 id>/…`, 비밀번호는 OS 키체인 | [0019](adr/0019-remote-fs-in-process.md) |
 
 ## 6. 용어
 
