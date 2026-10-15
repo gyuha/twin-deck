@@ -57,6 +57,17 @@ pub trait RemoteSession: Send + Sync {
     fn write(&self, path: &str) -> Result<Box<dyn RemoteWrite>>;
 }
 
+/// 서버가 목록에서 돌려준 이름이 **한 구성 요소짜리 평범한 이름**인가.
+/// 서버는 믿을 수 없다(악의적이거나 중간자일 수 있다). `../x`나 `/etc/x` 같은 이름을 그대로 쓰면 원격을 로컬로 복사할 때
+/// `dest.join(name)`이 대상 폴더 밖에 쓴다(scp의 CVE-2019-6111과 같은 유형). 그래서 빈 이름, `.`, `..`, 경로 구분자(`/`),
+/// NUL, 그리고 Windows에서는 `\`와 `:`(드라이브·경로 구분)를 담은 이름은 목록에서 뺀다.
+pub fn is_plain_name(name: &str) -> bool {
+    if name.is_empty() || name == "." || name == ".." || name.contains(['/', '\0']) {
+        return false;
+    }
+    !(cfg!(windows) && name.contains(['\\', ':']))
+}
+
 /// `/a/b` + `c` → `/a/b/c`.
 pub fn join(dir: &str, name: &str) -> String {
     if dir.ends_with('/') {
@@ -82,4 +93,34 @@ pub fn parent(path: &str) -> Option<String> {
 pub fn file_name(path: &str) -> Option<&str> {
     let p = path.trim_end_matches('/');
     p.rsplit('/').next().filter(|s| !s.is_empty())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_plain_name;
+
+    #[test]
+    fn 평범한_이름만_통과한다() {
+        for ok in ["a.txt", "한글 파일.md", ".hidden", "a b", "...", "x..y"] {
+            assert!(is_plain_name(ok), "{ok:?}");
+        }
+    }
+
+    #[test]
+    fn 상위_경로와_절대_경로와_구분자_이름은_거른다() {
+        for bad in [
+            "",
+            ".",
+            "..",
+            "../x",
+            "../../etc/passwd",
+            "/etc/passwd",
+            "a/b",
+            "a/",
+            "/",
+            "a\0b",
+        ] {
+            assert!(!is_plain_name(bad), "{bad:?}");
+        }
+    }
 }

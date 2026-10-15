@@ -10,8 +10,8 @@ use suppaftp::types::FileType;
 use suppaftp::{FtpError, FtpStream, ImplFtpStream, Status, TlsStream, TransferStream};
 
 use crate::{
-    file_name, join, parent, RemoteEntry, RemoteError, RemoteKind, RemoteSession, RemoteWrite,
-    Result,
+    file_name, is_plain_name, join, parent, RemoteEntry, RemoteError, RemoteKind, RemoteSession,
+    RemoteWrite, Result,
 };
 
 const TIMEOUT: Duration = Duration::from_secs(15);
@@ -112,7 +112,8 @@ fn entry_of(line: &str) -> Option<RemoteEntry> {
             .ok()?
     };
     let name = f.name().to_string();
-    if name == "." || name == ".." {
+    // 서버가 준 이름은 믿지 않는다: `../x` 같은 이름이 복사 때 대상 폴더 밖에 쓰지 않게 평범한 이름만 남긴다.
+    if !is_plain_name(&name) {
         return None;
     }
     let kind = if f.is_directory() {
@@ -279,5 +280,33 @@ impl<T: TlsStream + Send + 'static> RemoteWrite for FtpWriter<T> {
             let _ = c.quit();
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::entry_of;
+
+    #[test]
+    fn 목록의_상위_경로_이름은_항목으로_받지_않는다() {
+        // MLSD
+        assert!(entry_of("type=file;size=1; ../escaped.txt").is_none());
+        assert!(entry_of("type=file;size=1; ../../etc/passwd").is_none());
+        assert!(entry_of("type=file;size=1; /etc/passwd").is_none());
+        assert!(entry_of("type=dir; ..").is_none());
+        // LIST(유닉스)
+        assert!(entry_of("-rw-r--r-- 1 u g 1 Jan  1 00:00 ../escaped.txt").is_none());
+        assert!(entry_of("drwxr-xr-x 2 u g 0 Jan  1 00:00 ..").is_none());
+    }
+
+    #[test]
+    fn 평범한_이름은_그대로_받는다() {
+        assert_eq!(entry_of("type=file;size=3; a.txt").unwrap().name, "a.txt");
+        assert_eq!(
+            entry_of("-rw-r--r-- 1 u g 3 Jan  1 00:00 b.txt")
+                .unwrap()
+                .name,
+            "b.txt"
+        );
     }
 }

@@ -34,7 +34,8 @@ impl Drop for Rt {
 }
 
 use crate::{
-    file_name, join, RemoteEntry, RemoteError, RemoteKind, RemoteSession, RemoteWrite, Result,
+    file_name, is_plain_name, join, RemoteEntry, RemoteError, RemoteKind, RemoteSession,
+    RemoteWrite, Result,
 };
 
 const TIMEOUT: Duration = Duration::from_secs(15);
@@ -174,10 +175,8 @@ impl RemoteSession for SftpSession {
     fn list(&self, dir: &str) -> Result<Vec<RemoteEntry>> {
         let rd = self.run(dir, self.sftp.read_dir(dir.to_string()))?;
         Ok(rd
-            .filter(|e| {
-                let n = e.file_name();
-                n != "." && n != ".."
-            })
+            // 서버가 준 이름은 믿지 않는다: `../x` 같은 이름이 복사 때 대상 폴더 밖에 쓰지 않게 평범한 이름만 남긴다.
+            .filter(|e| is_plain_name(&e.file_name()))
             .map(|e| {
                 let m = e.metadata();
                 RemoteEntry {
