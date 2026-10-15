@@ -74,6 +74,10 @@ pub fn reveal_command(os: Os, path: &str, is_dir: bool) -> Command {
 /// 파일을 운영체제 기본 프로그램으로 실행하는 명령. 셸을 거치지 않는다(Windows는 `cmd /c start` 대신 explorer).
 pub fn open_command(os: Os, path: &str) -> Command {
     match os {
+        // `.DS_Store`는 맡은 앱이 없어 `open`이 kLSApplicationNotFoundErr로 실패하므로 기본 텍스트 편집기(`-t`)로 연다.
+        Os::Mac if path.rsplit(['/', '\\']).next() == Some(".DS_Store") => {
+            Command::new("open", ["-t".to_string(), path.to_string()])
+        }
         Os::Mac => Command::new("open", [path.to_string()]),
         Os::Windows => Command::new("explorer", [path.to_string()]),
         Os::Linux => Command::new("xdg-open", [path.to_string()]),

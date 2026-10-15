@@ -122,6 +122,16 @@ fn launch_open_args() {
         cmd("open", &["/Users/me/a b.txt"])
     );
     assert_eq!(
+        open_command(Os::Mac, "/Users/me/Downloads/.DS_Store"),
+        cmd("open", &["-t", "/Users/me/Downloads/.DS_Store"]),
+        ".DS_Store는 맡은 앱이 없어 기본 텍스트 편집기로 연다"
+    );
+    assert_eq!(
+        open_command(Os::Mac, "/Users/me/a.DS_Store"),
+        cmd("open", &["/Users/me/a.DS_Store"]),
+        "이름이 정확히 .DS_Store일 때만"
+    );
+    assert_eq!(
         open_command(Os::Windows, "C:\\x\\a.txt"),
         cmd("explorer", &["C:\\x\\a.txt"])
     );
