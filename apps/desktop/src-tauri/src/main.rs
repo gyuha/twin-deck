@@ -14,9 +14,9 @@ use tauri_specta::Event;
 use td_ops::SystemTrash;
 
 use commands::{
-    specta_builder, AppLaunch, AppService, AppVolumes, ConfigChanged, ConfigState, DirChanged,
-    LaunchPaths, OpenPaths, OpenPathsDto, QueueChanged, SearchChunk, SearchDone, TerminalExit,
-    TerminalOutput, UsageUpdate,
+    specta_builder, AppLaunch, AppService, AppVolumes, ConfigState, DirChanged, LaunchPaths,
+    OpenPaths, OpenPathsDto, QueueChanged, SearchChunk, SearchDone, TerminalExit, TerminalOutput,
+    UsageUpdate,
 };
 use service::{coalesce, SearchMsg};
 use std::path::Path;
@@ -58,12 +58,16 @@ fn single_instance_enabled() -> bool {
     single_instance_in(dir.as_deref())
 }
 
+/// `dir`은 로컬 앱 설정 폴더. 설정 저장 경로를 지정했으면 그 폴더의 설정을 읽는다.
 fn single_instance_in(dir: Option<&Path>) -> bool {
     dir.map(|d| {
-        td_config::load_dir(d, td_config::Platform::current())
-            .config
-            .environment
-            .single_instance
+        td_config::load_dir(
+            &td_config::resolve_config_dir(d).dir,
+            td_config::Platform::current(),
+        )
+        .config
+        .environment
+        .single_instance
     })
     .unwrap_or(true)
 }
@@ -111,6 +115,7 @@ fn main() {
         })
         .invoke_handler(builder.invoke_handler())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         // 창 위치·크기·최대화를 창 레이블별로 저장하고 다음 실행 때 복원한다.
         .plugin(
@@ -145,40 +150,14 @@ fn main() {
                     .emit(&handle);
                 }
             });
-            // 설정: 앱 설정 디렉터리를 감시하고, 바뀌면 UI로 알린다.
-            let config_dir = app.path().app_config_dir().ok();
-            let started = config_dir
-                .as_deref()
-                .map(|d| td_config::ConfigStore::start(d, td_config::Platform::current()));
-            let (store, config_rx, startup_warning) = match started {
-                Some(Ok((s, rx))) => (Some(s), Some(rx), None),
-                Some(Err(e)) => (
-                    None,
-                    None,
-                    Some(format!("설정 디렉터리를 열지 못해 기본값을 씁니다: {e}")),
-                ),
-                None => (
-                    None,
-                    None,
-                    Some("설정 디렉터리를 알 수 없어 기본값을 씁니다".to_string()),
-                ),
-            };
-            app.manage(ConfigState {
-                store,
-                startup_warning,
-            });
+            // 설정: 앱 설정 디렉터리(또는 지정한 저장 경로)를 감시하고, 바뀌면 UI로 알린다.
+            let (config_state, config_rx) = ConfigState::open(app.path().app_config_dir().ok());
+            app.manage(config_state);
             let current = app.state::<ConfigState>().current();
             apply_config(&app.state::<AppService>(), &current);
             global_hotkey::apply(app.handle(), &current.config.environment);
             if let Some(rx) = config_rx {
-                let handle = app.handle().clone();
-                std::thread::spawn(move || {
-                    while let Ok(loaded) = rx.recv() {
-                        apply_config(&handle.state::<AppService>(), &loaded);
-                        global_hotkey::apply(&handle, &loaded.config.environment);
-                        let _ = ConfigChanged { loaded }.emit(&handle);
-                    }
-                });
+                commands::forward_config_changes(app.handle().clone(), rx);
             }
             let handle = app.handle().clone();
             std::thread::spawn(move || {
@@ -288,8 +267,9 @@ mod capability_tests {
             "core:default 권한이 없다"
         );
 
-        // 화면이 부르는 명령이 없어 권한 파일 자체가 없는 플러그인(single-instance는 `permissions` 디렉터리가 없다).
-        const NO_PERMISSIONS: [&str; 1] = ["single-instance"];
+        // 화면이 부르는 명령이 없어 권한이 필요 없는 플러그인. single-instance는 `permissions` 디렉터리 자체가 없고,
+        // dialog는 Rust 명령(`pick_folder`)에서만 쓰므로 화면에 선택 창 권한을 주지 않는다.
+        const NO_PERMISSIONS: [&str; 2] = ["single-instance", "dialog"];
         let manifest =
             fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml")).unwrap();
         for line in manifest.lines() {
@@ -360,6 +340,25 @@ mod tests {
         )
         .unwrap();
         assert!(single_instance_in(Some(dir.path())));
+    }
+
+    /// 설정 저장 경로를 지정했으면 Tauri가 뜨기 전에 읽는 단일 인스턴스 설정도 그 폴더를 따른다.
+    #[test]
+    fn single_instance_follows_config_location() {
+        let local = tempfile::tempdir().unwrap();
+        let cloud = tempfile::tempdir().unwrap();
+        std::fs::write(
+            cloud.path().join("config.toml"),
+            "[environment]\nsingle_instance = false\n",
+        )
+        .unwrap();
+        assert!(single_instance_in(Some(local.path())));
+        std::fs::write(
+            local.path().join(td_config::LOCATION_FILE),
+            format!("dir = {:?}\n", cloud.path().to_string_lossy()),
+        )
+        .unwrap();
+        assert!(!single_instance_in(Some(local.path())));
     }
 
     /// 설정 폴더는 Tauri가 `config_dir/식별자`로 정한다. 식별자가 바뀌면 일찍 읽는 폴더가 어긋나므로 같이 고치게 한다.

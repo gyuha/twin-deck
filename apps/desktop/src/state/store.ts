@@ -19,6 +19,8 @@ import {
   trimTrailingSep,
 } from "@twin-deck/ts-client";
 import type {
+  ConfigLocationDto,
+  LocationConflict,
   Backend,
   PreviewRectDto,
   ShowOutcome,
@@ -367,6 +369,8 @@ export interface AppState {
   lastFind: FindForm | null;
   settingsSection: number;
   settingsError: string | null;
+  /** 설정 파일 저장 경로. 설정 화면이 열릴 때 읽는다. */
+  configLocation: ConfigLocationDto | null;
   queueCursor: number;
   /** 설정 파일에서 읽은 설정·키바인딩·경고. 로딩 전에는 내장 기본값. */
   loaded: Loaded;
@@ -560,6 +564,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     lastFind: null,
     settingsSection: 0,
     settingsError: null,
+    configLocation: null,
     queueCursor: 0,
     loaded: defaultLoaded(),
     keymapWarnings: [],
@@ -927,6 +932,28 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
 
   /** 다이얼로그를 열고 사용자의 결정을 기다린다. 취소하면 null. */
   let pending: ((value: unknown) => void) | null = null;
+  /** 설정 파일 저장 경로를 바꾼다(null = 기본 위치). 새 폴더에 이미 설정이 있으면 그 설정을 쓸지 지금 설정으로 덮어쓸지 묻는다. */
+  async function changeConfigLocation(dir: string | null) {
+    const loc = get().configLocation ?? (await backend.getConfigLocation());
+    const target = dir ?? loc.defaultDir;
+    if (target === loc.dir) return;
+    let conflict: LocationConflict = "useExisting";
+    if (await backend.configLocationHasFiles(target)) {
+      const choice = await ask<number>({
+        kind: "choice",
+        title: tr("store.config_location.exists.title"),
+        lines: [target, tr("store.config_location.exists.line")],
+        choices: [tr("store.config_location.use_existing"), tr("store.config_location.overwrite")],
+        selected: 0,
+      });
+      if (choice === null) return;
+      conflict = choice === 0 ? "useExisting" : "overwrite";
+    }
+    const loaded = await backend.setConfigLocation(dir, conflict);
+    set({ loaded, settingsError: null, configLocation: await backend.getConfigLocation() });
+    void reloadAll();
+  }
+
   function ask<T>(dialog: DialogState): Promise<T | null> {
     return new Promise((resolve) => {
       pending = resolve as (value: unknown) => void;
@@ -3232,6 +3259,31 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     async revealConfigDir() {
       try {
         await backend.revealConfigDir();
+      } catch (e) {
+        set({ settingsError: String(e instanceof Error ? e.message : e) });
+      }
+    },
+    /** 설정 화면: 설정 파일 저장 경로를 읽는다. */
+    async loadConfigLocation() {
+      try {
+        set({ configLocation: await backend.getConfigLocation() });
+      } catch (e) {
+        set({ settingsError: String(e instanceof Error ? e.message : e) });
+      }
+    },
+    /** 설정 화면: 폴더를 골라 설정 파일 저장 경로로 삼는다(iCloud Drive·Google Drive 폴더를 고르면 여러 기기가 같은 설정을 쓴다). */
+    async pickConfigLocation() {
+      try {
+        const dir = await backend.pickFolder();
+        if (dir) await changeConfigLocation(dir);
+      } catch (e) {
+        set({ settingsError: String(e instanceof Error ? e.message : e) });
+      }
+    },
+    /** 설정 화면: 설정 파일 저장 경로를 기본 위치로 되돌린다. */
+    async resetConfigLocation() {
+      try {
+        await changeConfigLocation(null);
       } catch (e) {
         set({ settingsError: String(e instanceof Error ? e.message : e) });
       }

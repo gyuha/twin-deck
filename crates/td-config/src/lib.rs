@@ -5,6 +5,7 @@ mod columns;
 mod config;
 mod keybindings;
 mod load;
+mod location;
 mod merge;
 mod store;
 mod themes;
@@ -17,6 +18,10 @@ pub use config::{
 };
 pub use keybindings::BindingSpec;
 pub use load::{load_dir, load_from_strs, Loaded, Platform, Warning};
+pub use location::{
+    change_config_location, has_config_files, read_config_location, resolve_config_dir,
+    LocationConflict, ResolvedDir, CONFIG_FILES, LOCATION_FILE,
+};
 pub use store::{
     append_favorite, remove_favorite, reset_user_value, set_user_value, ConfigStore, ConfigValue,
 };

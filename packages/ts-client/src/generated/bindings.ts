@@ -305,6 +305,45 @@ async revealConfigDir() : Promise<Result<null, string>> {
 }
 },
 /**
+ * 설정 화면: 지금 설정 파일 저장 경로와 기본 위치.
+ */
+async getConfigLocation() : Promise<Result<ConfigLocationDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_config_location") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 폴더 선택 창을 띄워 고른 폴더의 경로를 돌려준다. 취소하면 None.
+ */
+async pickFolder() : Promise<Result<string | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("pick_folder") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 설정 화면: 그 폴더에 이미 설정 파일(`config.toml`·`keybindings.toml`)이 있는가. 있으면 저장 경로를 바꾸기 전에 어떻게 할지 묻는다.
+ */
+async configLocationHasFiles(dir: string) : Promise<boolean> {
+    return await TAURI_INVOKE("config_location_has_files", { dir });
+},
+/**
+ * 설정 화면: 설정 파일 저장 경로를 바꾼다(`dir`이 None이면 기본 위치로). 새 폴더의 설정을 바로 적용해 돌려주고 다른 창에도 알린다.
+ */
+async setConfigLocation(dir: string | null, conflict: LocationConflict) : Promise<Result<Loaded, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_config_location", { dir, conflict }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * GitHub 릴리스의 `latest.json`을 읽어 새 버전이 있으면 알려 준다. 없으면 null.
  * 이 OS용 항목이 없는 버전은 새 버전으로 치지 않는다(updater가 "항목 없음"으로 돌려준다).
  */
@@ -794,6 +833,22 @@ favorites?: FavoriteDto[] }
  */
 export type ConfigChanged = { loaded: Loaded }
 /**
+ * 설정 화면이 보여 주는 저장 경로.
+ */
+export type ConfigLocationDto = { 
+/**
+ * 지금 설정 파일을 읽고 쓰는 폴더.
+ */
+dir: string; 
+/**
+ * 기본 위치(로컬 앱 설정 폴더).
+ */
+defaultDir: string; 
+/**
+ * 사용자가 저장 경로를 지정했는가.
+ */
+custom: boolean }
+/**
  * 설정 화면이 쓰는 값 하나. 문자열 목록 말고 배열과 테이블은 다루지 않는다.
  */
 export type ConfigValue = { kind: "bool"; value: boolean } | { kind: "int"; value: number } | { kind: "str"; value: string } | { kind: "strList"; value: string[] }
@@ -902,6 +957,18 @@ export type LoadedState = { snapshot: Snapshot | null;
  * 파일이 있었지만 읽을 수 없어 무시했다면 그 이유.
  */
 warning: string | null }
+/**
+ * 새 경로에 이미 설정 파일이 있을 때 어떻게 할지.
+ */
+export type LocationConflict = 
+/**
+ * 그 경로의 설정을 그대로 쓴다.
+ */
+"useExisting" | 
+/**
+ * 지금 설정으로 덮어쓴다. 그 경로에 있던 파일은 `.bak`으로 남긴다.
+ */
+"overwrite"
 /**
  * 이름을 조합형으로 고친 결과의 개수. 실패한 것이 있으면 첫 이유를 함께 담는다.
  */

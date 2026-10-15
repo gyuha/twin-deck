@@ -2,7 +2,9 @@ import { archiveRoot, isArchivePath } from "./archive";
 import { BackendError, baseName, joinPath, parentPath } from "./backend";
 import type { Backend, FileDropEvent, SearchEvent, TerminalEvent } from "./backend";
 import type {
+  ConfigLocationDto,
   ConfigValue,
+  LocationConflict,
   ConflictDto,
   EntryDto,
   FileInfoDto,
@@ -845,6 +847,33 @@ export class FakeBackend implements Backend {
   configDirRevealed = 0;
   async revealConfigDir() {
     this.configDirRevealed += 1;
+  }
+
+  /** 테스트용: 설정 파일 저장 경로. */
+  configLocation: ConfigLocationDto = { dir: "/config", defaultDir: "/config", custom: false };
+  /** 테스트용: 이미 설정 파일이 있는 폴더와, 그 설정을 쓰기로 하면 적용될 설정(없으면 지금 설정 유지). */
+  locationConfigs: Record<string, Loaded | null> = {};
+  /** 테스트용: `setConfigLocation` 호출 기록. */
+  readonly locationChanges: { dir: string | null; conflict: LocationConflict }[] = [];
+  /** 테스트용: 폴더 선택 창이 돌려줄 값(null = 취소). */
+  pickFolderResult: string | null = null;
+
+  async getConfigLocation() {
+    return { ...this.configLocation };
+  }
+  async configLocationHasFiles(dir: string) {
+    return dir in this.locationConfigs;
+  }
+  async setConfigLocation(dir: string | null, conflict: LocationConflict) {
+    this.locationChanges.push({ dir, conflict });
+    const target = dir ?? this.configLocation.defaultDir;
+    const existing = this.locationConfigs[target];
+    if (conflict === "useExisting" && existing) this.setConfig((l) => Object.assign(l, structuredClone(existing)));
+    this.configLocation = { ...this.configLocation, dir: target, custom: dir !== null };
+    return structuredClone(this.loaded);
+  }
+  async pickFolder() {
+    return this.pickFolderResult;
   }
 
   /** 테스트용: 다음 업데이트 확인 결과. 기본은 새 버전 없음. */
