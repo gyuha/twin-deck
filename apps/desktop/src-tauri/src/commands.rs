@@ -12,9 +12,9 @@ use td_volumes::{SystemUnmounter, Volumes};
 
 use crate::quicklook::QuickLookDto;
 use crate::service::{
-    edit, open_file, reveal, reveal_config, ConflictDto, EntryDto, ExpectedFileDto, FileInfoDto,
-    FindSpecDto, JobDto, JobKindDto, PreviewDto, QueueItemDto, SearchStartDto, SearchSummaryDto,
-    Service, ServiceResult, WriteTextResultDto,
+    edit, open_file, open_releases, reveal, reveal_config, ConflictDto, EntryDto, ExpectedFileDto,
+    FileInfoDto, FindSpecDto, JobDto, JobKindDto, PreviewDto, QueueItemDto, SearchStartDto,
+    SearchSummaryDto, Service, ServiceResult, WriteTextResultDto,
 };
 
 pub type AppService = Service<SystemTrash>;
@@ -818,6 +818,13 @@ pub fn open_path(launch: State<'_, AppLaunch>, path: String) -> ServiceResult<()
     open_file(&launch, &path)
 }
 
+/// GitHub 릴리스 목록을 기본 브라우저로 연다 (이슈 #70). 주소는 Rust 상수 하나이고 인수는 없다.
+#[tauri::command]
+#[specta::specta]
+pub fn open_releases_page(launch: State<'_, AppLaunch>) -> ServiceResult<()> {
+    open_releases(&launch)
+}
+
 /// 확장자와 무관하게 파일을 아카이브로 연다 (ARC-04). 아카이브 루트 경로를 돌려준다.
 #[tauri::command]
 #[specta::specta]
@@ -1274,6 +1281,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             glob_filter,
             reveal_path,
             open_path,
+            open_releases_page,
             edit_paths,
             launch_app,
             open_as_archive,

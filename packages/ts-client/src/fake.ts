@@ -848,6 +848,11 @@ export class FakeBackend implements Backend {
   async revealConfigDir() {
     this.configDirRevealed += 1;
   }
+  /** 테스트용: 열린 주소. 실제 주소는 Rust 상수(`RELEASES_URL`)가 정한다. */
+  readonly openedUrls: string[] = [];
+  async openReleasesPage() {
+    this.openedUrls.push("https://github.com/gyuha/twin-deck/releases");
+  }
 
   /** 테스트용: 설정 파일 저장 경로. */
   configLocation: ConfigLocationDto = { dir: "/config", defaultDir: "/config", custom: false };

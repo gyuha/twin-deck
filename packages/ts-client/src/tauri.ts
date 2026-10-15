@@ -302,6 +302,9 @@ export class TauriBackend implements Backend {
   async importConfig(src: string) {
     return unwrap(await commands.importConfig(src));
   }
+  async openReleasesPage() {
+    unwrap(await commands.openReleasesPage());
+  }
   async checkUpdate() {
     return unwrap(await commands.checkUpdate());
   }

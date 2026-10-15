@@ -1518,6 +1518,14 @@ pub fn open_file<L: Launcher>(launch: &Launch<L>, path: &str) -> ServiceResult<(
     launch.open(path)
 }
 
+/// "변경 사항" 버튼이 여는 GitHub 릴리스 목록(이슈 #70). 주소는 여기 한 곳에서만 정하고, 임의 URL을 받는 명령은 두지 않는다.
+pub const RELEASES_URL: &str = "https://github.com/gyuha/twin-deck/releases";
+
+/// GitHub 릴리스 목록을 기본 브라우저로 연다. OS의 기본 열기 명령(macOS `open`·Windows `explorer`·Linux `xdg-open`)을 쓴다.
+pub fn open_releases<L: Launcher>(launch: &Launch<L>) -> ServiceResult<()> {
+    launch.open(RELEASES_URL)
+}
+
 /// 설정한 편집기로 열기 (OP-09). 없는 경로가 하나라도 있으면 실행하지 않는다.
 pub fn edit<L: Launcher>(launch: &Launch<L>, editor: &str, paths: &[String]) -> ServiceResult<()> {
     for p in paths {
@@ -2364,6 +2372,34 @@ mod tests {
             log[1].args,
             ["-R".to_string(), format!("{dir}/config.toml")]
         );
+    }
+
+    #[test]
+    fn open_releases_opens_exactly_the_releases_page_with_the_os_opener() {
+        use std::cell::RefCell;
+        use std::rc::Rc;
+        struct Rec(Rc<RefCell<Vec<td_launch::Command>>>);
+        impl Launcher for Rec {
+            fn run(&self, c: &td_launch::Command) -> Result<(), String> {
+                self.0.borrow_mut().push(c.clone());
+                Ok(())
+            }
+        }
+        for (os, program) in [
+            (td_launch::Os::Mac, "open"),
+            (td_launch::Os::Windows, "explorer"),
+            (td_launch::Os::Linux, "xdg-open"),
+        ] {
+            let log = Rc::new(RefCell::new(Vec::new()));
+            open_releases(&Launch::new(Rec(log.clone()), os)).unwrap();
+            let log = log.borrow();
+            assert_eq!(log.len(), 1);
+            assert_eq!(log[0].program, program);
+            assert_eq!(
+                log[0].args,
+                ["https://github.com/gyuha/twin-deck/releases".to_string()]
+            );
+        }
     }
 
     #[test]
