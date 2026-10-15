@@ -1442,3 +1442,187 @@ fn smb_servers_write_refuses_invalid_entries_and_broken_file() {
         broken
     );
 }
+
+fn remote(
+    name: &str,
+    protocol: &str,
+    host: &str,
+    port: u16,
+    user: &str,
+    base_dir: &str,
+) -> td_config::RemoteServer {
+    td_config::RemoteServer {
+        name: name.into(),
+        protocol: protocol.into(),
+        host: host.into(),
+        port,
+        user: user.into(),
+        base_dir: base_dir.into(),
+    }
+}
+
+#[test]
+fn remote_servers_default_to_empty() {
+    let l = load("");
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert!(l.config.remote.servers.is_empty());
+}
+
+#[test]
+fn remote_servers_are_read_and_filled_with_defaults() {
+    let l = load(
+        r#"
+[[remote.servers]]
+name = "회사 서버"
+protocol = "SFTP"
+host = "files.example.com"
+port = 2222
+user = "me"
+base_dir = "/srv/data"
+
+[[remote.servers]]
+protocol = "ftp"
+host = "ftp.example.com"
+user = "kim"
+
+[[remote.servers]]
+protocol = "sftp"
+host = "10.0.0.7"
+port = 0
+"#,
+    );
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert_eq!(
+        l.config.remote.servers,
+        [
+            remote(
+                "회사 서버",
+                "sftp",
+                "files.example.com",
+                2222,
+                "me",
+                "/srv/data"
+            ),
+            remote(
+                "kim@ftp.example.com",
+                "ftp",
+                "ftp.example.com",
+                21,
+                "kim",
+                ""
+            ),
+            remote("10.0.0.7", "sftp", "10.0.0.7", 22, "", ""),
+        ]
+    );
+}
+
+#[test]
+fn remote_servers_with_bad_protocol_host_or_port_are_dropped_with_warning() {
+    let l = load(
+        r#"
+[[remote.servers]]
+protocol = "smb"
+host = "a"
+
+[[remote.servers]]
+protocol = "sftp"
+host = "  "
+
+[[remote.servers]]
+protocol = "ftp"
+host = "b"
+port = 70000
+
+[[remote.servers]]
+protocol = "ftp"
+host = "ok"
+"#,
+    );
+    assert_eq!(
+        l.config.remote.servers,
+        [remote("ok", "ftp", "ok", 21, "", "")]
+    );
+    assert_eq!(l.warnings.len(), 3, "{:?}", l.warnings);
+    assert!(l.warnings[0].message.starts_with("remote.servers[1]"));
+    assert!(l.warnings[1].message.starts_with("remote.servers[2]"));
+    assert!(l.warnings[2].message.starts_with("remote.servers[3]"));
+
+    assert!(load("[remote]\nservers = [\"x\"]\n")
+        .config
+        .remote
+        .servers
+        .is_empty());
+    assert!(load("[remote]\nservers = 3\n")
+        .config
+        .remote
+        .servers
+        .is_empty());
+}
+
+#[test]
+fn remote_servers_write_then_read_back_and_keep_other_settings() {
+    let d = user_value_dir(Some(
+        "# 내 설정\n[behavior]\ntheme = \"dark\" # 테마\n\n[[favorites]]\nname = \"A\"\npath = \"/a\"\n",
+    ));
+    let servers = [
+        remote("집 NAS", "sftp", "nas.local", 22, "me", "/volume1"),
+        remote("공개 FTP", "ftp", "ftp.example.com", 2121, "", ""),
+    ];
+    td_config::set_remote_servers(d.path(), &servers).unwrap();
+    let text = fs::read_to_string(d.path().join("config.toml")).unwrap();
+    assert!(text.contains("# 내 설정"), "{text}");
+    assert!(text.contains("[[remote.servers]]"), "{text}");
+    assert!(
+        !text.contains("[remote]\n"),
+        "빈 [remote] 머리글이 찍혔다: {text}"
+    );
+    let l = load_dir(d.path(), Platform::Linux);
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert_eq!(l.config.remote.servers, servers);
+    assert_eq!(l.config.behavior.theme, "dark");
+    assert_eq!(l.config.favorites.len(), 1);
+
+    td_config::set_remote_servers(d.path(), &servers[1..]).unwrap();
+    assert_eq!(
+        load_dir(d.path(), Platform::Linux).config.remote.servers,
+        servers[1..]
+    );
+
+    td_config::set_remote_servers(d.path(), &[]).unwrap();
+    let text = fs::read_to_string(d.path().join("config.toml")).unwrap();
+    assert!(!text.contains("remote"), "{text}");
+    assert!(text.contains("# 내 설정"), "{text}");
+}
+
+#[test]
+fn remote_servers_write_rejects_invalid_entries_without_touching_the_file() {
+    let d = user_value_dir(Some("# 그대로\n"));
+    let before = fs::read_to_string(d.path().join("config.toml")).unwrap();
+    assert!(
+        td_config::set_remote_servers(d.path(), &[remote("n", "smb", "h", 1, "", "")]).is_err()
+    );
+    assert!(
+        td_config::set_remote_servers(d.path(), &[remote("n", "ftp", " ", 21, "", "")]).is_err()
+    );
+    assert_eq!(
+        fs::read_to_string(d.path().join("config.toml")).unwrap(),
+        before
+    );
+}
+
+#[test]
+fn remote_server_password_is_never_written_to_or_kept_from_config() {
+    // 서버 항목에는 비밀번호 필드가 없다: 저장한 config.toml에도, 읽은 설정(JSON)에도 비밀번호가 나오지 않는다.
+    let d = user_value_dir(None);
+    td_config::set_remote_servers(d.path(), &[remote("n", "sftp", "h", 22, "me", "")]).unwrap();
+    let text = fs::read_to_string(d.path().join("config.toml")).unwrap();
+    assert!(!text.to_lowercase().contains("password"), "{text}");
+    assert!(!text.contains("비밀번호"), "{text}");
+
+    // 사용자가 손으로 `password`를 적어 넣어도 설정에는 실리지 않는다(UI·내보내기로 새지 않게).
+    let l =
+        load("[[remote.servers]]\nprotocol = \"ftp\"\nhost = \"h\"\npassword = \"s3cret-값\"\n");
+    let json = format!("{:?}", l.config);
+    assert!(!json.contains("s3cret"), "{json}");
+    assert_eq!(l.config.remote.servers.len(), 1);
+}

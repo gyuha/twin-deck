@@ -147,6 +147,9 @@
     "favorites": [],
     "smb": {
       "servers": []
+    },
+    "remote": {
+      "servers": []
     }
   },
   "bindings": [],

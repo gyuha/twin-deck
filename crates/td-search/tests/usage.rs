@@ -397,6 +397,7 @@ fn disk_usage_volume_boundary_default_off() {
         created: None,
         mode: None,
         hidden: false,
+        link_is_dir: false,
         file_id: Some(FileId {
             dev,
             ino: 1,

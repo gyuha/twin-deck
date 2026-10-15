@@ -73,6 +73,7 @@ fn to_entry(path: &VfsPath, meta: &fs::Metadata) -> Entry {
         created: meta.created().ok(),
         mode: mode_of(meta),
         file_id: file_id_of(meta),
+        link_is_dir: false,
     }
 }
 

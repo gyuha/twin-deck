@@ -8,6 +8,7 @@ mod local;
 mod names;
 mod path;
 mod preview;
+mod remote;
 mod symlink_error;
 
 pub use entry::{Entry, EntryKind, FileId, ListOptions};
@@ -21,6 +22,7 @@ pub use preview::{
     audio_mime, image_data_url, image_mime, is_video, read_preview, read_preview_vfs, Preview,
     PreviewKind, PreviewLimits,
 };
+pub use remote::{is_remote, remote_url, split_remote, RemoteLoc, RemoteProto};
 pub use symlink_error::symlink_error_message;
 
 /// 파일시스템 추상화. `LocalFs`가 기본 구현이고, 아카이브는 td-archive의 `CompositeFs`가 라우팅한다.
@@ -44,6 +46,10 @@ pub trait Vfs {
     fn symlink(&self, target: &VfsPath, link: &VfsPath, target_is_dir: bool) -> Result<()>;
     /// 파일의 앞부분을 최대 `max`바이트 읽는다(Look Up의 Content 조건 등). 파일이 더 짧으면 전부.
     fn read_head(&self, path: &VfsPath, max: usize) -> Result<Vec<u8>>;
+    /// 폴더를 훑는 데 네트워크 왕복이 드는 위치인가(원격). 작업 전 파일 수 집계가 오래 걸려 시간을 제한한다.
+    fn is_slow(&self, _path: &VfsPath) -> bool {
+        false
+    }
     /// 휴지통으로 보낼 수 있는 위치인가. 아카이브 안은 영구 삭제만 된다.
     fn can_trash(&self, _path: &VfsPath) -> bool {
         true

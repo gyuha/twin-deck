@@ -8,6 +8,7 @@ mod edit_session;
 mod error;
 mod kind;
 mod path;
+mod remote_fs;
 mod writer;
 
 pub use archive::{Archive, EntryInfo, ExtractReport};
@@ -17,4 +18,5 @@ pub use edit_session::{start_edit, EditSession};
 pub use error::{ArchiveError, Result};
 pub use kind::{kind_for_name, sniff_kind, Kind, ZIP_EXTS};
 pub use path::{join_archive_path, split_archive_path, split_archive_path_with, ArchivePath};
+pub use remote_fs::{remote_path, RemoteRegistry};
 pub use writer::{edit_in, edit_in_with, Source, ZipEdit};

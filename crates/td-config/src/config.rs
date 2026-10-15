@@ -27,6 +27,8 @@ pub struct Config {
     pub favorites: Vec<FavoriteDto>,
     /// 저장된 SMB 서버 목록. 비밀번호는 여기 두지 않고 OS 키체인에 둔다(ADR-0018).
     pub smb: SmbConfig,
+    /// 저장된 SFTP·FTP 서버 목록. 비밀번호는 여기 두지 않고 OS 키체인에 둔다(ADR-0019).
+    pub remote: RemoteConfig,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
@@ -226,4 +228,24 @@ pub struct SmbServer {
     pub host: String,
     pub share: String,
     pub user: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct RemoteConfig {
+    /// 병합 후 항목별로 검증해서 채운다(protocol이 sftp·ftp가 아니거나 host가 빈 항목은 경고와 함께 빠진다).
+    #[serde(default)]
+    pub servers: Vec<RemoteServer>,
+}
+
+/// SFTP·FTP 서버 항목(`[[remote.servers]]`). `name`이 비면 읽을 때 `user@host`(user가 없으면 `host`)로 채우고,
+/// `port`가 0이거나 없으면 프로토콜 기본 포트(sftp 22, ftp 21)로 채운다. `user`가 비면 FTP는 `anonymous`로 연결한다.
+/// `base_dir`은 접속 직후 이동할 폴더이고 비면 서버가 알려 주는 홈이다.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct RemoteServer {
+    pub name: String,
+    pub protocol: String,
+    pub host: String,
+    pub port: u16,
+    pub user: String,
+    pub base_dir: String,
 }

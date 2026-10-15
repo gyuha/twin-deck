@@ -34,6 +34,9 @@ pub struct Entry {
     pub hidden: bool,
     /// 유닉스에서만 채워진다(Windows 파일 ID는 아직 다루지 않는다). 아카이브 안 항목은 None.
     pub file_id: Option<FileId>,
+    /// 심볼릭 링크(`kind`가 `Symlink`)인데 대상이 폴더라서 들어갈 수 있다는 것을 파일시스템이 직접 알려 줄 때 true.
+    /// 로컬은 호출하는 쪽이 `metadata`로 따로 확인하므로 false다. 원격은 링크를 따라가며 복사하지 않아 이 값으로만 알린다.
+    pub link_is_dir: bool,
 }
 
 #[derive(Debug, Clone, Copy, Default)]

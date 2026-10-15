@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 use td_watch::DirWatcher;
 
-use crate::config::SmbServer;
+use crate::config::{RemoteServer, SmbServer};
 use crate::load::{load_dir, Loaded, Platform};
 
 /// 설정 디렉터리를 감시하며 최신 유효 설정을 보관한다.
@@ -248,6 +248,53 @@ pub fn set_smb_servers(dir: &Path, servers: &[SmbServer]) -> Result<(), String> 
         list.push(t);
     }
     smb.insert("servers", toml_edit::Item::ArrayOfTables(list));
+    write_user_doc(dir, &doc)
+}
+
+/// 사용자 `config.toml`의 원격 서버 목록(`[[remote.servers]]`)을 `servers`로 통째로 바꾼다.
+/// 다른 키와 주석은 그대로 두고, 빈 목록이면 키를 지워 기본값(빈 목록)으로 돌린다.
+/// protocol이 sftp·ftp가 아니거나 host가 빈 항목이 있거나 파일에 문법 오류가 있으면 파일을 건드리지 않고 오류를 돌려준다.
+/// 비밀번호는 이 목록에 없고 이 함수는 비밀번호를 쓰지 않는다.
+pub fn set_remote_servers(dir: &Path, servers: &[RemoteServer]) -> Result<(), String> {
+    for (i, s) in servers.iter().enumerate() {
+        if s.protocol != "sftp" && s.protocol != "ftp" {
+            return Err(format!(
+                "remote.servers[{}]: protocol은 sftp 또는 ftp여야 합니다",
+                i + 1
+            ));
+        }
+        if s.host.trim().is_empty() {
+            return Err(format!("remote.servers[{}]: host가 필요합니다", i + 1));
+        }
+    }
+    let mut doc = read_user_doc(dir)?;
+    if servers.is_empty() {
+        if !remove_key(doc.as_table_mut(), &["remote", "servers"]) {
+            return Ok(());
+        }
+        return write_user_doc(dir, &doc);
+    }
+    let remote = doc
+        .entry("remote")
+        .or_insert_with(|| {
+            let mut t = toml_edit::Table::new();
+            t.set_implicit(true);
+            toml_edit::Item::Table(t)
+        })
+        .as_table_mut()
+        .ok_or("remote: 테이블이 아닙니다")?;
+    let mut list = toml_edit::ArrayOfTables::new();
+    for s in servers {
+        let mut t = toml_edit::Table::new();
+        t.insert("name", toml_edit::value(s.name.as_str()));
+        t.insert("protocol", toml_edit::value(s.protocol.as_str()));
+        t.insert("host", toml_edit::value(s.host.as_str()));
+        t.insert("port", toml_edit::value(i64::from(s.port)));
+        t.insert("user", toml_edit::value(s.user.as_str()));
+        t.insert("base_dir", toml_edit::value(s.base_dir.as_str()));
+        list.push(t);
+    }
+    remote.insert("servers", toml_edit::Item::ArrayOfTables(list));
     write_user_doc(dir, &doc)
 }
 

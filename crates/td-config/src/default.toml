@@ -86,6 +86,11 @@ columns = ["name", "size", "modified"]
 [smb]
 servers = []
 
+# 저장된 SFTP·FTP 서버. 항목은 [[remote.servers]]에 name·protocol(sftp|ftp)·host·port·user·base_dir로 쓴다.
+# port를 비우면 프로토콜 기본값(sftp 22, ftp 21), base_dir을 비우면 접속 직후 서버의 홈 폴더다. 비밀번호는 OS 키체인에 둔다.
+[remote]
+servers = []
+
 # Ctrl+0~9로 바로 가는 폴더. 비워 두면 그 키는 아무 일도 하지 않는다.
 [shortcuts]
 "0" = ""
