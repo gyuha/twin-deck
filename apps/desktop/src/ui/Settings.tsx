@@ -60,6 +60,36 @@ function InfoTip({ text }: { text: string }) {
   );
 }
 
+/**
+ * 값이 기본값과 다를 때 나타나는 빗자루 아이콘 버튼("기본값으로"). 마우스를 올리거나 포커스하면 설명 말풍선이 뜬다.
+ * 버튼은 값이 기본값이면 없어지지만 자리(고정 크기)는 늘 남겨, 값을 바꿀 때 줄의 배치가 움직이지 않는다.
+ */
+function ResetSlot({ label, show, onClick }: { label: string; show: boolean; onClick: () => void }) {
+  return (
+    <span className="group relative inline-flex size-6 shrink-0 items-center justify-center">
+      {show && (
+        <>
+          <button
+            type="button"
+            aria-label={label}
+            onClick={onClick}
+            className="flex size-6 items-center justify-center rounded text-ink-dull outline-none hover:bg-app-selected hover:text-ink focus:bg-app-selected"
+          >
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M13 2.5 8.2 8.3" />
+              <path d="M8.6 7.9c-1.9-.9-3.9.2-4.6 2.3l-.6 2.3c-.1.4.3.8.7.6l2.3-.5c2.2-.5 3.3-2.5 2.4-4.4z" />
+              <path d="M4.6 10.4 6 12" />
+            </svg>
+          </button>
+          <span role="tooltip" className="pointer-events-none absolute left-0 top-full z-30 mt-1 whitespace-nowrap rounded border border-app-line bg-app-box px-2 py-1 text-xs font-normal text-ink opacity-0 shadow-lg group-hover:opacity-100 group-focus-within:opacity-100">
+            {label}
+          </span>
+        </>
+      )}
+    </span>
+  );
+}
+
 /** 지금 언어로 읽히는 항목 글자(getter라 화면을 그릴 때마다 사전을 다시 본다). */
 const langItem: Item = {
   key: "behavior.language",
@@ -1058,7 +1088,27 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
                     </div>
                   </div>
                   <div className={"flex items-center gap-3 " + (wide ? "min-w-0 flex-1 justify-end" : "shrink-0")}>
-                    {(combo || !isDefault) && !broken && (
+                    {!broken && !combo && (
+                      <ResetSlot
+                        label={t("settings.reset")}
+                        show={!isDefault}
+                        onClick={() =>
+                          void (async () => {
+                              if (extensionColumn) {
+                                await api.setConfigValue(item.key, { kind: "strList", value: withExtensionColumn(config.view.table.columns, false) });
+                              } else {
+                                await api.resetConfigValue(item.key);
+                              }
+                              // F키는 지정한 앱 경로도 함께 비운다.
+                              if (item.control.type === "fkey") {
+                                await api.resetConfigValue(item.key.replace("fkeys.", "fkey_apps."));
+                                await api.resetConfigValue(item.key.replace("fkeys.", "fkey_bar."));
+                              }
+                            })()
+                        }
+                      />
+                    )}
+                    {combo && !broken && (
                       <button type="button" className="whitespace-nowrap text-xs text-accent hover:underline" onClick={() =>
                           void (async () => {
                             if (extensionColumn) {
@@ -1074,7 +1124,7 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
                           })()
                         }
                       >
-                        {combo ? t("settings.delete") : t("settings.reset")}
+                        {t("settings.delete")}
                       </button>
                     )}
                     {(item.control.type === "switch" || extensionColumn) && (

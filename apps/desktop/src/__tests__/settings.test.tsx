@@ -230,6 +230,36 @@ describe("기본값으로", () => {
     expect(within(row).getByRole("spinbutton")).toHaveValue(16);
   });
 
+  it("글자 없는 아이콘 버튼이고, 마우스를 올리면 뜨는 말풍선이 \"기본값으로\"를 알려 준다", async () => {
+    const backend = seedBackend();
+    backend.setConfig((l) => (l.config.behavior.table.icon_size = 20));
+    const { user } = await renderApp(backend);
+    await open(user);
+    await dialog();
+    await listTab(user);
+    const row = screen.getByRole("group", { name: "아이콘 크기" });
+    const btn = within(row).getByRole("button", { name: "기본값으로" });
+    expect(btn.textContent).toBe(""); // 글자가 없다(빗자루 아이콘만)
+    expect(btn.querySelector("svg")).not.toBeNull();
+    expect(within(row).getAllByRole("tooltip").map((t) => t.textContent)).toContain("기본값으로");
+  });
+
+  it("값을 바꿔도 버튼 자리는 같은 크기로 남아 줄의 배치가 움직이지 않는다", async () => {
+    const backend = seedBackend();
+    const { user } = await renderApp(backend);
+    await open(user);
+    await dialog();
+    await listTab(user);
+    const row = screen.getByRole("group", { name: "아이콘 크기" });
+    const slot = () => row.querySelector<HTMLElement>("span.size-6");
+    expect(slot()).not.toBeNull(); // 기본값일 때도 자리는 있다
+    expect(within(row).queryByRole("button", { name: "기본값으로" })).toBeNull();
+    const before = slot()!.className;
+    await act(async () => void (await backend.setConfigValue("behavior.table.icon_size", { kind: "int", value: 20 })));
+    await within(row).findByRole("button", { name: "기본값으로" });
+    expect(slot()!.className).toBe(before); // 같은 자리·같은 크기
+  });
+
   it("기본값과 같으면 버튼이 없다", async () => {
     const { user } = await renderApp();
     await open(user);
