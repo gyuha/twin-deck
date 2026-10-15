@@ -2,7 +2,9 @@ import { archiveRoot, isArchivePath } from "./archive";
 import { BackendError, baseName, joinPath, parentPath } from "./backend";
 import type { Backend, FileDropEvent, SearchEvent, TerminalEvent } from "./backend";
 import type {
+  ConfigLocationDto,
   ConfigValue,
+  LocationConflict,
   ConflictDto,
   EntryDto,
   FileInfoDto,
@@ -850,6 +852,60 @@ export class FakeBackend implements Backend {
   readonly openedUrls: string[] = [];
   async openReleasesPage() {
     this.openedUrls.push("https://github.com/gyuha/twin-deck/releases");
+  }
+
+  /** 테스트용: 설정 파일 저장 경로. */
+  configLocation: ConfigLocationDto = { dir: "/config", defaultDir: "/config", custom: false };
+  /** 테스트용: 이미 설정 파일이 있는 폴더와, 그 설정을 쓰기로 하면 적용될 설정(없으면 지금 설정 유지). */
+  locationConfigs: Record<string, Loaded | null> = {};
+  /** 테스트용: `setConfigLocation` 호출 기록. */
+  readonly locationChanges: { dir: string | null; conflict: LocationConflict }[] = [];
+  /** 테스트용: 폴더 선택 창이 돌려줄 값(null = 취소). */
+  pickFolderResult: string | null = null;
+
+  async getConfigLocation() {
+    return { ...this.configLocation };
+  }
+  async configLocationHasFiles(dir: string) {
+    return dir in this.locationConfigs;
+  }
+  async setConfigLocation(dir: string | null, conflict: LocationConflict) {
+    this.locationChanges.push({ dir, conflict });
+    const target = dir ?? this.configLocation.defaultDir;
+    const existing = this.locationConfigs[target];
+    if (conflict === "useExisting" && existing) this.setConfig((l) => Object.assign(l, structuredClone(existing)));
+    this.configLocation = { ...this.configLocation, dir: target, custom: dir !== null };
+    return structuredClone(this.loaded);
+  }
+  async pickFolder() {
+    return this.pickFolderResult;
+  }
+
+  /** 테스트용: 저장·파일 선택 창이 돌려줄 값(null = 취소)과, 마지막 저장 선택 창에 넘긴 기본 이름. */
+  pickSaveFileResult: string | null = null;
+  pickFileResult: string | null = null;
+  lastSaveFileName: string | null = null;
+  /** 테스트용: 내보낸 경로 기록. 내보내면 그때의 설정을 그 경로에 기억한다. */
+  readonly exportedConfigs = new Map<string, Loaded>();
+  /** 테스트용: 다음 가져오기가 실패할 오류 문구. */
+  importError: string | null = null;
+
+  async pickSaveFile(defaultName: string, _extensions: string[]) {
+    this.lastSaveFileName = defaultName;
+    return this.pickSaveFileResult;
+  }
+  async pickFile(_extensions: string[]) {
+    return this.pickFileResult;
+  }
+  async exportConfig(dest: string) {
+    this.exportedConfigs.set(dest, structuredClone(this.loaded));
+  }
+  async importConfig(src: string) {
+    if (this.importError) throw new BackendError(this.importError);
+    const imported = this.exportedConfigs.get(src);
+    if (!imported) throw new BackendError("Twin Deck 설정 내보내기 파일(zip)이 아닙니다");
+    this.setConfig((l) => Object.assign(l, structuredClone(imported)));
+    return structuredClone(this.loaded);
   }
 
   /** 테스트용: 다음 업데이트 확인 결과. 기본은 새 버전 없음. */

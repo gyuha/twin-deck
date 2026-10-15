@@ -214,14 +214,70 @@ pub struct ConfigChanged {
 }
 
 /// 앱이 쓰는 설정 저장소. 설정 디렉터리를 열지 못하면 내장 기본값만 쓴다.
+/// 설정 파일 폴더는 저장 경로를 바꾸면 실행 중에 바뀌고, 창 상태(`state.json`)는 늘 로컬 폴더(`local_dir`)에 둔다.
 pub struct ConfigState {
-    pub store: Option<td_config::ConfigStore>,
+    pub local_dir: Option<std::path::PathBuf>,
+    pub store: std::sync::Mutex<Option<td_config::ConfigStore>>,
+    /// 지정 저장 경로를 쓰지 못해 로컬 폴더로 돌아갔다는 경고. 경로를 다시 정하면 지운다.
+    pub location_warning: std::sync::Mutex<Option<td_config::Warning>>,
     pub startup_warning: Option<String>,
 }
 
+/// 설정 화면이 보여 주는 저장 경로.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfigLocationDto {
+    /// 지금 설정 파일을 읽고 쓰는 폴더.
+    pub dir: String,
+    /// 기본 위치(로컬 앱 설정 폴더).
+    pub default_dir: String,
+    /// 사용자가 저장 경로를 지정했는가.
+    pub custom: bool,
+}
+
 impl ConfigState {
+    /// 로컬 앱 설정 폴더를 받아 지정 저장 경로를 따라 설정 저장소를 연다. 바뀐 설정을 받는 수신기도 돌려준다.
+    pub fn open(
+        local_dir: Option<std::path::PathBuf>,
+    ) -> (Self, Option<std::sync::mpsc::Receiver<Loaded>>) {
+        let Some(local) = local_dir else {
+            return (
+                Self::without_store(None, "설정 디렉터리를 알 수 없어 기본값을 씁니다".into()),
+                None,
+            );
+        };
+        let resolved = td_config::resolve_config_dir(&local);
+        match td_config::ConfigStore::start(&resolved.dir, td_config::Platform::current()) {
+            Ok((store, rx)) => (
+                Self {
+                    local_dir: Some(local),
+                    store: std::sync::Mutex::new(Some(store)),
+                    location_warning: std::sync::Mutex::new(resolved.warning),
+                    startup_warning: None,
+                },
+                Some(rx),
+            ),
+            Err(e) => (
+                Self::without_store(
+                    Some(local),
+                    format!("설정 디렉터리를 열지 못해 기본값을 씁니다: {e}"),
+                ),
+                None,
+            ),
+        }
+    }
+
+    fn without_store(local_dir: Option<std::path::PathBuf>, warning: String) -> Self {
+        Self {
+            local_dir,
+            store: std::sync::Mutex::new(None),
+            location_warning: std::sync::Mutex::new(None),
+            startup_warning: Some(warning),
+        }
+    }
+
     pub fn current(&self) -> Loaded {
-        match &self.store {
+        let mut l = match &*self.store.lock().unwrap() {
             Some(s) => s.current(),
             None => {
                 let mut l = td_config::load_from_strs(None, None, td_config::Platform::current());
@@ -234,8 +290,96 @@ impl ConfigState {
                 }
                 l
             }
+        };
+        if let Some(w) = &*self.location_warning.lock().unwrap() {
+            l.warnings.push(w.clone());
         }
+        l
     }
+
+    /// 설정 저장소로 일을 하고 최신 설정(저장 경로 경고 포함)을 돌려준다.
+    fn update(
+        &self,
+        f: impl FnOnce(&std::path::Path) -> Result<(), String>,
+    ) -> ServiceResult<Loaded> {
+        {
+            let guard = self.store.lock().unwrap();
+            let store = guard.as_ref().ok_or("설정 디렉터리를 사용할 수 없습니다")?;
+            f(store.dir())?;
+            store.refresh();
+        }
+        Ok(self.current())
+    }
+
+    /// 지금 설정 파일을 읽고 쓰는 폴더.
+    pub fn config_dir(&self) -> ServiceResult<std::path::PathBuf> {
+        self.store
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|s| s.dir().to_path_buf())
+            .ok_or_else(|| "설정 디렉터리를 사용할 수 없습니다".to_string())
+    }
+
+    pub fn location(&self) -> ServiceResult<ConfigLocationDto> {
+        let local = self
+            .local_dir
+            .as_ref()
+            .ok_or("설정 디렉터리를 사용할 수 없습니다")?;
+        let dir = self.config_dir()?;
+        Ok(ConfigLocationDto {
+            dir: dir.to_string_lossy().into_owned(),
+            default_dir: local.to_string_lossy().into_owned(),
+            custom: td_config::read_config_location(local).is_some(),
+        })
+    }
+
+    /// 지금 설정 파일을 zip 파일 `dest`로 내보낸다.
+    pub fn export_zip(&self, dest: &std::path::Path) -> ServiceResult<()> {
+        td_config::export_config_zip(&self.config_dir()?, dest)
+    }
+
+    /// zip 파일 `src`의 설정을 가져와 지금 설정 파일을 바꾸고(기존은 `.bak`) 새 설정을 돌려준다.
+    pub fn import_zip(&self, src: &std::path::Path) -> ServiceResult<Loaded> {
+        self.update(|dir| td_config::import_config_zip(src, dir))
+    }
+
+    /// 저장 경로를 바꾸고(None이면 기본 위치) 새 폴더로 설정 저장소를 다시 연다. 새 설정과 그 저장소의 변경 수신기를 돌려준다.
+    /// 이전 저장소는 버려지며 그 감시 스레드도 끝난다.
+    pub fn switch_location(
+        &self,
+        target: Option<&std::path::Path>,
+        conflict: td_config::LocationConflict,
+    ) -> ServiceResult<(Loaded, std::sync::mpsc::Receiver<Loaded>)> {
+        let local = self
+            .local_dir
+            .as_ref()
+            .ok_or("설정 디렉터리를 사용할 수 없습니다")?;
+        let current = self.config_dir().unwrap_or_else(|_| local.clone());
+        let dir = td_config::change_config_location(local, &current, target, conflict)?;
+        let (store, rx) = td_config::ConfigStore::start(&dir, td_config::Platform::current())
+            .map_err(|e| format!("새 설정 폴더를 열지 못했습니다: {e}"))?;
+        *self.store.lock().unwrap() = Some(store);
+        *self.location_warning.lock().unwrap() = None;
+        Ok((self.current(), rx))
+    }
+}
+
+/// 설정 저장소가 보내는 변경을 서비스·전역 단축키·화면에 반영한다. 저장소가 버려지면 끝난다.
+pub fn forward_config_changes(handle: tauri::AppHandle, rx: std::sync::mpsc::Receiver<Loaded>) {
+    use tauri::Manager;
+    std::thread::spawn(move || {
+        while let Ok(loaded) = rx.recv() {
+            // 다른 경고(저장 경로)를 합치려고 저장소 값 대신 ConfigState의 최신 값을 보낸다.
+            let loaded = handle
+                .try_state::<ConfigState>()
+                .map(|c| c.current())
+                .unwrap_or(loaded);
+            crate::apply_config(&handle.state::<AppService>(), &loaded);
+            crate::global_hotkey::apply(&handle, &loaded.config.environment);
+            let _ = ConfigChanged { loaded }.emit(&handle);
+        }
+    });
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -321,12 +465,7 @@ pub fn user_dirs(app: tauri::AppHandle) -> UserDirsDto {
 #[tauri::command]
 #[specta::specta]
 pub fn remove_favorite(config: State<'_, ConfigState>, path: String) -> ServiceResult<Loaded> {
-    let store = config
-        .store
-        .as_ref()
-        .ok_or("설정 디렉터리를 사용할 수 없습니다")?;
-    td_config::remove_favorite(store.dir(), &path)?;
-    Ok(store.refresh())
+    config.update(|dir| td_config::remove_favorite(dir, &path))
 }
 
 /// 현재 폴더 등을 즐겨찾기로 `config.toml`에 덧붙이고, 새로 병합된 설정을 바로 돌려준다(변경 이벤트를 기다리지 않는다).
@@ -337,12 +476,7 @@ pub fn add_favorite(
     name: String,
     path: String,
 ) -> ServiceResult<Loaded> {
-    let store = config
-        .store
-        .as_ref()
-        .ok_or("설정 디렉터리를 사용할 수 없습니다")?;
-    td_config::append_favorite(store.dir(), &name, &path)?;
-    Ok(store.refresh())
+    config.update(|dir| td_config::append_favorite(dir, &name, &path))
 }
 
 /// 설정 화면: 사용자 `config.toml`의 키 하나를 쓰고, 새로 병합된 설정을 바로 돌려준다(변경 이벤트를 기다리지 않는다).
@@ -354,12 +488,7 @@ pub fn set_config_value(
     key: String,
     value: td_config::ConfigValue,
 ) -> ServiceResult<Loaded> {
-    let store = config
-        .store
-        .as_ref()
-        .ok_or("설정 디렉터리를 사용할 수 없습니다")?;
-    td_config::set_user_value(store.dir(), &key, value)?;
-    let loaded = store.refresh();
+    let loaded = config.update(|dir| td_config::set_user_value(dir, &key, value))?;
     crate::apply_config(&svc, &loaded);
     Ok(loaded)
 }
@@ -372,12 +501,7 @@ pub fn reset_config_value(
     config: State<'_, ConfigState>,
     key: String,
 ) -> ServiceResult<Loaded> {
-    let store = config
-        .store
-        .as_ref()
-        .ok_or("설정 디렉터리를 사용할 수 없습니다")?;
-    td_config::reset_user_value(store.dir(), &key)?;
-    let loaded = store.refresh();
+    let loaded = config.update(|dir| td_config::reset_user_value(dir, &key))?;
     crate::apply_config(&svc, &loaded);
     Ok(loaded)
 }
@@ -389,8 +513,130 @@ pub fn reveal_config_dir(
     launch: State<'_, AppLaunch>,
     config: State<'_, ConfigState>,
 ) -> ServiceResult<()> {
-    let dir = config_dir(&config)?.to_string_lossy().into_owned();
+    let dir = config.config_dir()?.to_string_lossy().into_owned();
     reveal_config(&launch, &dir)
+}
+
+/// 설정 화면: 지금 설정 파일 저장 경로와 기본 위치.
+#[tauri::command]
+#[specta::specta]
+pub fn get_config_location(config: State<'_, ConfigState>) -> ServiceResult<ConfigLocationDto> {
+    config.location()
+}
+
+/// 폴더 선택 창을 띄워 고른 폴더의 경로를 돌려준다. 취소하면 None.
+#[tauri::command]
+#[specta::specta]
+pub async fn pick_folder(app: tauri::AppHandle) -> ServiceResult<Option<String>> {
+    use tauri_plugin_dialog::DialogExt;
+    let picked =
+        tauri::async_runtime::spawn_blocking(move || app.dialog().file().blocking_pick_folder())
+            .await
+            .map_err(|e| e.to_string())?;
+    picked
+        .map(|p| p.into_path().map(|p| p.to_string_lossy().into_owned()))
+        .transpose()
+        .map_err(|e| e.to_string())
+}
+
+/// 저장 위치 선택 창을 띄워 고른 파일 경로를 돌려준다. 취소하면 None.
+#[tauri::command]
+#[specta::specta]
+pub async fn pick_save_file(
+    app: tauri::AppHandle,
+    default_name: String,
+    extensions: Vec<String>,
+) -> ServiceResult<Option<String>> {
+    use tauri_plugin_dialog::DialogExt;
+    let picked = tauri::async_runtime::spawn_blocking(move || {
+        let exts: Vec<&str> = extensions.iter().map(String::as_str).collect();
+        let mut dialog = app.dialog().file().set_file_name(default_name);
+        if !exts.is_empty() {
+            dialog = dialog.add_filter(exts.join(", "), &exts);
+        }
+        dialog.blocking_save_file()
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    picked
+        .map(|p| p.into_path().map(|p| p.to_string_lossy().into_owned()))
+        .transpose()
+        .map_err(|e| e.to_string())
+}
+
+/// 파일 선택 창을 띄워 고른 파일 경로를 돌려준다. 취소하면 None.
+#[tauri::command]
+#[specta::specta]
+pub async fn pick_file(
+    app: tauri::AppHandle,
+    extensions: Vec<String>,
+) -> ServiceResult<Option<String>> {
+    use tauri_plugin_dialog::DialogExt;
+    let picked = tauri::async_runtime::spawn_blocking(move || {
+        let exts: Vec<&str> = extensions.iter().map(String::as_str).collect();
+        let mut dialog = app.dialog().file();
+        if !exts.is_empty() {
+            dialog = dialog.add_filter(exts.join(", "), &exts);
+        }
+        dialog.blocking_pick_file()
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    picked
+        .map(|p| p.into_path().map(|p| p.to_string_lossy().into_owned()))
+        .transpose()
+        .map_err(|e| e.to_string())
+}
+
+/// 설정 화면: 지금 설정 파일(`config.toml`·`keybindings.toml`)을 zip 파일로 내보낸다.
+#[tauri::command]
+#[specta::specta]
+pub fn export_config(config: State<'_, ConfigState>, dest: String) -> ServiceResult<()> {
+    config.export_zip(std::path::Path::new(&dest))
+}
+
+/// 설정 화면: 내보낸 zip 파일에서 설정을 가져와 지금 설정 파일을 바꾸고(기존은 `.bak`) 새 설정을 바로 돌려준다.
+#[tauri::command]
+#[specta::specta]
+pub fn import_config(
+    app: tauri::AppHandle,
+    svc: State<'_, AppService>,
+    config: State<'_, ConfigState>,
+    src: String,
+) -> ServiceResult<Loaded> {
+    let loaded = config.import_zip(std::path::Path::new(&src))?;
+    crate::apply_config(&svc, &loaded);
+    crate::global_hotkey::apply(&app, &loaded.config.environment);
+    Ok(loaded)
+}
+
+/// 설정 화면: 그 폴더에 이미 설정 파일(`config.toml`·`keybindings.toml`)이 있는가. 있으면 저장 경로를 바꾸기 전에 어떻게 할지 묻는다.
+#[tauri::command]
+#[specta::specta]
+pub fn config_location_has_files(dir: String) -> bool {
+    td_config::has_config_files(std::path::Path::new(&dir))
+}
+
+/// 설정 화면: 설정 파일 저장 경로를 바꾼다(`dir`이 None이면 기본 위치로). 새 폴더의 설정을 바로 적용해 돌려주고 다른 창에도 알린다.
+#[tauri::command]
+#[specta::specta]
+pub fn set_config_location(
+    app: tauri::AppHandle,
+    svc: State<'_, AppService>,
+    config: State<'_, ConfigState>,
+    dir: Option<String>,
+    conflict: td_config::LocationConflict,
+) -> ServiceResult<Loaded> {
+    let (loaded, rx) =
+        config.switch_location(dir.as_deref().map(std::path::Path::new), conflict)?;
+    forward_config_changes(app.clone(), rx);
+    crate::apply_config(&svc, &loaded);
+    crate::global_hotkey::apply(&app, &loaded.config.environment);
+    let _ = ConfigChanged {
+        loaded: loaded.clone(),
+    }
+    .emit(&app);
+    Ok(loaded)
 }
 
 #[tauri::command]
@@ -611,11 +857,11 @@ pub fn launch_app(
     crate::service::launch_app(&launch, &app, &paths)
 }
 
-fn config_dir(config: &ConfigState) -> ServiceResult<&std::path::Path> {
+/// 창 상태(`state.json`)를 두는 로컬 앱 설정 폴더. 설정 저장 경로를 바꿔도 여기에 둔다.
+fn state_dir(config: &ConfigState) -> ServiceResult<&std::path::Path> {
     config
-        .store
-        .as_ref()
-        .map(|s| s.dir())
+        .local_dir
+        .as_deref()
         .ok_or_else(|| "설정 디렉터리를 사용할 수 없어 상태를 저장/복원하지 못합니다".to_string())
 }
 
@@ -623,7 +869,7 @@ fn config_dir(config: &ConfigState) -> ServiceResult<&std::path::Path> {
 #[tauri::command]
 #[specta::specta]
 pub fn load_state(window: tauri::Window, config: State<'_, ConfigState>) -> LoadedState {
-    match config_dir(&config) {
+    match state_dir(&config) {
         Ok(dir) => td_state::load(dir, window.label()),
         Err(_) => LoadedState {
             snapshot: None,
@@ -639,14 +885,14 @@ pub fn save_state(
     config: State<'_, ConfigState>,
     snapshot: Snapshot,
 ) -> ServiceResult<()> {
-    td_state::save(config_dir(&config)?, window.label(), &snapshot).map_err(|e| e.to_string())
+    td_state::save(state_dir(&config)?, window.label(), &snapshot).map_err(|e| e.to_string())
 }
 
 /// 저장된 상태를 모두 지우고 앱을 종료한다 (`core.state.reset`).
 #[tauri::command]
 #[specta::specta]
 pub fn reset_state(app: tauri::AppHandle, config: State<'_, ConfigState>) -> ServiceResult<()> {
-    td_state::reset(config_dir(&config)?).map_err(|e| e.to_string())?;
+    td_state::reset(state_dir(&config)?).map_err(|e| e.to_string())?;
     app.exit(0);
     Ok(())
 }
@@ -1049,6 +1295,14 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             set_config_value,
             reset_config_value,
             reveal_config_dir,
+            get_config_location,
+            pick_folder,
+            pick_save_file,
+            pick_file,
+            export_config,
+            import_config,
+            config_location_has_files,
+            set_config_location,
             check_update,
             install_update,
             list_dir,
@@ -1141,5 +1395,201 @@ mod tests {
         let committed =
             std::fs::read_to_string(path).expect("bindings.ts가 없다: UPDATE_BINDINGS=1로 생성");
         assert_eq!(committed, generated, "bindings.ts가 최신이 아니다");
+    }
+}
+
+#[cfg(test)]
+mod config_location_tests {
+    use super::*;
+    use std::fs;
+    use td_config::LocationConflict;
+
+    fn theme(l: &Loaded) -> String {
+        l.config.behavior.theme.clone()
+    }
+
+    #[test]
+    fn config_location_switch_to_empty_dir_copies_and_reloads() {
+        let local = tempfile::tempdir().unwrap();
+        let cloud = tempfile::tempdir().unwrap();
+        fs::write(
+            local.path().join("config.toml"),
+            "[behavior]\ntheme = \"dark\"\n",
+        )
+        .unwrap();
+        let (state, _rx) = ConfigState::open(Some(local.path().to_path_buf()));
+        assert_eq!(theme(&state.current()), "dark");
+        let (loaded, _rx2) = state
+            .switch_location(Some(cloud.path()), LocationConflict::UseExisting)
+            .unwrap();
+        assert_eq!(theme(&loaded), "dark");
+        assert_eq!(state.config_dir().unwrap(), cloud.path());
+        assert!(cloud.path().join("config.toml").is_file());
+        let loc = state.location().unwrap();
+        assert!(loc.custom);
+        assert_eq!(loc.dir, cloud.path().to_string_lossy());
+        assert_eq!(loc.default_dir, local.path().to_string_lossy());
+        // 이후 설정 화면에서 바꾼 값은 새 폴더에 써진다.
+        let after = state
+            .update(|dir| {
+                td_config::set_user_value(
+                    dir,
+                    "behavior.theme",
+                    td_config::ConfigValue::Str("light".into()),
+                )
+            })
+            .unwrap();
+        assert_eq!(theme(&after), "light");
+        assert!(fs::read_to_string(cloud.path().join("config.toml"))
+            .unwrap()
+            .contains("light"));
+        assert!(fs::read_to_string(local.path().join("config.toml"))
+            .unwrap()
+            .contains("dark"));
+    }
+
+    #[test]
+    fn config_location_use_existing_loads_target_settings() {
+        let local = tempfile::tempdir().unwrap();
+        let cloud = tempfile::tempdir().unwrap();
+        fs::write(
+            local.path().join("config.toml"),
+            "[behavior]\ntheme = \"dark\"\n",
+        )
+        .unwrap();
+        fs::write(
+            cloud.path().join("config.toml"),
+            "[behavior]\ntheme = \"light\"\n",
+        )
+        .unwrap();
+        let (state, _rx) = ConfigState::open(Some(local.path().to_path_buf()));
+        let (loaded, _rx2) = state
+            .switch_location(Some(cloud.path()), LocationConflict::UseExisting)
+            .unwrap();
+        assert_eq!(theme(&loaded), "light");
+        assert!(!cloud.path().join("config.toml.bak").exists());
+    }
+
+    #[test]
+    fn config_location_overwrite_keeps_backup() {
+        let local = tempfile::tempdir().unwrap();
+        let cloud = tempfile::tempdir().unwrap();
+        fs::write(
+            local.path().join("config.toml"),
+            "[behavior]\ntheme = \"dark\"\n",
+        )
+        .unwrap();
+        fs::write(
+            cloud.path().join("config.toml"),
+            "[behavior]\ntheme = \"light\"\n",
+        )
+        .unwrap();
+        let (state, _rx) = ConfigState::open(Some(local.path().to_path_buf()));
+        let (loaded, _rx2) = state
+            .switch_location(Some(cloud.path()), LocationConflict::Overwrite)
+            .unwrap();
+        assert_eq!(theme(&loaded), "dark");
+        assert!(fs::read_to_string(cloud.path().join("config.toml.bak"))
+            .unwrap()
+            .contains("light"));
+    }
+
+    #[test]
+    fn config_location_state_stays_in_local_dir() {
+        let local = tempfile::tempdir().unwrap();
+        let cloud = tempfile::tempdir().unwrap();
+        let (state, _rx) = ConfigState::open(Some(local.path().to_path_buf()));
+        state
+            .switch_location(Some(cloud.path()), LocationConflict::UseExisting)
+            .unwrap();
+        assert_eq!(state_dir(&state).unwrap(), local.path());
+    }
+
+    #[test]
+    fn config_location_missing_dir_warns_and_uses_local() {
+        let local = tempfile::tempdir().unwrap();
+        let gone = local.path().join("사라진 폴더");
+        fs::write(
+            local.path().join(td_config::LOCATION_FILE),
+            format!("dir = {:?}\n", gone.to_string_lossy()),
+        )
+        .unwrap();
+        let (state, _rx) = ConfigState::open(Some(local.path().to_path_buf()));
+        assert_eq!(state.config_dir().unwrap(), local.path());
+        assert!(state
+            .current()
+            .warnings
+            .iter()
+            .any(|w| w.message.contains("사라진 폴더")));
+        // 기본 위치로 되돌리면 경고가 사라진다.
+        let (loaded, _rx2) = state
+            .switch_location(None, LocationConflict::UseExisting)
+            .unwrap();
+        assert!(loaded.warnings.is_empty(), "{:?}", loaded.warnings);
+        assert!(!local.path().join(td_config::LOCATION_FILE).exists());
+    }
+
+    #[test]
+    fn config_export_import_round_trip_applies_settings() {
+        let a = tempfile::tempdir().unwrap();
+        let b = tempfile::tempdir().unwrap();
+        fs::write(
+            a.path().join("config.toml"),
+            "[behavior]\ntheme = \"dark\"\n",
+        )
+        .unwrap();
+        let (src_state, _rx) = ConfigState::open(Some(a.path().to_path_buf()));
+        let zip = a.path().join("twin-deck-settings.zip");
+        src_state.export_zip(&zip).unwrap();
+
+        fs::write(
+            b.path().join("config.toml"),
+            "[behavior]\ntheme = \"light\"\n",
+        )
+        .unwrap();
+        let (state, _rx2) = ConfigState::open(Some(b.path().to_path_buf()));
+        assert_eq!(theme(&state.current()), "light");
+        let loaded = state.import_zip(&zip).unwrap();
+        assert_eq!(theme(&loaded), "dark");
+        assert_eq!(theme(&state.current()), "dark");
+        assert!(fs::read_to_string(b.path().join("config.toml.bak"))
+            .unwrap()
+            .contains("light"));
+    }
+
+    #[test]
+    fn config_import_follows_config_location() {
+        let local = tempfile::tempdir().unwrap();
+        let cloud = tempfile::tempdir().unwrap();
+        let other = tempfile::tempdir().unwrap();
+        fs::write(
+            other.path().join("config.toml"),
+            "[behavior]\ntheme = \"dark\"\n",
+        )
+        .unwrap();
+        let zip = other.path().join("s.zip");
+        td_config::export_config_zip(other.path(), &zip).unwrap();
+        let (state, _rx) = ConfigState::open(Some(local.path().to_path_buf()));
+        state
+            .switch_location(Some(cloud.path()), LocationConflict::UseExisting)
+            .unwrap();
+        state.import_zip(&zip).unwrap();
+        assert!(cloud.path().join("config.toml").is_file());
+        assert!(!local.path().join("config.toml").exists());
+    }
+
+    #[test]
+    fn config_import_rejects_broken_zip_and_keeps_settings() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(
+            dir.path().join("config.toml"),
+            "[behavior]\ntheme = \"dark\"\n",
+        )
+        .unwrap();
+        let bad = dir.path().join("bad.zip");
+        fs::write(&bad, "not a zip").unwrap();
+        let (state, _rx) = ConfigState::open(Some(dir.path().to_path_buf()));
+        assert!(state.import_zip(&bad).is_err());
+        assert_eq!(theme(&state.current()), "dark");
     }
 }

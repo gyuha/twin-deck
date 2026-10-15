@@ -4,7 +4,7 @@ import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { BackendError } from "./backend";
 import type { Backend, FileDropEvent, SearchEvent, TerminalEvent } from "./backend";
 import { commands, events } from "./generated/bindings";
-import type { CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigValue, ConflictDto, ExpectedFileDto, FileInfoDto, FindSpecDto, JobDto, LoadedState, PreviewDto, PreviewRectDto, QuickLookDto, EpubInfoDto, ShowOutcome, Snapshot, JobKindDto, Loaded, QueueItemDto, Result, WriteTextResultDto } from "./generated/bindings";
+import type { CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigValue, ConflictDto, LocationConflict, ExpectedFileDto, FileInfoDto, FindSpecDto, JobDto, LoadedState, PreviewDto, PreviewRectDto, QuickLookDto, EpubInfoDto, ShowOutcome, Snapshot, JobKindDto, Loaded, QueueItemDto, Result, WriteTextResultDto } from "./generated/bindings";
 
 function unwrap<T>(r: Result<T, string>): T {
   if (r.status === "error") throw new BackendError(r.error);
@@ -277,6 +277,30 @@ export class TauriBackend implements Backend {
   }
   async revealConfigDir() {
     unwrap(await commands.revealConfigDir());
+  }
+  async getConfigLocation() {
+    return unwrap(await commands.getConfigLocation());
+  }
+  async configLocationHasFiles(dir: string) {
+    return commands.configLocationHasFiles(dir);
+  }
+  async setConfigLocation(dir: string | null, conflict: LocationConflict) {
+    return unwrap(await commands.setConfigLocation(dir, conflict));
+  }
+  async pickFolder() {
+    return unwrap(await commands.pickFolder());
+  }
+  async pickSaveFile(defaultName: string, extensions: string[]) {
+    return unwrap(await commands.pickSaveFile(defaultName, extensions));
+  }
+  async pickFile(extensions: string[]) {
+    return unwrap(await commands.pickFile(extensions));
+  }
+  async exportConfig(dest: string) {
+    unwrap(await commands.exportConfig(dest));
+  }
+  async importConfig(src: string) {
+    return unwrap(await commands.importConfig(src));
   }
   async openReleasesPage() {
     unwrap(await commands.openReleasesPage());

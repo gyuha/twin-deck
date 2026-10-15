@@ -1,4 +1,4 @@
-import type { CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, EpubInfoDto, ExpectedFileDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, NormalizeResultDto, LoadedState, PreviewDto, PreviewRectDto, QueueItemDto, QuickLookDto, SearchStartDto, ShowOutcome, SearchSummaryDto, Snapshot, UpdateInfoDto, UserDirsDto, VolumeDto, WriteTextResultDto } from "./generated/bindings";
+import type { CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigLocationDto, ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, EpubInfoDto, ExpectedFileDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, NormalizeResultDto, LoadedState, LocationConflict, PreviewDto, PreviewRectDto, QueueItemDto, QuickLookDto, SearchStartDto, ShowOutcome, SearchSummaryDto, Snapshot, UpdateInfoDto, UserDirsDto, VolumeDto, WriteTextResultDto } from "./generated/bindings";
 
 /** Look Up / Flatten / Disk Usage가 스트리밍으로 보내는 이벤트. 작업마다 마지막은 `done`이다. */
 export type SearchEvent =
@@ -162,6 +162,25 @@ export interface Backend {
   resetConfigValue(key: string): Promise<Loaded>;
   /** 설정 폴더를 파일 관리자로 연다. */
   revealConfigDir(): Promise<void>;
+  /** 지금 설정 파일(`config.toml`·`keybindings.toml`) 저장 경로와 기본 위치. */
+  getConfigLocation(): Promise<ConfigLocationDto>;
+  /** 그 폴더에 이미 설정 파일이 있는가. 있으면 저장 경로를 바꾸기 전에 어떻게 할지 묻는다. */
+  configLocationHasFiles(dir: string): Promise<boolean>;
+  /**
+   * 설정 파일 저장 경로를 바꾼다(`dir`이 null이면 기본 위치로). 새 폴더의 설정을 바로 적용해 돌려준다.
+   * 새 폴더가 비었으면 지금 파일을 복사하고, 이미 설정이 있으면 `conflict`에 따라 그 설정을 쓰거나 지금 설정으로 덮어쓴다(기존은 `.bak`).
+   */
+  setConfigLocation(dir: string | null, conflict: LocationConflict): Promise<Loaded>;
+  /** 폴더 선택 창을 띄운다. 취소하면 null. */
+  pickFolder(): Promise<string | null>;
+  /** 저장 위치 선택 창을 띄운다(`extensions`는 `zip` 같은 확장자 필터). 취소하면 null. */
+  pickSaveFile(defaultName: string, extensions: string[]): Promise<string | null>;
+  /** 파일 선택 창을 띄운다. 취소하면 null. */
+  pickFile(extensions: string[]): Promise<string | null>;
+  /** 지금 설정 파일(`config.toml`·`keybindings.toml`)을 zip 파일 `dest`로 내보낸다. */
+  exportConfig(dest: string): Promise<void>;
+  /** 내보낸 zip 파일에서 설정을 가져와 지금 설정 파일을 바꾸고(기존은 `.bak`) 새 설정을 돌려준다. 설정 파일이 없거나 문법 오류면 거부된다. */
+  importConfig(src: string): Promise<Loaded>;
   /** GitHub 릴리스 목록(변경 사항)을 기본 브라우저로 연다(이슈 #70). */
   openReleasesPage(): Promise<void>;
   /** GitHub 릴리스의 최신 버전을 확인한다. 새 버전이 없으면 null. 확인에 실패하면 BackendError. */

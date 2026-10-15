@@ -443,6 +443,10 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
   const { api } = useAppStore();
   // 설정 화면이 닫히면(테마 목록을 연 채로 닫혀도) 임시 미리보기를 걷는다. 설정은 열려 있는 동안만 이 패널에 그려진다.
   useEffect(() => () => onThemePreview?.(null), [onThemePreview]);
+  const location = useApp((s) => s.configLocation);
+  useEffect(() => {
+    void api.loadConfigLocation();
+  }, [api]);
   const defaults = defaultLoaded().config;
   const randomTheme = config.behavior.random_theme;
   const hotkeyOff = !config.environment.global_hotkey_enabled;
@@ -611,6 +615,47 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
               );
             })}
             {current.title === t("settings.section.fkeys.title") && <FKeyAdder disabled={!!broken} />}
+            {current.title === t("settings.section.environment.title") && (
+              <div role="group" aria-label={t("settings.config_location.label")} className="flex items-center justify-between gap-4 border-b border-app-line py-2.5">
+                <div className="w-48 shrink-0">
+                  <div className="flex items-center gap-1.5 text-sm">
+                    {t("settings.config_location.label")}
+                    <InfoTip text={t("settings.config_location.desc")} />
+                  </div>
+                </div>
+                <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+                  <span data-testid="config-location" className="min-w-0 truncate text-sm text-ink-dull" title={location?.dir}>
+                    {location ? (location.custom ? location.dir : `${t("settings.config_location.default")} (${location.dir})`) : ""}
+                  </span>
+                  <Button size="sm" variant="gray" className="shrink-0 whitespace-nowrap" onClick={() => void api.pickConfigLocation()}>
+                    {t("settings.config_location.change")}
+                  </Button>
+                  {location?.custom && (
+                    <Button size="sm" variant="gray" className="shrink-0 whitespace-nowrap" onClick={() => void api.resetConfigLocation()}>
+                      {t("settings.config_location.reset")}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+            {current.title === t("settings.section.environment.title") && (
+              <div role="group" aria-label={t("settings.config_transfer.label")} className="flex items-center justify-between gap-4 border-b border-app-line py-2.5">
+                <div className="w-48 shrink-0">
+                  <div className="flex items-center gap-1.5 text-sm">
+                    {t("settings.config_transfer.label")}
+                    <InfoTip text={t("settings.config_transfer.desc")} />
+                  </div>
+                </div>
+                <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+                  <Button size="sm" variant="gray" className="shrink-0 whitespace-nowrap" onClick={() => void api.exportConfig()}>
+                    {t("settings.config_export")}
+                  </Button>
+                  <Button size="sm" variant="gray" className="shrink-0 whitespace-nowrap" onClick={() => void api.importConfig()}>
+                    {t("settings.config_import")}
+                  </Button>
+                </div>
+              </div>
+            )}
           </section>
         </div>
       </div>
