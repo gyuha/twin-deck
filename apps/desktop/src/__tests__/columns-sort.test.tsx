@@ -168,48 +168,7 @@ describe("CFG-08 정렬 (core.view.order)", () => {
   });
 });
 
-describe("CFG-07 표시 모드 / NAV-05 컬럼 이동 / NAV-02 반 페이지", () => {
-  const mode = (l: HTMLElement) => l.getAttribute("data-view");
-
-  it("Mod+Alt+2로 2열 모드가 되고 머리글이 사라지며 이름만 보인다", async () => {
-    const { user } = await renderApp(seed());
-    expect(mode(list("left"))).toBe("table");
-    await user.keyboard("{Control>}{Alt>}2{/Alt}{/Control}");
-    await waitFor(() => expect(mode(list("left"))).toBe("columns-2"));
-    expect(headerRow()).toBeNull();
-    expect(within(list("left")).getAllByRole("option")).toHaveLength(6);
-    expect(rowText("a.txt")).not.toContain("300 B");
-    await user.keyboard("{Control>}{Alt>}0{/Alt}{/Control}");
-    await waitFor(() => expect(mode(list("left"))).toBe("table"));
-  });
-
-  it("인수 없이 부르면 table → 1열 → 2열 → 3열 → table 순환", async () => {
-    const b = seed((l) => l.bindings.push(bind("F11", "core.view.mode")));
-    const { user } = await renderApp(b);
-    const seen: (string | null)[] = [];
-    for (let i = 0; i < 5; i++) {
-      await user.keyboard("{F11}");
-      await waitFor(() => expect(mode(list("left"))).not.toBe(seen.at(-1) ?? "table"));
-      seen.push(mode(list("left")));
-    }
-    expect(seen).toEqual(["columns-1", "columns-2", "columns-3", "table", "columns-1"]);
-  });
-
-  it("좌/우 키는 여러 컬럼 보기에서 컬럼 사이를 오간다 (열 우선 배치)", async () => {
-    const { user } = await renderApp(seed());
-    await user.keyboard("{Control>}{Alt>}2{/Alt}{/Control}");
-    await waitFor(() => expect(mode(list("left"))).toBe("columns-2"));
-    // 6개 항목, 2열 → 열당 3행: [docs src a.txt] [b.md c.zip d.txt]
-    await user.keyboard("{ArrowRight}");
-    expect(cursorName("left")).toBe("b.md");
-    await user.keyboard("{ArrowDown}");
-    expect(cursorName("left")).toBe("c.zip");
-    await user.keyboard("{ArrowLeft}");
-    expect(cursorName("left")).toBe("src");
-    await user.keyboard("{ArrowRight}{ArrowRight}"); // 마지막 열을 넘어가면 마지막 항목에 머문다
-    expect(cursorName("left")).toBe("d.txt");
-  });
-
+describe("NAV-02 반 페이지", () => {
   it("Alt+PageDown/PageUp은 반 페이지(5행)씩 움직인다", async () => {
     const b = new FakeBackend().seed(Object.fromEntries(Array.from({ length: 30 }, (_, i) => [`/home/a/f${String(i).padStart(2, "0")}`, "x"])));
     b.seed({ "/home/b": null });

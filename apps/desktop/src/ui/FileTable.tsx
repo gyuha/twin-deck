@@ -148,10 +148,8 @@ export function FileTable({ pane }: { pane: PaneId }) {
   );
   const sort = effectiveSort(tab, config.view.table.columns);
 
-  const multi = tab.view.mode === "columns";
   // 확장자 컬럼이 보이면 파일 이름에서는 확장자를 뺀다(그 컬럼이 보여 준다).
-  const hasExtColumn = !multi && columns.some((c) => c.name === "extension");
-  const colCount = tab.view.mode === "columns" ? tab.view.count : 1;
+  const hasExtColumn = columns.some((c) => c.name === "extension");
   // 수정일 구간 그룹핑(이슈 #62): 구간이 바뀌는 곳에 제목 행을 끼운다. 제목 행은 항목이 아니라 커서·선택 번호는 그대로 `tab.entries`의 번호다.
   const grouping = groupingActive(tab, config.behavior.table.group_by_modified);
   const language = config.behavior.language;
@@ -173,7 +171,7 @@ export function FileTable({ pane }: { pane: PaneId }) {
     return { lines, rowOfEntry };
     // 언어가 바뀌면 구간 제목도 다시 만든다.
   }, [grouping, tab.entries, language]);
-  const rows = layout ? Math.max(1, layout.lines.length) : Math.max(1, Math.ceil(tab.entries.length / colCount));
+  const rows = layout ? Math.max(1, layout.lines.length) : Math.max(1, tab.entries.length);
   const listRef = useRef<HTMLDivElement>(null);
   // `..` 상위 폴더 행(커서 -1)은 목록 맨 위에 두고 가상 스크롤 영역은 그 높이만큼 아래에서 시작한다.
   const parentRow = parentRowVisible(tab, config.behavior.table.show_parent_row);
@@ -188,7 +186,7 @@ export function FileTable({ pane }: { pane: PaneId }) {
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [tab.entries.length, multi, parentRow]);
+  }, [tab.entries.length, parentRow]);
   const virtualizer = useRows(rows, listRef, parentRow ? ROW_HEIGHT : 0);
   const rowId = (i: number) => `${pane}-${tab.id}-row-${i}`;
 
@@ -261,9 +259,7 @@ export function FileTable({ pane }: { pane: PaneId }) {
           void api.open();
         }}
         style={{
-          gridTemplateColumns: multi
-            ? `${showMarks ? `${MARK_COLUMN} ` : ""}${iconColumn(iconSize)} minmax(0,1fr)`
-            : gridTemplate(columns, iconSize, showMarks),
+          gridTemplateColumns: gridTemplate(columns, iconSize, showMarks),
         }}
         className={[
           "grid h-6 cursor-default items-center border-l-[3px] px-2",
@@ -323,9 +319,7 @@ export function FileTable({ pane }: { pane: PaneId }) {
           api.openContextMenu(pane, i, ev.clientX, ev.clientY);
         }}
         style={{
-          gridTemplateColumns: multi
-            ? `${showMarks ? `${MARK_COLUMN} ` : ""}${iconColumn(iconSize)} minmax(0,1fr)`
-            : gridTemplate(columns, iconSize, showMarks),
+          gridTemplateColumns: gridTemplate(columns, iconSize, showMarks),
         }}
         className={[
           "grid",
@@ -351,8 +345,8 @@ export function FileTable({ pane }: { pane: PaneId }) {
         )}
         {/* 폴더를 가리키는 링크는 폴더 아이콘에 링크 표시를 얹는다(이슈 #47). 파일 링크·끊어진 링크는 파일 아이콘에 링크 표시. */}
         <FileIcon name={e.name} kind={e.kind === "symlink" && e.linkIsDir ? "dir" : e.kind} link={e.kind === "symlink"} size={iconSize} path={e.path} systemIcons={systemIcons} />
-        {(multi ? [{ name: "name" } as ColumnSpec] : columns).map((c, k) => (
-          <span key={`${c.name}-${k}`} className={(c.name === "name" ? "truncate " : "self-stretch truncate text-right leading-6 tabular-nums ") + columnEdge(c.name, multi ? 0 : k, multi || k === columns.length - 1)}>
+        {columns.map((c, k) => (
+          <span key={`${c.name}-${k}`} className={(c.name === "name" ? "truncate " : "self-stretch truncate text-right leading-6 tabular-nums ") + columnEdge(c.name, k, k === columns.length - 1)}>
             {c.name === "name" && rename?.path === e.path ? (
               <RenameInput path={e.path} folder={isFolderEntry(e)} />
             ) : c.name === "name" && tab.quick ? (
@@ -374,49 +368,47 @@ export function FileTable({ pane }: { pane: PaneId }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col text-sm">
-      {!multi && (
-        <div
-          role="row"
-          aria-label={t("table.header_aria")}
-          style={{ gridTemplateColumns: gridTemplate(columns, iconSize, showMarks), paddingRight: scrollbarWidth > 0 ? `calc(0.5rem + ${scrollbarWidth}px)` : undefined }}
-          className="grid border-b border-l-[3px] border-app-line border-l-transparent px-2 text-xs text-ink-dull"
-        >
-          {showMarks && <span aria-hidden />}
-          <span aria-hidden />
-          {columns.map((c, k) => {
-            const sortable = (SORT_KEYS as readonly string[]).includes(c.name);
-            const active = sortable && sort.key === c.name;
-            return (
-              <span
-                key={`${c.name}-${k}`}
-                role="columnheader"
-                aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
-                onClick={() => {
-                  if (!sortable) return;
-                  activate();
-                  api.setOrder({ by: c.name as SortKey });
-                }}
-                className={(c.name === "name" ? "" : "relative text-right ") + columnEdge(c.name, k, k === columns.length - 1) + (sortable ? " cursor-pointer" : "")}
-              >
-                {COLUMN_TITLES[c.name]}
-                {active ? (sort.dir === "asc" ? " ▲" : " ▼") : ""}
-                {c.name !== "name" && (
-                  <span
-                    role="separator"
-                    aria-orientation="vertical"
-                    aria-label={t("table.resize_aria", { name: COLUMN_TITLES[c.name] })}
-                    onMouseDown={(ev) => startResize(ev, c, ev.currentTarget.parentElement)}
-                    onClick={(ev) => ev.stopPropagation()}
-                    className="group absolute inset-y-0 -left-1 flex w-2 cursor-col-resize items-center justify-center"
-                  >
-                    <span aria-hidden className={`h-3.5 w-px group-hover:w-0.5 group-hover:bg-accent ${columnLines === "none" ? "bg-app-line" : "bg-transparent"}`} />
-                  </span>
-                )}
-              </span>
-            );
-          })}
-        </div>
-      )}
+      <div
+        role="row"
+        aria-label={t("table.header_aria")}
+        style={{ gridTemplateColumns: gridTemplate(columns, iconSize, showMarks), paddingRight: scrollbarWidth > 0 ? `calc(0.5rem + ${scrollbarWidth}px)` : undefined }}
+        className="grid border-b border-l-[3px] border-app-line border-l-transparent px-2 text-xs text-ink-dull"
+      >
+        {showMarks && <span aria-hidden />}
+        <span aria-hidden />
+        {columns.map((c, k) => {
+          const sortable = (SORT_KEYS as readonly string[]).includes(c.name);
+          const active = sortable && sort.key === c.name;
+          return (
+            <span
+              key={`${c.name}-${k}`}
+              role="columnheader"
+              aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
+              onClick={() => {
+                if (!sortable) return;
+                activate();
+                api.setOrder({ by: c.name as SortKey });
+              }}
+              className={(c.name === "name" ? "" : "relative text-right ") + columnEdge(c.name, k, k === columns.length - 1) + (sortable ? " cursor-pointer" : "")}
+            >
+              {COLUMN_TITLES[c.name]}
+              {active ? (sort.dir === "asc" ? " ▲" : " ▼") : ""}
+              {c.name !== "name" && (
+                <span
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-label={t("table.resize_aria", { name: COLUMN_TITLES[c.name] })}
+                  onMouseDown={(ev) => startResize(ev, c, ev.currentTarget.parentElement)}
+                  onClick={(ev) => ev.stopPropagation()}
+                  className="group absolute inset-y-0 -left-1 flex w-2 cursor-col-resize items-center justify-center"
+                >
+                  <span aria-hidden className={`h-3.5 w-px group-hover:w-0.5 group-hover:bg-accent ${columnLines === "none" ? "bg-app-line" : "bg-transparent"}`} />
+                </span>
+              )}
+            </span>
+          );
+        })}
+      </div>
       {tab.error && (
         <div role="alert" className="bg-status-error/15 px-2 py-1 text-status-error">
           {tab.error}
@@ -432,7 +424,6 @@ export function FileTable({ pane }: { pane: PaneId }) {
         aria-multiselectable="true"
         aria-activedescendant={tab.entries.length || parentRow ? rowId(tab.cursor) : undefined}
         aria-rowcount={tab.entries.length}
-        data-view={multi ? `columns-${colCount}` : "table"}
         className="min-h-0 flex-1 overflow-auto"
       >
         {parentRow && renderParentRow()}
@@ -448,8 +439,6 @@ export function FileTable({ pane }: { pane: PaneId }) {
                 width: "100%",
                 height: ROW_HEIGHT,
                 transform: `translateY(${v.start - (parentRow ? ROW_HEIGHT : 0)}px)`,
-                display: multi ? "grid" : "block",
-                gridTemplateColumns: multi ? `repeat(${colCount}, minmax(0,1fr))` : undefined,
               }}
             >
               {layout
@@ -465,11 +454,9 @@ export function FileTable({ pane }: { pane: PaneId }) {
                     }
                     return renderRow(tab.entries[line.index], line.index);
                   })()
-                : Array.from({ length: colCount }, (_, c) => {
-                    const i = c * rows + v.index;
-                    const e = tab.entries[i];
-                    return e ? renderRow(e, i) : null;
-                  })}
+                : tab.entries[v.index]
+                  ? renderRow(tab.entries[v.index], v.index)
+                  : null}
             </div>
           ))}
         </div>

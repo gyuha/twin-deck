@@ -1,4 +1,4 @@
-import { waitFor, within } from "@testing-library/react";
+import { within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { Loaded } from "@twin-deck/ts-client";
 import { FakeBackend } from "@twin-deck/ts-client";
@@ -63,21 +63,6 @@ describe("날짜 구간 그룹핑 화면 (이슈 #62)", () => {
     expect(entryNames("left")).toEqual(["docs", "month.txt", "old.txt", "today.txt", "week.txt"]);
   });
 
-  it("여러 열 보기에서는 제목이 없고 순서도 평소 정렬이며, 목록 보기로 돌아오면 다시 나온다", async () => {
-    const { user } = await renderApp(seed(true));
-    expect(headers()).toHaveLength(4);
-    await runAction(user, "core.view.mode");
-    await waitFor(() => expect(list("left").getAttribute("data-view")).toBe("columns-1"));
-    expect(headers()).toEqual([]);
-    expect(entryNames("left")).toEqual(["docs", "month.txt", "old.txt", "today.txt", "week.txt"]);
-    await runAction(user, "core.view.mode");
-    await runAction(user, "core.view.mode");
-    await runAction(user, "core.view.mode");
-    await waitFor(() => expect(list("left").getAttribute("data-view")).toBe("table"));
-    expect(headers()).toEqual(["오늘", "이전 7일", "이전 30일", String(lastYear)]);
-    expect(entryNames("left")).toEqual(["docs", "today.txt", "week.txt", "month.txt", "old.txt"]);
-  });
-
   it("가상 탭(검색 결과)에서는 켜져 있어도 제목이 없다", async () => {
     const backend = searchBackend();
     backend.setConfig((l) => {
@@ -90,11 +75,9 @@ describe("날짜 구간 그룹핑 화면 (이슈 #62)", () => {
     expect(headers()).toEqual([]);
   });
 
-  it("groupingActive는 설정이 켜진 실제 폴더의 목록 보기에서만 참이다", () => {
-    const table = { mode: "table" } as const;
-    expect(groupingActive({ virtual: undefined, view: table }, true)).toBe(true);
-    expect(groupingActive({ virtual: undefined, view: table }, false)).toBe(false);
-    expect(groupingActive({ virtual: undefined, view: { mode: "columns", count: 2 } }, true)).toBe(false);
-    expect(groupingActive({ virtual: { kind: "lookup" } as never, view: table }, true)).toBe(false);
+  it("groupingActive는 설정이 켜진 실제 폴더에서만 참이다", () => {
+    expect(groupingActive({ virtual: undefined }, true)).toBe(true);
+    expect(groupingActive({ virtual: undefined }, false)).toBe(false);
+    expect(groupingActive({ virtual: { kind: "lookup" } as never }, true)).toBe(false);
   });
 });

@@ -37,21 +37,17 @@ describe("가상 스크롤 (10만 항목)", () => {
     expect(rendered()).toBeLessThanOrEqual(200);
   }, 60_000);
 
-  it("전체 선택과 3열 모드에서도 렌더 행 수가 제한된다", async () => {
+  it("전체 선택 뒤에도 렌더 행 수가 제한된다", async () => {
     const { user } = await renderApp(big(), "linux", { left: "/big", right: "/other" });
     await waitFor(() => expect(list("left").getAttribute("aria-rowcount")).toBe(String(N)), { timeout: 20_000 });
 
     await user.keyboard("{Control>}a{/Control}");
     await waitFor(() => expect(status()).toHaveTextContent(`파일: ${N}/${N}, 폴더: 0/0`));
 
-    await user.keyboard("{Control>}{Alt>}3{/Alt}{/Control}");
-    await waitFor(() => expect(list("left").getAttribute("data-view")).toBe("columns-3"));
-    expect(rendered()).toBeLessThanOrEqual(600); // 행 200 × 열 3
+    expect(rendered()).toBeLessThanOrEqual(200);
     await user.keyboard("{End}");
     await waitFor(() => expect(cursorName("left")).toBe(name(N - 1)));
-    expect(rendered()).toBeLessThanOrEqual(600);
-    await user.keyboard("{ArrowLeft}");
-    await waitFor(() => expect(cursorName("left")).toBe(name(N - 1 - Math.ceil(N / 3))));
+    expect(rendered()).toBeLessThanOrEqual(200);
   }, 60_000);
 
   it("100000개를 이름 외 기준으로 정렬해도 화면 행 수는 그대로다", async () => {

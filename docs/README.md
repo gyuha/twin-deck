@@ -23,7 +23,7 @@ twin-deck은 **Marta 수준의 기능을 갖춘 크로스플랫폼 듀얼 패널
 | [04-spacedrive-reuse.md](04-spacedrive-reuse.md) | 재사용 매트릭스, 이식 절차, 라이선스/출처 표기 규칙 |
 | [05-actions-keybindings.md](05-actions-keybindings.md) | 액션 모델, 액션 카탈로그, 기본 키맵, OS별 키 매핑 |
 | [06-config-plugins.md](06-config-plugins.md) | TOML 설정 스키마, Gadgets, 테마, 플러그인 API 초안 |
-| [07-ui-spec.md](07-ui-spec.md) | 패널, 탭, 표시 모드, 컬럼, 다이얼로그, 큐 UI |
+| [07-ui-spec.md](07-ui-spec.md) | 패널, 탭, 컬럼, 다이얼로그, 큐 UI |
 | [08-vfs-file-ops.md](08-vfs-file-ops.md) | VFS, 파일 작업, 작업 큐, 아카이브, Look Up, Disk Usage, Flatten |
 | [09-platform-support.md](09-platform-support.md) | macOS/Windows/Linux 차이와 대체 구현 |
 | [10-dev-setup.md](10-dev-setup.md) | 리포 구조, 셋업, 빌드/테스트/CI, 작업 규칙 |

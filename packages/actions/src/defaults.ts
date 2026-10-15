@@ -22,8 +22,6 @@ export interface ActionContext {
   cursorIsDir: boolean;
   /** 커서 항목이 압축 파일(아카이브)인지. */
   cursorIsArchive: boolean;
-  /** 활성 탭이 다중 컬럼 표시 모드인지. */
-  multiColumn: boolean;
   /** 활성 탭이 위치 없는 가상 탭(Look Up/Flatten/Disk Usage 결과)인지. */
   virtualTab: boolean;
   /** 활성 탭의 검색/순회가 아직 진행 중인지. */
@@ -103,10 +101,9 @@ export const DEFAULT_ACTION_META = [
   { id: "core.move.end", title: "끝으로", category: "Navigation", scopes: ["pane"] },
   { id: "core.move.half_page_up", title: "반 페이지 위로", category: "Navigation", scopes: ["pane"] },
   { id: "core.move.half_page_down", title: "반 페이지 아래로", category: "Navigation", scopes: ["pane"] },
-  { id: "core.move.left", title: "상위 폴더 / 이전 컬럼", category: "Navigation", scopes: ["pane"] },
-  { id: "core.move.right", title: "폴더 열기·미리보기 / 다음 컬럼", category: "Navigation", scopes: ["pane"], isApplicable: (c) => c.multiColumn || c.hasCursorItem },
+  { id: "core.move.left", title: "상위 폴더", category: "Navigation", scopes: ["pane"] },
+  { id: "core.move.right", title: "폴더 열기·미리보기", category: "Navigation", scopes: ["pane"], isApplicable: (c) => c.hasCursorItem },
   { id: "core.view.order", title: "정렬 (인수: by, dir)", category: "View", scopes: ["pane"] },
-  { id: "core.view.mode", title: "표시 모드 (인수: mode)", category: "View", scopes: ["pane"] },
   { id: "core.pane.send", title: "반대편 패널로 보내기 (인수: to)", category: "Navigation", scopes: ["pane"] },
   { id: "core.pane.switch", title: "활성 패널 전환", category: "Navigation", scopes: ["pane"] },
   { id: "core.pane.swap", title: "좌우 패널 바꾸기", category: "Navigation", scopes: ["pane"] },
@@ -259,16 +256,12 @@ export const DEFAULT_BINDINGS: Binding[] = [
   b("pane", "core.move.half_page_down", "Alt+PageDown"),
   b("pane", "core.move.left", "Left"),
   b("pane", "core.move.right", "Right"),
-  // 정렬/표시 모드의 기본 키는 twin-deck 자체 정의다(docs/05에 기본 키가 없다). 같은 정렬 키를 다시 누르면 방향이 바뀐다.
+  // 정렬의 기본 키는 twin-deck 자체 정의다(docs/05에 기본 키가 없다). 같은 정렬 키를 다시 누르면 방향이 바뀐다.
   ba("pane", "core.view.order", { by: "name" }, "Alt+Shift+N"),
   ba("pane", "core.view.order", { by: "size" }, "Alt+Shift+S"),
   ba("pane", "core.view.order", { by: "modified" }, "Alt+Shift+M"),
   ba("pane", "core.view.order", { by: "created" }, "Alt+Shift+C"),
   ba("pane", "core.view.order", { by: "extension" }, "Alt+Shift+E"),
-  ba("pane", "core.view.mode", { mode: "table" }, "Mod+Alt+0"),
-  ba("pane", "core.view.mode", { mode: "columns-1" }, "Mod+Alt+1"),
-  ba("pane", "core.view.mode", { mode: "columns-2" }, "Mod+Alt+2"),
-  ba("pane", "core.view.mode", { mode: "columns-3" }, "Mod+Alt+3"),
   b("pane", "core.select.all", "Mod+A"),
   b("pane", "core.select.none", "Escape"),
   // Space는 선택 토글이다. 미리보기는 오른쪽 키(core.move.right가 파일에서 연다)와 Mod+Y다.

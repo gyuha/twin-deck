@@ -145,6 +145,7 @@ describe("기본값에서는 지금 모양 그대로", () => {
 });
 
 describe("다중 열 보기에서도 같은 규칙", () => {
+  // 다열 보기가 있던 때 저장된 상태(view)도 이제는 표로 열린다.
   const columnsSnapshot = (): Snapshot => ({
     version: 1,
     activePane: "left",
@@ -159,7 +160,6 @@ describe("다중 열 보기에서도 같은 규칙", () => {
   it("표시 칸을 끄면 칸이 빠지고 폴더 모양이 이름에 붙는다", async () => {
     await renderApp(withTable({ show_marks: false, folder_style: "parens" }), undefined, undefined, { snapshot: columnsSnapshot() });
     const r = rows();
-    expect(list("left").getAttribute("data-view")).toBe("columns-2");
     for (const row of r) {
       expect(row.querySelector("[data-mark]")).toBeNull();
       expect(row.style.gridTemplateColumns.startsWith("1.25rem")).toBe(false);

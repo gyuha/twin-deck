@@ -37,7 +37,6 @@ export function navigationHandlers({ api }: AppStore): Partial<ActionHandlers> {
     "core.move.left": () => api.goLeft(),
     "core.move.right": () => api.goRight(),
     "core.view.order": (_ctx, args) => api.setOrder(args),
-    "core.view.mode": (_ctx, args) => api.setViewMode(args),
     "core.move.home": () => api.cursorHome(),
     "core.move.end": () => api.cursorEnd(),
     "core.pane.send": (_ctx, args) => api.paneSend(args),

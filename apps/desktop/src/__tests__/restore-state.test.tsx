@@ -45,7 +45,7 @@ const namesInOrder = (pane: "left" | "right") =>
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 describe("PANE-05 상태 복원", () => {
-  it("탭, 위치, 커서, 선택, 정렬, 표시 모드, 숨김 표시, 활성 패널, 검색어를 되살린다", async () => {
+  it("탭, 위치, 커서, 선택, 정렬, 숨김 표시, 활성 패널, 검색어를 되살린다. 예전에 저장된 다열 보기(view)는 무시하고 표로 연다", async () => {
     const b = seed();
     const s = snap({
       activePane: "right",
@@ -60,7 +60,7 @@ describe("PANE-05 상태 복원", () => {
             cursorName: "b.md",
             selection: ["/home/a/a.txt", "/home/a/gone.txt"], // 사라진 선택은 버려진다
             sort: { key: "size", dir: "desc" },
-            view: { mode: "columns", count: 2 },
+            view: { mode: "columns", count: 2 }, // 다열 보기가 있던 때의 저장 형식: 이제는 무시한다
           }),
         ],
       },
@@ -71,7 +71,8 @@ describe("PANE-05 상태 복원", () => {
     expect(crumbs()).toEqual(["/", "home", "a"]); // 활성 탭(둘째)의 위치
     expect(cursorName("left")).toBe("b.md");
     expect(selectedNames("left")).toEqual(["a.txt"]);
-    expect(list("left").getAttribute("data-view")).toBe("columns-2");
+    expect(list("left").hasAttribute("data-view")).toBe(false);
+    expect(screen.getAllByRole("row", { name: "컬럼 머리글" }).length).toBeGreaterThan(0); // 다열 보기였어도 표(머리글 있음)로 열린다
     expect(entryNames("left")).toContain(".hidden"); // 숨김 파일 표시
     // 크기 내림차순: 폴더 먼저, b.md(5) > a.txt(3), 같은 크기(1)는 이름순(.hidden, c.zip)
     expect(namesInOrder("left")).toEqual(["docs", "b.md", "a.txt", ".hidden", "c.zip"]);
@@ -132,13 +133,12 @@ describe("PANE-05 저장", () => {
     expect(saved.left.tabs[1]).toMatchObject({ path: "/home/a" });
   });
 
-  it("커서, 선택, 정렬, 표시 모드, 숨김, 패널을 저장하고 그대로 되살아난다 (왕복)", async () => {
+  it("커서, 선택, 정렬, 숨김, 패널을 저장하고 그대로 되살아난다 (왕복)", async () => {
     const b = seed();
     b.setConfig((l) => l.bindings.push(bind("F9", "core.view.order")));
     const { user } = await renderApp(b);
     await user.keyboard("{ArrowDown}{ArrowDown}{Insert}"); // b.md 선택, 커서는 c.zip
     await user.keyboard("{Alt>}{Shift>}s{/Shift}{/Alt}"); // 크기 정렬
-    await user.keyboard("{Control>}{Alt>}2{/Alt}{/Control}"); // 2열
     await user.keyboard("{Control>}h{/Control}"); // 숨김 표시
     await user.keyboard("{Tab}"); // 오른쪽 패널
     await waitFor(() => expect(b.savedStates.at(-1)?.activePane).toBe("right"), SAVE_WAIT);
@@ -149,7 +149,7 @@ describe("PANE-05 저장", () => {
       cursorName: "c.zip",
       selection: ["/home/a/b.md"],
       sort: { key: "size", dir: "asc" },
-      view: { mode: "columns", count: 2 },
+      view: { mode: "table", count: 1 }, // 저장 형식은 이전 상태 파일과 호환되게 그대로다
     });
 
     // 다음 실행: 저장된 상태로 시작하면 같은 화면이고, 다시 저장할 것이 없다
@@ -160,7 +160,6 @@ describe("PANE-05 저장", () => {
     await waitFor(() => expect(selectedNames("left")).toEqual(["b.md"]));
     expect(cursorName("left")).toBe("c.zip");
     expect(entryNames("left")).toEqual(before);
-    expect(list("left").getAttribute("data-view")).toBe("columns-2");
     expect(screen.getByRole("region", { name: "오른쪽 패널" })).toHaveAttribute("data-active", "true");
     await sleep(900);
     expect(b.savedStates).toHaveLength(count);

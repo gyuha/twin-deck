@@ -18,7 +18,7 @@ vi.mock("../lib/terminalEngine", () => ({
   }),
 }));
 
-// 이슈 #73: 탭을 번호로 옮긴다. macOS는 Cmd+숫자, Windows/Linux는 Ctrl+Shift+숫자(Ctrl+Alt+숫자는 표시 모드와 겹쳐 쓰지 않는다).
+// 이슈 #73: 탭을 번호로 옮긴다. macOS는 Cmd+숫자, Windows/Linux는 Ctrl+Shift+숫자.
 const MAC = (n: number) => `{Meta>}${n}{/Meta}`;
 const WIN = (n: number) => `{Control>}{Shift>}${n}{/Shift}{/Control}`;
 const tabs = (pane: "left" | "right") => within(screen.getAllByRole("tablist")[pane === "left" ? 0 : 1]).getAllByRole("tab");
@@ -75,15 +75,15 @@ describe.each([
   });
 });
 
-describe("표시 모드와 키가 겹치지 않는다", () => {
-  it("windows에서 Ctrl+Alt+1은 여전히 열 1개 보기이고 탭을 바꾸지 않는다", async () => {
+describe("Ctrl+Alt+숫자는 쓰지 않는다", () => {
+  it("windows에서 Ctrl+Alt+1은 아무 일도 하지 않는다(탭도 목록 모양도 그대로, 예전 다열 보기 키)", async () => {
     const { user } = await renderApp(backend(), "windows");
     await user.keyboard("{Control>}t{/Control}");
     await waitFor(() => expect(tabs("left")).toHaveLength(2));
     expect(selected("left")).toBe(1);
     await user.keyboard("{Control>}{Alt>}1{/Alt}{/Control}");
-    await waitFor(() => expect(list("left").getAttribute("data-view")).toBe("columns-1"));
     expect(selected("left")).toBe(1);
+    expect(list("left").hasAttribute("data-view")).toBe(false);
   });
 });
 

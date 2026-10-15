@@ -20,13 +20,12 @@ export function useActionContext(): ActionContext {
   const canGoForward = useApp((s) => !activeTab(s).virtual && activeTab(s).forward.length > 0);
   const cursorIsDir = useApp((s) => cursorEntry(activeTab(s))?.kind === "dir");
   const cursorIsArchive = useApp((s) => actionContext(s).cursorIsArchive);
-  const multiColumn = useApp((s) => activeTab(s).view.mode === "columns");
   const virtualTab = useApp((s) => !!activeTab(s).virtual);
   const searching = useApp((s) => !!activeTab(s).virtual?.running);
   const usageTab = useApp((s) => activeTab(s).virtual?.kind === "usage");
   return useMemo(
-    () => ({ hasCursorItem, selectedCount, tabCount, canGoUp, canGoBack, canGoForward, cursorIsDir, cursorIsArchive, multiColumn, virtualTab, searching, usageTab }),
-    [hasCursorItem, selectedCount, tabCount, canGoUp, canGoBack, canGoForward, cursorIsDir, cursorIsArchive, multiColumn, virtualTab, searching, usageTab],
+    () => ({ hasCursorItem, selectedCount, tabCount, canGoUp, canGoBack, canGoForward, cursorIsDir, cursorIsArchive, virtualTab, searching, usageTab }),
+    [hasCursorItem, selectedCount, tabCount, canGoUp, canGoBack, canGoForward, cursorIsDir, cursorIsArchive, virtualTab, searching, usageTab],
   );
 }
 

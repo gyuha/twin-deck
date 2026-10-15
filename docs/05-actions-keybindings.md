@@ -127,7 +127,7 @@ Marta에서는 수정자 없는 단일 키 바인딩이 Quick Select에 가로�
 | `core.go.up` | 상위 폴더 | `Backspace` | `Backspace`, `Alt+Up` | ID 확인 |
 | `core.go.path` | Go To Path | `Mod+G` | `Ctrl+G` | 자체 ID, 키 확인 |
 | `core.move.up` / `core.move.down` | 커서 위/아래 | `Up` / `Down` | 같음 | ID 확인 |
-| `core.move.left` / `core.move.right` | 여러 컬럼 보기: 컬럼 좌/우. 그 밖: `Left`는 상위 폴더, `Right`는 폴더면 들어가고 파일이면 미리보기 | `Left` / `Right` | 같음 | `left`는 ID 확인, `right`는 추정 |
+| `core.move.left` / `core.move.right` | `Left`는 상위 폴더, `Right`는 폴더면 들어가고 파일이면 미리보기 | `Left` / `Right` | 같음 | `left`는 ID 확인, `right`는 추정 |
 | `core.move.page_up` / `page_down` | 페이지 이동 | `PageUp` / `PageDown` | 같음 | 자체 |
 | `core.move.half_page_up` / `half_page_down` | 반 페이지 | `Alt+PageUp` / `Alt+PageDown` | 같음 | 자체 ID, 키 확인 |
 | `core.move.home` / `core.move.end` | 처음/끝 | `Home` / `End`, `Mod+Up` / `Mod+Down` | `Home` / `End` | 자체. macOS 키보드에는 Home/End가 없어 Cmd+↑/↓가 같은 자리다 |
@@ -162,7 +162,7 @@ Shift+이동 키(범위의 선택 반전)는 액션이 아니라 `pane` 스코�
 | `core.tab.new` | 새 탭 (탭 줄의 빈 곳을 더블클릭해도 그 패널에 만들어진다) | `Mod+T` | `Ctrl+T` | 자체 (Marta 키는 서드파티 정보) |
 | `core.tab.close` | 탭 닫기 | `Mod+W` | `Ctrl+W` | 자체 (같음). `Mod+W`는 창 닫기와 충돌하지 않게 앱이 가로챈다 |
 | `core.tab.next` / `core.tab.prev` | 다음/이전 탭 | `Alt+Mod+Right` / `Alt+Mod+Left`, `Ctrl+Tab` / `Ctrl+Shift+Tab` | `Ctrl+PageDown` / `Ctrl+PageUp`, `Ctrl+Tab` / `Ctrl+Shift+Tab` | `next`는 ID 추정 |
-| `core.tab.goto` | N번째 탭으로 이동 (인수 `index` 1~9). 1~8은 해당 번째 탭, 9는 마지막 탭이고 탭 수를 넘는 번호는 아무 일도 하지 않는다. 탭이 둘 이상일 때만 동작한다. 구현됨(이슈 #73) | `Mod+1`~`Mod+9` | `Ctrl+Shift+1`~`Ctrl+Shift+9` | pane·terminal, 자체 ID. Windows/Linux의 `Ctrl+Alt+숫자`는 `core.view.mode`와 같은 조합이라 쓰지 않는다 |
+| `core.tab.goto` | N번째 탭으로 이동 (인수 `index` 1~9). 1~8은 해당 번째 탭, 9는 마지막 탭이고 탭 수를 넘는 번호는 아무 일도 하지 않는다. 탭이 둘 이상일 때만 동작한다. 구현됨(이슈 #73) | `Mod+1`~`Mod+9` | `Ctrl+Shift+1`~`Ctrl+Shift+9` | pane·terminal, 자체 ID |
 | `core.window.new` | 새 창 | `Mod+N` | `Ctrl+N` | 자체 |
 
 ### 5.5 보기, 검색, 도구
@@ -172,7 +172,6 @@ Shift+이동 키(범위의 선택 반전)는 액션이 아니라 `pane` 스코�
 | `core.view.hidden` | 숨김 파일 표시 토글 | `Mod+Shift+.` | `Ctrl+H` | 자체 ID. macOS 키 확인, 나머지는 관례 |
 | `core.view.drive_bar` | 드라이브 바 표시 토글 | `Mod+Shift+D` | `Ctrl+Shift+D` | 자체 ID. 이슈 #6. 상태 줄 토글 버튼·macOS View 메뉴에도 키를 표시한다 |
 | `core.view.action_bar` | Action Bar 표시 토글 | `Mod+Shift+A` | `Ctrl+Shift+A` | 자체 ID. 이슈 #6 |
-| `core.view.mode` | 표시 모드 (인수) | 없음 | 없음 | 자체 (인수 이름 미확인) |
 | `core.view.order` | 정렬 (인수) | 없음 | 없음 | 자체 (인수 이름 미확인) |
 | `core.preview` | 미리보기 (폴더·파일 모두). `Shift+Right`는 폴더에서도 안으로 들어가지 않고 미리보기를 연다(여러 컬럼 보기 포함). 파일에서는 `Right`도 연다. 미리보기가 열려 있는 동안 `Shift+Right`는 아무것도 하지 않는다 | `Mod+Y` / `Shift+Right` | `Ctrl+Y` / `Shift+Right` | 자체 ID, 키 확인. 이슈 #19 |
 | `core.preview.forward` | 미리보기: 폴더 위에서는 그 안으로 들어가 첫 항목을 미리보고(항목이 없으면 미리보기를 닫는다), 파일 위에서는 다음 항목으로 넘어간다 | `Right` | `Right` | preview | 자체 ID. `Down`은 폴더 위에서도 다음 항목(`core.preview.next`) |

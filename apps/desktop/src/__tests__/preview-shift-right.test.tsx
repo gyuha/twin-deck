@@ -55,7 +55,7 @@ describe("Shift+→로 미리보기 (이슈 #19)", () => {
     expect(screen.queryAllByRole("dialog", { name: /^미리보기/ })).toHaveLength(1);
   });
 
-  it("여러 컬럼 보기에서도 Shift+→는 컬럼 이동이 아니라 미리보기를 연다", async () => {
+  it("예전에 다열 보기로 저장된 탭도 표로 열려 Shift+→가 미리보기를 연다", async () => {
     const snapshot: Snapshot = {
       version: 1,
       activePane: "left",

@@ -17,7 +17,7 @@ Marta의 중심 모델은 "활성 패널이 source, 비활성 패널이 target"�
 | ID | 기능 | 근거 | 우선 | twin-deck 방식 |
 |---|---|---|---|---|
 | PANE-01 | 두 패널, Tab 키로 활성 패널 전환 | `/docs/` | P0 | 활성 패널을 시각적으로 구분 |
-| PANE-02 | 패널별 탭 | 홈 | P0 | 탭마다 위치/표시 모드/정렬/선택/이력 보유 |
+| PANE-02 | 패널별 탭 | 홈 | P0 | 탭마다 위치/정렬/선택/이력 보유 |
 | PANE-03 | 다중 창 | 홈 | P1 | Tauri 멀티 윈도우 |
 | PANE-04 | 탭 단축키 (새 탭, 닫기, 이동) | 3rd (Cmd+T, Cmd+W, Opt+Cmd+←/→) | P0 | 액션으로 정의, 키는 자체 지정 |
 | PANE-05 | 재시작 시 탭, 창, 폴더, 선택, 터미널 높이, Actions Panel 검색어 복원 | `/docs/other/reset/` | P1 | 상태 스냅샷 저장. "Reset State" 액션 제공 |
@@ -32,7 +32,7 @@ Marta의 중심 모델은 "활성 패널이 source, 비활성 패널이 target"�
 | NAV-02 | Opt+PageUp/PageDown 반 페이지 스크롤 | `/docs/navigation/` | P1 | Alt로 매핑 |
 | NAV-03 | Return/더블클릭으로 열기, Backspace·←·경로 표시줄 조각 클릭으로 상위 이동 (`..` 줄은 두지 않는다) | `/docs/navigation/base/` | P0 | |
 | NAV-04 | Open With… | `/docs/navigation/` | P2 | OS별 앱 목록/실행 ([09](09-platform-support.md)) |
-| NAV-05 | 다중 컬럼 모드에서 좌우 이동 | `/docs/navigation/` | P1 | |
+| NAV-05 | ~~다중 컬럼 모드에서 좌우 이동~~ (제거됨: 다열 보기를 없앴다, 이슈 #74) | `/docs/navigation/` | - | |
 | NAV-06 | 순환 선택, 우클릭 선택, Quick Select 접두 일치/아무 문자 활성화 옵션 | `/docs/navigation/` | P1 | 설정 키로 제공 |
 | NAV-07 | Volumes 메뉴, 언마운트/추출 | `/docs/navigation/volumes/` | P1 | OS별 볼륨 감지 |
 | NAV-08 | Favorites (추가/편집, 숫자키 선택, 구분선, 중첩 그룹) | `/docs/navigation/favorites/` | P1 | 설정 파일과 UI 편집 |
@@ -127,7 +127,7 @@ Marta의 기본 키는 Total Commander 계열(F5 복사, F6 이동 등)을 따�
 | CFG-04 | 폰트: Action Bar, 브레드크럼, 가상 탭, 파일 목록, 상태 표시줄, 표 헤더, 탭, 환경설정 | `/docs/configuration/fonts/` | P2 | CSS 변수 |
 | CFG-05 | 표시 옵션: 아이콘 크기, 상대 날짜, 날짜/시간 포맷(strftime), 크기 표기(adaptive, KB…TiB) | `/docs/configuration/` | P1 | |
 | CFG-06 | 컬럼 명세 `[<|>]이름[:너비]` (size, created, modified, added, extension, 권한 2종) | `/docs/core/columns/` | P1 | [07](07-ui-spec.md) |
-| CFG-07 | 표시 모드: Table, 다중 컬럼(1~3), 패널별 | `/docs/core/display-modes/` | P1 | |
+| CFG-07 | ~~Table, 다중 컬럼(1~3) 보기 전환~~ (제거됨: 목록은 항상 표이다, 이슈 #74) | `/docs/core/display-modes/` | - | |
 | CFG-08 | 정렬(Ordering 액션). 인수 미확인 | `/docs/core/` | P1 | 자체 정의 |
 | CFG-09 | Gadgets: application/executable 유형, 선택/폴더 변수 | `/docs/advanced/gadgets/` | P3 | [06](06-config-plugins.md) |
 | CFG-10 | Lua 플러그인 (액션 정의, `isApplicable`, `apply`, 컨텍스트 객체) | `/api/` | P3 | ADR-0008 (Proposed) |

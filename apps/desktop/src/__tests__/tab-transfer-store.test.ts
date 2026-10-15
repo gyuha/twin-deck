@@ -19,7 +19,7 @@ const L = (app: ReturnType<typeof make>) => app.store.getState().panes.left;
 const R = (app: ReturnType<typeof make>) => app.store.getState().panes.right;
 const paths = (p: { tabs: { path: string }[] }) => p.tabs.map((t) => t.path);
 
-const twoLeft = () => make(snap([tab("/home/a"), tab("/home/a/docs", { view: { mode: "columns", count: 2 } }), tab("/home/a/src")], 1, [tab("/home/b"), tab("/home/b/img")], 0));
+const twoLeft = () => make(snap([tab("/home/a"), tab("/home/a/docs"), tab("/home/a/src")], 1, [tab("/home/b"), tab("/home/b/img")], 0));
 
 describe("패널 간 탭 이동·복사 (transferTab)", () => {
   it("원래 패널에 탭이 둘 이상이면 이동한다: 상태를 그대로 가져가고 반대쪽 활성·활성 패널이 바뀐다", async () => {
@@ -32,7 +32,6 @@ describe("패널 간 탭 이동·복사 (transferTab)", () => {
     expect(paths(R(app))).toEqual(["/home/b", "/home/a/docs", "/home/b/img"]);
     const got = R(app).tabs[1];
     expect(got.id).toBe(id);
-    expect(got.view).toEqual({ mode: "columns", count: 2 });
     expect(got.history).toEqual(["/home/a", "/home/a/docs"]);
     expect(got.back).toEqual(["/home/a"]);
     expect(R(app).active).toBe(1);
@@ -58,7 +57,7 @@ describe("패널 간 탭 이동·복사 (transferTab)", () => {
   });
 
   it("원래 패널에 탭이 하나뿐이면 복사한다: 원본은 그대로, 반대쪽에 같은 경로의 새 탭(새 id, 기록 초기화)", async () => {
-    const app = make(snap([tab("/home/a/docs", { view: { mode: "columns", count: 3 } })], 0, [tab("/home/b")]));
+    const app = make(snap([tab("/home/a/docs")], 0, [tab("/home/b")]));
     const original = L(app).tabs[0];
     await app.api.transferTab("left", 0, "right", 1);
     expect(L(app).tabs).toEqual([original]);

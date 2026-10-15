@@ -57,13 +57,10 @@ import type { SortKey, SortState } from "../lib/sort";
 
 export type PaneId = "left" | "right";
 
-export type ViewMode = { mode: "table" } | { mode: "columns"; count: 1 | 2 | 3 };
-
 export interface TabState {
   id: number;
   /** 탭별 정렬. null이면 설정의 컬럼 명세(`>extension` 등)를 따른다. */
   sort: SortState | null;
-  view: ViewMode;
   path: string;
   /** 방문한 경로 이력 (이 탭). */
   history: string[];
@@ -401,8 +398,8 @@ export function effectiveSort(tab: TabState, columns: readonly string[]): SortSt
 }
 
 /** 수정일 구간 그룹핑이 이 탭에 적용되는가(이슈 #62): 설정이 켜져 있고, 실제 폴더이고, 단일 컬럼 목록 보기일 때만이다. */
-export function groupingActive(tab: Pick<TabState, "virtual" | "view">, enabled: boolean): boolean {
-  return enabled && !tab.virtual && tab.view.mode === "table";
+export function groupingActive(tab: Pick<TabState, "virtual">, enabled: boolean): boolean {
+  return enabled && !tab.virtual;
 }
 
 /** 정렬한 항목을 수정일 구간 순서(최신 구간이 위)로 안정하게 다시 배열한다. 구간 안은 정렬 순서를 그대로 따른다. */
@@ -469,7 +466,6 @@ export function actionContext(s: AppState): ActionContext {
     canGoForward: !tab.virtual && tab.forward.length > 0,
     cursorIsDir: cursorEntry(tab)?.kind === "dir",
     cursorIsArchive: isArchiveEntry(cursorEntry(tab), s.loaded.config.file_systems.zip.additional_extensions),
-    multiColumn: tab.view.mode === "columns",
     virtualTab: !!tab.virtual,
     searching: !!tab.virtual?.running,
     usageTab: tab.virtual?.kind === "usage",
@@ -504,7 +500,6 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
   const newTab = (path: string): TabState => ({
     id: nextTabId++,
     sort: null,
-    view: { mode: "table" },
     path,
     history: [path],
     back: [],
@@ -523,10 +518,6 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     sort: t.sort && (SORT_KEYS as readonly string[]).includes(t.sort.key) && (t.sort.dir === "asc" || t.sort.dir === "desc")
       ? { key: t.sort.key as SortKey, dir: t.sort.dir }
       : null,
-    view:
-      t.view.mode === "columns" && [1, 2, 3].includes(t.view.count)
-        ? { mode: "columns", count: t.view.count as 1 | 2 | 3 }
-        : { mode: "table" },
     restoreCursor: t.cursorName ?? undefined,
   });
 
@@ -1028,7 +1019,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
           cursorName: t.entries[t.cursor]?.name ?? t.restoreCursor ?? null,
           selection: t.selection.size <= SELECTION_SAVE_LIMIT ? [...t.selection] : [],
           sort: t.sort,
-          view: t.view.mode === "columns" ? { mode: "columns", count: t.view.count } : { mode: "table", count: 1 },
+          view: { mode: "table", count: 1 }, // 다열 보기는 없어졌다. 저장 형식(`ViewSnap`)은 이전 상태 파일과 호환되게 그대로 둔다.
         }),
       ),
       };
@@ -1549,26 +1540,16 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     moveHalfPage(dir: 1 | -1) {
       api.moveCursor(dir * Math.floor(PAGE_SIZE / 2));
     },
-    /** 다중 컬럼 모드에서 이전/다음 컬럼으로 (NAV-05). 컬럼은 위에서 아래로 채워진다. */
-    moveColumn(dir: 1 | -1) {
-      patchActive((t) => {
-        if (t.view.mode !== "columns" || t.entries.length === 0 || t.cursor < 0) return {};
-        const rows = Math.ceil(t.entries.length / t.view.count);
-        return { cursor: clamp(t.cursor + dir * rows, t.entries.length) };
-      });
-    },
-    /** 왼쪽 키: 여러 컬럼 보기에서는 이전 컬럼, 그 밖에는 상위 폴더로 간다. */
+    /** 왼쪽 키: 상위 폴더로 간다. */
     async goLeft() {
       if (isTreemap(activeTab(get()))) return api.usageMove("left");
-      if (activeTab(get()).view.mode === "columns") api.moveColumn(-1);
-      else await api.goUp();
+      await api.goUp();
     },
-    /** 오른쪽 키: 여러 컬럼 보기에서는 다음 컬럼, 그 밖에는 폴더면 들어가고 파일이면 미리보기를 연다. */
+    /** 오른쪽 키: 폴더면 들어가고 파일이면 미리보기를 연다. */
     async goRight() {
       const tab = activeTab(get());
       if (isTreemap(tab)) return api.usageMove("right");
-      if (tab.view.mode === "columns") api.moveColumn(1);
-      else if (isFolderEntry(cursorEntry(tab))) await api.open();
+      if (isFolderEntry(cursorEntry(tab))) await api.open();
       else await api.previewToggle();
     },
     /** 정렬 변경 (`core.view.order`). 같은 키를 다시 고르면 방향을 뒤집는다. `dir`로 방향을 지정할 수 있다. */
@@ -1589,29 +1570,6 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         const entries = groupingActive(t, cfg().behavior.table.group_by_modified) ? groupByModified(sorted) : sorted;
         const idx = cursorPath ? entries.findIndex((e) => e.path === cursorPath) : -1;
         return { sort, entries, cursor: idx >= 0 ? idx : 0 };
-      });
-    },
-    /** 표시 모드 변경 (`core.view.mode`). 인수가 없으면 table → columns-1 → 2 → 3 → table 순환. */
-    setViewMode(args?: Record<string, unknown>) {
-      const order = ["table", "columns-1", "columns-2", "columns-3"] as const;
-      const t = activeTab(get());
-      const now = t.view.mode === "table" ? "table" : (`columns-${t.view.count}` as const);
-      const asked = typeof args?.mode === "string" ? args.mode : order[(order.indexOf(now) + 1) % order.length];
-      const view: ViewMode | null =
-        asked === "table"
-          ? { mode: "table" }
-          : asked === "columns-1" || asked === "columns-2" || asked === "columns-3"
-            ? { mode: "columns", count: Number(asked.slice(-1)) as 1 | 2 | 3 }
-            : null;
-      if (!view) return fail(tr("store.mode.unknown", { mode: asked }));
-      // 구간 그룹핑은 단일 컬럼 목록 보기에서만 적용되니, 보기가 바뀌면 항목 순서도 그에 맞춰 다시 배열한다(이슈 #62).
-      patchActive((t) => {
-        if (!cfg().behavior.table.group_by_modified || t.virtual) return { view };
-        const cursorPath = t.entries[t.cursor]?.path;
-        const sorted = sortEntries(t.entries, effectiveSort(t, cfg().view.table.columns));
-        const entries = groupingActive({ virtual: t.virtual, view }, true) ? groupByModified(sorted) : sorted;
-        const idx = cursorPath ? entries.findIndex((e) => e.path === cursorPath) : -1;
-        return { view, entries, cursor: idx >= 0 ? idx : t.cursor };
       });
     },
     cursorHome() {

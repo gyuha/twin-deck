@@ -82,13 +82,4 @@ describe("파일 목록 아이콘", () => {
     expect(iconOf("dangling").getAttribute("src")).toMatch(/\/file\.svg$/);
     expect(rowOf("dangling").querySelector("[data-link='true']")).not.toBeNull();
   });
-
-  it("멀티 컬럼 모드에서도 아이콘이 렌더된다", async () => {
-    const { user } = await renderApp(seeded());
-    await user.keyboard("{Control>}{Alt>}3{/Alt}{/Control}");
-    await within(list("left")).findAllByRole("option");
-    expect(list("left").getAttribute("data-view")).toBe("columns-3");
-    const imgs = within(list("left")).getAllByRole("option").map((o) => o.querySelector("img"));
-    expect(imgs.every((i) => i !== null)).toBe(true);
-  });
 });
