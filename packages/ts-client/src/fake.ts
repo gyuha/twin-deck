@@ -15,11 +15,8 @@ import type {
   LoadedState,
   PreviewDto,
   QueueItemDto,
-  PreviewRectDto,
   OfficePreviewDto,
-  QuickLookDto,
   EpubInfoDto,
-  ShowOutcome,
   SearchStartDto,
   Snapshot,
   UserDirsDto,
@@ -400,20 +397,6 @@ export class FakeBackend implements Backend {
     return { markdown: n.content, truncated: false };
   }
 
-  /** `quickLookPreview` 호출 기록과 요청 순번. */
-  readonly quickLookCalls: string[] = [];
-  readonly quickLookSeqs: number[] = [];
-  /** Quick Look 응답을 바꾼다(지연·오류 흉내). 없으면 파일 내용을 그대로 Quick Look이 만든 HTML로 본다. */
-  quickLookResponder: ((path: string) => Promise<QuickLookDto>) | null = null;
-
-  async quickLookPreview(path: string, seq: number): Promise<QuickLookDto> {
-    this.quickLookCalls.push(path);
-    this.quickLookSeqs.push(seq);
-    const n = this.need(path);
-    if (this.quickLookResponder) return this.quickLookResponder(path);
-    return { html: n.content, dir: `/tmp/ql${path}.qlpreview`, sheets: [] };
-  }
-
   /** `systemIcon` 호출 기록. */
   readonly systemIconCalls: Array<{ path: string; isDir: boolean; size: number }> = [];
   /** 테스트용: 시스템 아이콘 응답을 바꾼다(지연·null·거부 흉내). 없으면 확장자(폴더는 `dir`)별로 다른 PNG 데이터 주소를 돌려준다. */
@@ -458,37 +441,6 @@ export class FakeBackend implements Backend {
     const c = this.epubBook(path).chapters[index];
     if (!c) throw new BackendError("챕터 번호가 범위를 벗어났습니다");
     return c.html;
-  }
-
-  /** 테스트용: 미리보기 처리기 호출 기록(호출 순서대로). */
-  readonly previewHandlerCalls: Array<{ call: "show" | "setRect" | "setVisible" | "close"; path?: string; rect?: PreviewRectDto; visible?: boolean }> = [];
-  /** 테스트용: 처리기가 있다고 답할 경로. 기본은 모두 없음(false)이다. */
-  previewHandlerAvailable: (path: string) => boolean = () => false;
-  /** 테스트용: 인터넷에서 받아 막힌 것으로 답할 경로. `unblockFile`이 지운다. */
-  readonly previewHandlerBlocked = new Set<string>();
-  /** 테스트용: `unblockFile`을 부른 경로들. */
-  readonly unblocked: string[] = [];
-  /** 테스트용: 처리기 응답을 바꾼다(지연·오류 흉내). true는 그렸다, false는 처리기 없음. */
-  previewHandlerResponder: ((path: string) => Promise<boolean>) | null = null;
-
-  async previewHandlerShow(path: string, rect: PreviewRectDto): Promise<ShowOutcome> {
-    this.previewHandlerCalls.push({ call: "show", path, rect });
-    if (this.previewHandlerBlocked.has(path)) return "blocked";
-    const shown = this.previewHandlerResponder ? await this.previewHandlerResponder(path) : this.previewHandlerAvailable(path);
-    return shown ? "shown" : "unavailable";
-  }
-  async unblockFile(path: string): Promise<void> {
-    this.unblocked.push(path);
-    this.previewHandlerBlocked.delete(path);
-  }
-  async previewHandlerSetRect(rect: PreviewRectDto): Promise<void> {
-    this.previewHandlerCalls.push({ call: "setRect", rect });
-  }
-  async previewHandlerSetVisible(visible: boolean): Promise<void> {
-    this.previewHandlerCalls.push({ call: "setVisible", visible });
-  }
-  async previewHandlerClose(): Promise<void> {
-    this.previewHandlerCalls.push({ call: "close" });
   }
 
   async globFilter(pattern: string, names: string[]) {

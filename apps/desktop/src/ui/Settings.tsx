@@ -164,7 +164,6 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
     items: [
       { key: "preview.audio_autoplay", get title() { return translate("settings.item.preview.audio_autoplay.title"); }, get desc() { return translate("settings.item.preview.audio_autoplay.desc"); }, control: { type: "switch" } },
       { key: "preview.video_autoplay", get title() { return translate("settings.item.preview.video_autoplay.title"); }, get desc() { return translate("settings.item.preview.video_autoplay.desc"); }, control: { type: "switch" } },
-      { key: "preview.office", get title() { return translate("settings.item.preview.office.title"); }, get desc() { return translate("settings.item.preview.office.desc"); }, control: { type: "switch" } },
       { key: "preview.image_max_mb", get title() { return translate("settings.item.preview.image_max_mb.title"); }, get desc() { return translate("settings.item.preview.image_max_mb.desc"); }, control: { type: "int" } },
       { key: "preview.pdf_max_mb", get title() { return translate("settings.item.preview.pdf_max_mb.title"); }, get desc() { return translate("settings.item.preview.pdf_max_mb.desc"); }, control: { type: "int" } },
       { key: "preview.audio_max_mb", get title() { return translate("settings.item.preview.audio_max_mb.title"); }, get desc() { return translate("settings.item.preview.audio_max_mb.desc"); }, control: { type: "int" } },

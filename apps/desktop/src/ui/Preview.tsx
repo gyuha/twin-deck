@@ -17,13 +17,8 @@ import { PdfView } from "./PdfView";
 import { ModelView } from "./ModelView";
 import { modelKindOf } from "../lib/model/kinds";
 import { OfficeMarkdownView, isOfficeFile } from "./OfficeMarkdownView";
-import { quickLookKindOf, usesPreviewHandler } from "../lib/office/kinds";
-import { PreviewHandlerView } from "./PreviewHandlerView";
-import type { HandlerUnavailable } from "./PreviewHandlerView";
 import { EpubView } from "./EpubView";
 import { HwpView } from "./HwpView";
-import { QuickLookView } from "./QuickLookView";
-import { useUi } from "./uiContext";
 
 const isMarkdown = (name: string) => /\.(md|markdown)$/i.test(name);
 
@@ -58,10 +53,7 @@ export function Preview() {
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const saved = useApp((s) => s.previewRect);
   const { api } = useAppStore();
-  const { platform } = useUi();
   const edit = useApp((s) => s.previewEdit);
-  // Windows 미리보기 처리기를 쓸 수 없다고 알려 온 파일(처리기가 없거나 못 그림). 이 파일은 지금까지의 미리보기로 보여 준다.
-  const [handlerFailed, setHandlerFailed] = useState<({ path: string } & HandlerUnavailable) | null>(null);
   const [copied, setCopied] = useState(false); // 복사 버튼이 잠깐 "복사됨"을 보이는 동안
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
@@ -114,20 +106,14 @@ export function Preview() {
   const model = p.isDir || isArchivePath(p.path) ? null : modelKindOf(p.name); // 3D 모델이면 서비스가 돌려준 kind와 무관하게 3D 뷰어로 보여 준다(압축 파일 안은 asset 프로토콜로 읽을 수 없어 제외)
   // Office 문서는 디스크 위 파일만 Rust가 office_oxide로 읽은 글자·표(Markdown)로 보여 준다. 압축 안은 "미리 볼 수 없는 형식"이다.
   const office = !p.isDir && !model && !isArchivePath(p.path) && isOfficeFile(p.name);
-  // (이전 방식: 아래 Quick Look·처리기 분기는 office가 늘 먼저 가져가므로 쓰이지 않는다. 다음 작업에서 지운다.)
-  const ql = !office && platform === "mac" && !p.isDir && !model && !isArchivePath(p.path) ? quickLookKindOf(p.name) : null;
-  // Windows는 docx를 미리보기 처리기(탐색기 미리보기 창이 쓰는 것)로 앱 창 위에 겹쳐 보여 준다(ADR-0015). 다른 형식은 지금까지의 방식이다. 설정과 관계없고,
-  // 처리기를 쓸 수 없으면(없거나 못 그림) 아래의 지금까지의 미리보기로 돌아간다.
-  const hKind = !office && platform === "windows" && !p.isDir && !model && !isArchivePath(p.path) && handlerFailed?.path !== p.path && usesPreviewHandler(p.name) ? quickLookKindOf(p.name) : null;
-  const native = ql !== null || hKind !== null;
-  // epub은 디스크 위 파일만 앱이 읽어 보여 준다(압축 안은 읽지 않고 "미리 볼 수 없는 형식"). 3D·Office·네이티브 미리보기와 겹치지 않는다.
-  const epub = !p.isDir && !model && !native && !isArchivePath(p.path) && /\.epub$/i.test(p.name);
+  // epub은 디스크 위 파일만 앱이 읽어 보여 준다(압축 안은 읽지 않고 "미리 볼 수 없는 형식"). 3D·Office와 겹치지 않는다.
+  const epub = !p.isDir && !model && !isArchivePath(p.path) && /\.epub$/i.test(p.name);
   // HWP·HWPX도 디스크 위 파일만 앱이 쪽 단위로 그려 보여 준다(압축 안은 "미리 볼 수 없는 형식").
-  const hwp = !p.isDir && !model && !native && !isArchivePath(p.path) && /\.hwpx?$/i.test(p.name);
+  const hwp = !p.isDir && !model && !isArchivePath(p.path) && /\.hwpx?$/i.test(p.name);
   // 텍스트 본문. 3D 뷰어가 모델을 읽지 못하면 텍스트 형식은 이것으로 돌아간다.
   // 텍스트 계열(텍스트·코드·마크다운·JSON)이 3D·Office 뷰어 없이 그려질 때만 복사 버튼을 보인다.
-  const showCopy = fresh && d?.kind === "text" && !model && !office && !native;
-  const editing = !!edit && edit.path === p.path && d?.kind === "text" && !model && !office && !native;
+  const showCopy = fresh && d?.kind === "text" && !model && !office;
+  const editing = !!edit && edit.path === p.path && d?.kind === "text" && !model && !office;
   const textBody = d?.kind === "text" ? (
     <>
               {isMarkdown(p.name) ? (
@@ -207,32 +193,7 @@ export function Preview() {
           </button>
         </div>
         <div ref={bodyRef} data-preview-body className={`td-thin-scroll min-h-0 flex-1 select-text overflow-auto py-2 pl-3 pr-3 ${p.status === "loading" && d ? "opacity-60" : ""}`}>
-          {handlerFailed?.path === p.path && handlerFailed.blocked && (
-            <p data-preview-handler-blocked className="mb-1 flex flex-wrap items-center gap-2 text-xs text-ink-faint">
-              {t("preview.blocked")}
-              <button
-                type="button"
-                tabIndex={-1}
-                onClick={() => {
-                  const path = p.path;
-                  // 사용자가 누를 때만 그 파일의 차단 표시를 지운다(탐색기 파일 속성의 "차단 해제"와 같다). 풀리면 처리기로 다시 보여 준다.
-                  api.unblockFile(path).then(
-                    () => setHandlerFailed(null),
-                    (e: unknown) => setHandlerFailed({ path, reason: e instanceof Error ? e.message : String(e) }),
-                  );
-                }}
-                className="rounded border border-app-line px-2 py-0.5 text-ink hover:bg-app-selected"
-              >
-                {t("preview.unblock")}
-              </button>
-            </p>
-          )}
-          {handlerFailed?.path === p.path && handlerFailed.reason && (
-            <p data-preview-handler-error className="mb-1 text-xs text-ink-faint">
-              {t("preview.handler_failed", { reason: handlerFailed.reason })}
-            </p>
-          )}
-          {p.status === "loading" && !native && (!d || model || office) && <p className="text-ink-faint">{t("common.loading")}</p>}
+          {p.status === "loading" && (!d || model || office) && <p className="text-ink-faint">{t("common.loading")}</p>}
           {p.status === "error" && (
             <p role="alert" className="text-status-error">
               {p.error}
@@ -242,9 +203,7 @@ export function Preview() {
           {office && <OfficeMarkdownView key={p.path} path={p.path} />}
           {epub && <EpubView key={p.path} path={p.path} name={p.name} />}
           {hwp && d && fresh && <HwpView path={p.path} fileSize={d.size} sizeText={size(d.size)} />}
-          {ql && <QuickLookView key={p.path} path={p.path} name={p.name} fit={ql === "document"} />}
-          {hKind && <PreviewHandlerView key={p.path} path={p.path} suspended={live !== null} onUnavailable={(why) => setHandlerFailed({ path: p.path, ...why })} />}
-          {d?.kind === "text" && !model && !office && !native &&
+          {d?.kind === "text" && !model && !office &&
             (editing ? (
               <textarea
                 data-preview-edit
@@ -268,7 +227,7 @@ export function Preview() {
             ) : (
               <div onDoubleClick={() => void api.previewEditStart()}>{textBody}</div>
             ))}
-          {d?.kind === "image" && !model && !office && !native &&
+          {d?.kind === "image" && !model && !office &&
             (d.dataUrl ? (
               <div className="flex h-full items-center justify-center">
                 <img src={d.dataUrl} alt={p.name} className="max-h-full max-w-full object-contain" />
@@ -291,7 +250,7 @@ export function Preview() {
             ) : (
               <p className="text-ink-faint">{t("preview.pdf_too_big", { size: size(d.size) })}</p>
             ))}
-          {(d?.kind === "directory" || (d?.kind === "other" && !model && !office && !native && !epub && !hwp)) && (
+          {(d?.kind === "directory" || (d?.kind === "other" && !model && !office && !epub && !hwp)) && (
             <p className="text-ink-faint">
               {kindLabel(d.kind)} — {t("preview.unsupported")}
               {d.kind === "other" ? ` (${size(d.size)})` : ""}

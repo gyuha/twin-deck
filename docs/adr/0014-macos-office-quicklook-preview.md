@@ -1,6 +1,6 @@
 # ADR-0014. macOS의 Office 미리보기는 Quick Look HTML을 스크립트 없는 iframe으로 보여 준다
 
-- 상태: Accepted
+- 상태: Superseded by [ADR-0020](0020-office-preview-via-office-oxide.md)
 - 날짜: 2026-10-08
 
 ## 맥락

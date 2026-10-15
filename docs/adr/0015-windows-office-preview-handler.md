@@ -1,6 +1,6 @@
 # ADR-0015. Windows의 Office 미리보기는 미리보기 처리기를 앱 창 위에 네이티브 창으로 겹쳐 보여 준다
 
-- 상태: Accepted
+- 상태: Superseded by [ADR-0020](0020-office-preview-via-office-oxide.md)
 - 날짜: 2026-10-09
 
 ## 맥락

@@ -32,11 +32,12 @@
 | [0011](0011-specta-pinned-versions.md) | 타입 생성은 tauri-specta 업스트림 고정 버전 | Accepted |
 | [0012](0012-archive-path-notation.md) | 아카이브 안 경로 표기 `아카이브!/안/경로` | Accepted |
 | [0013](0013-lookup-query-syntax.md) | Look Up 질의 문법과 확인하지 못한 부분의 가정 | Accepted |
-| [0014](0014-macos-office-quicklook-preview.md) | macOS Office 미리보기는 Quick Look HTML을 스크립트 없는 iframe으로 | Accepted |
-| [0015](0015-windows-office-preview-handler.md) | Windows Office 미리보기는 미리보기 처리기를 앱 창 위에 네이티브 창으로 | Accepted |
+| [0014](0014-macos-office-quicklook-preview.md) | macOS Office 미리보기는 Quick Look HTML을 스크립트 없는 iframe으로 | Superseded by 0020 |
+| [0015](0015-windows-office-preview-handler.md) | Windows Office 미리보기는 미리보기 처리기를 앱 창 위에 네이티브 창으로 | Superseded by 0020 |
 | [0016](0016-i18n-dictionary-and-rust-catalog.md) | 다국어: 직접 만든 사전과 Rust 문구 대응표 | Accepted |
 | [0017](0017-td-command-is-the-app-executable.md) | `td` 명령은 앱 실행 파일 자체이고, Windows 설치 훅은 앱을 한 번 실행해 설치한다 | Accepted |
 | [0018](0018-smb-via-os-mount.md) | SMB 연결은 OS 마운트로 하고, 자체 원격 파일시스템은 만들지 않는다 | Accepted |
 | [0019](0019-remote-fs-in-process.md) | SFTP·FTP는 앱 안의 원격 클라이언트를 `Vfs`로 감싸 패널에 통합한다 | Accepted |
+| [0020](0020-office-preview-via-office-oxide.md) | Office 문서 미리보기는 office_oxide로 글자·표를 뽑아 Markdown으로 보여 준다 | Accepted |
 
 Accepted는 2026-09-29에 사용자가 설계안을 승인한 결정이다. 세부 사항(버전, 라이브러리 선택)은 각 문서의 "미확인 과제"에 남아 있다.

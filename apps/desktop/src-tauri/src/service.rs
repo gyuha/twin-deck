@@ -19,7 +19,6 @@ use td_vfs::{sort_entries, Entry, EntryKind, ListOptions, Vfs, VfsPath};
 use td_watch::DirWatcher;
 
 use crate::epub::EpubInfoDto;
-use crate::quicklook::{QuickLook, QuickLookDto};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "lowercase")]
@@ -787,8 +786,6 @@ pub struct Service<T: Trasher> {
     next_search: AtomicU32,
     search_tx: Sender<SearchMsg>,
     file_clipboard: Box<dyn FileClipboard>,
-    /// macOS Office 문서의 Quick Look 미리보기(ADR-0014). 한 번에 하나만 돌린다.
-    quicklook: QuickLook,
     /// 이미지·PDF·사운드 미리보기의 파일 크기 한도. 설정(`preview.*_max_mb`)을 따라 바뀐다.
     preview_limits: Mutex<td_vfs::PreviewLimits>,
     /// (시험) 디스크 PDF를 읽지 않고 파일 주소로 열게 한다(`preview.pdf_direct`).
@@ -896,7 +893,6 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
                 next_search: AtomicU32::new(0),
                 search_tx,
                 file_clipboard: Box::new(SystemFileClipboard),
-                quicklook: QuickLook::new("/usr/bin/qlmanage", Duration::from_secs(10)),
                 preview_limits: Mutex::new(td_vfs::PreviewLimits::default()),
                 pdf_direct: std::sync::atomic::AtomicBool::new(false),
                 icons: Mutex::new(HashMap::new()),
@@ -1403,18 +1399,6 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
         td_vfs::read_preview(&vp(path), self.limits())
             .map(PreviewDto::from)
             .map_err(|e| e.to_string())
-    }
-
-    /// macOS Quick Look으로 Office 문서의 HTML 미리보기를 만든다(ADR-0014). 압축 안 파일과 다른 OS는 지원하지 않는다.
-    /// `seq`는 프런트가 붙인 요청 순번이다(클수록 최근). 늦게 들어온 오래된 요청이 새 요청을 끊지 않게 한다.
-    pub fn quicklook_preview(&self, path: &str, seq: f64) -> ServiceResult<QuickLookDto> {
-        if !cfg!(target_os = "macos") {
-            return Err("이 OS에서는 지원하지 않습니다".into());
-        }
-        if self.fs.is_archive_path(&vp(path)) {
-            return Err("압축 파일 안의 문서는 Quick Look으로 볼 수 없습니다".into());
-        }
-        self.quicklook.preview(Path::new(path), seq)
     }
 
     /// 디스크 위 Office 문서를 `office_oxide`로 읽은 Markdown. 압축 파일 안의 문서는 읽지 않는다.

@@ -61,18 +61,6 @@ async previewFile(path: string) : Promise<Result<PreviewDto, string>> {
 }
 },
 /**
- * macOS Quick Look으로 Office 문서의 HTML 미리보기를 만든다. 최대 10초 걸릴 수 있어 메인 스레드가 아닌 곳에서 돌린다.
- * `seq`는 요청 순번(클수록 최근)이다. 명령이 보낸 순서와 다르게 들어와도 최근 요청이 이긴다.
- */
-async quicklookPreview(path: string, seq: number) : Promise<Result<QuickLookDto, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("quicklook_preview", { path, seq }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-/**
  * Office 문서를 `office_oxide`로 읽어 Markdown으로 돌려준다. 큰 문서는 시간이 걸려 메인 스레드가 아닌 곳에서 돌린다.
  */
 async officePreview(path: string) : Promise<Result<OfficePreviewDto, string>> {
@@ -111,48 +99,6 @@ async systemIcon(path: string, isDir: boolean, size: number) : Promise<Result<st
 async epubChapter(path: string, index: number) : Promise<Result<string, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("epub_chapter", { path, index }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-/**
- * Windows 미리보기 처리기로 `path`를 앱 창 위 `rect` 자리에 띄운다 (ADR-0015). 이 형식의 처리기가 없거나 Windows가 아니면 false.
- * 처리기가 문서를 그릴 때까지 기다리므로 메인 스레드가 아닌 곳에서 돌린다.
- */
-async previewHandlerShow(path: string, rect: PreviewRectDto) : Promise<Result<ShowOutcome, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("preview_handler_show", { path, rect }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-/**
- * 처리기 창의 자리(웹 화면의 미리보기 영역)가 바뀌었다.
- */
-async previewHandlerSetRect(rect: PreviewRectDto) : Promise<void> {
-    await TAURI_INVOKE("preview_handler_set_rect", { rect });
-},
-/**
- * 대화상자·메뉴 같은 것이 위에 뜨는 동안 처리기 창을 숨기고(false), 닫히면 다시 보인다(true). 문서는 다시 읽지 않는다.
- */
-async previewHandlerSetVisible(visible: boolean) : Promise<void> {
-    await TAURI_INVOKE("preview_handler_set_visible", { visible });
-},
-/**
- * 처리기 창을 내린다(다른 항목으로 넘어가거나 미리보기를 닫을 때).
- */
-async previewHandlerClose() : Promise<void> {
-    await TAURI_INVOKE("preview_handler_close");
-},
-/**
- * 인터넷에서 받아 Office가 미리보기를 막는 파일의 차단 표시(Zone.Identifier)를 지운다. 탐색기 파일 속성의 "차단 해제"와 같고 파일 내용은 건드리지 않는다.
- * 사용자가 버튼을 눌렀을 때만 부른다. Windows가 아니면 아무것도 하지 않는다.
- */
-async unblockFile(path: string) : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("unblock_file", { path }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -1187,12 +1133,6 @@ video_autoplay: boolean;
  */
 close_on_outside_click: boolean; 
 /**
- * Office 문서(docx·xlsx·pptx)의 데이터 미리보기를 보여 준다. 읽기가 느리고 실제 문서 화면과 달라 기본은 끈다.
- * macOS는 이 값과 관계없이 Office 문서에 Quick Look 미리보기를 쓰고(ADR-0014), Windows는 docx에 미리보기 처리기를 쓴다(ADR-0015).
- * 그 밖의 경우(Linux, Windows의 xlsx·pptx, Office가 없는 Windows)만 이 값이 쓰인다.
- */
-office: boolean; 
-/**
  * 이미지 미리보기를 싣는 최대 파일 크기(MB). 이보다 크면 "너무 커서 미리 볼 수 없습니다"가 보인다. 0은 제한 없음.
  */
 image_max_mb: number; 
@@ -1219,10 +1159,6 @@ export type PreviewKindDto = "text" | "image" | "audio" | "video" | "pdf" | "dir
  */
 export type PreviewRect = { x: number; y: number; w: number; h: number }
 /**
- * 웹뷰 기준 CSS 픽셀 사각형(미리보기 자리).
- */
-export type PreviewRectDto = { x: number; y: number; width: number; height: number }
-/**
  * 작업 큐의 상태가 바뀔 때마다 전체 스냅샷을 보낸다.
  */
 export type QueueChanged = { jobs: JobDto[] }
@@ -1231,15 +1167,6 @@ export type QueueItemDto = { src: string;
  * 복사/이동의 대상 폴더. 휴지통/삭제에서는 null.
  */
 destDir: string | null; policy: ConflictDto }
-/**
- * Quick Look이 만든 미리보기. `html`은 `Preview.html` 원문이고, 그 안의 `AttachmentN.*` 참조는 `dir` 폴더에 있다.
- * 여러 시트 xlsx면 `sheets`에 시트가 순서대로 들어 있고(둘 이상), 이때 `html`은 JS로 탭을 바꾸는 껍데기라 쓰지 않는다.
- */
-export type QuickLookDto = { html: string; dir: string; sheets: QuickLookSheetDto[] }
-/**
- * 여러 시트 xlsx의 시트 하나. `html`의 첨부 참조도 `QuickLookDto::dir` 폴더에 있다.
- */
-export type QuickLookSheetDto = { name: string; html: string }
 export type QuickSelect = { match_only_prefix: boolean; activate_on_any_character: boolean }
 export type RemoteConfig = { 
 /**
@@ -1283,22 +1210,6 @@ export type SelectionConfig = {
  * "invert" | "extend"
  */
 shift_mode: string }
-/**
- * 처리기를 시도한 결과. 프런트가 이것으로 다음 동작(안내·폴백)을 정한다.
- */
-export type ShowOutcome = 
-/**
- * 처리기가 문서를 그렸다.
- */
-"shown" | 
-/**
- * 이 형식의 처리기가 없거나 Windows가 아니다.
- */
-"unavailable" | 
-/**
- * 인터넷에서 받은 파일이라 Office가 미리보기를 막는다(차단 해제하면 보인다).
- */
-"blocked"
 export type SmbConfig = { 
 /**
  * 병합 후 항목별로 검증해서 채운다(host나 share가 빈 항목은 경고와 함께 빠진다).

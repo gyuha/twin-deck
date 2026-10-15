@@ -4,7 +4,7 @@ import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { BackendError, RemoteConnectError, SmbConnectError } from "./backend";
 import type { Backend, FileDropEvent, SearchEvent, TerminalEvent } from "./backend";
 import { commands, events } from "./generated/bindings";
-import type { CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigValue, ConflictDto, LocationConflict, ExpectedFileDto, FileInfoDto, FindSpecDto, JobDto, LoadedState, PreviewDto, PreviewRectDto, OfficePreviewDto, QuickLookDto, EpubInfoDto, ShowOutcome, Snapshot, JobKindDto, Loaded, QueueItemDto, RemoteServer, Result, SmbServer, WriteTextResultDto } from "./generated/bindings";
+import type { CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigValue, ConflictDto, LocationConflict, ExpectedFileDto, FileInfoDto, FindSpecDto, JobDto, LoadedState, PreviewDto, OfficePreviewDto, EpubInfoDto, Snapshot, JobKindDto, Loaded, QueueItemDto, RemoteServer, Result, SmbServer, WriteTextResultDto } from "./generated/bindings";
 
 function unwrap<T>(r: Result<T, string>): T {
   if (r.status === "error") throw new BackendError(r.error);
@@ -157,9 +157,6 @@ export class TauriBackend implements Backend {
   async officePreview(path: string): Promise<OfficePreviewDto> {
     return unwrap(await commands.officePreview(path));
   }
-  async quickLookPreview(path: string, seq: number): Promise<QuickLookDto> {
-    return unwrap(await commands.quicklookPreview(path, seq));
-  }
   async systemIcon(path: string, isDir: boolean, size: number): Promise<string | null> {
     return unwrap(await commands.systemIcon(path, isDir, size));
   }
@@ -168,21 +165,6 @@ export class TauriBackend implements Backend {
   }
   async epubChapter(path: string, index: number): Promise<string> {
     return unwrap(await commands.epubChapter(path, index));
-  }
-  async previewHandlerShow(path: string, rect: PreviewRectDto): Promise<ShowOutcome> {
-    return unwrap(await commands.previewHandlerShow(path, rect));
-  }
-  previewHandlerSetRect(rect: PreviewRectDto): Promise<void> {
-    return commands.previewHandlerSetRect(rect);
-  }
-  previewHandlerSetVisible(visible: boolean): Promise<void> {
-    return commands.previewHandlerSetVisible(visible);
-  }
-  previewHandlerClose(): Promise<void> {
-    return commands.previewHandlerClose();
-  }
-  async unblockFile(path: string): Promise<void> {
-    unwrap(await commands.unblockFile(path));
   }
   globFilter(pattern: string, names: string[]) {
     return commands.globFilter(pattern, names);

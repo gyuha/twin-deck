@@ -758,15 +758,10 @@ fn preview_autoplay_round_trips_through_user_config() {
 }
 
 #[test]
-fn preview_office_defaults_off_and_round_trips() {
-    use td_config::{set_user_value, ConfigValue};
-    assert!(!load("").config.preview.office);
-    let l = load("[preview]\noffice = true\n");
-    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
-    assert!(l.config.preview.office);
-    let dir = tempfile::tempdir().unwrap();
-    set_user_value(dir.path(), "preview.office", ConfigValue::Bool(true)).unwrap();
-    assert!(load_dir(dir.path(), Platform::Linux).config.preview.office);
+fn removed_preview_office_key_in_an_old_user_config_still_loads() {
+    // 예전 버전이 쓴 `[preview]` 아래 `office` 키는 이제 없다. 설정을 읽는 것은 막지 않고 다른 값은 그대로 읽는다.
+    let l = load("[preview]\noffice = true\nvideo_autoplay = true\n");
+    assert!(l.config.preview.video_autoplay, "{:?}", l.warnings);
 }
 
 #[test]

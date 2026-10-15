@@ -68,7 +68,7 @@ describe("translateRust", () => {
     expect(translateRust("폴더가 아닙니다: /a/b")).toBe("Not a folder: /a/b");
     expect(translateRust("입출력 오류: 찾을 수 없음: /x")).toBe("I/O error: Not found: /x");
     expect(translateRust("{0}개 항목을 복사하지 못해 원본을 지우지 않았습니다".replace("{0}", "3"))).toBe("3 items could not be copied, so the originals were not deleted");
-    expect(translateRust("Quick Look으로 미리 볼 수 없습니다 (시간 초과)")).toBe("Cannot preview with Quick Look (timed out)");
+    expect(translateRust("Office 문서를 읽을 수 없습니다: 깨진 zip")).toBe("Could not read the Office document: 깨진 zip");
   });
 
   it("모르는 문구는 그대로 둔다. 한국어 모드에서는 바꾸지 않는다", () => {

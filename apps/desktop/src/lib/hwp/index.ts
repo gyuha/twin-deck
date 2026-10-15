@@ -1,7 +1,5 @@
-import { MAX_BYTES } from "../office";
-
-/** 파일이 이보다 크면 읽지 않는다. Office 미리보기와 같은 한도다. */
-export { MAX_BYTES };
+/** 파일이 이보다 크면 읽지 않는다(메모리와 해석 시간 제한). */
+export const MAX_BYTES = 20 * 1024 * 1024;
 
 export type HwpDoc = {
   pageCount: number;

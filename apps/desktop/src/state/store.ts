@@ -27,8 +27,6 @@ import type {
   ConfigLocationDto,
   LocationConflict,
   Backend,
-  PreviewRectDto,
-  ShowOutcome,
   ConfigValue,
   FileDropEvent,
   ConflictDto,
@@ -356,7 +354,7 @@ export interface AppState {
   preview: PreviewState | null;
   /** 미리보기에서 편집 중인 텍스트. 편집 중이 아니면 null. */
   previewEdit: PreviewEdit | null;
-  /** Quick Look 미리보기(macOS xlsx)에서 보고 있는 시트. 시트가 둘 이상인 파일을 보고 있을 때만 있다. */
+  /** 미리보기(epub 챕터·HWP 쪽)에서 보고 있는 시트. 둘 이상인 파일을 보고 있을 때만 있다. */
   previewSheet: { path: string; index: number; count: number } | null;
   /** 진행 중인 드래그(행을 끌어 다른 폴더·패널에 놓기). 없으면 null. */
   drag: DragState | null;
@@ -2265,10 +2263,6 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     officePreview(path: string) {
       return backend.officePreview(path);
     },
-    /** macOS Quick Look이 만든 Office 문서 미리보기(ADR-0014). `seq`는 요청 순번(클수록 최근)이다. */
-    quickLookPreview(path: string, seq: number) {
-      return backend.quickLookPreview(path, seq);
-    },
     /** 항목의 시스템 파일 아이콘(데이터 주소, 이 OS가 못 주면 null). 설정 `behavior.table.system_icons`가 켜졌을 때만 부른다. */
     systemIcon(path: string, isDir: boolean, size: number) {
       return backend.systemIcon(path, isDir, size);
@@ -2281,24 +2275,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     epubChapter(path: string, index: number) {
       return backend.epubChapter(path, index);
     },
-    /** Windows 미리보기 처리기(ADR-0015): 앱 창 위 `rect`(웹뷰 기준 CSS 픽셀) 자리에 `path`를 띄운다. 결과는 shown·unavailable(처리기 없음)·blocked(인터넷에서 받은 파일). */
-    previewHandlerShow(path: string, rect: PreviewRectDto): Promise<ShowOutcome> {
-      return backend.previewHandlerShow(path, rect);
-    },
-    previewHandlerSetRect(rect: PreviewRectDto) {
-      return backend.previewHandlerSetRect(rect);
-    },
-    previewHandlerSetVisible(visible: boolean) {
-      return backend.previewHandlerSetVisible(visible);
-    },
-    previewHandlerClose() {
-      return backend.previewHandlerClose();
-    },
-    /** 인터넷에서 받은 파일의 차단 표시를 지운다(탐색기의 "차단 해제"). 사용자가 버튼을 눌렀을 때만 부른다. */
-    unblockFile(path: string) {
-      return backend.unblockFile(path);
-    },
-    /** Quick Look 미리보기가 시트 `count`개짜리 파일을 열었다. 첫 시트부터 보인다. */
+    /** 미리보기가 시트(챕터·쪽) `count`개짜리 파일을 열었다. 첫 시트부터 보인다. */
     previewSheetsLoaded(path: string, count: number) {
       set({ previewSheet: count > 1 ? { path, index: 0, count } : null });
     },

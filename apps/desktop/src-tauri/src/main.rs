@@ -5,10 +5,6 @@ mod commands;
 mod epub;
 mod global_hotkey;
 mod office;
-mod preview_handler;
-#[cfg(windows)]
-mod preview_host;
-mod quicklook;
 mod service;
 
 use tauri_specta::Event;
@@ -132,7 +128,6 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(service)
         .manage(LaunchPaths(std::sync::Mutex::new(launch)))
-        .manage(preview_handler::PreviewHandlers::default())
         .manage(AppLaunch::new(
             td_launch::SystemLauncher,
             td_launch::Os::current(),
