@@ -34,12 +34,12 @@ describe("설정 화면 열기와 닫기", () => {
     expect(cursorName("left")).toBe("docs");
   });
 
-  it("섹션 8개가 왼쪽에 있고 처음에는 모양이 열린다", async () => {
+  it("섹션 9개가 왼쪽에 있고 처음에는 모양이 열린다", async () => {
     const { user } = await renderApp();
     await open(user);
     await dialog();
     const tabs = within(screen.getByRole("tablist", { name: "설정 섹션" })).getAllByRole("tab").map((t) => t.textContent);
-    expect(tabs).toEqual(["모양", "목록과 선택", "표시 형식", "미리보기", "확인", "폴더 단축키", "F키", "환경"]);
+    expect(tabs).toEqual(["모양", "목록과 선택", "표시 형식", "미리보기", "확인", "폴더 단축키", "F키", "환경", "SMB 서버"]);
     expect(screen.getByRole("tab", { name: "모양" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("switch", { name: "액션바 표시" })).toBeInTheDocument();
   });
@@ -316,5 +316,84 @@ describe("탭 위치 설정 항목 (이슈 #67)", () => {
     await user.click(within(group).getByRole("combobox"));
     await user.click(await screen.findByRole("option", { name: "bottom" }));
     await waitFor(async () => expect((await backend.getConfig()).config.behavior.layout.tab_position).toBe("bottom"));
+  });
+});
+
+describe("SMB 서버 탭 (이슈 #77)", () => {
+  const NAS = { name: "NAS", host: "nas.local", share: "media", user: "kim" };
+  const smbServers = async (backend: ReturnType<typeof seedBackend>) => (await backend.getConfig()).config.smb.servers;
+  const openSmb = async (backend = seedBackend()) => {
+    const app = await renderApp(backend);
+    await open(app.user);
+    await dialog();
+    await app.user.click(screen.getByRole("tab", { name: "SMB 서버" }));
+    return app;
+  };
+  const field = (name: string) => screen.getByRole("textbox", { name });
+  const button = (name: string) => screen.getByRole("button", { name });
+
+  it("추가 → 입력 → 저장하면 setSmbServers로 설정에 저장된다", async () => {
+    const { user, backend } = await openSmb();
+    expect(screen.getByText("저장된 서버가 없습니다. 추가를 눌러 만듭니다")).toBeInTheDocument();
+    await user.click(button("추가"));
+    await user.type(field("표시 이름"), "NAS");
+    await user.type(field("호스트"), "nas.local");
+    await user.type(field("공유"), "media");
+    await user.type(field("사용자"), "kim");
+    expect(await smbServers(backend)).toEqual([]);
+    await user.click(button("저장"));
+    await waitFor(async () => expect(await smbServers(backend)).toEqual([NAS]));
+    expect(button("저장")).toBeDisabled();
+  });
+
+  it("저장된 항목을 고쳐 저장하고, 삭제 후 저장하면 목록에서 빠진다", async () => {
+    const backend = seedBackend();
+    backend.setConfig((l) => (l.config.smb = { servers: [NAS, { name: "백업", host: "backup", share: "data", user: "" }] }));
+    const { user } = await openSmb(backend);
+    const listbox = screen.getByRole("listbox", { name: "저장된 SMB 서버" });
+    expect(within(listbox).getAllByRole("option").map((o) => o.textContent)).toEqual(["NASnas.local/media · kim", "백업backup/data"]);
+    await user.click(within(listbox).getByRole("option", { name: /백업/ }));
+    await user.clear(field("공유"));
+    await user.type(field("공유"), "archive{Enter}");
+    await waitFor(async () => expect((await smbServers(backend))?.[1].share).toBe("archive"));
+    await user.click(within(listbox).getByRole("option", { name: /NAS/ }));
+    await user.click(button("삭제"));
+    await user.click(button("저장"));
+    await waitFor(async () => expect(await smbServers(backend)).toEqual([{ name: "백업", host: "backup", share: "archive", user: "" }]));
+  });
+
+  it("호스트나 공유가 비면 저장하지 않고 오류를 보인다", async () => {
+    const backend = seedBackend();
+    const calls: unknown[] = [];
+    const original = backend.setSmbServers.bind(backend);
+    backend.setSmbServers = async (servers) => {
+      calls.push(servers);
+      return original(servers);
+    };
+    const { user } = await openSmb(backend);
+    await user.click(button("추가"));
+    await user.type(field("공유"), "media");
+    await user.click(button("저장"));
+    expect(await screen.findByText("1번째 항목: 호스트와 공유를 입력하세요")).toBeInTheDocument();
+    expect(calls).toEqual([]);
+    expect(await smbServers(backend)).toEqual([]);
+  });
+
+  it("저장된 비밀번호 지우기는 키체인에서 그 항목의 비밀번호를 지운다", async () => {
+    const backend = seedBackend();
+    backend.setConfig((l) => (l.config.smb = { servers: [NAS] }));
+    backend.smbPasswords.set("kim@nas.local/media", "secret");
+    const { user } = await openSmb(backend);
+    await user.click(button("저장된 비밀번호 지우기"));
+    expect(await within(screen.getByRole("group", { name: "저장된 SMB 서버" })).findByRole("status")).toHaveTextContent("저장된 비밀번호를 지웠습니다");
+    expect(backend.smbPasswords.size).toBe(0);
+  });
+
+  it("폼에 입력하는 동안 패널 키가 패널로 새지 않는다", async () => {
+    const { user, backend } = await openSmb();
+    await user.click(button("추가"));
+    await user.type(field("호스트"), "{F8}j");
+    expect(backend.trashed).toEqual([]);
+    expect(field("호스트")).toHaveValue("j");
   });
 });

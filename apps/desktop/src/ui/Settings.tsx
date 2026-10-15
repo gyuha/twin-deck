@@ -4,6 +4,7 @@ import { Button, Input, Select, SelectOption } from "@spacedrive/primitives";
 import { defaultBindingsFor } from "@twin-deck/actions";
 import type { Platform } from "@twin-deck/keybinds";
 import { defaultLoaded } from "@twin-deck/ts-client";
+import type { SmbServer } from "@twin-deck/ts-client";
 import { APP_ACTIONS, APP_LAUNCH_ACTION, APP_OPEN_FOLDER_ACTION } from "../lib/fkeys";
 import { THEMES } from "../lib/themes.generated";
 import { parseThemeList } from "../lib/themeColors";
@@ -28,7 +29,9 @@ type Control =
   | { type: "tags"; options: readonly ComboOption[] }
   | { type: "fkey" }
   /** 전역 단축키: 수식키 체크 + 키 선택 상자. 값은 `Mod+Alt+O` 문자열이다. */
-  | { type: "hotkey" };
+  | { type: "hotkey" }
+  /** 저장된 SMB 서버 목록(`smb.servers`): 목록 + 선택 항목 편집 폼. 목록 전체를 한 번에 저장한다. */
+  | { type: "smb-servers" };
 
 interface Item {
   key: string;
@@ -88,6 +91,12 @@ const TAB_POSITIONS = ["top", "bottom"] as const;
 const TERMINAL_SHELLS = ["default", "cmd", "powershell", "gitbash"] as const;
 const COLUMN_LINES = ["none", "solid", "dash"] as const;
 const FOLDER_STYLES =["none", "brackets", "parens", "slash"] as const;
+
+const smbSection: { title: string; desc?: string; items: Item[] } = {
+  get title() { return translate("settings.section.smb.title"); },
+  get desc() { return translate("settings.section.smb.desc"); },
+  items: [{ key: "smb.servers", get title() { return translate("settings.smb.list"); }, control: { type: "smb-servers" } }],
+};
 
 const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
   {
@@ -187,7 +196,11 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
       { key: "behavior.layout.recent_limit", get title() { return translate("settings.item.behavior.layout.recent_limit.title"); }, get desc() { return translate("settings.item.behavior.layout.recent_limit.desc"); }, control: { type: "int" } },
     ],
   },
+  smbSection,
 ];
+
+/** SMB 서버 탭의 순번. `api.openSettings(SMB_SECTION)`으로 이 탭을 바로 연다. */
+export const SMB_SECTION = SECTIONS.indexOf(smbSection);
 
 const valueAt = (obj: unknown, key: string): unknown => key.split(".").reduce<unknown>((o, k) => (o as Record<string, unknown> | undefined)?.[k], obj);
 
@@ -421,6 +434,152 @@ function HotkeyControl({ name, value, disabled, onCommit }: { name: string; valu
   );
 }
 
+const EMPTY_SMB: SmbServer = { name: "", host: "", share: "", user: "" };
+const SMB_FIELDS = ["name", "host", "share", "user"] as const;
+
+/**
+ * 저장된 SMB 서버 목록과 선택 항목 편집 폼. 다른 항목과 달리 바꾸는 즉시 저장하지 않고 "저장"을 눌러 목록 전체를 쓴다
+ * (항목 하나를 쓰다 만 상태로 host·share가 비면 저장이 거부되기 때문이다). 비밀번호는 여기서 받지 않고 지우기만 한다.
+ */
+function SmbServersControl({ label, disabled }: { label: string; disabled: boolean }) {
+  const t = useT();
+  const { api } = useAppStore();
+  const saved = useApp((s) => s.loaded.config.smb.servers ?? []);
+  const [draft, setDraft] = useState<SmbServer[]>(saved);
+  const [selected, setSelected] = useState(0);
+  const [invalid, setInvalid] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  // 저장하면(또는 설정 파일이 밖에서 바뀌면) 새 목록으로 다시 시작한다.
+  const savedKey = JSON.stringify(saved);
+  useEffect(() => {
+    setDraft(JSON.parse(savedKey) as SmbServer[]);
+    setSelected((i) => Math.min(i, Math.max(0, (JSON.parse(savedKey) as SmbServer[]).length - 1)));
+  }, [savedKey]);
+  const dirty = JSON.stringify(draft) !== savedKey;
+  const current = draft[selected] as SmbServer | undefined;
+  const edit = (field: (typeof SMB_FIELDS)[number], value: string) => {
+    setDraft(draft.map((s, i) => (i === selected ? { ...s, [field]: value } : s)));
+    setInvalid(null);
+    setNotice(null);
+  };
+  const save = async () => {
+    const bad = draft.findIndex((s) => !s.host.trim() || !s.share.trim());
+    if (bad >= 0) {
+      setSelected(bad);
+      setInvalid(t("settings.smb.required", { n: bad + 1 }));
+      return;
+    }
+    setInvalid(null);
+    await api.setSmbServers(draft);
+  };
+  // 비밀번호는 저장된 항목 순번으로 지운다. 저장 전 변경이 있으면 순번이 어긋날 수 있어 막는다.
+  const canForget = !disabled && !dirty && !!current?.user;
+  return (
+    <div role="group" aria-label={label} className="flex flex-col gap-3 py-2.5">
+      <div className="flex min-h-0 gap-4">
+        <div className="flex w-56 shrink-0 flex-col gap-2">
+          <ul role="listbox" aria-label={label} className="min-h-24 overflow-auto rounded border border-app-line">
+            {draft.length === 0 && <li className="px-2 py-1.5 text-xs text-ink-faint">{t("settings.smb.empty")}</li>}
+            {draft.map((s, i) => (
+              <li
+                key={i}
+                role="option"
+                aria-selected={i === selected}
+                tabIndex={0}
+                onClick={() => setSelected(i)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") setSelected(i);
+                }}
+                className={"cursor-default px-2 py-1.5 text-sm " + (i === selected ? "bg-app-selected" : "hover:bg-app-hover")}
+              >
+                <div className="truncate">{s.name || `${s.host}/${s.share}`}</div>
+                <div className="truncate text-xs text-ink-faint">
+                  {s.host}/{s.share}
+                  {s.user ? ` · ${s.user}` : ""}
+                </div>
+              </li>
+            ))}
+          </ul>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="gray"
+              disabled={disabled}
+              onClick={() => {
+                setDraft([...draft, { ...EMPTY_SMB }]);
+                setSelected(draft.length);
+                setNotice(null);
+              }}
+            >
+              {t("settings.smb.add")}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="gray"
+              disabled={disabled || !current}
+              onClick={() => {
+                setDraft(draft.filter((_, i) => i !== selected));
+                setSelected(Math.max(0, selected - 1));
+                setInvalid(null);
+                setNotice(null);
+              }}
+            >
+              {t("settings.smb.delete")}
+            </Button>
+          </div>
+        </div>
+        {current && (
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            {SMB_FIELDS.map((field) => (
+              <label key={field} className="flex items-center gap-3 text-sm">
+                <span className="w-24 shrink-0">{t(`settings.smb.${field}`)}</span>
+                <Input
+                  aria-label={t(`settings.smb.${field}`)}
+                  type="text"
+                  size="sm"
+                  className="w-full"
+                  value={current[field]}
+                  disabled={disabled}
+                  placeholder={field === "name" ? t("settings.smb.name_placeholder") : field === "user" ? t("settings.smb.user_placeholder") : field === "host" ? "nas.local" : "share"}
+                  onChange={(e) => edit(field, e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void save();
+                  }}
+                />
+              </label>
+            ))}
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                size="sm"
+                variant="gray"
+                disabled={!canForget}
+                onClick={() =>
+                  void api.smbForgetPassword(selected).then((ok) => {
+                    if (ok) setNotice(t("settings.smb.forgotten"));
+                  })
+                }
+              >
+                {t("settings.smb.forget")}
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="flex items-center justify-end gap-3">
+        {invalid && <span className="text-xs text-status-error">{invalid}</span>}
+        {!invalid && notice && <span role="status" className="text-xs text-ink-dull">{notice}</span>}
+        {!invalid && !notice && dirty && <span className="text-xs text-ink-faint">{t("settings.smb.unsaved")}</span>}
+        <Button type="button" size="sm" variant="accent" disabled={disabled || !dirty} onClick={() => void save()}>
+          {t("settings.smb.save")}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 /** 사용자 설정을 항목별 컨트롤로 바꾸는 화면(`Mod+,`). 바꾸는 즉시 저장한다. */
 export function Settings({ onThemePreview }: { onThemePreview?: (theme: string | null) => void }) {
   const t = useT();
@@ -511,6 +670,8 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
             <h3 className="text-sm font-semibold">{current.title}</h3>
             {current.desc ? <p className="mb-2 text-xs text-ink-faint">{current.desc}</p> : <div className="mb-2" />}
             {items.map((item) => {
+              // SMB 서버 목록은 한 줄짜리 항목이 아니라 탭 전체를 쓰는 편집기다(기본값으로 버튼도 없다).
+              if (item.control.type === "smb-servers") return <SmbServersControl key={item.key} label={item.title} disabled={!!broken} />;
               const combo = item.key.startsWith("fkeys.") && item.title.includes("+") && item.title in config.fkeys;
               // 설정 파일에 없는 내장 조합키는 값이 없다 → 기본값("")으로 본다.
               const extensionColumn = item.control.type === "extension-column";

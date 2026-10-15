@@ -84,6 +84,28 @@ export function Dialog() {
             )}
           </>
         )}
+        {dialog.kind === "password" && (
+          <>
+            <input
+              ref={input}
+              type="password"
+              autoComplete="off"
+              aria-label={t("dialog.password")}
+              value={dialog.value}
+              onChange={(e) => api.dialogSetValue(e.target.value)}
+              className="w-full border border-app-line px-1 py-0.5"
+            />
+            <label className="mt-2 flex items-center gap-2">
+              <input type="checkbox" checked={dialog.remember} onChange={(e) => api.dialogSetOption(e.target.checked)} />
+              {t("dialog.remember")}
+            </label>
+            {dialog.error && (
+              <p role="alert" className="mt-1 text-status-error">
+                {dialog.error}
+              </p>
+            )}
+          </>
+        )}
         {dialog.kind === "multirename" && <MultiRename items={dialog.items} existing={dialog.existing} options={dialog.options} />}
         {dialog.kind === "progress" && job && (() => {
           // 복사·이동은 지금 처리 중인 파일의 바이트 막대와 전체 개수 막대를 함께 보인다(파일이 1개면 앞의 것만).
@@ -224,7 +246,7 @@ export function Dialog() {
             <button
               type="button"
               disabled={dialog.kind === "multirename" && !canMultiRename(dialog)}
-              data-dialog-primary={dialog.kind === "name" || dialog.kind === "multirename" ? undefined : ""}
+              data-dialog-primary={dialog.kind === "name" || dialog.kind === "password" || dialog.kind === "multirename" ? undefined : ""}
               className="rounded bg-accent px-3 py-0.5 text-accent-ink focus:ring-2 focus:ring-accent-ink disabled:opacity-40"
               onClick={() => api.dialogConfirm()}
             >
