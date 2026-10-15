@@ -1,3 +1,4 @@
+import { SECTION_GROUPS } from "../ui/Settings";
 import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { cursorName, renderApp, seedBackend } from "./helpers";
@@ -42,6 +43,25 @@ describe("설정 화면 열기와 닫기", () => {
     expect(tabs).toEqual(["모양", "목록과 선택", "표시 형식", "미리보기", "확인", "폴더 단축키", "F키", "환경", "SMB 서버"]);
     expect(screen.getByRole("tab", { name: "모양" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("switch", { name: "액션바 표시" })).toBeInTheDocument();
+  });
+
+  it("탭은 세로 사이드바에 그룹별로 묶여 있고 그룹 제목이 보인다", async () => {
+    const { user } = await renderApp();
+    await open(user);
+    await dialog();
+    const list = screen.getByRole("tablist", { name: "설정 섹션" });
+    expect(list).toHaveAttribute("aria-orientation", "vertical");
+    const groups = within(list).getAllByRole("group").map((g) => [g.getAttribute("aria-label"), within(g).getAllByRole("tab").map((t) => t.textContent)]);
+    expect(groups).toEqual([
+      ["화면", ["모양", "목록과 선택", "표시 형식", "미리보기"]],
+      ["동작", ["확인", "폴더 단축키", "F키"]],
+      ["시스템", ["환경"]],
+      ["연결", ["SMB 서버"]],
+    ]);
+    // 그룹을 건너도 탭 번호(settingsSection)는 SECTIONS 순서 그대로라 다른 그룹의 탭도 열린다.
+    await user.click(screen.getByRole("tab", { name: "SMB 서버" }));
+    expect(screen.getByRole("tab", { name: "SMB 서버" })).toHaveAttribute("aria-selected", "true");
+    expect(SECTION_GROUPS.reduce((n, g) => n + g.count, 0)).toBe(9);
   });
 });
 

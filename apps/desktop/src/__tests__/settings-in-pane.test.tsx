@@ -58,12 +58,12 @@ describe("설정은 활성 패널 자리에 뜬다", () => {
     expect(within(pane("right")).getByRole("tab").className).toContain("flex-1");
   });
 
-  it("섹션은 위쪽 가로 탭 줄이고 눌러서 바꿀 수 있다", async () => {
+  it("섹션은 왼쪽 세로 탭 줄이고 눌러서 바꿀 수 있다", async () => {
     const { user } = await renderApp();
     await open(user);
     const dlg = await screen.findByRole("dialog", { name: "설정" });
     const strip = within(dlg).getByRole("tablist", { name: "설정 섹션" });
-    expect(strip).toHaveAttribute("aria-orientation", "horizontal");
+    expect(strip).toHaveAttribute("aria-orientation", "vertical");
     await user.click(within(strip).getByRole("tab", { name: "목록과 선택" }));
     expect(within(dlg).getByRole("tabpanel", { name: "목록과 선택" })).toBeInTheDocument();
   });

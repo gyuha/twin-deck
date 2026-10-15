@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactElement } from "react";
 import { HexColorPicker } from "react-colorful";
 import { Button, Input, Select, SelectOption } from "@spacedrive/primitives";
 import { defaultBindingsFor } from "@twin-deck/actions";
@@ -8,7 +8,7 @@ import type { SmbServer } from "@twin-deck/ts-client";
 import { APP_ACTIONS, APP_LAUNCH_ACTION, APP_OPEN_FOLDER_ACTION } from "../lib/fkeys";
 import { THEMES } from "../lib/themes.generated";
 import { parseThemeList } from "../lib/themeColors";
-import { actionTitle, currentLanguage, LOCALES, t as translate } from "../i18n";
+import { actionTitle, currentLanguage, LOCALES, t as translate, type Key } from "../i18n";
 import { useApp, useAppStore, useT } from "../state/context";
 import { Combobox } from "./Combobox";
 import type { ComboOption } from "./Combobox";
@@ -197,6 +197,17 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
     ],
   },
   smbSection,
+];
+
+/**
+ * 설정 탭을 묶는 그룹. `count`는 SECTIONS 앞에서부터 이어서 센 개수라 순서는 SECTIONS 그대로 두고(탭 번호 `settingsSection`이 그대로다) 제목만 끼운다.
+ * 합이 SECTIONS.length와 같아야 한다(어긋나면 테스트가 잡는다). 새 탭은 어울리는 그룹의 `count`를 올리고 SECTIONS에 같은 자리로 넣는다.
+ */
+export const SECTION_GROUPS: { titleKey: Key; count: number }[] = [
+  { titleKey: "settings.group.view", count: 4 },
+  { titleKey: "settings.group.behavior", count: 3 },
+  { titleKey: "settings.group.system", count: 1 },
+  { titleKey: "settings.group.connection", count: 1 },
 ];
 
 /** SMB 서버 탭의 순번. `api.openSettings(SMB_SECTION)`으로 이 탭을 바로 연다. */
@@ -648,23 +659,40 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
               : error}
           </div>
         )}
-        <div className="flex min-h-0 flex-1 flex-col">
-          <nav role="tablist" aria-label={t("settings.sections")} aria-orientation="horizontal" className="td-thin-scroll flex shrink-0 gap-1 overflow-x-auto border-b border-app-line bg-sidebar p-2">
-            {SECTIONS.map((s, i) => (
-              <button
-                key={s.title}
-                type="button"
-                role="tab"
-                aria-selected={i === section}
-                onClick={() => api.setSettingsSection(i)}
-                className={
-                  "shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 text-sm " +
-                  (i === section ? "bg-sidebar-selected text-sidebar-ink" : "text-sidebar-ink-dull hover:bg-sidebar-button")
-                }
-              >
-                {s.title}
-              </button>
-            ))}
+        <div className="flex min-h-0 flex-1">
+          <nav role="tablist" aria-label={t("settings.sections")} aria-orientation="vertical" className="td-thin-scroll flex w-44 shrink-0 flex-col gap-3 overflow-y-auto border-r border-app-line bg-sidebar p-2">
+            {SECTION_GROUPS.reduce<{ start: number; nodes: ReactElement[] }>(
+              (acc, g) => {
+                const range = SECTIONS.slice(acc.start, acc.start + g.count);
+                acc.nodes.push(
+                  <div key={g.titleKey} role="group" aria-label={t(g.titleKey)} className={"flex flex-col gap-0.5 " + (acc.start > 0 ? "border-t border-app-line pt-3" : "")}>
+                    {/* 그룹 제목은 탭보다 작고 흐리게, 탭은 안쪽으로 들여 한눈에 구분한다. */}
+                    <div className="px-2 pb-1 text-[11px] font-bold uppercase tracking-wider text-ink-faint">{t(g.titleKey)}</div>
+                    {range.map((s, j) => {
+                      const i = acc.start + j;
+                      return (
+                        <button
+                          key={s.title}
+                          type="button"
+                          role="tab"
+                          aria-selected={i === section}
+                          onClick={() => api.setSettingsSection(i)}
+                          className={
+                            "ml-2 truncate rounded-md px-3 py-1.5 text-left text-sm " +
+                            (i === section ? "bg-sidebar-selected text-sidebar-ink" : "text-sidebar-ink-dull hover:bg-sidebar-button")
+                          }
+                        >
+                          {s.title}
+                        </button>
+                      );
+                    })}
+                  </div>,
+                );
+                acc.start += g.count;
+                return acc;
+              },
+              { start: 0, nodes: [] },
+            ).nodes}
           </nav>
           <section role="tabpanel" aria-label={current.title} className="min-w-0 flex-1 overflow-auto px-6 py-3">
             <h3 className="text-sm font-semibold">{current.title}</h3>
