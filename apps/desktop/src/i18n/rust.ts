@@ -203,10 +203,34 @@ export const RUST_MESSAGES: readonly (readonly [ko: string, en: string])[] = [
   ["앱 실행 파일 위치를 알 수 없습니다: {e}", "The app executable location is unknown: {e}"],
   ["사용법: td [폴더 [폴더]]  (첫 폴더는 왼쪽 패널, 둘째는 오른쪽 패널에 새 탭으로 엽니다)", "Usage: td [folder [folder]]  (the first folder opens in the left pane, the second in the right pane, each as a new tab)"],
   ["경로를 확인할 수 없음 {path}: {source}", "Cannot check the path {path}: {source}"],
+  // 원격 접속(ADR-0018)
+  ["원격 경로에서는 아직 지원하지 않음", "Not supported on remote paths yet"],
+  ["등록되지 않은 원격 호스트: {alias} (설정 [remote.hosts.{alias}])", "Unknown remote host: {alias} (settings [remote.hosts.{alias}])"],
+  ["remote: [remote.hosts.<별칭>] 형식이어야 합니다", "remote: must be in the form [remote.hosts.<alias>]"],
+  ["remote.hosts.{alias}: address와 token이 필요하고 별칭에 '/'를 쓸 수 없습니다", "remote.hosts.{alias}: address and token are required, and the alias cannot contain '/'"],
+  ["원격 호스트에 연결할 수 없음: {0}", "Cannot connect to the remote host: {0}"],
+  ["원격 호스트가 토큰을 거부했다", "The remote host rejected the token"],
+  ["Twin Deck 원격 프로토콜 버전이 다름 (원격 {server}, 이쪽 {client})", "Twin Deck remote protocol version differs (remote {server}, local {client})"],
+  ["원격 호스트의 응답을 이해할 수 없음: {0}", "Cannot understand the remote host's response: {0}"],
+  ["주소를 찾을 수 없음: {addr}", "Address not found: {addr}"],
+  ["원격 연결이 끊겼다", "The remote connection was closed"],
+  ["원격 응답 형식 오류: {e}", "Malformed remote response: {e}"],
+  ["원격 연결 오류: {e}", "Remote connection error: {e}"],
+  ["원격 응답이 예상과 다름: {reply:?}", "Unexpected remote response: {reply:?}"],
 ];
 
 /** 사용자에게 그대로 보이지 않는 한국어 리터럴: 개발자용 진단·테스트 확인 문구, 더 큰 문구를 이루는 조각. 한국어로 둔다. */
 export const RUST_INTERNAL: readonly string[] = [
+  // 원격 데몬(`--serve`)의 터미널 출력과 내부 진단(ADR-0018)
+  "--listen 뒤에 주소(예: 100.64.1.2:6868)가 필요하다",
+  "--listen 주소를 해석할 수 없음: {listen} (예: 100.64.1.2:6868)",
+  "twin-deck: {} 에서 열 수 없음: {e}",
+  "경고: {}는 이 컴퓨터 밖에서 접속할 수 있는 주소입니다. 연결은 암호화되지 않으니 Tailscale·SSH 터널 같은 믿을 수 있는 네트워크에서만 쓰세요.",
+  "Twin Deck 원격 데몬: ws://{}/",
+  "토큰: {token}",
+  "직렬화",
+  "열린 소켓의 주소",
+  "OS 난수를 읽을 수 없다",
   "td: 앱 실행 파일 위치를 알 수 없습니다: {e}",
   "경로는 최대 2개입니다: {}개",
   "지원하지 않는 옵션: {opt}",

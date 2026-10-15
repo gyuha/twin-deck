@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { joinPath } from "@twin-deck/ts-client";
+import { joinPath, remoteRoot } from "@twin-deck/ts-client";
 import { formatSpace } from "../lib/format";
 import { useApp, useAppStore, useT } from "../state/context";
 import type { PaneId } from "../state/store";
@@ -30,11 +30,12 @@ export function Breadcrumb({ pane, path }: { pane: PaneId; path: string }) {
     setEditing(false);
     if (go && value.trim() !== "" && value.trim() !== path) void api.goToPath(value);
   };
-  // Windows 드라이브(`C:\`, `C:/`)는 그 자체가 루트이고, 그 밖에는 `/`가 루트다.
-  const drive = /^[A-Za-z]:[\\/]?/.exec(path)?.[0];
-  const root = drive ? (/[\\/]$/.test(drive) ? drive : drive + "\\") : "/";
+  // 원격 경로는 `td://별칭`, Windows 드라이브(`C:\`, `C:/`)는 그 자체가 루트이고, 그 밖에는 `/`가 루트다.
+  const remote = remoteRoot(path);
+  const drive = remote ? undefined : /^[A-Za-z]:[\\/]?/.exec(path)?.[0];
+  const root = remote ?? (drive ? (/[\\/]$/.test(drive) ? drive : drive + "\\") : "/");
   const segments = [{ label: root, path: root }];
-  for (const part of path.slice(drive?.length ?? 0).split(/[\\/]/).filter(Boolean)) {
+  for (const part of path.slice(remote?.length ?? drive?.length ?? 0).split(/[\\/]/).filter(Boolean)) {
     segments.push({ label: part, path: joinPath(segments[segments.length - 1].path, part) });
   }
   const go = (target: string) => {

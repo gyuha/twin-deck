@@ -233,8 +233,15 @@ export function joinPath(dir: string, name: string): string {
   return dir + sep + name;
 }
 
+/** 원격 경로(`td://별칭/…`, ADR-0018)의 루트 `td://별칭`. 원격 경로가 아니면 null. */
+export function remoteRoot(path: string): string | null {
+  return /^td:\/\/[^/\\]+/.exec(path)?.[0] ?? null;
+}
+
 export function parentPath(path: string): string | null {
   if (isDriveRoot(path)) return null;
+  const remote = remoteRoot(path);
+  if (remote && trimTrailingSep(path) === remote) return null;
   const i = lastSep(path);
   if (i < 0) return null;
   if (i === 0) return path.length > 1 ? "/" : null;

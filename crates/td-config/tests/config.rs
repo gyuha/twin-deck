@@ -1291,3 +1291,57 @@ fn single_instance_defaults_on_and_can_be_turned_off() {
     assert!(l.warnings.is_empty(), "{:?}", l.warnings);
     assert!(!l.config.environment.single_instance);
 }
+
+#[test]
+fn 원격_호스트_별칭을_읽고_잘못된_항목은_경고한다() {
+    let src = r#"
+[remote.hosts.office]
+address = "100.64.1.2:6868"
+token = "abc"
+
+[remote.hosts.bad]
+address = "100.64.1.3:6868"
+"#;
+    let loaded = load_from_strs(Some(src), None, Platform::Mac);
+    let office = loaded.remote_hosts.get("office").expect("office 별칭");
+    assert_eq!(office.address, "100.64.1.2:6868");
+    assert_eq!(office.token, "abc");
+    assert!(!loaded.remote_hosts.contains_key("bad"));
+    assert!(
+        loaded
+            .warnings
+            .iter()
+            .any(|w| w.message.contains("remote.hosts.bad")),
+        "{:?}",
+        loaded.warnings
+    );
+    // 알 수 없는 키 경고가 나오면 안 된다.
+    assert!(!loaded
+        .warnings
+        .iter()
+        .any(|w| w.message.contains("알 수 없는 키")));
+}
+
+#[test]
+fn 원격_토큰은_화면으로_보내는_설정에_들어가지_않는다() {
+    let src = "[remote.hosts.office]\naddress = \"h:1\"\ntoken = \"secret-token\"\n";
+    let loaded = load_from_strs(Some(src), None, Platform::Mac);
+    let json = serde_json::to_string(&loaded).unwrap();
+    assert!(!json.contains("secret-token"), "{json}");
+}
+
+#[test]
+fn 설정에_문법_오류가_생겨도_원격_호스트는_이전_값을_유지한다() {
+    let dir = tempfile::tempdir().unwrap();
+    let good = "[remote.hosts.office]\naddress = \"h:1\"\ntoken = \"t\"\n";
+    fs::write(dir.path().join("config.toml"), good).unwrap();
+    let (store, _rx) = ConfigStore::start(dir.path(), Platform::Mac).unwrap();
+    assert!(store.current().remote_hosts.contains_key("office"));
+    fs::write(dir.path().join("config.toml"), format!("{good}\n[[[깨짐")).unwrap();
+    let l = store.refresh();
+    assert!(
+        l.remote_hosts.contains_key("office"),
+        "{:?}",
+        l.remote_hosts
+    );
+}

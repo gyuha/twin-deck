@@ -1163,6 +1163,25 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
         self.fs.set_extra_zip_exts(exts);
     }
 
+    /// 설정 `[remote.hosts.<별칭>]`을 반영한다(ADR-0018). 기존 원격 연결은 닫고 다음 사용 때 다시 연결한다.
+    pub fn set_remote_hosts(
+        &self,
+        hosts: &std::collections::BTreeMap<String, td_config::RemoteHost>,
+    ) {
+        self.fs.set_remote_hosts(
+            hosts
+                .iter()
+                .map(|(alias, h)| {
+                    let host = td_remote::HostConfig {
+                        address: h.address.clone(),
+                        token: h.token.clone(),
+                    };
+                    (alias.clone(), host)
+                })
+                .collect(),
+        );
+    }
+
     /// 확장자와 무관하게 파일을 아카이브로 연다 (ARC-04). 아카이브 루트 경로(`파일!`)를 돌려준다.
     pub fn open_as_archive(&self, path: &str) -> ServiceResult<String> {
         self.fs
@@ -1479,6 +1498,10 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
     }
 
     pub fn watch(&self, path: &str) -> ServiceResult<()> {
+        // 원격 경로는 감시하지 않는다(자동 새로 고침은 PoC 범위 밖, ADR-0018).
+        if td_remote::split_remote_path(path).is_some() {
+            return Ok(());
+        }
         self.watcher
             .lock()
             .unwrap()
@@ -1487,6 +1510,9 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
     }
 
     pub fn unwatch(&self, path: &str) -> ServiceResult<()> {
+        if td_remote::split_remote_path(path).is_some() {
+            return Ok(());
+        }
         self.watcher
             .lock()
             .unwrap()
@@ -1847,6 +1873,62 @@ mod tests {
         assert_eq!(listed[0].name, "word");
         svc.set_archive_extensions(vec![]);
         assert!(svc.list_dir(&format!("{docx}!"), false).is_err());
+    }
+
+    /// 원격 데몬을 별칭으로 등록하면 `td://별칭/…`을 목록으로 보고 큐로 로컬에 복사할 수 있다(ADR-0018).
+    #[test]
+    fn remote_folder_lists_and_copies_to_local() {
+        let (_t, svc, _ch, root) = setup();
+        let remote = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(remote.path().join("문서/하위")).unwrap();
+        std::fs::write(remote.path().join("문서/a.txt"), "a").unwrap();
+        std::fs::write(remote.path().join("문서/하위/b.txt"), "bb").unwrap();
+        let server = td_remote::Server::bind(
+            "127.0.0.1:0",
+            "t".into(),
+            std::sync::Arc::new(td_vfs::LocalFs),
+        )
+        .unwrap();
+        let addr = server.local_addr().to_string();
+        server.spawn();
+        let mut hosts = std::collections::BTreeMap::new();
+        hosts.insert(
+            "office".to_string(),
+            td_config::RemoteHost {
+                address: addr,
+                token: "t".into(),
+            },
+        );
+        svc.set_remote_hosts(&hosts);
+
+        let src = format!("td://office{}", remote.path().join("문서").display());
+        let names: Vec<String> = svc
+            .list_dir(&src, false)
+            .unwrap()
+            .into_iter()
+            .map(|e| e.name)
+            .collect();
+        assert_eq!(names.len(), 2);
+        // 원격 경로는 폴더 감시 대상이 아니다(오류 없이 넘어간다).
+        assert!(svc.watch(&src).is_ok());
+        assert!(svc.unwatch(&src).is_ok());
+
+        let dest = format!("{root}/dest");
+        svc.mkdir(&dest).unwrap();
+        let id = svc.enqueue(
+            JobKindDto::Copy,
+            vec![item(&src, Some(&dest), ConflictDto::Skip)],
+        );
+        let job = wait_finished(&svc, id);
+        assert_eq!(job.status, JobStatusDto::Done, "{job:?}");
+        assert_eq!(
+            std::fs::read_to_string(format!("{dest}/문서/하위/b.txt")).unwrap(),
+            "bb"
+        );
+        assert_eq!(
+            std::fs::read_to_string(format!("{dest}/문서/a.txt")).unwrap(),
+            "a"
+        );
     }
 
     #[test]

@@ -18,7 +18,7 @@ pub use config::{
     SelectionConfig, TableView, ViewConfig, ZipConfig,
 };
 pub use keybindings::BindingSpec;
-pub use load::{load_dir, load_from_strs, Loaded, Platform, Warning};
+pub use load::{load_dir, load_from_strs, Loaded, Platform, RemoteHost, Warning};
 pub use location::{
     change_config_location, has_config_files, read_config_location, resolve_config_dir,
     LocationConflict, ResolvedDir, CONFIG_FILES, LOCATION_FILE,

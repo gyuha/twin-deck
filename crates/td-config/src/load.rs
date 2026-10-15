@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
@@ -62,6 +63,55 @@ pub struct Loaded {
     pub config: Config,
     pub bindings: Vec<BindingSpec>,
     pub warnings: Vec<Warning>,
+    /// 원격 호스트 별칭(`[remote.hosts.<별칭>]`, ADR-0018). 토큰이 화면으로 가지 않게 직렬화하지 않는다.
+    #[serde(skip)]
+    pub remote_hosts: BTreeMap<String, RemoteHost>,
+}
+
+/// `td://별칭/경로`가 가리키는 원격 데몬의 주소와 토큰.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RemoteHost {
+    pub address: String,
+    pub token: String,
+}
+
+/// 사용자 설정의 `remote` 테이블에서 별칭을 읽는다. 기본값에 없는 키라 병합 전에 따로 꺼낸다.
+fn parse_remote(value: Option<Value>, warnings: &mut Vec<Warning>) -> BTreeMap<String, RemoteHost> {
+    let mut out = BTreeMap::new();
+    let Some(value) = value else {
+        return out;
+    };
+    let hosts = value
+        .as_table()
+        .and_then(|t| t.get("hosts"))
+        .and_then(Value::as_table);
+    let Some(hosts) = hosts else {
+        warnings.push(Warning::new(
+            "config.toml",
+            "remote: [remote.hosts.<별칭>] 형식이어야 합니다",
+        ));
+        return out;
+    };
+    for (alias, host) in hosts {
+        let text = |k: &str| {
+            host.get(k)
+                .and_then(Value::as_str)
+                .filter(|s| !s.is_empty())
+                .map(str::to_string)
+        };
+        match (text("address"), text("token")) {
+            (Some(address), Some(token)) if !alias.contains('/') => {
+                out.insert(alias.clone(), RemoteHost { address, token });
+            }
+            _ => warnings.push(Warning::new(
+                "config.toml",
+                format!(
+                    "remote.hosts.{alias}: address와 token이 필요하고 별칭에 '/'를 쓸 수 없습니다"
+                ),
+            )),
+        }
+    }
+    out
 }
 
 fn defaults_table() -> Table {
@@ -287,9 +337,13 @@ pub fn load_from_strs(
     let defaults = defaults_table();
 
     let mut merged = defaults.clone();
+    let mut remote_hosts = BTreeMap::new();
     if let Some(src) = config {
         match src.parse::<Table>() {
-            Ok(user) => merged = merge_user(&defaults, &user, "", "config.toml", &mut warnings),
+            Ok(mut user) => {
+                remote_hosts = parse_remote(user.remove("remote"), &mut warnings);
+                merged = merge_user(&defaults, &user, "", "config.toml", &mut warnings)
+            }
             Err(e) => warnings.push(syntax_warning("config.toml", src, &e)),
         }
     }
@@ -332,6 +386,7 @@ pub fn load_from_strs(
         config,
         bindings,
         warnings,
+        remote_hosts,
     }
 }
 

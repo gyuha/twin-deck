@@ -46,7 +46,7 @@ twin-deck은 키보드 중심으로 조작하는 듀얼 패널 파일 탐색기�
 - Spacedrive의 VDFS 기능 전반: 라이브러리, 태그, 동기화, P2P, 클라우드 스토리지, 벡터 검색, AI
 - 모바일 앱
 - Marta의 Marco 설정 형식과의 호환 ([ADR-0006](adr/0006-toml-config.md))
-- 원격 파일시스템(SFTP, SMB 등). Marta에서 지원하는지 확인하지 못했다 `[알 수 없음]`
+- SFTP·SMB 같은 원격 파일시스템 프로토콜. Marta에서 지원하는지 확인하지 못했다 `[알 수 없음]`. 다른 PC의 Twin Deck에 붙는 원격 접속은 PoC로 확인 중이다([ADR-0018](adr/0018-remote-daemon.md))
 - Marta의 소스, 에셋, 테마, 문서 문장 복제
 
 ## 5. 확정된 결정 요약

@@ -75,6 +75,7 @@ impl ConfigStore {
                     // 이전 유효 설정을 유지하고 경고만 새로 반영한다.
                     fresh.config = guard.config.clone();
                     fresh.bindings = guard.bindings.clone();
+                    fresh.remote_hosts = guard.remote_hosts.clone();
                 }
                 *guard = fresh.clone();
                 drop(guard);
@@ -110,6 +111,7 @@ impl ConfigStore {
         if has_syntax_error(&fresh) {
             fresh.config = guard.config.clone();
             fresh.bindings = guard.bindings.clone();
+            fresh.remote_hosts = guard.remote_hosts.clone();
         }
         *guard = fresh.clone();
         fresh

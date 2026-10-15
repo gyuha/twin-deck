@@ -1,0 +1,17 @@
+[package]
+name = "td-remote"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+td-vfs = { path = "../td-vfs" }
+thiserror.workspace = true
+serde.workspace = true
+serde_json = "1"
+tungstenite = "0.30"
+getrandom = "0.2"
+
+[dev-dependencies]
+tempfile.workspace = true

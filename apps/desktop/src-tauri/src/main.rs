@@ -23,10 +23,11 @@ use std::path::Path;
 use std::time::Duration;
 use tauri::Manager;
 
-/// 설정 중 서비스가 들고 있는 값(ZIP 추가 확장자 ARC-01, 미리보기 한도)을 서비스에 반영한다.
+/// 설정 중 서비스가 들고 있는 값(ZIP 추가 확장자 ARC-01, 미리보기 한도, 원격 호스트)을 서비스에 반영한다.
 pub fn apply_config(svc: &AppService, loaded: &td_config::Loaded) {
     svc.set_archive_extensions(loaded.config.file_systems.zip.additional_extensions.clone());
     svc.set_preview_limits(&loaded.config.preview);
+    svc.set_remote_hosts(&loaded.remote_hosts);
 }
 
 /// 터미널에서 `td`로 불린 요청을 해석해 화면에 알리고 창을 앞으로 가져온다(이미 떠 있던 앱이 받는다).
@@ -72,10 +73,48 @@ fn single_instance_in(dir: Option<&Path>) -> bool {
     .unwrap_or(true)
 }
 
+/// 원격 데몬을 띄우고 접속을 받는다. 토큰은 `TD_REMOTE_TOKEN`이 있으면 그 값, 없으면 새로 만든다.
+fn run_remote_daemon(parsed: Result<td_remote::cli::ServeArgs, String>) -> i32 {
+    let args = match parsed {
+        Ok(a) => a,
+        Err(msg) => {
+            eprintln!("twin-deck: {msg}");
+            return 2;
+        }
+    };
+    let token = std::env::var("TD_REMOTE_TOKEN")
+        .ok()
+        .filter(|t| !t.is_empty())
+        .unwrap_or_else(td_remote::new_token);
+    let fs = std::sync::Arc::new(td_archive::CompositeFs::default());
+    let server = match td_remote::Server::bind(&args.listen.to_string(), token.clone(), fs) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("twin-deck: {} 에서 열 수 없음: {e}", args.listen);
+            return 1;
+        }
+    };
+    if args.external() {
+        eprintln!(
+            "경고: {}는 이 컴퓨터 밖에서 접속할 수 있는 주소입니다. 연결은 암호화되지 않으니 Tailscale·SSH 터널 같은 믿을 수 있는 네트워크에서만 쓰세요.",
+            args.listen
+        );
+    }
+    println!("Twin Deck 원격 데몬: ws://{}/", server.local_addr());
+    println!("토큰: {token}");
+    server.run();
+    0
+}
+
 fn main() {
     // 설치 파일이 `--td-install-cli`/`--td-uninstall-cli`로 앱을 한 번 실행하면 화면 없이 `td` 명령만 설치·제거하고 끝난다.
     if let Some(flag) = cli::manage_flag(&std::env::args().skip(1).collect::<Vec<_>>()) {
         std::process::exit(cli::run_manage(flag));
+    }
+    // `--serve`면 창 없이 원격 데몬으로 뜬다(ADR-0018). `td --serve`가 터미널에서 떨어져 나가지 않게 먼저 본다.
+    if let Some(parsed) = td_remote::cli::serve_args(&std::env::args().skip(1).collect::<Vec<_>>())
+    {
+        std::process::exit(run_remote_daemon(parsed));
     }
     // `td`라는 이름으로 불렸으면 인수를 검사하고 터미널에서 떨어져 나온다(앱 시작보다 먼저).
     #[cfg(unix)]
