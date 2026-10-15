@@ -287,6 +287,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "atoi_simd"
+version = "0.18.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3cdb3708a128e559a30fb830e8a77a5022ee6902806925c216658652b452a44"
+dependencies = [
+ "debug_unsafe",
+ "rustversion",
+]
+
+[[package]]
 name = "atomic-waker"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -852,6 +862,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "core_detect"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f8f80099a98041a3d1622845c271458a2d73e688351bf3cb999266764b81d48"
+
+[[package]]
 name = "cpubits"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1103,6 +1119,12 @@ dependencies = [
  "libdbus-sys",
  "windows-sys 0.61.2",
 ]
+
+[[package]]
+name = "debug_unsafe"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7eed2c4702fa172d1ce21078faa7c5203e69f5394d48cc436d25928394a867a2"
 
 [[package]]
 name = "deflate64"
@@ -1480,6 +1502,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ef6b89e5b37196644d8796de5268852ff179b44e96276cf4290264843743bb7"
 
 [[package]]
+name = "encoding_rs"
+version = "0.8.42"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e985e0451871ad22fb8d2b6b076e2028a502a0d3950998c2c5c0a4f9b5d9679"
+dependencies = [
+ "cfg-if",
+ "core_detect",
+ "multiversion_no_op",
+ "rustversion",
+ "scopeguard",
+ "simdutf8",
+]
+
+[[package]]
 name = "endi"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1570,6 +1606,12 @@ dependencies = [
  "event-listener",
  "pin-project-lite",
 ]
+
+[[package]]
+name = "fast-float2"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6e8948ce679d00a02a94739ea185595dca7118ed04feb991127e443bd3d761f"
 
 [[package]]
 name = "fastrand"
@@ -3179,6 +3221,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "multiversion_no_op"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "743fb55ba31b18fb1ecef6bdc9aa2743314978ac084044301a7eee33fb99a20d"
+
+[[package]]
 name = "ndk"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3552,6 +3600,24 @@ dependencies = [
  "objc2-app-kit",
  "objc2-core-foundation",
  "objc2-foundation",
+]
+
+[[package]]
+name = "office_oxide"
+version = "0.1.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7993e747e60a6b06c8c0b7060f0bd7f7e8e03921f18a4b42b23738ff276a4715"
+dependencies = [
+ "atoi_simd",
+ "encoding_rs",
+ "fast-float2",
+ "flate2",
+ "log",
+ "quick-xml 0.42.0",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "zip 9.0.3",
 ]
 
 [[package]]
@@ -4152,6 +4218,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "41b1177fdf999d2321d3fb46ff47159d9c1fb9ad66a4879f8c50a0b504615e9b"
 dependencies = [
  "memchr",
+ "serde",
 ]
 
 [[package]]
@@ -6520,6 +6587,7 @@ dependencies = [
  "objc2",
  "objc2-app-kit",
  "objc2-foundation",
+ "office_oxide",
  "roxmltree",
  "serde",
  "serde_json",
@@ -8078,6 +8146,21 @@ dependencies = [
  "zeroize",
  "zopfli",
  "zstd",
+]
+
+[[package]]
+name = "zip"
+version = "9.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c2d98561b612a84ae525331a7a094429ef8a5772514ed507ff6db5f54badc971"
+dependencies = [
+ "crc32fast",
+ "flate2",
+ "indexmap 2.14.2",
+ "memchr",
+ "nix 0.31.3",
+ "typed-path",
+ "zopfli",
 ]
 
 [[package]]

@@ -16,8 +16,8 @@ import { VideoView } from "./VideoView";
 import { PdfView } from "./PdfView";
 import { ModelView } from "./ModelView";
 import { modelKindOf } from "../lib/model/kinds";
-import { OfficeView } from "./OfficeView";
-import { officeKindOf, quickLookKindOf, usesPreviewHandler } from "../lib/office/kinds";
+import { OfficeMarkdownView, isOfficeFile } from "./OfficeMarkdownView";
+import { quickLookKindOf, usesPreviewHandler } from "../lib/office/kinds";
 import { PreviewHandlerView } from "./PreviewHandlerView";
 import type { HandlerUnavailable } from "./PreviewHandlerView";
 import { EpubView } from "./EpubView";
@@ -112,20 +112,18 @@ export function Preview() {
   // 항목을 넘기는 동안 `data`는 이전 파일의 것이다. 크기·내용으로 파일을 읽는 뷰어(3D·Office)는 새 항목의 데이터가 온 뒤에만 띄운다.
   const fresh = p.status === "ready";
   const model = p.isDir || isArchivePath(p.path) ? null : modelKindOf(p.name); // 3D 모델이면 서비스가 돌려준 kind와 무관하게 3D 뷰어로 보여 준다(압축 파일 안은 asset 프로토콜로 읽을 수 없어 제외)
-  // macOS는 Office 문서를 설정과 관계없이 Quick Look 미리보기로 보여 준다(ADR-0014). 압축 안은 실제 파일이 아니라 제외한다.
-  const ql = platform === "mac" && !p.isDir && !model && !isArchivePath(p.path) ? quickLookKindOf(p.name) : null;
+  // Office 문서는 디스크 위 파일만 Rust가 office_oxide로 읽은 글자·표(Markdown)로 보여 준다. 압축 안은 "미리 볼 수 없는 형식"이다.
+  const office = !p.isDir && !model && !isArchivePath(p.path) && isOfficeFile(p.name);
+  // (이전 방식: 아래 Quick Look·처리기 분기는 office가 늘 먼저 가져가므로 쓰이지 않는다. 다음 작업에서 지운다.)
+  const ql = !office && platform === "mac" && !p.isDir && !model && !isArchivePath(p.path) ? quickLookKindOf(p.name) : null;
   // Windows는 docx를 미리보기 처리기(탐색기 미리보기 창이 쓰는 것)로 앱 창 위에 겹쳐 보여 준다(ADR-0015). 다른 형식은 지금까지의 방식이다. 설정과 관계없고,
   // 처리기를 쓸 수 없으면(없거나 못 그림) 아래의 지금까지의 미리보기로 돌아간다.
-  const hKind = platform === "windows" && !p.isDir && !model && !isArchivePath(p.path) && handlerFailed?.path !== p.path && usesPreviewHandler(p.name) ? quickLookKindOf(p.name) : null;
+  const hKind = !office && platform === "windows" && !p.isDir && !model && !isArchivePath(p.path) && handlerFailed?.path !== p.path && usesPreviewHandler(p.name) ? quickLookKindOf(p.name) : null;
   const native = ql !== null || hKind !== null;
   // epub은 디스크 위 파일만 앱이 읽어 보여 준다(압축 안은 읽지 않고 "미리 볼 수 없는 형식"). 3D·Office·네이티브 미리보기와 겹치지 않는다.
   const epub = !p.isDir && !model && !native && !isArchivePath(p.path) && /\.epub$/i.test(p.name);
   // HWP·HWPX도 디스크 위 파일만 앱이 쪽 단위로 그려 보여 준다(압축 안은 "미리 볼 수 없는 형식").
   const hwp = !p.isDir && !model && !native && !isArchivePath(p.path) && /\.hwpx?$/i.test(p.name);
-  const officeKind = p.isDir || model || native ? null : officeKindOf(p.name);
-  // Office 문서도 같은 방식으로 kind와 무관하게 보여 준다. 설정 `preview.office`가 꺼져 있으면(기본) 미리 볼 수 없는 형식으로 둔다.
-  const office = previewConfig.office ? officeKind : null;
-  const officeOff = !previewConfig.office && officeKind !== null;
   // 텍스트 본문. 3D 뷰어가 모델을 읽지 못하면 텍스트 형식은 이것으로 돌아간다.
   // 텍스트 계열(텍스트·코드·마크다운·JSON)이 3D·Office 뷰어 없이 그려질 때만 복사 버튼을 보인다.
   const showCopy = fresh && d?.kind === "text" && !model && !office && !native;
@@ -241,7 +239,7 @@ export function Preview() {
             </p>
           )}
           {d && model && fresh && <ModelView path={p.path} name={p.name} size={d.size} fallback={d.kind === "text" ? textBody : undefined} />}
-          {d && office && fresh && <OfficeView path={p.path} kind={office} fileSize={d.size} sizeText={size(d.size)} />}
+          {office && <OfficeMarkdownView key={p.path} path={p.path} />}
           {epub && <EpubView key={p.path} path={p.path} name={p.name} />}
           {hwp && d && fresh && <HwpView path={p.path} fileSize={d.size} sizeText={size(d.size)} />}
           {ql && <QuickLookView key={p.path} path={p.path} name={p.name} fit={ql === "document"} />}
@@ -295,7 +293,7 @@ export function Preview() {
             ))}
           {(d?.kind === "directory" || (d?.kind === "other" && !model && !office && !native && !epub && !hwp)) && (
             <p className="text-ink-faint">
-              {kindLabel(d.kind)} — {officeOff ? t("preview.office_off") : t("preview.unsupported")}
+              {kindLabel(d.kind)} — {t("preview.unsupported")}
               {d.kind === "other" ? ` (${size(d.size)})` : ""}
             </p>
           )}

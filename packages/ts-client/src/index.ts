@@ -44,6 +44,7 @@ export type {
   TextSpecDto,
   DiskSpaceDto,
   UpdateInfoDto,
+  OfficePreviewDto,
   QuickLookDto,
   EpubInfoDto,
   EpubChapterDto,

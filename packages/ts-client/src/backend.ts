@@ -1,4 +1,4 @@
-import type { CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigLocationDto, ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, EpubInfoDto, ExpectedFileDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, NormalizeResultDto, LoadedState, LocationConflict, PreviewDto, RemoteErrorKindDto, RemoteServer, SmbErrorKindDto, SmbServer, PreviewRectDto, QueueItemDto, QuickLookDto, SearchStartDto, ShowOutcome, SearchSummaryDto, Snapshot, UpdateInfoDto, UserDirsDto, VolumeDto, WriteTextResultDto } from "./generated/bindings";
+import type { CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigLocationDto, ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, EpubInfoDto, ExpectedFileDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, NormalizeResultDto, LoadedState, LocationConflict, PreviewDto, RemoteErrorKindDto, RemoteServer, SmbErrorKindDto, SmbServer, PreviewRectDto, QueueItemDto, OfficePreviewDto, QuickLookDto, SearchStartDto, ShowOutcome, SearchSummaryDto, Snapshot, UpdateInfoDto, UserDirsDto, VolumeDto, WriteTextResultDto } from "./generated/bindings";
 
 /** Look Up / Flatten / Disk Usage가 스트리밍으로 보내는 이벤트. 작업마다 마지막은 `done`이다. */
 export type SearchEvent =
@@ -96,6 +96,8 @@ export interface Backend {
   newWindow(): Promise<string>;
   /** 미리보기: 텍스트 앞부분, 이미지 data URL, 종류 판별. */
   preview(path: string): Promise<PreviewDto>;
+  /** Office 문서(docx·xlsx·pptx·doc·xls·ppt 등)를 읽어 뽑은 Markdown. 문서 모습이 아니라 글자와 표다. 압축 안 경로는 오류다. */
+  officePreview(path: string): Promise<OfficePreviewDto>;
   /**
    * macOS Quick Look이 만든 Office 문서의 HTML 미리보기(ADR-0014). `seq`는 요청 순번(클수록 최근)이다.
    * 더 큰 순번의 요청이 오면 이전 요청은 취소 오류로 끝나고, 늦게 들어온 작은 순번의 요청은 바로 취소된다.

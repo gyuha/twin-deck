@@ -16,6 +16,7 @@ import type {
   PreviewDto,
   QueueItemDto,
   PreviewRectDto,
+  OfficePreviewDto,
   QuickLookDto,
   EpubInfoDto,
   ShowOutcome,
@@ -385,6 +386,18 @@ export class FakeBackend implements Backend {
     if (n.content.includes("\u0000")) return { ...base, kind: "other" };
     const limit = 64 * 1024;
     return { ...base, kind: "text", text: n.content.slice(0, limit), truncated: n.content.length > limit };
+  }
+
+  /** `officePreview` 호출 기록. */
+  readonly officeCalls: string[] = [];
+  /** Office 응답을 바꾼다(지연·오류 흉내). 없으면 파일 내용을 그대로 Markdown으로 본다. */
+  officeResponder: ((path: string) => Promise<OfficePreviewDto>) | null = null;
+
+  async officePreview(path: string): Promise<OfficePreviewDto> {
+    this.officeCalls.push(path);
+    const n = this.need(path);
+    if (this.officeResponder) return this.officeResponder(path);
+    return { markdown: n.content, truncated: false };
   }
 
   /** `quickLookPreview` 호출 기록과 요청 순번. */

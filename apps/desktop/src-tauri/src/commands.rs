@@ -913,6 +913,16 @@ pub fn preview_file(svc: State<'_, AppService>, path: String) -> ServiceResult<P
     svc.preview(&path)
 }
 
+/// Office 문서를 `office_oxide`로 읽어 Markdown으로 돌려준다. 큰 문서는 시간이 걸려 메인 스레드가 아닌 곳에서 돌린다.
+#[tauri::command(async)]
+#[specta::specta]
+pub fn office_preview(
+    svc: State<'_, AppService>,
+    path: String,
+) -> ServiceResult<crate::office::OfficePreviewDto> {
+    svc.office_preview(&path)
+}
+
 /// macOS Quick Look으로 Office 문서의 HTML 미리보기를 만든다. 최대 10초 걸릴 수 있어 메인 스레드가 아닌 곳에서 돌린다.
 /// `seq`는 요청 순번(클수록 최근)이다. 명령이 보낸 순서와 다르게 들어와도 최근 요청이 이긴다.
 #[tauri::command(async)]
@@ -1519,6 +1529,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             file_info,
             preview_file,
             quicklook_preview,
+            office_preview,
             epub_open,
             system_icon,
             epub_chapter,

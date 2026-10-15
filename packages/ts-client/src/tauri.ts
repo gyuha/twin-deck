@@ -4,7 +4,7 @@ import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { BackendError, RemoteConnectError, SmbConnectError } from "./backend";
 import type { Backend, FileDropEvent, SearchEvent, TerminalEvent } from "./backend";
 import { commands, events } from "./generated/bindings";
-import type { CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigValue, ConflictDto, LocationConflict, ExpectedFileDto, FileInfoDto, FindSpecDto, JobDto, LoadedState, PreviewDto, PreviewRectDto, QuickLookDto, EpubInfoDto, ShowOutcome, Snapshot, JobKindDto, Loaded, QueueItemDto, RemoteServer, Result, SmbServer, WriteTextResultDto } from "./generated/bindings";
+import type { CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigValue, ConflictDto, LocationConflict, ExpectedFileDto, FileInfoDto, FindSpecDto, JobDto, LoadedState, PreviewDto, PreviewRectDto, OfficePreviewDto, QuickLookDto, EpubInfoDto, ShowOutcome, Snapshot, JobKindDto, Loaded, QueueItemDto, RemoteServer, Result, SmbServer, WriteTextResultDto } from "./generated/bindings";
 
 function unwrap<T>(r: Result<T, string>): T {
   if (r.status === "error") throw new BackendError(r.error);
@@ -153,6 +153,9 @@ export class TauriBackend implements Backend {
   }
   async preview(path: string): Promise<PreviewDto> {
     return unwrap(await commands.previewFile(path));
+  }
+  async officePreview(path: string): Promise<OfficePreviewDto> {
+    return unwrap(await commands.officePreview(path));
   }
   async quickLookPreview(path: string, seq: number): Promise<QuickLookDto> {
     return unwrap(await commands.quicklookPreview(path, seq));

@@ -2261,6 +2261,10 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     fileUrl(path: string): string {
       return backend.fileUrl(path);
     },
+    /** Office 문서를 office_oxide로 읽은 Markdown(글자·표). */
+    officePreview(path: string) {
+      return backend.officePreview(path);
+    },
     /** macOS Quick Look이 만든 Office 문서 미리보기(ADR-0014). `seq`는 요청 순번(클수록 최근)이다. */
     quickLookPreview(path: string, seq: number) {
       return backend.quickLookPreview(path, seq);

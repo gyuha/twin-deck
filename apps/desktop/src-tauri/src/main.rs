@@ -4,6 +4,7 @@ mod cli;
 mod commands;
 mod epub;
 mod global_hotkey;
+mod office;
 mod preview_handler;
 #[cfg(windows)]
 mod preview_host;

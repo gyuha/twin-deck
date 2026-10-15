@@ -1417,6 +1417,14 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
         self.quicklook.preview(Path::new(path), seq)
     }
 
+    /// 디스크 위 Office 문서를 `office_oxide`로 읽은 Markdown. 압축 파일 안의 문서는 읽지 않는다.
+    pub fn office_preview(&self, path: &str) -> ServiceResult<crate::office::OfficePreviewDto> {
+        if self.fs.is_archive_path(&vp(path)) {
+            return Err("압축 파일 안의 문서는 미리 볼 수 없습니다".into());
+        }
+        crate::office::preview(Path::new(path))
+    }
+
     /// 디스크 위 epub의 제목·저자·표지·챕터 목록. 압축 파일 안의 epub은 읽지 않는다. 표지는 이미지 한도 안일 때만 싣는다.
     pub fn epub_open(&self, path: &str) -> ServiceResult<EpubInfoDto> {
         if self.fs.is_archive_path(&vp(path)) {
@@ -3269,6 +3277,97 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(inner, txt);
+    }
+
+    /// 최소한의 OOXML 파일을 만든다. 각 항목은 (ZIP 안 경로, 내용)이다.
+    fn write_ooxml(path: &str, parts: &[(&str, &str)]) {
+        let mut z = td_archive::ZipEdit::create(Path::new(path)).unwrap();
+        for (n, body) in parts {
+            z.add_file(n, td_archive::Source::Bytes(body.as_bytes().to_vec()));
+        }
+        z.commit().unwrap();
+    }
+
+    #[test]
+    fn office_preview_reads_docx_xlsx_pptx_text() {
+        let (_t, svc, _ch, root) = setup();
+        let docx = format!("{root}/a.docx");
+        write_ooxml(
+            &docx,
+            &[
+                (
+                    "[Content_Types].xml",
+                    r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>"#,
+                ),
+                (
+                    "_rels/.rels",
+                    r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#,
+                ),
+                (
+                    "word/document.xml",
+                    r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>안녕하세요 오피스 본문</w:t></w:r></w:p></w:body></w:document>"#,
+                ),
+            ],
+        );
+        let d = svc.office_preview(&docx).unwrap();
+        assert!(
+            d.markdown.contains("안녕하세요 오피스 본문"),
+            "{}",
+            d.markdown
+        );
+        assert!(!d.truncated);
+
+        let xlsx = format!("{root}/b.xlsx");
+        std::fs::copy("fixtures/office/two-sheets.xlsx", &xlsx).unwrap();
+        let d = svc.office_preview(&xlsx).unwrap();
+        assert!(d.markdown.contains("첫 시트 값"), "{}", d.markdown);
+        assert!(d.markdown.contains("둘째 시트 값"), "{}", d.markdown);
+
+        let pptx = format!("{root}/c.pptx");
+        write_ooxml(
+            &pptx,
+            &[
+                (
+                    "[Content_Types].xml",
+                    r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/><Override PartName="/ppt/slides/slide1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/></Types>"#,
+                ),
+                (
+                    "_rels/.rels",
+                    r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/></Relationships>"#,
+                ),
+                (
+                    "ppt/presentation.xml",
+                    r#"<?xml version="1.0" encoding="UTF-8"?><p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst></p:presentation>"#,
+                ),
+                (
+                    "ppt/_rels/presentation.xml.rels",
+                    r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>"#,
+                ),
+                (
+                    "ppt/slides/slide1.xml",
+                    r#"<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>슬라이드 제목 글</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>"#,
+                ),
+            ],
+        );
+        let d = svc.office_preview(&pptx).unwrap();
+        assert!(d.markdown.contains("슬라이드 제목 글"), "{}", d.markdown);
+    }
+
+    #[test]
+    fn office_preview_refuses_broken_files_wrong_extensions_and_archive_paths() {
+        let (_t, svc, _ch, root) = setup();
+        let broken = format!("{root}/broken.docx");
+        std::fs::write(&broken, "zip이 아닌 내용").unwrap();
+        assert!(svc.office_preview(&broken).is_err());
+        let txt = format!("{root}/a.txt");
+        std::fs::write(&txt, "x").unwrap();
+        assert!(svc.office_preview(&txt).is_err());
+        let zip = format!("{root}/x.zip");
+        let mut z = td_archive::ZipEdit::create(Path::new(&zip)).unwrap();
+        z.add_file("b.docx", td_archive::Source::Bytes(b"x".to_vec()));
+        z.commit().unwrap();
+        let err = svc.office_preview(&format!("{zip}!/b.docx")).unwrap_err();
+        assert!(err.contains("압축"), "{err}");
     }
 
     #[test]

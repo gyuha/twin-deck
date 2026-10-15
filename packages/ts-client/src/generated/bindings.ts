@@ -73,6 +73,17 @@ async quicklookPreview(path: string, seq: number) : Promise<Result<QuickLookDto,
 }
 },
 /**
+ * Office 문서를 `office_oxide`로 읽어 Markdown으로 돌려준다. 큰 문서는 시간이 걸려 메인 스레드가 아닌 곳에서 돌린다.
+ */
+async officePreview(path: string) : Promise<Result<OfficePreviewDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("office_preview", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * epub의 제목·저자·표지·챕터 목록. 파일을 열어 읽으므로 메인 스레드가 아닌 곳에서 돌린다.
  */
 async epubOpen(path: string) : Promise<Result<EpubInfoDto, string>> {
@@ -1142,6 +1153,10 @@ failed: number;
  * 바꾸지 못한 첫 항목의 이유.
  */
 first_error: string | null }
+/**
+ * Office 문서에서 뽑은 내용. `truncated`면 `markdown`은 앞부분이다.
+ */
+export type OfficePreviewDto = { markdown: string; truncated: boolean }
 /**
  * 실행 중인 앱에 `td` 명령이 경로를 넘겼다(단일 인스턴스).
  */
