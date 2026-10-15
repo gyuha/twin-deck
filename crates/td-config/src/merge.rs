@@ -37,6 +37,10 @@ fn is_fkey_combo(key: &str) -> bool {
     })
 }
 
+/// 예전 버전에는 있었지만 지금은 없는 설정 키. 사용자 `config.toml`에 남아 있어도 경고하지 않고 조용히 무시한다
+/// (업데이트한 모든 사용자에게 "알 수 없는 키" 경고가 계속 뜨는 것을 막는다). 키를 지울 때마다 여기에 더한다.
+const REMOVED_KEYS: &[&str] = &["preview.office"];
+
 /// 기본값 위에 사용자 값을 깊게 병합한다. 테이블은 재귀, 배열은 통째로 교체.
 /// 알 수 없는 키와 타입이 다른 값은 경고하고 무시한다.
 pub fn merge_user(
@@ -63,10 +67,12 @@ pub fn merge_user(
                 out.insert(key.clone(), uv.clone());
                 continue;
             }
-            warnings.push(Warning::new(
-                file,
-                format!("알 수 없는 키를 무시합니다: {here}"),
-            ));
+            if !REMOVED_KEYS.contains(&here.as_str()) {
+                warnings.push(Warning::new(
+                    file,
+                    format!("알 수 없는 키를 무시합니다: {here}"),
+                ));
+            }
             continue;
         };
         match (dv, uv) {

@@ -762,6 +762,14 @@ fn removed_preview_office_key_in_an_old_user_config_still_loads() {
     // 예전 버전이 쓴 `[preview]` 아래 `office` 키는 이제 없다. 설정을 읽는 것은 막지 않고 다른 값은 그대로 읽는다.
     let l = load("[preview]\noffice = true\nvideo_autoplay = true\n");
     assert!(l.config.preview.video_autoplay, "{:?}", l.warnings);
+    assert!(
+        l.warnings.is_empty(),
+        "지워진 키는 경고하지 않는다: {:?}",
+        l.warnings
+    );
+    // 지워진 키가 아닌 모르는 키는 그대로 경고한다.
+    let l = load("[preview]\nnot_a_key = true\n");
+    assert_eq!(l.warnings.len(), 1, "{:?}", l.warnings);
 }
 
 #[test]
