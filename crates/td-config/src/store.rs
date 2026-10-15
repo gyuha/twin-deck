@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 use td_watch::DirWatcher;
 
+use crate::config::SmbServer;
 use crate::load::{load_dir, Loaded, Platform};
 
 /// 설정 디렉터리를 감시하며 최신 유효 설정을 보관한다.
@@ -208,6 +209,46 @@ fn remove_key(table: &mut toml_edit::Table, path: &[&str]) -> bool {
             removed
         }
     }
+}
+
+/// 사용자 `config.toml`의 SMB 서버 목록(`[[smb.servers]]`)을 `servers`로 통째로 바꾼다.
+/// 다른 키와 주석은 그대로 두고, 빈 목록이면 키를 지워 기본값(빈 목록)으로 돌린다.
+/// host나 share가 빈 항목이 있거나 파일에 문법 오류가 있으면 파일을 건드리지 않고 오류를 돌려준다.
+pub fn set_smb_servers(dir: &Path, servers: &[SmbServer]) -> Result<(), String> {
+    if let Some(i) = servers
+        .iter()
+        .position(|s| s.host.trim().is_empty() || s.share.trim().is_empty())
+    {
+        return Err(format!("smb.servers[{}]: host와 share가 필요합니다", i + 1));
+    }
+    let mut doc = read_user_doc(dir)?;
+    if servers.is_empty() {
+        if !remove_key(doc.as_table_mut(), &["smb", "servers"]) {
+            return Ok(());
+        }
+        return write_user_doc(dir, &doc);
+    }
+    let smb = doc
+        .entry("smb")
+        .or_insert_with(|| {
+            // 다른 키가 없으면 `[smb]` 머리글이 따로 찍히지 않게 암시적 테이블로 만든다.
+            let mut t = toml_edit::Table::new();
+            t.set_implicit(true);
+            toml_edit::Item::Table(t)
+        })
+        .as_table_mut()
+        .ok_or("smb: 테이블이 아닙니다")?;
+    let mut list = toml_edit::ArrayOfTables::new();
+    for s in servers {
+        let mut t = toml_edit::Table::new();
+        t.insert("name", toml_edit::value(s.name.as_str()));
+        t.insert("host", toml_edit::value(s.host.as_str()));
+        t.insert("share", toml_edit::value(s.share.as_str()));
+        t.insert("user", toml_edit::value(s.user.as_str()));
+        list.push(t);
+    }
+    smb.insert("servers", toml_edit::Item::ArrayOfTables(list));
+    write_user_doc(dir, &doc)
 }
 
 /// `config.toml`의 즐겨찾기에서 경로가 `path`(변수 확장 전의 원문)인 항목 하나를 지운다. 그룹 안의 항목도 찾는다.

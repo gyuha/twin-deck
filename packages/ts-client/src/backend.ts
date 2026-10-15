@@ -1,4 +1,4 @@
-import type { CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigLocationDto, ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, EpubInfoDto, ExpectedFileDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, NormalizeResultDto, LoadedState, LocationConflict, PreviewDto, PreviewRectDto, QueueItemDto, QuickLookDto, SearchStartDto, ShowOutcome, SearchSummaryDto, Snapshot, UpdateInfoDto, UserDirsDto, VolumeDto, WriteTextResultDto } from "./generated/bindings";
+import type { CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigLocationDto, ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, EpubInfoDto, ExpectedFileDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, NormalizeResultDto, LoadedState, LocationConflict, PreviewDto, SmbErrorKindDto, SmbServer, PreviewRectDto, QueueItemDto, QuickLookDto, SearchStartDto, ShowOutcome, SearchSummaryDto, Snapshot, UpdateInfoDto, UserDirsDto, VolumeDto, WriteTextResultDto } from "./generated/bindings";
 
 /** Look Up / Flatten / Disk Usage가 스트리밍으로 보내는 이벤트. 작업마다 마지막은 `done`이다. */
 export type SearchEvent =
@@ -17,6 +17,16 @@ export function setBackendErrorTranslator(fn: (message: string) => string): void
 export class BackendError extends Error {
   constructor(message?: string) {
     super(message === undefined ? message : translateError(message));
+  }
+}
+
+/** SMB 연결 실패. `kind`가 `auth`면 비밀번호가 없거나 틀렸으니 다시 묻는다. */
+export class SmbConnectError extends BackendError {
+  constructor(
+    readonly kind: SmbErrorKindDto,
+    message: string,
+  ) {
+    super(message);
   }
 }
 
@@ -160,6 +170,16 @@ export interface Backend {
   setConfigValue(key: string, value: ConfigValue): Promise<Loaded>;
   /** 설정 화면: 사용자 config.toml에서 키를 지워 기본값으로 되돌리고, 새로 병합된 설정을 돌려준다. */
   resetConfigValue(key: string): Promise<Loaded>;
+  /** 저장된 SMB 서버 목록 전체를 바꾸고 새로 병합된 설정을 돌려준다. 목록은 `Loaded`의 `config.smb.servers`로 읽는다. host나 share가 빈 항목이 있으면 거부된다. */
+  setSmbServers(servers: SmbServer[]): Promise<Loaded>;
+  /**
+   * 설정의 `index`번째 SMB 서버에 연결(OS 마운트)하고 마운트 지점을 돌려준다. 이미 마운트돼 있으면 그 경로다.
+   * `password`가 null이면 키체인 값을 쓰고, 성공했고 `remember`면 받은 비밀번호를 키체인에 저장한다.
+   * 연결 실패는 `SmbConnectError`(`kind`로 인증 실패를 구분), 없는 항목 번호 같은 문제는 `BackendError`로 거부된다.
+   */
+  smbConnect(index: number, password: string | null, remember: boolean): Promise<string>;
+  /** 설정의 `index`번째 SMB 서버에 저장된 비밀번호를 키체인에서 지운다. 저장된 값이 없어도 성공이다. */
+  smbForgetPassword(index: number): Promise<void>;
   /** 설정 폴더를 파일 관리자로 연다. */
   revealConfigDir(): Promise<void>;
   /** 지금 설정 파일(`config.toml`·`keybindings.toml`) 저장 경로와 기본 위치. */

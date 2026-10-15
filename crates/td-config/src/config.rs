@@ -25,6 +25,8 @@ pub struct Config {
     /// 병합 후 항목별로 검증해서 채운다(잘못된 항목은 경고와 함께 빠진다).
     #[serde(default)]
     pub favorites: Vec<FavoriteDto>,
+    /// 저장된 SMB 서버 목록. 비밀번호는 여기 두지 않고 OS 키체인에 둔다(ADR-0018).
+    pub smb: SmbConfig,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
@@ -208,4 +210,20 @@ pub struct FavoriteDto {
 pub struct FavoriteLeaf {
     pub name: String,
     pub path: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct SmbConfig {
+    /// 병합 후 항목별로 검증해서 채운다(host나 share가 빈 항목은 경고와 함께 빠진다).
+    #[serde(default)]
+    pub servers: Vec<SmbServer>,
+}
+
+/// SMB 서버 항목(`[[smb.servers]]`). `name`이 비면 읽을 때 `host/share`로 채운다. `user`가 비면 게스트로 연결한다.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct SmbServer {
+    pub name: String,
+    pub host: String,
+    pub share: String,
+    pub user: String,
 }

@@ -9,7 +9,7 @@
 
 ## 결정
 
-- **SMB는 OS에 마운트를 맡긴다.** macOS는 NetFS(`NetFSMountURLSync`)로 `/Volumes` 아래에 마운트하고, Windows는 `net use *`로 빈 드라이브 문자에 연결한다. 마운트한 뒤에는 기존 `LocalFs`, 작업 큐, 파일 감시를 그대로 쓴다. Linux는 지원하지 않는다고 알린다.
+- **SMB는 OS에 마운트를 맡긴다.** macOS는 NetFS(`NetFSMountURLSync`)로 `/Volumes` 아래에 마운트하고, Windows는 WNet API(`WNetUseConnectionW`, `CONNECT_REDIRECT`)로 빈 드라이브 문자에 연결한다(`net use`는 비밀번호가 명령줄에 실려서 쓰지 않는다). 마운트한 뒤에는 기존 `LocalFs`, 작업 큐, 파일 감시를 그대로 쓴다. Linux는 지원하지 않는다고 알린다.
 - **자체 SMB 클라이언트(`Vfs` 원격 구현체)는 만들지 않는다.**
 - 저장된 서버 목록(`name`, `host`, `share`, `user`)은 `config.toml`의 `[[smb.servers]]`에 둔다. 비밀번호는 설정 파일에 넣지 않고 OS 키체인(macOS 키체인, Windows 자격 증명 관리자)에 둔다. 설정 파일은 #71로 내보내기·동기화 대상이 되었다.
 

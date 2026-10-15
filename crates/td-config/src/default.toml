@@ -82,6 +82,10 @@ additional_extensions = []
 [view.table]
 columns = ["name", "size", "modified"]
 
+# 저장된 SMB 서버. 항목은 [[smb.servers]]에 name·host·share·user로 쓴다(user를 비우면 게스트). 비밀번호는 OS 키체인에 둔다.
+[smb]
+servers = []
+
 # Ctrl+0~9로 바로 가는 폴더. 비워 두면 그 키는 아무 일도 하지 않는다.
 [shortcuts]
 "0" = ""

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 use toml::{Table, Value};
 
-use crate::config::{Config, FavoriteDto, FavoriteLeaf};
+use crate::config::{Config, FavoriteDto, FavoriteLeaf, SmbServer};
 use crate::keybindings::{self, BindingSpec};
 use crate::merge::merge_user;
 use crate::themes::THEME_IDS;
@@ -277,6 +277,50 @@ fn parse_favorites(value: Option<Value>, warnings: &mut Vec<Warning>) -> Vec<Fav
     out
 }
 
+/// `smb.servers`를 항목별로 검증한다. host나 share가 비었거나 없는 항목은 경고와 함께 빼고,
+/// 빈 `name`은 `host/share`로 채운다. `user`가 없으면 빈 문자열(게스트)이다.
+fn parse_smb_servers(value: Option<Value>, warnings: &mut Vec<Warning>) -> Vec<SmbServer> {
+    let Some(Value::Array(items)) = value else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for (i, item) in items.iter().enumerate() {
+        let bad = |warnings: &mut Vec<Warning>, why: &str| {
+            warnings.push(Warning::new(
+                "config.toml",
+                format!("smb.servers[{}]: {why}", i + 1),
+            ));
+        };
+        let Some(t) = item.as_table() else {
+            bad(warnings, "테이블이어야 합니다");
+            continue;
+        };
+        let text = |k: &str| {
+            t.get(k)
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .trim()
+                .to_string()
+        };
+        let (host, share) = (text("host"), text("share"));
+        if host.is_empty() || share.is_empty() {
+            bad(warnings, "host와 share가 필요합니다");
+            continue;
+        }
+        let name = match text("name") {
+            n if n.is_empty() => format!("{host}/{share}"),
+            n => n,
+        };
+        out.push(SmbServer {
+            name,
+            host,
+            share,
+            user: text("user"),
+        });
+    }
+    out
+}
+
 /// 문자열로 주어진 사용자 설정을 읽는다. `None`은 파일이 없다는 뜻이다.
 pub fn load_from_strs(
     config: Option<&str>,
@@ -296,6 +340,13 @@ pub fn load_from_strs(
     validate_enums(&mut merged, &defaults, &mut warnings);
     validate_text_color(&mut merged, &mut warnings);
     let favorites = parse_favorites(merged.remove("favorites"), &mut warnings);
+    let smb_servers = parse_smb_servers(
+        merged
+            .get_mut("smb")
+            .and_then(Value::as_table_mut)
+            .and_then(|t| t.remove("servers")),
+        &mut warnings,
+    );
     let mut config = match Value::Table(merged).try_into::<Config>() {
         Ok(c) => c,
         Err(e) => {
@@ -307,6 +358,7 @@ pub fn load_from_strs(
         }
     };
     config.favorites = favorites;
+    config.smb.servers = smb_servers;
 
     // 컬럼 명세 검증: 잘못된 항목은 빼고 경고, name 컬럼은 항상 앞에 있다.
     let (columns, bad) = crate::columns::normalize_columns(&config.view.table.columns);

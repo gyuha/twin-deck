@@ -144,7 +144,10 @@
       "F9": false,
       "Shift+F8": true
     },
-    "favorites": []
+    "favorites": [],
+    "smb": {
+      "servers": []
+    }
   },
   "bindings": [],
   "warnings": []

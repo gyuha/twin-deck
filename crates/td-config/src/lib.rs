@@ -15,7 +15,7 @@ pub use columns::{normalize_columns, parse_column, ColumnSpec, SortMarker, COLUM
 pub use config::{
     Behavior, BehaviorLayout, BehaviorTable, Config, ConfirmConfig, Display, Environment,
     FavoriteDto, FavoriteLeaf, FileSystemsConfig, LayoutConfig, PreviewConfig, QuickSelect,
-    SelectionConfig, TableView, ViewConfig, ZipConfig,
+    SelectionConfig, SmbConfig, SmbServer, TableView, ViewConfig, ZipConfig,
 };
 pub use keybindings::BindingSpec;
 pub use load::{load_dir, load_from_strs, Loaded, Platform, Warning};
@@ -24,7 +24,8 @@ pub use location::{
     LocationConflict, ResolvedDir, CONFIG_FILES, LOCATION_FILE,
 };
 pub use store::{
-    append_favorite, remove_favorite, reset_user_value, set_user_value, ConfigStore, ConfigValue,
+    append_favorite, remove_favorite, reset_user_value, set_smb_servers, set_user_value,
+    ConfigStore, ConfigValue,
 };
 pub use themes::THEME_IDS;
 pub use transfer::{export_config_zip, import_config_zip};

@@ -327,6 +327,42 @@ async getConfigLocation() : Promise<Result<ConfigLocationDto, string>> {
 }
 },
 /**
+ * 저장된 SMB 서버 목록(`[[smb.servers]]`) 전체를 바꾸고, 새로 병합된 설정을 바로 돌려준다.
+ * 목록은 설정(`Loaded`)의 `smb.servers`로 읽는다. host나 share가 빈 항목이 있으면 쓰지 않고 거부한다.
+ */
+async setSmbServers(servers: SmbServer[]) : Promise<Result<Loaded, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_smb_servers", { servers }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 설정의 `index`번째 SMB 서버에 연결(OS 마운트)한다. 이미 마운트돼 있으면 그 경로를 돌려준다.
+ * `password`가 없으면 키체인 값을 쓴다. 성공했고 `remember`면 받은 비밀번호를 키체인에 저장한다.
+ * 마운트는 블로킹이라 UI 스레드를 막지 않게 따로 돌린다.
+ */
+async smbConnect(index: number, password: string | null, remember: boolean) : Promise<Result<SmbConnectDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("smb_connect", { index, password, remember }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 설정의 `index`번째 SMB 서버에 저장된 비밀번호를 키체인에서 지운다. 저장된 값이 없어도 성공이다.
+ */
+async smbForgetPassword(index: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("smb_forget_password", { index }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * 폴더 선택 창을 띄워 고른 폴더의 경로를 돌려준다. 취소하면 None.
  */
 async pickFolder() : Promise<Result<string | null, string>> {
@@ -882,7 +918,11 @@ fkey_bar: Partial<{ [key in string]: boolean }>;
 /**
  * 병합 후 항목별로 검증해서 채운다(잘못된 항목은 경고와 함께 빠진다).
  */
-favorites?: FavoriteDto[] }
+favorites?: FavoriteDto[]; 
+/**
+ * 저장된 SMB 서버 목록. 비밀번호는 여기 두지 않고 OS 키체인에 둔다(ADR-0018).
+ */
+smb: SmbConfig }
 /**
  * 설정이 바뀌었다(파일 감시). 문법 오류가 있으면 이전 유효 설정과 경고가 온다.
  */
@@ -1165,6 +1205,25 @@ export type ShowOutcome =
  * 인터넷에서 받은 파일이라 Office가 미리보기를 막는다(차단 해제하면 보인다).
  */
 "blocked"
+export type SmbConfig = { 
+/**
+ * 병합 후 항목별로 검증해서 채운다(host나 share가 빈 항목은 경고와 함께 빠진다).
+ */
+servers?: SmbServer[] }
+/**
+ * `smb_connect`의 결과: 마운트 지점, 또는 종류가 구분된 실패.
+ * 설정 디렉터리 없음·없는 항목 번호 같은 그 밖의 문제는 명령 오류(문자열)로 온다.
+ */
+export type SmbConnectDto = { mounted: string } | { failed: SmbFailureDto }
+/**
+ * SMB 연결 실패의 종류. UI는 `auth`면 비밀번호를 다시 묻는다.
+ */
+export type SmbErrorKindDto = "auth" | "unreachable" | "unsupported" | "other"
+export type SmbFailureDto = { kind: SmbErrorKindDto; message: string }
+/**
+ * SMB 서버 항목(`[[smb.servers]]`). `name`이 비면 읽을 때 `host/share`로 채운다. `user`가 비면 게스트로 연결한다.
+ */
+export type SmbServer = { name: string; host: string; share: string; user: string }
 /**
  * 창 하나의 복원 상태: 두 패널의 탭들, 활성 패널, 숨김 표시, Actions Panel 검색어.
  */

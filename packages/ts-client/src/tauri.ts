@@ -1,10 +1,10 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { BackendError } from "./backend";
+import { BackendError, SmbConnectError } from "./backend";
 import type { Backend, FileDropEvent, SearchEvent, TerminalEvent } from "./backend";
 import { commands, events } from "./generated/bindings";
-import type { CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigValue, ConflictDto, LocationConflict, ExpectedFileDto, FileInfoDto, FindSpecDto, JobDto, LoadedState, PreviewDto, PreviewRectDto, QuickLookDto, EpubInfoDto, ShowOutcome, Snapshot, JobKindDto, Loaded, QueueItemDto, Result, WriteTextResultDto } from "./generated/bindings";
+import type { CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigValue, ConflictDto, LocationConflict, ExpectedFileDto, FileInfoDto, FindSpecDto, JobDto, LoadedState, PreviewDto, PreviewRectDto, QuickLookDto, EpubInfoDto, ShowOutcome, Snapshot, JobKindDto, Loaded, QueueItemDto, Result, SmbServer, WriteTextResultDto } from "./generated/bindings";
 
 function unwrap<T>(r: Result<T, string>): T {
   if (r.status === "error") throw new BackendError(r.error);
@@ -274,6 +274,17 @@ export class TauriBackend implements Backend {
   }
   async resetConfigValue(key: string) {
     return unwrap(await commands.resetConfigValue(key));
+  }
+  async setSmbServers(servers: SmbServer[]) {
+    return unwrap(await commands.setSmbServers(servers));
+  }
+  async smbConnect(index: number, password: string | null, remember: boolean) {
+    const r = unwrap(await commands.smbConnect(index, password, remember));
+    if ("failed" in r) throw new SmbConnectError(r.failed.kind, r.failed.message);
+    return r.mounted;
+  }
+  async smbForgetPassword(index: number) {
+    unwrap(await commands.smbForgetPassword(index));
   }
   async revealConfigDir() {
     unwrap(await commands.revealConfigDir());

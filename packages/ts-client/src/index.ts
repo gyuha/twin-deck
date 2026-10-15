@@ -47,6 +47,9 @@ export type {
   QuickLookDto,
   EpubInfoDto,
   EpubChapterDto,
+  SmbConfig,
+  SmbServer,
+  SmbErrorKindDto,
 } from "./generated/bindings";
 export * from "./backend";
 export { archiveFileName, archiveRoot, isArchiveName, isArchivePath } from "./archive";

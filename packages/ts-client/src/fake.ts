@@ -1,5 +1,5 @@
 import { archiveRoot, isArchivePath } from "./archive";
-import { BackendError, baseName, joinPath, parentPath } from "./backend";
+import { BackendError, SmbConnectError, baseName, joinPath, parentPath } from "./backend";
 import type { Backend, FileDropEvent, SearchEvent, TerminalEvent } from "./backend";
 import type {
   ConfigLocationDto,
@@ -31,6 +31,7 @@ import type {
   OpenPathsDto,
   CliOutcomeDto,
   CliStatusDto,
+  SmbServer,
 } from "./generated/bindings";
 import { globMatch } from "./glob";
 import defaultConfigJson from "./generated/default-config.json";
@@ -841,6 +842,52 @@ export class FakeBackend implements Backend {
     const fallback = getPath(defaultLoaded().config as unknown as Record<string, unknown>, key);
     this.setConfig((l) => setPath(l.config as unknown as Record<string, unknown>, key, fallback));
     return structuredClone(this.loaded);
+  }
+
+  /** 실제 구현처럼 목록 전체를 바꾼다. host나 share가 빈 항목이 있으면 거부하고, 빈 name은 `host/share`로 채운다. */
+  async setSmbServers(servers: SmbServer[]) {
+    const items = servers.map((v) => ({ name: v.name.trim(), host: v.host.trim(), share: v.share.trim(), user: v.user.trim() }));
+    const bad = items.findIndex((v) => !v.host || !v.share);
+    if (bad >= 0) throw new BackendError(`smb.servers[${bad + 1}]: host와 share가 필요합니다`);
+    this.setConfig((l) => {
+      l.config.smb = { servers: items.map((v) => ({ ...v, name: v.name || `${v.host}/${v.share}` })) };
+    });
+    return structuredClone(this.loaded);
+  }
+
+  /** 테스트용: 키체인에 저장된 SMB 비밀번호(키 `user@host/share`). */
+  readonly smbPasswords = new Map<string, string>();
+
+  private smbServer(index: number): SmbServer {
+    const s = this.loaded.config.smb.servers?.[index];
+    if (!s) throw new BackendError(`SMB 서버 항목이 없습니다: ${index}`);
+    return s;
+  }
+
+  private static smbKey(s: SmbServer) {
+    return s.user ? `${s.user}@${s.host}/${s.share}` : `${s.host}/${s.share}`;
+  }
+
+  /**
+   * 가짜 마운트: 이미 `/Volumes/<share>`가 있으면 그 경로, host가 "offline"이면 unreachable,
+   * 비밀번호가 "bad"이거나 사용자가 있는데 비밀번호(인자·저장값)가 없으면 auth 오류. 성공하면 볼륨에 더한다.
+   */
+  async smbConnect(index: number, password: string | null, remember: boolean) {
+    const s = this.smbServer(index);
+    const mountPoint = `/Volumes/${s.share}`;
+    if (this.volumes.some((v) => v.mountPoint === mountPoint)) return mountPoint;
+    const key = FakeBackend.smbKey(s);
+    const pw = password ?? this.smbPasswords.get(key) ?? null;
+    if (s.user && pw === null) throw new SmbConnectError("auth", "인증에 실패했습니다. 사용자 이름과 비밀번호를 확인하세요");
+    if (s.host === "offline") throw new SmbConnectError("unreachable", "서버나 공유에 연결할 수 없습니다");
+    if (pw === "bad") throw new SmbConnectError("auth", "인증에 실패했습니다. 사용자 이름과 비밀번호를 확인하세요");
+    this.volumes.push({ name: s.share, mountPoint });
+    if (remember && password !== null && s.user) this.smbPasswords.set(key, password);
+    return mountPoint;
+  }
+
+  async smbForgetPassword(index: number) {
+    this.smbPasswords.delete(FakeBackend.smbKey(this.smbServer(index)));
   }
 
   /** 테스트용: 설정 폴더 열기를 누른 횟수. */
