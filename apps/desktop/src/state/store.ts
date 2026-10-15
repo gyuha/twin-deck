@@ -3280,6 +3280,37 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         set({ settingsError: String(e instanceof Error ? e.message : e) });
       }
     },
+    /** 설정 화면: 지금 설정 파일을 zip 하나로 내보낸다. */
+    async exportConfig() {
+      try {
+        const dest = await backend.pickSaveFile("twin-deck-settings.zip", ["zip"]);
+        if (!dest) return;
+        await backend.exportConfig(dest);
+        set({ settingsError: null });
+        flash(tr("store.config_export.done", { path: dest }));
+      } catch (e) {
+        set({ settingsError: String(e instanceof Error ? e.message : e) });
+      }
+    },
+    /** 설정 화면: 내보낸 zip에서 설정을 가져와 지금 설정을 바꾼다(기존 파일은 .bak). */
+    async importConfig() {
+      try {
+        const src = await backend.pickFile(["zip"]);
+        if (!src) return;
+        const ok = await ask<boolean>({
+          kind: "confirm",
+          title: tr("store.config_import.title"),
+          lines: [src, tr("store.config_import.line")],
+          confirmLabel: tr("store.config_import.confirm"),
+        });
+        if (!ok) return;
+        set({ loaded: await backend.importConfig(src), settingsError: null });
+        void reloadAll();
+        flash(tr("store.config_import.done"));
+      } catch (e) {
+        set({ settingsError: String(e instanceof Error ? e.message : e) });
+      }
+    },
     /** 설정 화면: 설정 파일 저장 경로를 기본 위치로 되돌린다. */
     async resetConfigLocation() {
       try {

@@ -494,6 +494,12 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
               {t("settings.config_location.reset")}
             </Button>
           )}
+          <Button size="sm" variant="gray" onClick={() => void api.exportConfig()}>
+            {t("settings.config_export")}
+          </Button>
+          <Button size="sm" variant="gray" onClick={() => void api.importConfig()}>
+            {t("settings.config_import")}
+          </Button>
         </div>
         {(broken || error) && (
           <div role="alert" className="border-b border-app-line bg-status-error/15 px-4 py-2 text-sm text-status-error">

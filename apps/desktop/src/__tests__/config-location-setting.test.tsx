@@ -41,7 +41,7 @@ describe("설정 저장 경로 (이슈 #71)", () => {
   it("이미 설정이 있는 폴더에서 '그 폴더의 설정 사용'을 고르면 그 설정이 바로 적용된다", async () => {
     const backend = seedBackend();
     const other = defaultLoaded();
-    other.config.behavior.zebra_rows = true;
+    other.config.behavior.table.zebra_rows = true;
     backend.locationConfigs["/icloud/TwinDeck"] = other;
     backend.pickFolderResult = "/icloud/TwinDeck";
     const { user, bar } = await open(backend);
@@ -49,7 +49,7 @@ describe("설정 저장 경로 (이슈 #71)", () => {
     const ask = within(await screen.findByRole("dialog", { name: "이 폴더에 이미 설정이 있습니다" }));
     await user.click(ask.getByRole("button", { name: "확인" })); // 기본 선택은 그 폴더의 설정 사용
     await waitFor(() => expect(backend.locationChanges).toEqual([{ dir: "/icloud/TwinDeck", conflict: "useExisting" }]));
-    await waitFor(async () => expect((await backend.getConfig()).config.behavior.zebra_rows).toBe(true));
+    await waitFor(async () => expect((await backend.getConfig()).config.behavior.table.zebra_rows).toBe(true));
   });
 
   it("'지금 설정으로 덮어쓰기'를 고르면 덮어쓰기로 바꾼다", async () => {

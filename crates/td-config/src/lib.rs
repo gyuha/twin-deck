@@ -9,6 +9,7 @@ mod location;
 mod merge;
 mod store;
 mod themes;
+mod transfer;
 
 pub use columns::{normalize_columns, parse_column, ColumnSpec, SortMarker, COLUMN_NAMES};
 pub use config::{
@@ -26,6 +27,7 @@ pub use store::{
     append_favorite, remove_favorite, reset_user_value, set_user_value, ConfigStore, ConfigValue,
 };
 pub use themes::THEME_IDS;
+pub use transfer::{export_config_zip, import_config_zip};
 
 /// 내장 기본값(TOML).
 pub const DEFAULTS: &str = include_str!("default.toml");

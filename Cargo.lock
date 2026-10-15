@@ -4816,6 +4816,7 @@ dependencies = [
  "tempfile",
  "toml 0.8.2",
  "toml_edit 0.22.27",
+ "zip 8.6.0",
 ]
 
 [[package]]

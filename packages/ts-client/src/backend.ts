@@ -173,6 +173,14 @@ export interface Backend {
   setConfigLocation(dir: string | null, conflict: LocationConflict): Promise<Loaded>;
   /** 폴더 선택 창을 띄운다. 취소하면 null. */
   pickFolder(): Promise<string | null>;
+  /** 저장 위치 선택 창을 띄운다(`extensions`는 `zip` 같은 확장자 필터). 취소하면 null. */
+  pickSaveFile(defaultName: string, extensions: string[]): Promise<string | null>;
+  /** 파일 선택 창을 띄운다. 취소하면 null. */
+  pickFile(extensions: string[]): Promise<string | null>;
+  /** 지금 설정 파일(`config.toml`·`keybindings.toml`)을 zip 파일 `dest`로 내보낸다. */
+  exportConfig(dest: string): Promise<void>;
+  /** 내보낸 zip 파일에서 설정을 가져와 지금 설정 파일을 바꾸고(기존은 `.bak`) 새 설정을 돌려준다. 설정 파일이 없거나 문법 오류면 거부된다. */
+  importConfig(src: string): Promise<Loaded>;
   /** GitHub 릴리스의 최신 버전을 확인한다. 새 버전이 없으면 null. 확인에 실패하면 BackendError. */
   checkUpdate(): Promise<UpdateInfoDto | null>;
   /** 새 버전을 내려받아 설치하고 앱을 다시 시작한다. 실패하면 BackendError(서명 불일치 포함). */

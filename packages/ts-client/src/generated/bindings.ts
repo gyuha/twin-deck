@@ -327,6 +327,50 @@ async pickFolder() : Promise<Result<string | null, string>> {
 }
 },
 /**
+ * 저장 위치 선택 창을 띄워 고른 파일 경로를 돌려준다. 취소하면 None.
+ */
+async pickSaveFile(defaultName: string, extensions: string[]) : Promise<Result<string | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("pick_save_file", { defaultName, extensions }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 파일 선택 창을 띄워 고른 파일 경로를 돌려준다. 취소하면 None.
+ */
+async pickFile(extensions: string[]) : Promise<Result<string | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("pick_file", { extensions }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 설정 화면: 지금 설정 파일(`config.toml`·`keybindings.toml`)을 zip 파일로 내보낸다.
+ */
+async exportConfig(dest: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("export_config", { dest }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 설정 화면: 내보낸 zip 파일에서 설정을 가져와 지금 설정 파일을 바꾸고(기존은 `.bak`) 새 설정을 바로 돌려준다.
+ */
+async importConfig(src: string) : Promise<Result<Loaded, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("import_config", { src }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * 설정 화면: 그 폴더에 이미 설정 파일(`config.toml`·`keybindings.toml`)이 있는가. 있으면 저장 경로를 바꾸기 전에 어떻게 할지 묻는다.
  */
 async configLocationHasFiles(dir: string) : Promise<boolean> {

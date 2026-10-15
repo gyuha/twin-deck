@@ -15,12 +15,12 @@ wall: none
 - [ ] C6. `grep -cE '^#+ .*(저장 경로|내보내기)' docs/06-config-plugins.md` ≥ 2
 
 ## Check progress (updated after EVERY stop-condition run — drives the no-progress & tension walls & fg-status)
-- C1: 아직 실행 안 함 (작성 시 기준선: 해당 테스트 0개)
-- C2: 아직 실행 안 함
-- C3: 아직 실행 안 함 (작성 시 기준선: 해당 테스트 파일 0개)
-- C4: 아직 실행 안 함
-- C5: 아직 실행 안 함
-- C6: 아직 실행 안 함 (작성 시 기준선: 0)
+- C1: pass · regressed: ×0 · last-evidence: "cargo test -p td-config → 9+47 통과, --list location|export|import → 9" (task 165 봉인 후)
+- C2: pass · regressed: ×0 · last-evidence: "cargo test -p twin-deck-desktop → 128 통과(up_to_date 포함), --list config_location|export|import → 6"
+- C3: pass · regressed: ×0 · last-evidence: "vitest → 164파일 1363 통과, 해당 테스트 파일 1"
+- C4: pass · regressed: ×0 · last-evidence: "tsc --noEmit → 오류 없음"
+- C5: pass · regressed: ×0 · last-evidence: "clippy -p td-config -p twin-deck-desktop -D warnings 통과, fmt --check 통과"
+- C6: fail ×1 · regressed: ×0 · last-evidence: "제목 개수 → 1 (저장 경로 절만 있음, 내보내기 절은 task 166 몫)"
 
 ## Authorized replan scope
 - 위 검사 중 실패한 것과 직접 이어지는 수정 작업만 자동으로 만든다. 그 밖의 일은 하지 않는다.

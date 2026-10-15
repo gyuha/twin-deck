@@ -290,6 +290,18 @@ export class TauriBackend implements Backend {
   async pickFolder() {
     return unwrap(await commands.pickFolder());
   }
+  async pickSaveFile(defaultName: string, extensions: string[]) {
+    return unwrap(await commands.pickSaveFile(defaultName, extensions));
+  }
+  async pickFile(extensions: string[]) {
+    return unwrap(await commands.pickFile(extensions));
+  }
+  async exportConfig(dest: string) {
+    unwrap(await commands.exportConfig(dest));
+  }
+  async importConfig(src: string) {
+    return unwrap(await commands.importConfig(src));
+  }
   async checkUpdate() {
     return unwrap(await commands.checkUpdate());
   }

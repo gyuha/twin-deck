@@ -876,6 +876,33 @@ export class FakeBackend implements Backend {
     return this.pickFolderResult;
   }
 
+  /** 테스트용: 저장·파일 선택 창이 돌려줄 값(null = 취소)과, 마지막 저장 선택 창에 넘긴 기본 이름. */
+  pickSaveFileResult: string | null = null;
+  pickFileResult: string | null = null;
+  lastSaveFileName: string | null = null;
+  /** 테스트용: 내보낸 경로 기록. 내보내면 그때의 설정을 그 경로에 기억한다. */
+  readonly exportedConfigs = new Map<string, Loaded>();
+  /** 테스트용: 다음 가져오기가 실패할 오류 문구. */
+  importError: string | null = null;
+
+  async pickSaveFile(defaultName: string, _extensions: string[]) {
+    this.lastSaveFileName = defaultName;
+    return this.pickSaveFileResult;
+  }
+  async pickFile(_extensions: string[]) {
+    return this.pickFileResult;
+  }
+  async exportConfig(dest: string) {
+    this.exportedConfigs.set(dest, structuredClone(this.loaded));
+  }
+  async importConfig(src: string) {
+    if (this.importError) throw new BackendError(this.importError);
+    const imported = this.exportedConfigs.get(src);
+    if (!imported) throw new BackendError("Twin Deck 설정 내보내기 파일(zip)이 아닙니다");
+    this.setConfig((l) => Object.assign(l, structuredClone(imported)));
+    return structuredClone(this.loaded);
+  }
+
   /** 테스트용: 다음 업데이트 확인 결과. 기본은 새 버전 없음. */
   updateScenario: { info: UpdateInfoDto | null; checkError?: string; installError?: string } = { info: null };
   /** 테스트용: `checkUpdate`/`installUpdate` 호출 횟수. */

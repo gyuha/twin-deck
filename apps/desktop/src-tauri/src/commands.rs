@@ -334,6 +334,16 @@ impl ConfigState {
         })
     }
 
+    /// 지금 설정 파일을 zip 파일 `dest`로 내보낸다.
+    pub fn export_zip(&self, dest: &std::path::Path) -> ServiceResult<()> {
+        td_config::export_config_zip(&self.config_dir()?, dest)
+    }
+
+    /// zip 파일 `src`의 설정을 가져와 지금 설정 파일을 바꾸고(기존은 `.bak`) 새 설정을 돌려준다.
+    pub fn import_zip(&self, src: &std::path::Path) -> ServiceResult<Loaded> {
+        self.update(|dir| td_config::import_config_zip(src, dir))
+    }
+
     /// 저장 경로를 바꾸고(None이면 기본 위치) 새 폴더로 설정 저장소를 다시 연다. 새 설정과 그 저장소의 변경 수신기를 돌려준다.
     /// 이전 저장소는 버려지며 그 감시 스레드도 끝난다.
     pub fn switch_location(
@@ -527,6 +537,77 @@ pub async fn pick_folder(app: tauri::AppHandle) -> ServiceResult<Option<String>>
         .map(|p| p.into_path().map(|p| p.to_string_lossy().into_owned()))
         .transpose()
         .map_err(|e| e.to_string())
+}
+
+/// 저장 위치 선택 창을 띄워 고른 파일 경로를 돌려준다. 취소하면 None.
+#[tauri::command]
+#[specta::specta]
+pub async fn pick_save_file(
+    app: tauri::AppHandle,
+    default_name: String,
+    extensions: Vec<String>,
+) -> ServiceResult<Option<String>> {
+    use tauri_plugin_dialog::DialogExt;
+    let picked = tauri::async_runtime::spawn_blocking(move || {
+        let exts: Vec<&str> = extensions.iter().map(String::as_str).collect();
+        let mut dialog = app.dialog().file().set_file_name(default_name);
+        if !exts.is_empty() {
+            dialog = dialog.add_filter(exts.join(", "), &exts);
+        }
+        dialog.blocking_save_file()
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    picked
+        .map(|p| p.into_path().map(|p| p.to_string_lossy().into_owned()))
+        .transpose()
+        .map_err(|e| e.to_string())
+}
+
+/// 파일 선택 창을 띄워 고른 파일 경로를 돌려준다. 취소하면 None.
+#[tauri::command]
+#[specta::specta]
+pub async fn pick_file(
+    app: tauri::AppHandle,
+    extensions: Vec<String>,
+) -> ServiceResult<Option<String>> {
+    use tauri_plugin_dialog::DialogExt;
+    let picked = tauri::async_runtime::spawn_blocking(move || {
+        let exts: Vec<&str> = extensions.iter().map(String::as_str).collect();
+        let mut dialog = app.dialog().file();
+        if !exts.is_empty() {
+            dialog = dialog.add_filter(exts.join(", "), &exts);
+        }
+        dialog.blocking_pick_file()
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    picked
+        .map(|p| p.into_path().map(|p| p.to_string_lossy().into_owned()))
+        .transpose()
+        .map_err(|e| e.to_string())
+}
+
+/// 설정 화면: 지금 설정 파일(`config.toml`·`keybindings.toml`)을 zip 파일로 내보낸다.
+#[tauri::command]
+#[specta::specta]
+pub fn export_config(config: State<'_, ConfigState>, dest: String) -> ServiceResult<()> {
+    config.export_zip(std::path::Path::new(&dest))
+}
+
+/// 설정 화면: 내보낸 zip 파일에서 설정을 가져와 지금 설정 파일을 바꾸고(기존은 `.bak`) 새 설정을 바로 돌려준다.
+#[tauri::command]
+#[specta::specta]
+pub fn import_config(
+    app: tauri::AppHandle,
+    svc: State<'_, AppService>,
+    config: State<'_, ConfigState>,
+    src: String,
+) -> ServiceResult<Loaded> {
+    let loaded = config.import_zip(std::path::Path::new(&src))?;
+    crate::apply_config(&svc, &loaded);
+    crate::global_hotkey::apply(&app, &loaded.config.environment);
+    Ok(loaded)
 }
 
 /// 설정 화면: 그 폴더에 이미 설정 파일(`config.toml`·`keybindings.toml`)이 있는가. 있으면 저장 경로를 바꾸기 전에 어떻게 할지 묻는다.
@@ -1208,6 +1289,10 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             reveal_config_dir,
             get_config_location,
             pick_folder,
+            pick_save_file,
+            pick_file,
+            export_config,
+            import_config,
             config_location_has_files,
             set_config_location,
             check_update,
@@ -1434,5 +1519,69 @@ mod config_location_tests {
             .unwrap();
         assert!(loaded.warnings.is_empty(), "{:?}", loaded.warnings);
         assert!(!local.path().join(td_config::LOCATION_FILE).exists());
+    }
+
+    #[test]
+    fn config_export_import_round_trip_applies_settings() {
+        let a = tempfile::tempdir().unwrap();
+        let b = tempfile::tempdir().unwrap();
+        fs::write(
+            a.path().join("config.toml"),
+            "[behavior]\ntheme = \"dark\"\n",
+        )
+        .unwrap();
+        let (src_state, _rx) = ConfigState::open(Some(a.path().to_path_buf()));
+        let zip = a.path().join("twin-deck-settings.zip");
+        src_state.export_zip(&zip).unwrap();
+
+        fs::write(
+            b.path().join("config.toml"),
+            "[behavior]\ntheme = \"light\"\n",
+        )
+        .unwrap();
+        let (state, _rx2) = ConfigState::open(Some(b.path().to_path_buf()));
+        assert_eq!(theme(&state.current()), "light");
+        let loaded = state.import_zip(&zip).unwrap();
+        assert_eq!(theme(&loaded), "dark");
+        assert_eq!(theme(&state.current()), "dark");
+        assert!(fs::read_to_string(b.path().join("config.toml.bak"))
+            .unwrap()
+            .contains("light"));
+    }
+
+    #[test]
+    fn config_import_follows_config_location() {
+        let local = tempfile::tempdir().unwrap();
+        let cloud = tempfile::tempdir().unwrap();
+        let other = tempfile::tempdir().unwrap();
+        fs::write(
+            other.path().join("config.toml"),
+            "[behavior]\ntheme = \"dark\"\n",
+        )
+        .unwrap();
+        let zip = other.path().join("s.zip");
+        td_config::export_config_zip(other.path(), &zip).unwrap();
+        let (state, _rx) = ConfigState::open(Some(local.path().to_path_buf()));
+        state
+            .switch_location(Some(cloud.path()), LocationConflict::UseExisting)
+            .unwrap();
+        state.import_zip(&zip).unwrap();
+        assert!(cloud.path().join("config.toml").is_file());
+        assert!(!local.path().join("config.toml").exists());
+    }
+
+    #[test]
+    fn config_import_rejects_broken_zip_and_keeps_settings() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(
+            dir.path().join("config.toml"),
+            "[behavior]\ntheme = \"dark\"\n",
+        )
+        .unwrap();
+        let bad = dir.path().join("bad.zip");
+        fs::write(&bad, "not a zip").unwrap();
+        let (state, _rx) = ConfigState::open(Some(dir.path().to_path_buf()));
+        assert!(state.import_zip(&bad).is_err());
+        assert_eq!(theme(&state.current()), "dark");
     }
 }
