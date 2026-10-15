@@ -846,6 +846,11 @@ export class FakeBackend implements Backend {
   async revealConfigDir() {
     this.configDirRevealed += 1;
   }
+  /** 테스트용: 열린 주소. 실제 주소는 Rust 상수(`RELEASES_URL`)가 정한다. */
+  readonly openedUrls: string[] = [];
+  async openReleasesPage() {
+    this.openedUrls.push("https://github.com/gyuha/twin-deck/releases");
+  }
 
   /** 테스트용: 다음 업데이트 확인 결과. 기본은 새 버전 없음. */
   updateScenario: { info: UpdateInfoDto | null; checkError?: string; installError?: string } = { info: null };

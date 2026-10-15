@@ -65,7 +65,7 @@ There are no installers for Intel Macs or Linux. You can build it yourself by fo
 
 ### Update
 
-Press **Check for Updates** at the top of the Settings screen (`Mod+,`; on macOS the **Settings…** item in the menu bar, and on every OS the **Settings** button in the status bar at the bottom), or run "update" in the Actions Panel (`Mod+Shift+P`). If there is a new version it shows the changes, installs it, and restarts the app. The app does not check by itself, so press it once in a while.
+Press **Check for Updates** at the top of the Settings screen (`Mod+,`; on macOS the **Settings…** item in the menu bar, and on every OS the **Settings** button in the status bar at the bottom), or run "update" in the Actions Panel (`Mod+Shift+P`). If there is a new version it shows the changes, installs it, and restarts the app. To read past changes again, press **Release notes** at the top of the Settings screen (or run "Open Release Notes" in the Actions Panel); it opens the GitHub releases list in your default browser. The app does not check by itself, so press it once in a while.
 
 `Mod` is `Cmd` on macOS and `Ctrl` on Windows.
 

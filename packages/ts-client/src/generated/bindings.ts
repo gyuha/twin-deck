@@ -184,6 +184,17 @@ async openPath(path: string) : Promise<Result<null, string>> {
 }
 },
 /**
+ * GitHub 릴리스 목록을 기본 브라우저로 연다 (이슈 #70). 주소는 Rust 상수 하나이고 인수는 없다.
+ */
+async openReleasesPage() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("open_releases_page") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * 설정의 `environment.text_editor`로 항목을 연다.
  */
 async editPaths(paths: string[]) : Promise<Result<null, string>> {

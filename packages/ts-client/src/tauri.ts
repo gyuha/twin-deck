@@ -278,6 +278,9 @@ export class TauriBackend implements Backend {
   async revealConfigDir() {
     unwrap(await commands.revealConfigDir());
   }
+  async openReleasesPage() {
+    unwrap(await commands.openReleasesPage());
+  }
   async checkUpdate() {
     return unwrap(await commands.checkUpdate());
   }

@@ -3229,6 +3229,14 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         set({ settingsError: String(e instanceof Error ? e.message : e) });
       }
     },
+    /** GitHub 릴리스 목록(변경 사항)을 기본 브라우저로 연다(이슈 #70). */
+    async openReleasesPage() {
+      try {
+        await backend.openReleasesPage();
+      } catch (e) {
+        fail(e);
+      }
+    },
     async revealConfigDir() {
       try {
         await backend.revealConfigDir();

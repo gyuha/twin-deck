@@ -466,6 +466,10 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
             >
               {t("settings.update")}
             </Button>
+            {/* GitHub 릴리스 목록을 기본 브라우저로 연다(이슈 #70). 설정은 그대로 둔다. */}
+            <Button size="sm" variant="gray" onClick={() => void api.openReleasesPage()}>
+              {t("settings.releases")}
+            </Button>
             <Button size="sm" variant="gray" onClick={() => void api.revealConfigDir()}>
               {t("settings.open_config_dir")}
             </Button>
