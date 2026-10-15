@@ -807,8 +807,11 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
   const dirSizeQueue: string[] = [];
   let dirSizeRunning: string | null = null;
   let dirSizeInputs: unknown[] = [];
+  // 복사·이동이 시작되면(확인 뒤 `runTransfer`가 도는 동안과 그 작업이 끝날 때까지) 새 계산을 시작하지 않고 진행 중·대기 중 계산도 멈춘다(이슈 #81).
+  let transfersStarting = 0;
+  const transferBusy = (s: AppState) => transfersStarting > 0 || s.queue.some((j) => (j.kind === "copy" || j.kind === "move") && isActiveJob(j));
   function wantedDirSizes(s: AppState): string[] {
-    if (!s.loaded.config.display.folder_size_on_select) return [];
+    if (!s.loaded.config.display.folder_size_on_select || transferBusy(s)) return [];
     const out: string[] = [];
     for (const pane of ["left", "right"] as const) {
       const t = activeTab(s, pane);
@@ -819,7 +822,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
   }
   function syncDirSizes(s: AppState) {
     // 목록·선택·옵션이 그대로면(커서만 움직인 경우 등) 다시 세지 않는다.
-    const inputs = [s.loaded.config.display.folder_size_on_select, ...(["left", "right"] as const).flatMap((pane) => {
+    const inputs = [s.loaded.config.display.folder_size_on_select, transferBusy(s), ...(["left", "right"] as const).flatMap((pane) => {
       const t = activeTab(s, pane);
       return [t.entries, t.selection, t.virtual, t.path];
     })];
@@ -1245,6 +1248,16 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
 
   /** 겹치는 이름은 항목마다(또는 "남은 항목에도 적용"으로) 정한 뒤 작업 큐에 넣는다. 복사/이동의 공통 부분. */
   async function runTransfer(kind: "copy" | "move", targets: { path: string }[], destDir: string, progressDelayMs: number, clearSelection: boolean) {
+    transfersStarting++;
+    syncDirSizes(get()); // 용량 계산을 바로 멈춘다
+    try {
+      await runTransferNow(kind, targets, destDir, progressDelayMs, clearSelection);
+    } finally {
+      transfersStarting--;
+      syncDirSizes(get()); // 작업이 이미 끝났거나 진행 중 작업이 없으면 선택이 남은 폴더의 계산을 다시 시작한다
+    }
+  }
+  async function runTransferNow(kind: "copy" | "move", targets: { path: string }[], destDir: string, progressDelayMs: number, clearSelection: boolean) {
     const verb = kind === "copy" ? tr("store.verb.copy") : tr("store.verb.move");
     const items: QueueItemDto[] = [];
     let sticky: ConflictDto | null = null; // "남은 항목에도 같은 선택 적용"으로 정해진 처리
