@@ -16,6 +16,7 @@ import {
   joinPath,
   parentPath,
   setBackendErrorTranslator,
+  SmbConnectError,
   trimTrailingSep,
 } from "@twin-deck/ts-client";
 import type {
@@ -42,6 +43,7 @@ import type {
   VolumeDto,
   DiskSpaceDto,
   FindSpecDto,
+  SmbServer,
 } from "@twin-deck/ts-client";
 import type { ActionContext } from "@twin-deck/actions";
 import type { Scope } from "@twin-deck/keybinds";
@@ -182,13 +184,15 @@ export type DialogState =
   | { kind: "choice"; title: string; lines: string[]; choices: string[]; selected: number }
   | { kind: "conflict"; title: string; existing: string; selected: number; remaining: number; all: boolean }
   | { kind: "info"; title: string; lines: string[] }
+  /** SMB 비밀번호 입력(가림). 확인이면 `{ value, remember }`, 취소면 null. `error`는 앞서 넣은 비밀번호가 틀렸다는 안내다. */
+  | { kind: "password"; title: string; value: string; remember: boolean; error: string | null }
   /** 실행 중인 전송(복사/이동) 작업의 진행 창. */
   | { kind: "progress"; title: string; jobId: number };
 
 /** 최근 위치 개수 설정(1 이상). */
 export const recentLimit = (c: { behavior: { layout: { recent_limit: number } } }) => Math.max(1, Math.floor(c.behavior.layout.recent_limit) || 20);
 
-export type MenuKind = "volumes" | "favorites" | "recent" | "hierarchy";
+export type MenuKind = "volumes" | "favorites" | "recent" | "hierarchy" | "smb";
 
 export interface MenuItem {
   label: string;
@@ -197,7 +201,16 @@ export interface MenuItem {
   /** 즐겨찾기 항목의 변수 확장 전 경로(삭제할 때 설정 파일과 맞춘다). */
   raw?: string;
   separator?: boolean;
+  /** SMB 연결 메뉴: 연결할 서버 항목 번호(`smb.servers`의 순번). */
+  smb?: number;
+  /** SMB 연결 메뉴의 "서버 관리…": 이 순번의 설정 탭을 연다. */
+  settings?: number;
+  /** 보이지만 고를 수 없다(연결 중인 SMB 항목). */
+  disabled?: boolean;
 }
+
+/** 팝업 메뉴에서 고를 수 있는 항목인지(머리글·구분선·비활성 항목이 아님). */
+export const pickable = (it: MenuItem) => !it.disabled && (it.path !== undefined || it.smb !== undefined || it.settings !== undefined);
 
 export interface MenuState {
   kind: MenuKind;
@@ -207,6 +220,8 @@ export interface MenuState {
   /** 최근 위치·즐겨찾기 메뉴: 필터 전 전체 목록과 입력한 필터. `items`는 필터를 거친 보이는 목록이다. */
   all?: MenuItem[];
   filter?: string;
+  /** SMB 연결 메뉴를 연 드라이브 바의 패널. 연결되면 이 패널이 이동한다. */
+  pane?: PaneId;
 }
 
 /** 컨텍스트 메뉴 항목. `sub`가 있으면 하위 메뉴를 연다. 둘 다 없으면 구분선이다. */
@@ -369,6 +384,8 @@ export interface AppState {
   lastFind: FindForm | null;
   settingsSection: number;
   settingsError: string | null;
+  /** 연결 중인 SMB 서버 항목 번호. 그동안 같은 항목은 다시 연결하지 않고, 메뉴에 "연결 중…"으로 보인다. */
+  smbConnecting: number[];
   /** 설정 파일 저장 경로. 설정 화면이 열릴 때 읽는다. */
   configLocation: ConfigLocationDto | null;
   queueCursor: number;
@@ -564,6 +581,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     lastFind: null,
     settingsSection: 0,
     settingsError: null,
+    smbConnecting: [],
     configLocation: null,
     queueCursor: 0,
     loaded: defaultLoaded(),
@@ -1897,9 +1915,15 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       patchActive({ quick: null });
     },
 
-    /** 이름 다이얼로그의 체크박스를 바꾼다. */
+    /** 이름 다이얼로그의 체크박스(비밀번호 창이면 "기억")를 바꾼다. */
     dialogSetOption(checked: boolean) {
-      set((s) => (s.dialog?.kind === "name" && s.dialog.option ? { dialog: { ...s.dialog, option: { ...s.dialog.option, checked } } } : {}));
+      set((s) =>
+        s.dialog?.kind === "name" && s.dialog.option
+          ? { dialog: { ...s.dialog, option: { ...s.dialog.option, checked } } }
+          : s.dialog?.kind === "password"
+            ? { dialog: { ...s.dialog, remember: checked } }
+            : {},
+      );
     },
     /** 다중 이름 바꾸기 창의 입력을 바꾼다. */
     dialogMultiRenameSet(patch: Partial<RenameOptions>) {
@@ -1909,7 +1933,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       set((s) => (s.dialog?.kind === "multirename" ? { dialog: { ...s.dialog, options: { ...DEFAULT_RENAME_OPTIONS } } } : {}));
     },
     dialogSetValue(value: string) {
-      set((s) => (s.dialog?.kind === "name" ? { dialog: { ...s.dialog, value, error: null } } : {}));
+      set((s) => (s.dialog?.kind === "name" || s.dialog?.kind === "password" ? { dialog: { ...s.dialog, value, error: null } } : {}));
     },
     dialogSetChoice(index: number) {
       set((s) =>
@@ -1945,6 +1969,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
           return;
         }
         result = d.option ? { value: d.value, checked: d.option.checked } : d.value;
+      } else if (d.kind === "password") {
+        result = { value: d.value, remember: d.remember };
       } else if (d.kind === "conflict") {
         result = { choice: CONFLICT_CHOICES[d.selected], all: d.all };
       } else if (d.kind === "choice") {
@@ -2691,7 +2717,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         fail(e);
         return;
       }
-      const first = items.findIndex((i) => i.path !== undefined);
+      const first = items.findIndex(pickable);
       set({ menu: { kind, title, items, cursor: Math.max(first, 0), ...(kind === "recent" || kind === "favorites" ? { all: items, filter: "" } : {}) } });
     },
     /** 파일 행 우클릭: 선택 밖의 행이면 그 행만 대상으로 삼고, 선택 안의 행이면 선택을 유지한 채 메뉴를 연다. */
@@ -2755,7 +2781,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         if (!m) return {};
         const n = m.items.length;
         for (let i = m.cursor + delta; i >= 0 && i < n; i += delta) {
-          if (m.items[i].path !== undefined) return { menu: { ...m, cursor: i } };
+          if (pickable(m.items[i])) return { menu: { ...m, cursor: i } };
         }
         return {};
       });
@@ -2782,17 +2808,80 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const m = get().menu;
       if (!m) return;
       const item = m.items[index ?? m.cursor];
-      if (!item?.path) return;
+      if (!item || !pickable(item)) return;
       set({ menu: null });
-      await api.navigate(item.path);
+      if (item.settings !== undefined) return api.openSettings(item.settings);
+      if (item.smb !== undefined) return api.connectSmb(m.pane ?? get().activePane, item.smb);
+      if (item.path) await api.navigate(item.path);
     },
     /** 숫자키: n번째로 고를 수 있는 항목 (1~9, 0은 10번째). */
     async menuSelectNth(n: number) {
       const m = get().menu;
       if (!m) return;
-      const selectable = m.items.map((it, i) => (it.path !== undefined ? i : -1)).filter((i) => i >= 0);
+      const selectable = m.items.map((it, i) => (pickable(it) ? i : -1)).filter((i) => i >= 0);
       const idx = selectable[n === 0 ? 9 : n - 1];
       if (idx !== undefined) await api.menuSelect(idx);
+    },
+    /**
+     * 드라이브 바의 "연결" 메뉴: 저장된 SMB 서버 항목(연결 중이면 비활성)과 "서버 관리…"(설정의 `settingsSection` 탭을 연다).
+     * 탭 순번은 설정 화면(UI)이 정하므로 부르는 쪽이 넘긴다.
+     */
+    openSmbMenu(pane: PaneId, settingsSection: number) {
+      api.activate(pane);
+      const s = get();
+      const items: MenuItem[] = (s.loaded.config.smb.servers ?? []).map((v, i) =>
+        s.smbConnecting.includes(i) ? { label: tr("store.smb.connecting", { name: v.name }), smb: i, disabled: true } : { label: v.name, smb: i },
+      );
+      if (items.length > 0) items.push({ label: "", separator: true });
+      items.push({ label: tr("store.smb.manage"), settings: settingsSection });
+      set({ notice: null, ctxMenu: null, menu: { kind: "smb", title: tr("store.menu.smb"), items, cursor: Math.max(items.findIndex(pickable), 0), pane } });
+    },
+    /**
+     * 저장된 SMB 서버 항목에 연결하고 그 패널을 마운트 지점으로 옮긴다. 이미 마운트돼 있으면 바로 옮긴다.
+     * 먼저 저장된 비밀번호(키체인)로 시도하고, 인증이 필요하거나 틀리면 비밀번호를 물어 다시 시도한다(취소하면 그만둔다).
+     * 그 밖의 실패는 오류로 알린다. 연결 중에도 UI는 막지 않고, 같은 항목은 끝날 때까지 다시 연결하지 않는다.
+     */
+    async connectSmb(pane: PaneId, index: number) {
+      const server = get().loaded.config.smb.servers?.[index];
+      if (!server || get().smbConnecting.includes(index)) return;
+      set((s) => ({ notice: null, smbConnecting: [...s.smbConnecting, index] }));
+      // 백엔드는 항목을 순번으로 찾는다. 기다리는 사이 설정에서 목록이 바뀌어 이 순번이 다른 서버가 되면,
+      // 비밀번호를 엉뚱한 서버로 보내지 않도록 묻거나 다시 시도하기 전에 멈춘다.
+      const changed = () => {
+        const now = get().loaded.config.smb.servers?.[index];
+        return !now || now.host !== server.host || now.share !== server.share || now.user !== server.user;
+      };
+      try {
+        let password: string | null = null;
+        let remember = false;
+        for (;;) {
+          if (changed()) return fail(tr("store.smb.changed"));
+          let mountPoint: string;
+          try {
+            mountPoint = await backend.smbConnect(index, password, remember);
+          } catch (e) {
+            // 다른 창이 떠 있으면 그 창의 응답을 가로채지 않도록 묻지 않고 오류로 알린다.
+            if (!(e instanceof SmbConnectError) || e.kind !== "auth" || get().dialog) return fail(e);
+            if (changed()) return fail(tr("store.smb.changed"));
+            const answer: { value: string; remember: boolean } | null = await ask<{ value: string; remember: boolean }>({
+              kind: "password",
+              title: tr("store.smb.password_title", { name: server.name }),
+              value: "",
+              remember,
+              error: password === null ? null : tr("store.smb.password_wrong"),
+            });
+            if (answer === null) return;
+            password = answer.value;
+            remember = answer.remember;
+            continue;
+          }
+          await api.refreshVolumes();
+          await api.selectVolume(pane, mountPoint);
+          return;
+        }
+      } finally {
+        set((s) => ({ smbConnecting: s.smbConnecting.filter((i) => i !== index) }));
+      }
     },
     /** 마운트된 볼륨 목록과 두 패널의 용량을 다시 읽는다(앱 시작, 창이 포커스를 얻을 때). 목록을 못 읽으면 이전 목록을 유지한다. */
     async refreshVolumes() {
@@ -3221,8 +3310,9 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         fail(e);
       }
     },
-    openSettings() {
-      set((s) => ({ settingsOpen: true, settingsPane: s.activePane, settingsSection: 0, settingsError: null }));
+    /** 설정 화면을 연다. `section`을 주면 그 탭(설정 화면 `SECTIONS`의 순번)으로 연다. */
+    openSettings(section = 0) {
+      set((s) => ({ settingsOpen: true, settingsPane: s.activePane, settingsSection: section, settingsError: null }));
     },
     closeSettings() {
       set({ settingsOpen: false, settingsError: null });
@@ -3245,6 +3335,27 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         void reloadAll();
       } catch (e) {
         set({ settingsError: String(e instanceof Error ? e.message : e) });
+      }
+    },
+    /** 저장된 SMB 서버 목록 전체를 바꾼다. 성공하면 돌려받은 설정을 바로 적용하고 `true`, 실패하면 설정 화면에 오류를 보이고 `false`. */
+    async setSmbServers(servers: SmbServer[]) {
+      try {
+        set({ loaded: await backend.setSmbServers(servers), settingsError: null });
+        return true;
+      } catch (e) {
+        set({ settingsError: String(e instanceof Error ? e.message : e) });
+        return false;
+      }
+    },
+    /** 저장된 SMB 서버 항목(`index`)의 비밀번호를 키체인에서 지운다. 실패하면 설정 화면에 오류를 보이고 `false`. */
+    async smbForgetPassword(index: number) {
+      try {
+        await backend.smbForgetPassword(index);
+        set({ settingsError: null });
+        return true;
+      } catch (e) {
+        set({ settingsError: String(e instanceof Error ? e.message : e) });
+        return false;
       }
     },
     /** 설정 하나를 사용자 config.toml에서 지워 기본값으로 되돌린다. */

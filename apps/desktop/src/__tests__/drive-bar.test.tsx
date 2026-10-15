@@ -21,7 +21,7 @@ describe("드라이브 바", () => {
   it("각 패널 위에 마운트된 볼륨 버튼이 나온다", async () => {
     await renderApp(setup());
     for (const side of ["왼쪽", "오른쪽"] as const) {
-      await waitFor(() => expect(within(bar(side)).getAllByRole("button").map((b) => b.textContent)).toEqual(["/", "USB"]));
+      await waitFor(() => expect(within(bar(side)).getAllByRole("button").map((b) => b.textContent)).toEqual(["/", "USB", "연결"]));
     }
   });
 
@@ -194,9 +194,9 @@ describe("드라이브 바", () => {
       await user.click(volButton("왼쪽", "USB"));
       await waitFor(() => expect(within(bar("왼쪽")).getByRole("button", { name: "언마운트" })).toBeInTheDocument());
       const buttons = within(bar("왼쪽")).getAllByRole("button");
-      expect(buttons.map((b) => b.getAttribute("aria-label") ?? b.textContent)).toEqual(["/", "USB", "언마운트"]);
+      expect(buttons.map((b) => b.getAttribute("aria-label") ?? b.textContent)).toEqual(["/", "USB", "연결", "언마운트"]);
       expect(info("왼쪽").className).toContain("ml-auto");
-      expect(info("왼쪽")).toContainElement(buttons[2]);
+      expect(info("왼쪽")).toContainElement(buttons[3]);
       expect(info("왼쪽").textContent).toBe("⏏ 언마운트");
       await waitFor(() => expect(pathNav("왼쪽")).toHaveTextContent("1.5 GB 남음"));
     });
@@ -207,6 +207,201 @@ describe("드라이브 바", () => {
       fireEvent.contextMenu(pathNav("왼쪽"));
       expect(await screen.findByRole("textbox", { name: "경로 입력" })).toBeInTheDocument();
       expect(pathNav("왼쪽")).not.toHaveTextContent("남음");
+    });
+  });
+
+  describe("SMB 연결 메뉴 (이슈 #77)", () => {
+    const NAS = { name: "NAS", host: "nas.local", share: "media", user: "kim" };
+    const GUEST = { name: "공용", host: "nas.local", share: "public", user: "" };
+    const OFFLINE = { name: "꺼진 서버", host: "offline", share: "data", user: "" };
+    const withServers = (...servers: (typeof NAS)[]) => {
+      const backend = setup();
+      backend.setConfig((l) => (l.config.smb = { servers }));
+      return backend;
+    };
+    const menu = () => screen.getByRole("dialog", { name: "SMB 서버에 연결" });
+    const options = () => within(menu()).getAllByRole("option").map((o) => o.textContent?.trim());
+    const openConnect = async (user: Awaited<ReturnType<typeof renderApp>>["user"], side: "왼쪽" | "오른쪽" = "왼쪽") => {
+      await user.click(within(bar(side)).getByRole("button", { name: "연결" }));
+      return menu();
+    };
+    const pick = async (user: Awaited<ReturnType<typeof renderApp>>["user"], name: string) =>
+      user.click(within(menu()).getByRole("option", { name: new RegExp(name) }));
+    const rightCrumbs = () =>
+      within(pathNav("오른쪽"))
+        .getAllByRole("button")
+        .map((b) => b.textContent);
+    const passwordDialog = () => screen.findByRole("dialog", { name: "NAS 비밀번호" });
+
+    it("연결 메뉴에 저장된 항목과 구분선, 서버 관리…가 보인다", async () => {
+      const { user } = await renderApp(withServers(NAS, GUEST));
+      await openConnect(user);
+      expect(options()).toEqual(["1NAS", "2공용", "3서버 관리…"]);
+      expect(within(menu()).getByRole("separator")).toBeInTheDocument();
+    });
+
+    it("저장된 항목이 없으면 서버 관리…만 있다", async () => {
+      const { user } = await renderApp(setup());
+      await openConnect(user);
+      expect(options()).toEqual(["1서버 관리…"]);
+      expect(within(menu()).queryByRole("separator")).toBeNull();
+    });
+
+    it("항목을 고르면 마운트하고 그 패널이 마운트 지점으로 이동한다(볼륨 버튼도 생긴다)", async () => {
+      const { user } = await renderApp(withServers(GUEST));
+      await openConnect(user, "오른쪽");
+      await pick(user, "공용");
+      await waitFor(() => expect(rightCrumbs()).toEqual(["/", "Volumes", "public"]));
+      expect(screen.queryByRole("dialog", { name: "SMB 서버에 연결" })).toBeNull();
+      expect(volButton("오른쪽", "public")).toHaveAttribute("aria-pressed", "true");
+      expect(leftCrumbs()).toEqual(["/", "home", "a"]); // 다른 패널은 그대로
+    });
+
+    it("이미 마운트된 항목은 비밀번호를 묻지 않고 바로 이동한다", async () => {
+      const backend = withServers(NAS);
+      backend.volumes.push({ name: "media", mountPoint: "/Volumes/media" });
+      backend.seed({ "/Volumes/media/movie.mkv": "m" });
+      const { user } = await renderApp(backend);
+      await openConnect(user);
+      await pick(user, "NAS");
+      await waitFor(() => expect(leftCrumbs()).toEqual(["/", "Volumes", "media"]));
+      expect(screen.queryByRole("dialog", { name: "NAS 비밀번호" })).toBeNull();
+    });
+
+    it("저장된 비밀번호가 있으면 묻지 않고 연결한다", async () => {
+      const backend = withServers(NAS);
+      backend.smbPasswords.set("kim@nas.local/media", "secret");
+      const { user } = await renderApp(backend);
+      await openConnect(user);
+      await pick(user, "NAS");
+      await waitFor(() => expect(leftCrumbs()).toEqual(["/", "Volumes", "media"]));
+      expect(screen.queryByRole("dialog", { name: "NAS 비밀번호" })).toBeNull();
+    });
+
+    it("인증이 필요하면 비밀번호를 묻고, 틀리면 다시 묻고, 맞으면 이동한다(기억하면 저장된다)", async () => {
+      const backend = withServers(NAS);
+      const { user } = await renderApp(backend);
+      await openConnect(user);
+      await pick(user, "NAS");
+      let d = await passwordDialog();
+      const input = within(d).getByLabelText("비밀번호");
+      expect(input).toHaveAttribute("type", "password");
+      expect(within(d).queryByRole("alert")).toBeNull(); // 처음에는 틀렸다는 안내가 없다
+      await user.type(input, "bad{Enter}");
+      d = await passwordDialog();
+      expect(await within(d).findByRole("alert")).toHaveTextContent("비밀번호가 맞지 않습니다");
+      expect(within(d).getByLabelText("비밀번호")).toHaveValue("");
+      await user.click(within(d).getByRole("checkbox", { name: "비밀번호 기억" }));
+      await user.type(within(d).getByLabelText("비밀번호"), "secret");
+      await user.click(within(d).getByRole("button", { name: "확인" }));
+      await waitFor(() => expect(leftCrumbs()).toEqual(["/", "Volumes", "media"]));
+      expect(screen.queryByRole("dialog", { name: "NAS 비밀번호" })).toBeNull();
+      expect(backend.smbPasswords.get("kim@nas.local/media")).toBe("secret");
+    });
+
+    it("비밀번호 창에서 Esc로 취소하면 연결하지 않고 이동하지 않는다", async () => {
+      const backend = withServers(NAS);
+      const { user } = await renderApp(backend);
+      await openConnect(user);
+      await pick(user, "NAS");
+      await passwordDialog();
+      await user.keyboard("{Escape}");
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: "NAS 비밀번호" })).toBeNull());
+      expect(leftCrumbs()).toEqual(["/", "home", "a"]);
+      expect(backend.volumes.map((v) => v.mountPoint)).not.toContain("/Volumes/media");
+      expect(screen.queryByRole("alert")).toBeNull();
+    });
+
+    // dialog 스코프는 모달이라(keymap MODAL_SCOPES) 바깥 pane 바인딩이 풀리지 않는다. 그 회귀 점검이다.
+    it("비밀번호 입력 중의 패널 단축키(F8)는 패널로 가지 않는다", async () => {
+      const backend = withServers(NAS);
+      backend.seed({ "/home/a/keep.txt": "k" });
+      const { user } = await renderApp(backend);
+      await openConnect(user);
+      await pick(user, "NAS");
+      await passwordDialog();
+      await user.keyboard("{F8}");
+      await new Promise((r) => setTimeout(r, 30));
+      expect(screen.queryByRole("dialog", { name: /휴지통|삭제/ })).toBeNull();
+      expect(backend.trashed).toEqual([]);
+    });
+
+    it("서버에 닿지 않으면 오류 메시지를 보이고 이동하지 않는다", async () => {
+      const { user } = await renderApp(withServers(OFFLINE));
+      await openConnect(user);
+      await pick(user, "꺼진 서버");
+      expect(await screen.findByText("서버나 공유에 연결할 수 없습니다")).toBeInTheDocument();
+      expect(leftCrumbs()).toEqual(["/", "home", "a"]);
+      expect(screen.queryByRole("dialog", { name: "꺼진 서버 비밀번호" })).toBeNull();
+    });
+
+    it("연결 중인 항목은 메뉴에서 '연결 중…'으로 비활성이다", async () => {
+      const backend = withServers(GUEST);
+      let release!: () => void;
+      const gate = new Promise<void>((r) => (release = r));
+      const original = backend.smbConnect.bind(backend);
+      let calls = 0;
+      backend.smbConnect = async (...args) => {
+        calls += 1;
+        await gate;
+        return original(...args);
+      };
+      const { user } = await renderApp(backend);
+      await openConnect(user);
+      await pick(user, "공용");
+      await openConnect(user); // 연결 중에도 UI는 막히지 않는다
+      const busy = within(menu()).getByRole("option", { name: /공용 — 연결 중…/ });
+      expect(busy).toHaveAttribute("aria-disabled", "true");
+      await user.click(busy); // 골라도 다시 연결하지 않는다
+      expect(calls).toBe(1);
+      await user.keyboard("{Escape}");
+      release();
+      await waitFor(() => expect(leftCrumbs()).toEqual(["/", "Volumes", "public"]));
+      expect(calls).toBe(1);
+    });
+
+    // 백엔드는 항목을 순번으로 찾는다. 연결 중에 목록이 바뀌면 같은 순번이 다른 서버라서 비밀번호를 엉뚱한 서버로 보낼 수 있다.
+    it("연결 중에 서버 목록이 바뀌면 비밀번호를 묻지 않고 멈춘다", async () => {
+      const OTHER = { name: "다른 서버", host: "other.local", share: "media", user: "kim" };
+      const backend = withServers(NAS, OTHER);
+      let release!: () => void;
+      const gate = new Promise<void>((r) => (release = r));
+      const original = backend.smbConnect.bind(backend);
+      let calls = 0;
+      backend.smbConnect = async (...args) => {
+        calls += 1;
+        await gate;
+        return original(...args);
+      };
+      const { user } = await renderApp(backend);
+      await openConnect(user);
+      await pick(user, "NAS");
+      await openConnect(user);
+      await pick(user, "서버 관리…");
+      const group = await screen.findByRole("group", { name: "저장된 SMB 서버" });
+      await user.click(within(group).getByRole("button", { name: "삭제" })); // 0번 NAS를 지운다 → 0번이 "다른 서버"가 된다
+      await user.click(within(group).getByRole("button", { name: "저장" }));
+      await waitFor(async () => expect((await backend.getConfig()).config.smb.servers).toEqual([OTHER]));
+      release();
+      await new Promise((r) => setTimeout(r, 50));
+      expect(screen.queryByRole("dialog", { name: /비밀번호/ })).toBeNull();
+      expect(calls).toBe(1);
+      await user.keyboard("{Escape}"); // 설정을 닫으면 멈춘 이유가 보인다
+      expect(await screen.findByText(/서버 목록이 바뀌어 연결을 멈췄습니다/)).toBeInTheDocument();
+    });
+
+    it("서버 관리…를 고르면 설정의 SMB 서버 탭이 열린다", async () => {
+      const { user } = await renderApp(withServers(NAS));
+      await openConnect(user);
+      await pick(user, "서버 관리…");
+      expect(await screen.findByRole("tab", { name: "SMB 서버" })).toHaveAttribute("aria-selected", "true");
+    });
+
+    it("메뉴는 키보드(↓·Return)로도 고른다", async () => {
+      const { user } = await renderApp(withServers(GUEST));
+      await openConnect(user);
+      await user.keyboard("{ArrowDown}{Enter}");
+      expect(await screen.findByRole("tab", { name: "SMB 서버" })).toHaveAttribute("aria-selected", "true");
     });
   });
 });

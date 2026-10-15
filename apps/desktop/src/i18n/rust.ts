@@ -203,6 +203,17 @@ export const RUST_MESSAGES: readonly (readonly [ko: string, en: string])[] = [
   ["앱 실행 파일 위치를 알 수 없습니다: {e}", "The app executable location is unknown: {e}"],
   ["사용법: td [폴더 [폴더]]  (첫 폴더는 왼쪽 패널, 둘째는 오른쪽 패널에 새 탭으로 엽니다)", "Usage: td [folder [folder]]  (the first folder opens in the left pane, the second in the right pane, each as a new tab)"],
   ["경로를 확인할 수 없음 {path}: {source}", "Cannot check the path {path}: {source}"],
+  ["host와 share가 필요합니다", "host and share are required"],
+  ["smb.servers[{}]: host와 share가 필요합니다", "smb.servers[{}]: host and share are required"],
+  ["smb: 테이블이 아닙니다", "smb: not a table"],
+  ["인증에 실패했습니다. 사용자 이름과 비밀번호를 확인하세요", "Authentication failed. Check the user name and password"],
+  ["서버나 공유에 연결할 수 없습니다", "Cannot connect to the server or share"],
+  ["이 운영체제에서는 SMB 연결을 지원하지 않습니다", "SMB connections are not supported on this operating system"],
+  ["SMB 연결에 실패했습니다: {0}", "SMB connection failed: {0}"],
+  ["NetFS 오류 {code} ({})", "NetFS error {code} ({})"],
+  ["잘못된 SMB 주소: {url_str}", "Invalid SMB address: {url_str}"],
+  ["마운트 지점을 받지 못했습니다", "No mount point was returned"],
+  ["SMB 서버 항목이 없습니다: {index}", "No such SMB server entry: {index}"],
 ];
 
 /** 사용자에게 그대로 보이지 않는 한국어 리터럴: 개발자용 진단·테스트 확인 문구, 더 큰 문구를 이루는 조각. 한국어로 둔다. */

@@ -506,6 +506,116 @@ pub fn reset_config_value(
     Ok(loaded)
 }
 
+/// 저장된 SMB 서버 목록(`[[smb.servers]]`) 전체를 바꾸고, 새로 병합된 설정을 바로 돌려준다.
+/// 목록은 설정(`Loaded`)의 `smb.servers`로 읽는다. host나 share가 빈 항목이 있으면 쓰지 않고 거부한다.
+#[tauri::command]
+#[specta::specta]
+pub fn set_smb_servers(
+    config: State<'_, ConfigState>,
+    servers: Vec<td_config::SmbServer>,
+) -> ServiceResult<Loaded> {
+    config.update(|dir| td_config::set_smb_servers(dir, &servers))
+}
+
+/// SMB 연결 실패의 종류. UI는 `auth`면 비밀번호를 다시 묻는다.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub enum SmbErrorKindDto {
+    Auth,
+    Unreachable,
+    Unsupported,
+    Other,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct SmbFailureDto {
+    pub kind: SmbErrorKindDto,
+    pub message: String,
+}
+
+/// `smb_connect`의 결과: 마운트 지점, 또는 종류가 구분된 실패.
+/// 설정 디렉터리 없음·없는 항목 번호 같은 그 밖의 문제는 명령 오류(문자열)로 온다.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub enum SmbConnectDto {
+    Mounted(String),
+    Failed(SmbFailureDto),
+}
+
+impl From<Result<std::path::PathBuf, td_smb::SmbError>> for SmbConnectDto {
+    fn from(r: Result<std::path::PathBuf, td_smb::SmbError>) -> Self {
+        match r {
+            Ok(path) => Self::Mounted(path.to_string_lossy().into_owned()),
+            Err(e) => {
+                let kind = match e {
+                    td_smb::SmbError::Auth => SmbErrorKindDto::Auth,
+                    td_smb::SmbError::Unreachable => SmbErrorKindDto::Unreachable,
+                    td_smb::SmbError::Unsupported => SmbErrorKindDto::Unsupported,
+                    td_smb::SmbError::Other(_) => SmbErrorKindDto::Other,
+                };
+                Self::Failed(SmbFailureDto {
+                    kind,
+                    message: e.to_string(),
+                })
+            }
+        }
+    }
+}
+
+/// 설정의 `index`번째 SMB 서버 항목을 연결 대상으로 바꾼다. 빈 `user`는 게스트다.
+fn smb_target(config: &ConfigState, index: u32) -> ServiceResult<td_smb::SmbTarget> {
+    let loaded = config.current();
+    let s = loaded
+        .config
+        .smb
+        .servers
+        .get(index as usize)
+        .ok_or_else(|| format!("SMB 서버 항목이 없습니다: {index}"))?;
+    Ok(td_smb::SmbTarget {
+        host: s.host.clone(),
+        share: s.share.clone(),
+        user: Some(s.user.clone()).filter(|u| !u.is_empty()),
+    })
+}
+
+/// 설정의 `index`번째 SMB 서버에 연결(OS 마운트)한다. 이미 마운트돼 있으면 그 경로를 돌려준다.
+/// `password`가 없으면 키체인 값을 쓴다. 성공했고 `remember`면 받은 비밀번호를 키체인에 저장한다.
+/// 마운트는 블로킹이라 UI 스레드를 막지 않게 따로 돌린다.
+#[tauri::command]
+#[specta::specta]
+pub async fn smb_connect(
+    config: State<'_, ConfigState>,
+    index: u32,
+    password: Option<String>,
+    remember: bool,
+) -> ServiceResult<SmbConnectDto> {
+    let target = smb_target(&config, index)?;
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        td_smb::connect(
+            &target,
+            password,
+            remember,
+            &td_smb::SystemMounter,
+            &td_smb::KeyringStore,
+            td_smb::find_mounted,
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    Ok(result.into())
+}
+
+/// 설정의 `index`번째 SMB 서버에 저장된 비밀번호를 키체인에서 지운다. 저장된 값이 없어도 성공이다.
+#[tauri::command]
+#[specta::specta]
+pub fn smb_forget_password(config: State<'_, ConfigState>, index: u32) -> ServiceResult<()> {
+    use td_smb::SecretStore;
+    let target = smb_target(&config, index)?;
+    td_smb::KeyringStore
+        .delete(&td_smb::secret_key(&target))
+        .map_err(|e| e.to_string())
+}
+
 /// 설정 화면: 설정 폴더를 파일 관리자로 연다.
 #[tauri::command]
 #[specta::specta]
@@ -1296,6 +1406,9 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             reset_config_value,
             reveal_config_dir,
             get_config_location,
+            set_smb_servers,
+            smb_connect,
+            smb_forget_password,
             pick_folder,
             pick_save_file,
             pick_file,
@@ -1591,5 +1704,42 @@ mod config_location_tests {
         let (state, _rx) = ConfigState::open(Some(dir.path().to_path_buf()));
         assert!(state.import_zip(&bad).is_err());
         assert_eq!(theme(&state.current()), "dark");
+    }
+}
+
+#[cfg(test)]
+mod smb_tests {
+    use super::*;
+
+    #[test]
+    fn smb_서버_항목을_연결_대상으로_바꾸고_빈_user는_게스트다() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("config.toml"),
+            "[[smb.servers]]\nhost = \"nas\"\nshare = \"공유\"\nuser = \"\"\n\n\
+             [[smb.servers]]\nhost = \"nas\"\nshare = \"home\"\nuser = \"kim\"\n",
+        )
+        .unwrap();
+        let (state, _rx) = ConfigState::open(Some(dir.path().to_path_buf()));
+        let guest = smb_target(&state, 0).unwrap();
+        assert_eq!(guest.share, "공유");
+        assert_eq!(guest.user, None);
+        assert_eq!(smb_target(&state, 1).unwrap().user.as_deref(), Some("kim"));
+        assert!(smb_target(&state, 2).is_err());
+    }
+
+    #[test]
+    fn smb_연결_결과는_인증_실패를_구분한다() {
+        let ok: SmbConnectDto = Ok(std::path::PathBuf::from("/Volumes/공유")).into();
+        assert_eq!(ok, SmbConnectDto::Mounted("/Volumes/공유".into()));
+        let SmbConnectDto::Failed(f) = Err(td_smb::SmbError::Auth).into() else {
+            panic!("실패여야 한다");
+        };
+        assert_eq!(f.kind, SmbErrorKindDto::Auth);
+        let SmbConnectDto::Failed(f) = Err(td_smb::SmbError::Other("x".into())).into() else {
+            panic!("실패여야 한다");
+        };
+        assert_eq!(f.kind, SmbErrorKindDto::Other);
+        assert!(f.message.contains('x'));
     }
 }

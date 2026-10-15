@@ -2,10 +2,11 @@ import { volumeOf } from "../lib/volumes";
 import { useApp, useAppStore, useT } from "../state/context";
 import { activeTab } from "../state/store";
 import type { PaneId } from "../state/store";
+import { SMB_SECTION } from "./Settings";
 
 /**
  * 패널 위의 드라이브 바(Double Commander 방식). 한 줄이다: 마운트된 볼륨 버튼(현재 볼륨 강조, 누르면 그 루트로 이동)이 왼쪽에 있고,
- * 오른쪽 끝에 루트가 아닌 볼륨일 때만 언마운트 버튼이 있다. 남은 용량은 이 바를 꺼도 보이도록 경로 표시줄(Breadcrumb) 오른쪽 끝에 있다.
+ * 볼륨 버튼 뒤에 저장된 SMB 서버에 연결하는 "연결" 버튼(메뉴), 오른쪽 끝에 루트가 아닌 볼륨일 때만 언마운트 버튼이 있다. 남은 용량은 이 바를 꺼도 보이도록 경로 표시줄(Breadcrumb) 오른쪽 끝에 있다.
  * 볼륨 버튼이 많아 줄이 넘치면 오른쪽 끝 블록은 다음 줄로 내려가도 오른쪽에 붙는다.
  * `behavior.layout.show_drive_bar`로 끈다(설정 화면, 메뉴바 View 메뉴, `core.view.drive_bar`).
  */
@@ -37,6 +38,14 @@ export function DriveBar({ pane }: { pane: PaneId }) {
             </button>
           );
         })}
+        <button
+          type="button"
+          title={t("drive.connect_title")}
+          className="rounded border border-dashed border-app-line px-2 py-0.5 text-ink-dull hover:bg-app-selected"
+          onClick={() => api.openSmbMenu(pane, SMB_SECTION)}
+        >
+          {t("drive.connect")}
+        </button>
         {current && current.mountPoint !== "/" && current.mountPoint !== volumes[0].mountPoint && (
           <span role="group" aria-label={t("drive.current_aria", { side })} className="ml-auto flex shrink-0 items-center gap-2">
             <button type="button" aria-label={t("drive.unmount")} className="rounded border border-app-line px-2 py-0.5 hover:bg-app-selected" onClick={() => void api.unmountVolume(pane)}>

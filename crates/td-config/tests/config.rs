@@ -1291,3 +1291,154 @@ fn single_instance_defaults_on_and_can_be_turned_off() {
     assert!(l.warnings.is_empty(), "{:?}", l.warnings);
     assert!(!l.config.environment.single_instance);
 }
+
+fn smb(name: &str, host: &str, share: &str, user: &str) -> td_config::SmbServer {
+    td_config::SmbServer {
+        name: name.into(),
+        host: host.into(),
+        share: share.into(),
+        user: user.into(),
+    }
+}
+
+#[test]
+fn smb_servers_default_to_empty() {
+    let l = load_from_strs(None, None, Platform::Linux);
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert!(l.config.smb.servers.is_empty());
+}
+
+#[test]
+fn smb_servers_are_read_from_user_config() {
+    let l = load(
+        r#"
+[[smb.servers]]
+name = "사무실 NAS"
+host = "nas.local"
+share = "공유 폴더"
+user = "me"
+
+[[smb.servers]]
+host = "10.0.0.5"
+share = "public"
+"#,
+    );
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert_eq!(
+        l.config.smb.servers,
+        [
+            smb("사무실 NAS", "nas.local", "공유 폴더", "me"),
+            // name이 없으면 host/share, user가 없으면 게스트(빈 문자열)
+            smb("10.0.0.5/public", "10.0.0.5", "public", ""),
+        ]
+    );
+}
+
+#[test]
+fn smb_servers_without_host_or_share_are_dropped_with_warning() {
+    let l = load(
+        r#"
+[[smb.servers]]
+name = "호스트 없음"
+host = ""
+share = "a"
+
+[[smb.servers]]
+host = "nas"
+
+[[smb.servers]]
+name = ""
+host = "nas"
+share = "b"
+"#,
+    );
+    assert_eq!(l.config.smb.servers, [smb("nas/b", "nas", "b", "")]);
+    assert_eq!(l.warnings.len(), 2, "{:?}", l.warnings);
+    assert!(l.warnings[0].message.starts_with("smb.servers[1]"));
+    assert!(l.warnings[1].message.starts_with("smb.servers[2]"));
+
+    // 테이블이 아닌 항목도 빠지고 경고, 목록이 배열이 아니면 기본값(빈 목록)
+    let l = load("[smb]\nservers = [\"nas\"]\n");
+    assert!(l.config.smb.servers.is_empty());
+    assert_eq!(l.warnings.len(), 1, "{:?}", l.warnings);
+    let l = load("[smb]\nservers = 3\n");
+    assert!(l.config.smb.servers.is_empty());
+    assert_eq!(l.warnings.len(), 1, "{:?}", l.warnings);
+}
+
+#[test]
+fn smb_servers_write_then_read_back_and_keep_other_settings() {
+    let d = user_value_dir(Some(
+        "# 내 설정\n[behavior]\ntheme = \"dark\" # 테마\n\n[[favorites]]\nname = \"A\"\npath = \"/a\"\n",
+    ));
+    let servers = [
+        smb("NAS \"집\"", "nas.local", "공유 폴더", "DOMAIN;me"),
+        smb("공개", "10.0.0.5:445", "public", ""),
+    ];
+    td_config::set_smb_servers(d.path(), &servers).unwrap();
+    let text = fs::read_to_string(d.path().join("config.toml")).unwrap();
+    assert!(text.contains("# 내 설정"), "{text}");
+    assert!(text.contains("theme = \"dark\" # 테마"), "{text}");
+    assert!(text.contains("[[smb.servers]]"), "{text}");
+    assert!(
+        !text.contains("[smb]\n"),
+        "빈 [smb] 머리글이 찍혔다: {text}"
+    );
+    let l = load_dir(d.path(), Platform::Linux);
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert_eq!(l.config.smb.servers, servers);
+    assert_eq!(l.config.behavior.theme, "dark");
+    assert_eq!(l.config.favorites.len(), 1);
+
+    // 다시 쓰면 목록이 통째로 바뀐다
+    td_config::set_smb_servers(d.path(), &servers[1..]).unwrap();
+    let l = load_dir(d.path(), Platform::Linux);
+    assert_eq!(l.config.smb.servers, servers[1..]);
+
+    // 빈 목록이면 키를 지운다
+    td_config::set_smb_servers(d.path(), &[]).unwrap();
+    let text = fs::read_to_string(d.path().join("config.toml")).unwrap();
+    assert!(!text.contains("smb"), "{text}");
+    assert!(text.contains("# 내 설정"), "{text}");
+    let l = load_dir(d.path(), Platform::Linux);
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert!(l.config.smb.servers.is_empty());
+    assert_eq!(l.config.favorites.len(), 1);
+}
+
+#[test]
+fn smb_servers_write_creates_file_and_replaces_inline_array() {
+    let d = user_value_dir(None);
+    td_config::set_smb_servers(d.path(), &[smb("n", "h", "s", "u")]).unwrap();
+    let l = load_dir(d.path(), Platform::Linux);
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert_eq!(l.config.smb.servers, [smb("n", "h", "s", "u")]);
+
+    let d = user_value_dir(Some(
+        "[smb]\nservers = [ { host = \"old\", share = \"x\" } ]\n",
+    ));
+    td_config::set_smb_servers(d.path(), &[smb("n", "h", "s", "")]).unwrap();
+    let l = load_dir(d.path(), Platform::Linux);
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert_eq!(l.config.smb.servers, [smb("n", "h", "s", "")]);
+}
+
+#[test]
+fn smb_servers_write_refuses_invalid_entries_and_broken_file() {
+    let original = "[behavior]\ntheme = \"dark\"\n";
+    let d = user_value_dir(Some(original));
+    assert!(td_config::set_smb_servers(d.path(), &[smb("n", "h", " ", "")]).is_err());
+    assert!(td_config::set_smb_servers(d.path(), &[smb("n", "", "s", "")]).is_err());
+    assert_eq!(
+        fs::read_to_string(d.path().join("config.toml")).unwrap(),
+        original
+    );
+
+    let broken = "[behavior\ntheme = ";
+    let d = user_value_dir(Some(broken));
+    assert!(td_config::set_smb_servers(d.path(), &[smb("n", "h", "s", "")]).is_err());
+    assert_eq!(
+        fs::read_to_string(d.path().join("config.toml")).unwrap(),
+        broken
+    );
+}

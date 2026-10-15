@@ -14,6 +14,7 @@ const dlg = (name: string | RegExp) => screen.findByRole("dialog", { name });
 const KINDS: Record<DialogState["kind"], "button" | "input"> = {
   name: "input",
   multirename: "input",
+  password: "input",
   confirm: "button",
   choice: "button",
   conflict: "button",
@@ -22,8 +23,8 @@ const KINDS: Record<DialogState["kind"], "button" | "input"> = {
 };
 
 describe("다이얼로그가 열릴 때의 포커스 (이슈 #41)", () => {
-  it("종류 목록이 7가지 전부를 다룬다", () => {
-    expect(Object.keys(KINDS).sort()).toEqual(["choice", "confirm", "conflict", "info", "multirename", "name", "progress"]);
+  it("종류 목록이 8가지 전부를 다룬다", () => {
+    expect(Object.keys(KINDS).sort()).toEqual(["choice", "confirm", "conflict", "info", "multirename", "name", "password", "progress"]);
   });
 
   it("confirm(영구 삭제 확인): 확인 버튼에 포커스", async () => {
