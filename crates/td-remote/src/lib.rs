@@ -5,6 +5,7 @@ mod connect;
 mod error;
 mod ftp;
 mod secret;
+pub mod server;
 mod sftp;
 #[cfg(feature = "testing")]
 pub mod testing;
