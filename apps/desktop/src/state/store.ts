@@ -208,7 +208,7 @@ export interface MenuItem {
   smb?: number;
   /** 연결 메뉴: 연결할 원격(SFTP·FTP) 서버 항목 번호(`remote.servers`의 순번). */
   remote?: number;
-  /** SMB 연결 메뉴의 "서버 관리…": 이 순번의 설정 탭을 연다. */
+  /** SMB 연결 메뉴의 "SMB 서버 관리…": 이 순번의 설정 탭을 연다. */
   settings?: number;
   /** 보이지만 고를 수 없다(연결 중인 SMB 항목). */
   disabled?: boolean;
@@ -2828,7 +2828,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     },
     /**
      * 드라이브 바의 "연결" 메뉴: 저장된 SMB 서버 항목, 원격(SFTP·FTP) 서버 항목(연결 중이면 비활성), 그리고 각 설정 탭을 여는
-     * "서버 관리…"·"원격 서버 관리…". 탭 순번은 설정 화면(UI)이 정하므로 부르는 쪽이 넘긴다.
+     * "SMB 서버 관리…"·"SFTP·FTP 관리…". 탭 순번은 설정 화면(UI)이 정하므로 부르는 쪽이 넘긴다.
      */
     openSmbMenu(pane: PaneId, smbSection: number, remoteSection?: number) {
       api.activate(pane);

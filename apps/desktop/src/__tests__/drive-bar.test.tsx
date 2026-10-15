@@ -233,17 +233,17 @@ describe("드라이브 바", () => {
         .map((b) => b.textContent);
     const passwordDialog = () => screen.findByRole("dialog", { name: "NAS 비밀번호" });
 
-    it("연결 메뉴에 저장된 항목과 구분선, 서버 관리…가 보인다", async () => {
+    it("연결 메뉴에 저장된 항목과 구분선, SMB 서버 관리…가 보인다", async () => {
       const { user } = await renderApp(withServers(NAS, GUEST));
       await openConnect(user);
-      expect(options()).toEqual(["1NAS", "2공용", "3서버 관리…", "4원격 서버 관리…"]);
+      expect(options()).toEqual(["1NAS", "2공용", "3SMB 서버 관리…", "4SFTP·FTP 관리…"]);
       expect(within(menu()).getByRole("separator")).toBeInTheDocument();
     });
 
-    it("저장된 항목이 없으면 서버 관리…만 있다", async () => {
+    it("저장된 항목이 없으면 SMB 서버 관리…와 SFTP·FTP 관리…만 있다", async () => {
       const { user } = await renderApp(setup());
       await openConnect(user);
-      expect(options()).toEqual(["1서버 관리…", "2원격 서버 관리…"]);
+      expect(options()).toEqual(["1SMB 서버 관리…", "2SFTP·FTP 관리…"]);
       expect(within(menu()).queryByRole("separator")).toBeNull();
     });
 
@@ -377,7 +377,7 @@ describe("드라이브 바", () => {
       await openConnect(user);
       await pick(user, "NAS");
       await openConnect(user);
-      await user.click(within(menu()).getByRole("option", { name: /^(?!.*원격).*서버 관리…/ }));
+      await user.click(within(menu()).getByRole("option", { name: /SMB 서버 관리…/ }));
       const group = await screen.findByRole("group", { name: "저장된 SMB 서버" });
       await user.click(within(group).getByRole("button", { name: "삭제" })); // 0번 NAS를 지운다 → 0번이 "다른 서버"가 된다
       await user.click(within(group).getByRole("button", { name: "저장" }));
@@ -390,10 +390,10 @@ describe("드라이브 바", () => {
       expect(await screen.findByText(/서버 목록이 바뀌어 연결을 멈췄습니다/)).toBeInTheDocument();
     });
 
-    it("서버 관리…를 고르면 설정의 SMB 서버 탭이 열린다", async () => {
+    it("SMB 서버 관리…를 고르면 설정의 SMB 서버 탭이 열린다", async () => {
       const { user } = await renderApp(withServers(NAS));
       await openConnect(user);
-      await user.click(within(menu()).getByRole("option", { name: /^(?!.*원격).*서버 관리…/ }));
+      await user.click(within(menu()).getByRole("option", { name: /SMB 서버 관리…/ }));
       expect(await screen.findByRole("tab", { name: "SMB 서버" })).toHaveAttribute("aria-selected", "true");
     });
 
@@ -429,10 +429,10 @@ describe("드라이브 바", () => {
         .map((b) => b.textContent);
     const passwordDialog = () => screen.findByRole("dialog", { name: "회사 비밀번호" });
 
-    it("연결 메뉴에 저장된 원격 항목이 프로토콜과 함께 보이고 원격 서버 관리…가 있다", async () => {
+    it("연결 메뉴에 저장된 원격 항목이 프로토콜과 함께 보이고 SFTP·FTP 관리…가 있다", async () => {
       const { user } = await renderApp(withRemotes(SFTP, FTP));
       await openConnect(user);
-      expect(options()).toEqual(["1SFTP · 회사", "2FTP · 공개", "3서버 관리…", "4원격 서버 관리…"]);
+      expect(options()).toEqual(["1SFTP · 회사", "2FTP · 공개", "3SMB 서버 관리…", "4SFTP·FTP 관리…"]);
     });
 
     it("SFTP 항목을 고르면 비밀번호를 묻고 맞으면 그 패널이 원격 루트로 이동한다(기억하면 저장된다)", async () => {
@@ -533,10 +533,10 @@ describe("드라이브 바", () => {
       expect(screen.queryByRole("dialog", { name: "회사 비밀번호" })).toBeNull();
     });
 
-    it("원격 서버 관리…를 고르면 설정의 SFTP·FTP 서버 탭이 열린다", async () => {
+    it("SFTP·FTP 관리…를 고르면 설정의 SFTP·FTP 서버 탭이 열린다", async () => {
       const { user } = await renderApp(withRemotes(SFTP));
       await openConnect(user);
-      await pick(user, "원격 서버 관리…");
+      await pick(user, "SFTP·FTP 관리…");
       expect(await screen.findByRole("tab", { name: "SFTP·FTP 서버" })).toHaveAttribute("aria-selected", "true");
     });
 

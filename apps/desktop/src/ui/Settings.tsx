@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactElement } from "react";
+import { useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { HexColorPicker } from "react-colorful";
 import { Button, Input, Select, SelectOption } from "@spacedrive/primitives";
 import { defaultBindingsFor } from "@twin-deck/actions";
@@ -455,6 +455,46 @@ function HotkeyControl({ name, value, disabled, onCommit }: { name: string; valu
   );
 }
 
+/**
+ * 서버 입력 창. 설정 화면의 좁은 칸 대신 가운데에 띄운다. 키 입력은 설정 화면(바깥)으로 새지 않게 여기서 멈추고,
+ * Esc·바깥 클릭·닫기로 닫는다. 입력한 값은 닫아도 목록 초안에 남고, 파일에는 바깥의 "저장"을 눌러야 쓴다.
+ */
+function ServerModal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  const t = useT();
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    root.current?.querySelector<HTMLElement>("input, select")?.focus();
+  }, []);
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        ref={root}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className="flex max-h-full w-[32rem] max-w-full flex-col gap-3 overflow-auto rounded border border-app-line bg-app-box p-4 text-sm shadow-lg"
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === "Escape" && !e.nativeEvent.isComposing) onClose();
+        }}
+      >
+        <h2 className="font-semibold">{title}</h2>
+        {children}
+        <div className="flex justify-end">
+          <Button type="button" size="sm" variant="accent" onClick={onClose}>
+            {t("common.close")}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const EMPTY_SMB: SmbServer = { name: "", host: "", share: "", user: "" };
 const SMB_FIELDS = ["name", "host", "share", "user"] as const;
 
@@ -470,6 +510,7 @@ function SmbServersControl({ label, disabled }: { label: string; disabled: boole
   const [selected, setSelected] = useState(0);
   const [invalid, setInvalid] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
   // 저장하면(또는 설정 파일이 밖에서 바뀌면) 새 목록으로 다시 시작한다.
   const savedKey = JSON.stringify(saved);
   useEffect(() => {
@@ -488,106 +529,141 @@ function SmbServersControl({ label, disabled }: { label: string; disabled: boole
     if (bad >= 0) {
       setSelected(bad);
       setInvalid(t("settings.smb.required", { n: bad + 1 }));
-      return;
+      return false;
     }
     setInvalid(null);
     await api.setSmbServers(draft);
+    return true;
   };
   // 비밀번호는 저장된 항목 순번으로 지운다. 저장 전 변경이 있으면 순번이 어긋날 수 있어 막는다.
   const canForget = !disabled && !dirty && !!current?.user;
-  // 설정 화면이 활성 패널을 덮고 있으므로 연결 결과는 반대편 패널에서 보인다. 저장 전 변경이 있으면 항목 순번이 어긋날 수 있어 막는다.
-  const activePane = useApp((s) => s.activePane);
-  const otherPane = activePane === "left" ? "right" : "left";
-  const canConnect = !disabled && !dirty && !!current;
+  // 연결을 누르면 (저장 전 변경이 있으면 먼저 저장하고) 설정 화면을 닫고, 설정이 덮고 있던 그 패널에서 연결한다. 저장이 거부되면 닫지도 연결하지도 않는다.
+  const settingsPane = useApp((s) => s.settingsPane);
+  const canConnect = !disabled && !!current;
   return (
-    <div role="group" aria-label={label} className="flex flex-col gap-3 py-2.5">
-      <div className="flex min-h-0 gap-4">
-        <div className="flex w-56 shrink-0 flex-col gap-2">
-          <ul role="listbox" aria-label={label} className="h-80 overflow-auto rounded border border-app-line">
-            {draft.length === 0 && <li className="px-2 py-1.5 text-xs text-ink-faint">{t("settings.smb.empty")}</li>}
-            {draft.map((s, i) => (
-              <li
-                key={i}
-                role="option"
-                aria-selected={i === selected}
-                tabIndex={0}
-                onClick={() => setSelected(i)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") setSelected(i);
-                }}
-                className={"cursor-default px-2 py-1.5 text-sm " + (i === selected ? "bg-app-selected" : "hover:bg-app-hover")}
-              >
-                <div className="truncate">{s.name || `${s.host}/${s.share}`}</div>
-                <div className="truncate text-xs text-ink-faint">
-                  {s.host}/{s.share}
-                  {s.user ? ` · ${s.user}` : ""}
-                </div>
-              </li>
-            ))}
-          </ul>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="gray"
-              disabled={disabled}
-              onClick={() => {
-                setDraft([...draft, { ...EMPTY_SMB }]);
-                setSelected(draft.length);
-                setNotice(null);
-              }}
-            >
-              {t("settings.smb.add")}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="gray"
-              disabled={disabled || !current}
-              onClick={() => {
-                if (!current) return;
-                // 선택한 항목 바로 뒤에 같은 내용으로 복제한다. 이름이 있으면 구분되게 "(복사)"를 붙인다.
-                const copy = { ...current, name: current.name ? `${current.name} ${t("settings.smb.copy_suffix")}` : "" };
-                setDraft([...draft.slice(0, selected + 1), copy, ...draft.slice(selected + 1)]);
-                setSelected(selected + 1);
-                setInvalid(null);
-                setNotice(null);
-              }}
-            >
-              {t("settings.smb.duplicate")}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="gray"
-              disabled={disabled || !current}
-              onClick={() => {
-                setDraft(draft.filter((_, i) => i !== selected));
-                setSelected(Math.max(0, selected - 1));
-                setInvalid(null);
-                setNotice(null);
-              }}
-            >
-              {t("settings.smb.delete")}
-            </Button>
-          </div>
+    <div role="group" aria-label={label} className="flex min-h-0 flex-1 flex-col gap-3 py-2.5">
+      <ul role="listbox" aria-label={label} className="min-h-[12rem] flex-1 overflow-auto rounded border border-app-line">
+        {draft.length === 0 && <li className="px-2 py-1.5 text-xs text-ink-faint">{t("settings.smb.empty")}</li>}
+        {draft.map((s, i) => (
+          <li
+            key={i}
+            role="option"
+            aria-selected={i === selected}
+            tabIndex={0}
+            onClick={() => setSelected(i)}
+            onDoubleClick={() => {
+              setSelected(i);
+              setEditing(true);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") setSelected(i);
+            }}
+            className={"cursor-default px-2 py-1.5 text-sm " + (i === selected ? "bg-app-selected" : "hover:bg-app-hover")}
+          >
+            <div className="truncate">{s.name || `${s.host}/${s.share}`}</div>
+            <div className="truncate text-xs text-ink-faint">
+              {s.host}/{s.share}
+              {s.user ? ` · ${s.user}` : ""}
+            </div>
+          </li>
+        ))}
+      </ul>
+      {(invalid || notice || dirty) && (
+        <div className="flex items-center gap-3">
+          {invalid && <span className="text-xs text-status-error">{invalid}</span>}
+          {!invalid && notice && <span role="status" className="text-xs text-ink-dull">{notice}</span>}
+          {!invalid && !notice && dirty && <span className="text-xs text-ink-faint">{t("settings.smb.unsaved")}</span>}
         </div>
-        {current && (
-          <div className="flex min-w-0 flex-1 flex-col gap-2">
+      )}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="gray"
+            disabled={disabled}
+            onClick={() => {
+              setDraft([...draft, { ...EMPTY_SMB }]);
+              setSelected(draft.length);
+              setEditing(true);
+              setNotice(null);
+            }}
+          >
+            {t("settings.smb.add")}
+          </Button>
+          <Button type="button" size="sm" variant="gray" disabled={disabled || !current} onClick={() => setEditing(true)}>
+            {t("settings.smb.edit")}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="gray"
+            disabled={disabled || !current}
+            onClick={() => {
+              if (!current) return;
+              // 선택한 항목 바로 뒤에 같은 내용으로 복제한다. 이름이 있으면 구분되게 "(복사)"를 붙인다.
+              const copy = { ...current, name: current.name ? `${current.name} ${t("settings.smb.copy_suffix")}` : "" };
+              setDraft([...draft.slice(0, selected + 1), copy, ...draft.slice(selected + 1)]);
+              setSelected(selected + 1);
+              setInvalid(null);
+              setNotice(null);
+            }}
+          >
+            {t("settings.smb.duplicate")}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="gray"
+            disabled={disabled || !current}
+            onClick={() => {
+              setDraft(draft.filter((_, i) => i !== selected));
+              setSelected(Math.max(0, selected - 1));
+              setInvalid(null);
+              setNotice(null);
+            }}
+          >
+            {t("settings.smb.delete")}
+          </Button>
+        </div>
+        <div className="flex items-center justify-end gap-3">
+          <Button
+            type="button"
+            size="sm"
+            variant="gray"
+            disabled={!canConnect}
+            onClick={() =>
+              void (async () => {
+                if (dirty && !(await save())) return;
+                api.closeSettings();
+                await api.connectSmb(settingsPane, selected);
+              })()
+            }
+          >
+            {t("settings.smb.connect")}
+          </Button>
+          <Button type="button" size="sm" variant="accent" disabled={disabled || !dirty} onClick={() => void save()}>
+            {t("settings.smb.save")}
+          </Button>
+        </div>
+      </div>
+      {editing && current && (
+        <ServerModal title={t("settings.smb.edit_title")} onClose={() => setEditing(false)}>
+          <div className="flex flex-col gap-2">
             {SMB_FIELDS.map((field) => (
-              <label key={field} className="flex items-center gap-3 text-sm">
+              <label key={field} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                 <span className="w-24 shrink-0">{t(`settings.smb.${field}`)}</span>
                 <Input
                   aria-label={t(`settings.smb.${field}`)}
                   type="text"
                   size="sm"
-                  className="w-full"
+                  className="min-w-[12rem] flex-1"
                   value={current[field]}
                   disabled={disabled}
                   placeholder={field === "name" ? t("settings.smb.name_placeholder") : field === "user" ? t("settings.smb.user_placeholder") : field === "host" ? "nas.local" : "share"}
                   onChange={(e) => edit(field, e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") void save();
+                    if (e.key === "Enter") setEditing(false);
                   }}
                 />
               </label>
@@ -608,26 +684,8 @@ function SmbServersControl({ label, disabled }: { label: string; disabled: boole
               </Button>
             </div>
           </div>
-        )}
-      </div>
-      <div className="flex items-center justify-end gap-3">
-        {invalid && <span className="text-xs text-status-error">{invalid}</span>}
-        {!invalid && notice && <span role="status" className="text-xs text-ink-dull">{notice}</span>}
-        {!invalid && !notice && dirty && <span className="text-xs text-ink-faint">{t("settings.smb.unsaved")}</span>}
-        <Button
-          type="button"
-          size="sm"
-          variant="gray"
-          disabled={!canConnect}
-          title={dirty ? t("settings.smb.connect_unsaved") : undefined}
-          onClick={() => void api.connectSmb(otherPane, selected)}
-        >
-          {t("settings.smb.connect")}
-        </Button>
-        <Button type="button" size="sm" variant="accent" disabled={disabled || !dirty} onClick={() => void save()}>
-          {t("settings.smb.save")}
-        </Button>
-      </div>
+        </ServerModal>
+      )}
     </div>
   );
 }
@@ -647,6 +705,7 @@ function RemoteServersControl({ label, disabled }: { label: string; disabled: bo
   const [selected, setSelected] = useState(0);
   const [invalid, setInvalid] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
   const savedKey = JSON.stringify(saved);
   useEffect(() => {
     setDraft(JSON.parse(savedKey) as RemoteServer[]);
@@ -664,99 +723,134 @@ function RemoteServersControl({ label, disabled }: { label: string; disabled: bo
     if (bad >= 0) {
       setSelected(bad);
       setInvalid(t("settings.remote.required", { n: bad + 1 }));
-      return;
+      return false;
     }
     const badPort = draft.findIndex((s) => !Number.isInteger(s.port) || s.port < 0 || s.port > 65535);
     if (badPort >= 0) {
       setSelected(badPort);
       setInvalid(t("settings.remote.bad_port", { n: badPort + 1 }));
-      return;
+      return false;
     }
     setInvalid(null);
     await api.setRemoteServers(draft);
+    return true;
   };
   const defaultPort = (p: string) => (p === "ftp" ? 21 : 22);
   const canForget = !disabled && !dirty && !!current?.user;
-  // 설정 화면이 활성 패널을 덮고 있으므로 연결 결과는 반대편 패널에서 보인다. 저장 전 변경이 있으면 항목 순번이 어긋날 수 있어 막는다.
-  const activePane = useApp((s) => s.activePane);
-  const otherPane = activePane === "left" ? "right" : "left";
-  const canConnect = !disabled && !dirty && !!current;
+  // 연결을 누르면 (저장 전 변경이 있으면 먼저 저장하고) 설정 화면을 닫고, 설정이 덮고 있던 그 패널에서 연결한다. 저장이 거부되면 닫지도 연결하지도 않는다.
+  const settingsPane = useApp((s) => s.settingsPane);
+  const canConnect = !disabled && !!current;
   return (
-    <div role="group" aria-label={label} className="flex flex-col gap-3 py-2.5">
-      <div className="flex min-h-0 gap-4">
-        <div className="flex w-56 shrink-0 flex-col gap-2">
-          <ul role="listbox" aria-label={label} className="h-80 overflow-auto rounded border border-app-line">
-            {draft.length === 0 && <li className="px-2 py-1.5 text-xs text-ink-faint">{t("settings.remote.empty")}</li>}
-            {draft.map((s, i) => (
-              <li
-                key={i}
-                role="option"
-                aria-selected={i === selected}
-                tabIndex={0}
-                onClick={() => setSelected(i)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") setSelected(i);
-                }}
-                className={"cursor-default px-2 py-1.5 text-sm " + (i === selected ? "bg-app-selected" : "hover:bg-app-hover")}
-              >
-                <div className="truncate">{s.name || (s.user ? `${s.user}@${s.host}` : s.host)}</div>
-                <div className="truncate text-xs text-ink-faint">
-                  {s.protocol.toUpperCase()} · {s.host}
-                  {s.port ? `:${s.port}` : ""}
-                </div>
-              </li>
-            ))}
-          </ul>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="gray"
-              disabled={disabled}
-              onClick={() => {
-                setDraft([...draft, { ...EMPTY_REMOTE }]);
-                setSelected(draft.length);
-                setNotice(null);
-              }}
-            >
-              {t("settings.remote.add")}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="gray"
-              disabled={disabled || !current}
-              onClick={() => {
-                if (!current) return;
-                // 선택한 항목 바로 뒤에 같은 내용으로 복제한다. 이름이 있으면 구분되게 "(복사)"를 붙인다.
-                const copy = { ...current, name: current.name ? `${current.name} ${t("settings.remote.copy_suffix")}` : "" };
-                setDraft([...draft.slice(0, selected + 1), copy, ...draft.slice(selected + 1)]);
-                setSelected(selected + 1);
-                setInvalid(null);
-                setNotice(null);
-              }}
-            >
-              {t("settings.remote.duplicate")}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="gray"
-              disabled={disabled || !current}
-              onClick={() => {
-                setDraft(draft.filter((_, i) => i !== selected));
-                setSelected(Math.max(0, selected - 1));
-                setInvalid(null);
-                setNotice(null);
-              }}
-            >
-              {t("settings.remote.delete")}
-            </Button>
-          </div>
+    <div role="group" aria-label={label} className="flex min-h-0 flex-1 flex-col gap-3 py-2.5">
+      <ul role="listbox" aria-label={label} className="min-h-[12rem] flex-1 overflow-auto rounded border border-app-line">
+        {draft.length === 0 && <li className="px-2 py-1.5 text-xs text-ink-faint">{t("settings.remote.empty")}</li>}
+        {draft.map((s, i) => (
+          <li
+            key={i}
+            role="option"
+            aria-selected={i === selected}
+            tabIndex={0}
+            onClick={() => setSelected(i)}
+            onDoubleClick={() => {
+              setSelected(i);
+              setEditing(true);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") setSelected(i);
+            }}
+            className={"cursor-default px-2 py-1.5 text-sm " + (i === selected ? "bg-app-selected" : "hover:bg-app-hover")}
+          >
+            <div className="truncate">{s.name || (s.user ? `${s.user}@${s.host}` : s.host)}</div>
+            <div className="truncate text-xs text-ink-faint">
+              {s.protocol.toUpperCase()} · {s.host}
+              {s.port ? `:${s.port}` : ""}
+            </div>
+          </li>
+        ))}
+      </ul>
+      {(invalid || notice || dirty) && (
+        <div className="flex items-center gap-3">
+          {invalid && <span className="text-xs text-status-error">{invalid}</span>}
+          {!invalid && notice && <span role="status" className="text-xs text-ink-dull">{notice}</span>}
+          {!invalid && !notice && dirty && <span className="text-xs text-ink-faint">{t("settings.remote.unsaved")}</span>}
         </div>
-        {current && (
-          <div className="flex min-w-0 flex-1 flex-col gap-2">
-            <label className="flex items-center gap-3 text-sm">
+      )}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="gray"
+            disabled={disabled}
+            onClick={() => {
+              setDraft([...draft, { ...EMPTY_REMOTE }]);
+              setSelected(draft.length);
+              setEditing(true);
+              setNotice(null);
+            }}
+          >
+            {t("settings.remote.add")}
+          </Button>
+          <Button type="button" size="sm" variant="gray" disabled={disabled || !current} onClick={() => setEditing(true)}>
+            {t("settings.remote.edit")}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="gray"
+            disabled={disabled || !current}
+            onClick={() => {
+              if (!current) return;
+              // 선택한 항목 바로 뒤에 같은 내용으로 복제한다. 이름이 있으면 구분되게 "(복사)"를 붙인다.
+              const copy = { ...current, name: current.name ? `${current.name} ${t("settings.remote.copy_suffix")}` : "" };
+              setDraft([...draft.slice(0, selected + 1), copy, ...draft.slice(selected + 1)]);
+              setSelected(selected + 1);
+              setInvalid(null);
+              setNotice(null);
+            }}
+          >
+            {t("settings.remote.duplicate")}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="gray"
+            disabled={disabled || !current}
+            onClick={() => {
+              setDraft(draft.filter((_, i) => i !== selected));
+              setSelected(Math.max(0, selected - 1));
+              setInvalid(null);
+              setNotice(null);
+            }}
+          >
+            {t("settings.remote.delete")}
+          </Button>
+        </div>
+        <div className="flex items-center justify-end gap-3">
+          <Button
+            type="button"
+            size="sm"
+            variant="gray"
+            disabled={!canConnect}
+            onClick={() =>
+              void (async () => {
+                if (dirty && !(await save())) return;
+                api.closeSettings();
+                await api.connectRemote(settingsPane, selected);
+              })()
+            }
+          >
+            {t("settings.remote.connect")}
+          </Button>
+          <Button type="button" size="sm" variant="accent" disabled={disabled || !dirty} onClick={() => void save()}>
+            {t("settings.remote.save")}
+          </Button>
+        </div>
+      </div>
+      {editing && current && (
+        <ServerModal title={t("settings.remote.edit_title")} onClose={() => setEditing(false)}>
+          <div className="flex flex-col gap-2">
+            <label className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
               <span className="w-24 shrink-0">{t("settings.remote.protocol")}</span>
               <select
                 aria-label={t("settings.remote.protocol")}
@@ -775,13 +869,13 @@ function RemoteServersControl({ label, disabled }: { label: string; disabled: bo
               </p>
             )}
             {REMOTE_TEXT_FIELDS.map((field) => (
-              <label key={field} className="flex items-center gap-3 text-sm">
+              <label key={field} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                 <span className="w-24 shrink-0">{t(`settings.remote.${field}`)}</span>
                 <Input
                   aria-label={t(`settings.remote.${field}`)}
                   type="text"
                   size="sm"
-                  className="w-full"
+                  className="min-w-[12rem] flex-1"
                   value={current[field]}
                   disabled={disabled}
                   placeholder={
@@ -795,25 +889,25 @@ function RemoteServersControl({ label, disabled }: { label: string; disabled: bo
                   }
                   onChange={(e) => patch({ [field]: e.target.value })}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") void save();
+                    if (e.key === "Enter") setEditing(false);
                   }}
                 />
               </label>
             ))}
-            <label className="flex items-center gap-3 text-sm">
+            <label className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
               <span className="w-24 shrink-0">{t("settings.remote.port")}</span>
               <Input
                 aria-label={t("settings.remote.port")}
                 type="text"
                 inputMode="numeric"
                 size="sm"
-                className="w-full"
+                className="min-w-[12rem] flex-1"
                 value={current.port ? String(current.port) : ""}
                 disabled={disabled}
                 placeholder={String(defaultPort(current.protocol))}
                 onChange={(e) => patch({ port: Number(e.target.value.replace(/\D/g, "")) || 0 })}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") void save();
+                  if (e.key === "Enter") setEditing(false);
                 }}
               />
             </label>
@@ -833,26 +927,8 @@ function RemoteServersControl({ label, disabled }: { label: string; disabled: bo
               </Button>
             </div>
           </div>
-        )}
-      </div>
-      <div className="flex items-center justify-end gap-3">
-        {invalid && <span className="text-xs text-status-error">{invalid}</span>}
-        {!invalid && notice && <span role="status" className="text-xs text-ink-dull">{notice}</span>}
-        {!invalid && !notice && dirty && <span className="text-xs text-ink-faint">{t("settings.remote.unsaved")}</span>}
-        <Button
-          type="button"
-          size="sm"
-          variant="gray"
-          disabled={!canConnect}
-          title={dirty ? t("settings.remote.connect_unsaved") : undefined}
-          onClick={() => void api.connectRemote(otherPane, selected)}
-        >
-          {t("settings.remote.connect")}
-        </Button>
-        <Button type="button" size="sm" variant="accent" disabled={disabled || !dirty} onClick={() => void save()}>
-          {t("settings.remote.save")}
-        </Button>
-      </div>
+        </ServerModal>
+      )}
     </div>
   );
 }
@@ -960,7 +1036,7 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
               { start: 0, nodes: [] },
             ).nodes}
           </nav>
-          <section role="tabpanel" aria-label={current.title} className="min-w-0 flex-1 overflow-auto px-6 py-3">
+          <section role="tabpanel" aria-label={current.title} className={"min-w-0 flex-1 overflow-auto px-6 py-3" + (items.some((i) => i.control.type === "smb-servers" || i.control.type === "remote-servers") ? " flex flex-col" : "")}>
             <h3 className="text-sm font-semibold">{current.title}</h3>
             {current.desc ? <p className="mb-2 text-xs text-ink-faint">{current.desc}</p> : <div className="mb-2" />}
             {items.map((item) => {

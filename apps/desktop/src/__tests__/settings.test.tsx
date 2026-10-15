@@ -358,9 +358,11 @@ describe("SMB 서버 탭 (이슈 #77)", () => {
     const listbox = screen.getByRole("listbox", { name: "저장된 SMB 서버" });
     expect(within(listbox).getAllByRole("option").map((o) => o.textContent)).toEqual(["NASnas.local/media · kim", "백업backup/data"]);
     await user.click(within(listbox).getByRole("option", { name: /백업/ }));
+    await user.click(button("편집"));
     await user.clear(field("공유"));
-    await user.type(field("공유"), "archive{Enter}");
-    await waitFor(async () => expect((await smbServers(backend))?.[1].share).toBe("archive"));
+    await user.type(field("공유"), "archive{Enter}"); // Enter는 입력 창을 닫는다
+    expect(screen.queryByRole("dialog", { name: "SMB 서버 편집" })).toBeNull();
+    expect(await smbServers(backend)).toEqual([NAS, { name: "백업", host: "backup", share: "data", user: "" }]); // 닫아도 저장은 따로 누른다
     await user.click(within(listbox).getByRole("option", { name: /NAS/ }));
     await user.click(button("삭제"));
     await user.click(button("저장"));
@@ -389,6 +391,7 @@ describe("SMB 서버 탭 (이슈 #77)", () => {
     backend.setConfig((l) => (l.config.smb = { servers: [NAS] }));
     backend.smbPasswords.set("kim@nas.local/media", "secret");
     const { user } = await openSmb(backend);
+    await user.click(button("편집"));
     await user.click(button("저장된 비밀번호 지우기"));
     expect(await within(screen.getByRole("group", { name: "저장된 SMB 서버" })).findByRole("status")).toHaveTextContent("저장된 비밀번호를 지웠습니다");
     expect(backend.smbPasswords.size).toBe(0);
@@ -400,6 +403,39 @@ describe("SMB 서버 탭 (이슈 #77)", () => {
     await user.type(field("호스트"), "{F8}j");
     expect(backend.trashed).toEqual([]);
     expect(field("호스트")).toHaveValue("j");
+  });
+});
+
+describe("서버 입력 창 (모달)", () => {
+  const NAS = { name: "NAS", host: "nas.local", share: "media", user: "kim" };
+  const openSmb = async () => {
+    const backend = seedBackend();
+    backend.setConfig((l) => (l.config.smb = { servers: [NAS] }));
+    const app = await renderApp(backend);
+    await open(app.user);
+    await dialog();
+    await app.user.click(screen.getByRole("tab", { name: "SMB 서버" }));
+    return app;
+  };
+
+  it("처음에는 입력칸이 보이지 않고, 편집·더블클릭으로 입력 창이 열린다", async () => {
+    const { user } = await openSmb();
+    expect(screen.queryByRole("textbox", { name: "호스트" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "편집" }));
+    const d = screen.getByRole("dialog", { name: "SMB 서버 편집" });
+    expect(within(d).getByRole("textbox", { name: "호스트" })).toHaveValue("nas.local");
+    await user.click(within(d).getByRole("button", { name: "닫기" }));
+    expect(screen.queryByRole("dialog", { name: "SMB 서버 편집" })).toBeNull();
+    await user.dblClick(screen.getByRole("option", { name: /NAS/ }));
+    expect(screen.getByRole("dialog", { name: "SMB 서버 편집" })).toBeInTheDocument();
+  });
+
+  it("Esc는 입력 창만 닫고 설정 화면은 그대로 둔다", async () => {
+    const { user } = await openSmb();
+    await user.click(screen.getByRole("button", { name: "편집" }));
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "SMB 서버 편집" })).toBeNull();
+    expect(screen.getByRole("dialog", { name: "설정" })).toBeInTheDocument();
   });
 });
 
@@ -449,9 +485,10 @@ describe("SFTP·FTP 서버 탭 (이슈 #76)", () => {
     const listbox = screen.getByRole("listbox", { name: "저장된 원격 서버" });
     expect(within(listbox).getAllByRole("option").map((o) => o.textContent)).toEqual(["회사SFTP · files.example.com:2222", "백업FTP · backup:21"]);
     await user.click(within(listbox).getByRole("option", { name: /백업/ }));
+    await user.click(button("편집"));
     await user.clear(field("호스트"));
-    await user.type(field("호스트"), "archive{Enter}");
-    await waitFor(async () => expect((await remoteServers(backend))?.[1].host).toBe("archive"));
+    await user.type(field("호스트"), "archive{Enter}"); // Enter는 입력 창을 닫는다
+    expect(screen.queryByRole("dialog", { name: "SFTP·FTP 서버 편집" })).toBeNull();
     await user.click(within(listbox).getByRole("option", { name: /회사/ }));
     await user.click(button("삭제"));
     await user.click(button("저장"));
@@ -483,6 +520,7 @@ describe("SFTP·FTP 서버 탭 (이슈 #76)", () => {
     backend.setConfig((l) => (l.config.remote = { servers: [SFTP] }));
     backend.remotePasswords.set("kim@files.example.com:2222/sftp", "secret");
     const { user } = await openRemote(backend);
+    await user.click(button("편집"));
     await user.click(button("저장된 비밀번호 지우기"));
     expect(await within(screen.getByRole("group", { name: "저장된 원격 서버" })).findByRole("status")).toHaveTextContent("저장된 비밀번호를 지웠습니다");
     expect(backend.remotePasswords.size).toBe(0);
@@ -548,30 +586,50 @@ describe("설정 화면에서 바로 연결 (이슈 #76)", () => {
     return app;
   };
 
-  it("SFTP: 연결을 누르면 비밀번호를 묻고, 맞으면 반대편 패널이 서버 폴더로 이동한다", async () => {
+  it("SFTP: 연결을 누르면 설정을 닫고 비밀번호를 묻고, 맞으면 설정이 덮었던 패널이 서버 폴더로 이동한다", async () => {
     const backend = seedBackend();
     backend.setConfig((l) => (l.config.remote = { servers: [SFTP] }));
     backend.seed({ "sftp://kim@nas:22/docs/a.txt": "a" });
     const { user } = await openTab("SFTP·FTP 서버", backend);
     await user.click(button("연결"));
+    expect(screen.queryByRole("dialog", { name: "설정" })).toBeNull();
     const d = await screen.findByRole("dialog", { name: "회사 비밀번호" });
     await user.type(within(d).getByLabelText("비밀번호"), "pw{Enter}");
     await waitFor(async () => expect(await backend.remoteConnections()).toEqual([0]));
     await waitFor(() =>
-      expect(within(screen.getAllByRole("navigation", { name: "경로" }).at(-1)!).getAllByRole("button").map((b) => b.textContent)).toEqual(["sftp://kim@nas:22"]),
+      expect(within(screen.getAllByRole("navigation", { name: "경로" }).at(0)!).getAllByRole("button").map((b) => b.textContent)).toEqual(["sftp://kim@nas:22"]),
     );
   });
 
-  it("저장하지 않은 변경이 있거나 항목이 없으면 연결 버튼이 꺼져 있다", async () => {
+  it("저장하지 않은 변경이 있으면 연결을 누를 때 먼저 저장하고 그 설정으로 연결한다", async () => {
+    const backend = seedBackend();
+    backend.setConfig((l) => (l.config.remote = { servers: [SFTP] }));
+    backend.seed({ "sftp://kim@nas:22/docs/a.txt": "a" });
+    const { user } = await openTab("SFTP·FTP 서버", backend);
+    expect(button("연결")).toBeEnabled();
+    await user.click(button("편집"));
+    const host = within(screen.getByRole("tabpanel")).getByRole("textbox", { name: "호스트" });
+    await user.clear(host);
+    await user.type(host, "nas2{Enter}");
+    expect(button("연결")).toBeEnabled();
+    await user.click(button("연결"));
+    await waitFor(async () => expect((await backend.getConfig()).config.remote.servers?.[0].host).toBe("nas2"));
+    const d = await screen.findByRole("dialog", { name: "회사 비밀번호" });
+    expect(d).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "설정" })).toBeNull();
+  });
+
+  it("저장이 거부되는 입력이면 연결하지 않고 오류를 보인다", async () => {
     const backend = seedBackend();
     backend.setConfig((l) => (l.config.remote = { servers: [SFTP] }));
     const { user } = await openTab("SFTP·FTP 서버", backend);
-    expect(button("연결")).toBeEnabled();
-    await user.type(within(screen.getByRole("tabpanel")).getByRole("textbox", { name: "호스트" }), "x");
-    expect(button("연결")).toBeDisabled();
-    expect(button("연결")).toHaveAttribute("title", "저장한 뒤에 연결할 수 있습니다");
-    await user.click(button("저장"));
-    await waitFor(() => expect(button("연결")).toBeEnabled());
+    await user.click(button("편집"));
+    await user.clear(within(screen.getByRole("tabpanel")).getByRole("textbox", { name: "호스트" }));
+    await user.keyboard("{Escape}");
+    await user.click(button("연결"));
+    expect(await screen.findByText("1번째 항목: 호스트를 입력하세요")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "설정" })).toBeInTheDocument(); // 저장이 거부되면 닫지 않는다
+    expect(await backend.remoteConnections()).toEqual([]);
   });
 
   it("항목이 없으면 연결 버튼이 꺼져 있다", async () => {
@@ -579,11 +637,12 @@ describe("설정 화면에서 바로 연결 (이슈 #76)", () => {
     expect(button("연결")).toBeDisabled();
   });
 
-  it("SMB: 연결을 누르면 마운트하고 반대편 패널이 마운트 지점으로 이동한다", async () => {
+  it("SMB: 연결을 누르면 설정을 닫고 마운트해 설정이 덮었던 패널이 마운트 지점으로 이동한다", async () => {
     const backend = seedBackend();
     backend.setConfig((l) => (l.config.smb = { servers: [{ name: "공용", host: "nas.local", share: "public", user: "" }] }));
     const { user } = await openTab("SMB 서버", backend);
     await user.click(button("연결"));
+    expect(screen.queryByRole("dialog", { name: "설정" })).toBeNull();
     await waitFor(() => expect(backend.volumes.map((v) => v.mountPoint)).toContain("/Volumes/public"));
   });
 });
