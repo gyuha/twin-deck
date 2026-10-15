@@ -178,7 +178,7 @@ To find folders that take a lot of space, press `Alt+T` on a folder. Subfolders 
 
 ### Tabs and panes
 
-- **Tabs**: each pane can have several tabs. `Mod+T` opens a new tab and `Mod+W` closes it; a middle click on a tab also closes it.
+- **Tabs**: each pane can have several tabs. `Mod+T` opens a new tab and `Mod+W` closes it; a middle click on a tab also closes it. To jump to a tab by number, press `Cmd+1`~`Cmd+9` on macOS or `Ctrl+Shift+1`~`Ctrl+Shift+9` on Windows/Linux (`9` is the last tab, and a number beyond the tab count does nothing). These keys are also handled by the app in a terminal tab. `Ctrl+Alt+1`~`3` on Windows/Linux is the view mode, so it is not used for tabs.
 - **Dragging tabs**: drag a tab to reorder within a pane, or drop it on the opposite pane's tab bar to send it there. If the original pane has only one tab, it is copied instead of moved.
 - **Swap panes**: `Mod+U` swaps the tabs, folders, cursors, and selections of the left and right panes.
 - **Pane width**: drag the middle border to adjust it.

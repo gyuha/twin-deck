@@ -128,6 +128,7 @@ export const ko = {
   "action.core.tab.close": "탭 닫기",
   "action.core.tab.next": "다음 탭",
   "action.core.tab.prev": "이전 탭",
+  "action.core.tab.goto": "N번째 탭으로 (인수: index, 9는 마지막 탭)",
   "action.core.view.drive_bar": "드라이브바 표시 토글",
   "action.core.view.action_bar": "액션바 표시 토글",
   "action.core.view.hidden": "숨김 파일 표시 토글",

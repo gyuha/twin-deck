@@ -1858,6 +1858,15 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       set({ panes: { ...s.panes, [s.activePane]: { ...p, active } } });
     },
 
+    /** `index`번째(1부터) 탭으로 간다(`core.tab.goto`). 9는 마지막 탭이고, 탭 수를 넘는 번호나 잘못된 값은 아무 일도 하지 않는다. */
+    gotoTab(index: number) {
+      const s = get();
+      const p = s.panes[s.activePane];
+      const active = index === 9 ? p.tabs.length - 1 : index - 1;
+      if (!Number.isInteger(active) || active < 0 || active >= p.tabs.length || active === p.active) return;
+      set({ panes: { ...s.panes, [s.activePane]: { ...p, active } } });
+    },
+
     async toggleHidden() {
       set((s) => ({ showHidden: !s.showHidden }));
       await reloadAll();

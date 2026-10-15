@@ -162,6 +162,7 @@ Shift+이동 키(범위의 선택 반전)는 액션이 아니라 `pane` 스코�
 | `core.tab.new` | 새 탭 (탭 줄의 빈 곳을 더블클릭해도 그 패널에 만들어진다) | `Mod+T` | `Ctrl+T` | 자체 (Marta 키는 서드파티 정보) |
 | `core.tab.close` | 탭 닫기 | `Mod+W` | `Ctrl+W` | 자체 (같음). `Mod+W`는 창 닫기와 충돌하지 않게 앱이 가로챈다 |
 | `core.tab.next` / `core.tab.prev` | 다음/이전 탭 | `Alt+Mod+Right` / `Alt+Mod+Left`, `Ctrl+Tab` / `Ctrl+Shift+Tab` | `Ctrl+PageDown` / `Ctrl+PageUp`, `Ctrl+Tab` / `Ctrl+Shift+Tab` | `next`는 ID 추정 |
+| `core.tab.goto` | N번째 탭으로 이동 (인수 `index` 1~9). 1~8은 해당 번째 탭, 9는 마지막 탭이고 탭 수를 넘는 번호는 아무 일도 하지 않는다. 탭이 둘 이상일 때만 동작한다. 구현됨(이슈 #73) | `Mod+1`~`Mod+9` | `Ctrl+Shift+1`~`Ctrl+Shift+9` | pane·terminal, 자체 ID. Windows/Linux의 `Ctrl+Alt+숫자`는 `core.view.mode`와 같은 조합이라 쓰지 않는다 |
 | `core.window.new` | 새 창 | `Mod+N` | `Ctrl+N` | 자체 |
 
 ### 5.5 보기, 검색, 도구

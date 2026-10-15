@@ -130,6 +130,7 @@ export const en: Record<Key, string> = {
   "action.core.tab.close": "Close Tab",
   "action.core.tab.next": "Next Tab",
   "action.core.tab.prev": "Previous Tab",
+  "action.core.tab.goto": "Go to Tab N (arg: index; 9 is the last tab)",
   "action.core.view.drive_bar": "Toggle Drive Bar",
   "action.core.view.action_bar": "Toggle Action Bar",
   "action.core.view.hidden": "Toggle Hidden Files",

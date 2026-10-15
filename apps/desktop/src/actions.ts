@@ -54,6 +54,7 @@ export function navigationHandlers({ api }: AppStore): Partial<ActionHandlers> {
     "core.tab.close": () => api.closeTab(),
     "core.tab.next": () => api.cycleTab(1),
     "core.tab.prev": () => api.cycleTab(-1),
+    "core.tab.goto": (_ctx, args) => api.gotoTab(Number(args?.index)),
     "core.view.hidden": () => api.toggleHidden(),
     "core.view.drive_bar": () => api.toggleLayoutFlag("show_drive_bar"),
     "core.view.action_bar": () => api.toggleLayoutFlag("show_action_bar"),
