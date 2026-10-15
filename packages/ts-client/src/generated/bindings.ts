@@ -374,6 +374,41 @@ async remoteForgetPassword(index: number) : Promise<Result<null, string>> {
 }
 },
 /**
+ * 내장 서버(Twin Deck Remote)를 현재 설정(`remote_server.*`)으로 켠다. `enabled` 값과 무관하게 켠다(그 키는 시작 때만 본다).
+ * 비밀번호가 없거나 루트가 비었으면 사람이 읽을 사유와 함께 거부한다.
+ */
+async remoteServerStart() : Promise<Result<RemoteServerStatus, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("remote_server_start") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 내장 서버를 끈다. 꺼져 있어도 성공이다.
+ */
+async remoteServerStop() : Promise<RemoteServerStatus> {
+    return await TAURI_INVOKE("remote_server_stop");
+},
+/**
+ * 내장 서버의 상태. 비밀번호 값은 돌려주지 않고 설정 여부(`hasPassword`)만 준다.
+ */
+async remoteServerStatus() : Promise<RemoteServerStatus> {
+    return await TAURI_INVOKE("remote_server_status");
+},
+/**
+ * 내장 서버의 비밀번호를 OS 키체인에 저장한다(빈 문자열이면 지운다). 설정 파일에는 쓰지 않는다.
+ */
+async setRemoteServerPassword(password: string) : Promise<Result<RemoteServerStatus, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_remote_server_password", { password }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * 폴더 선택 창을 띄워 고른 폴더의 경로를 돌려준다. 취소하면 None.
  */
 async pickFolder() : Promise<Result<string | null, string>> {
@@ -937,7 +972,11 @@ smb: SmbConfig;
 /**
  * 저장된 SFTP·FTP 서버 목록. 비밀번호는 여기 두지 않고 OS 키체인에 둔다(ADR-0019).
  */
-remote: RemoteConfig }
+remote: RemoteConfig; 
+/**
+ * 이 앱 안에서 도는 SSH/SFTP 서버(Twin Deck Remote). 비밀번호는 여기 두지 않고 OS 키체인에 둔다.
+ */
+remote_server: RemoteServerConfig }
 /**
  * 설정이 바뀌었다(파일 감시). 문법 오류가 있으면 이전 유효 설정과 경고가 온다.
  */
@@ -1189,6 +1228,27 @@ export type RemoteFailureDto = { kind: RemoteErrorKindDto; message: string }
  * `base_dir`은 접속 직후 이동할 폴더이고 비면 서버가 알려 주는 홈이다.
  */
 export type RemoteServer = { name: string; protocol: string; host: string; port: number; user: string; base_dir: string }
+/**
+ * 내장 서버(Twin Deck Remote) 설정. 기본은 꺼짐·로컬 전용·읽기 전용·셸 없음이다.
+ * `root`가 비어 있으면 서버를 켤 수 없다(홈 폴더로 대신하지 않는다).
+ */
+export type RemoteServerConfig = { enabled: boolean; bind: string; port: number; root: string; allow_write: boolean; allow_shell: boolean; user: string }
+/**
+ * 내장 서버 상태. 비밀번호 값은 어디에도 담지 않고, 설정됐는지(`has_password`)만 알린다.
+ */
+export type RemoteServerStatus = { running: boolean; 
+/**
+ * 수신 중인 주소(`host:port`). 꺼져 있으면 비어 있다.
+ */
+addresses: string[]; 
+/**
+ * 호스트키 지문. 꺼져 있으면 None.
+ */
+fingerprint: string | null; hasPassword: boolean; 
+/**
+ * 마지막 켜기 실패의 사람이 읽을 사유. 켜는 데 성공하거나 끄면 지운다.
+ */
+lastError: string | null }
 /**
  * Look Up / Flatten 결과가 더 도착했다.
  */

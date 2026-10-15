@@ -31,6 +31,7 @@ import type {
   CliStatusDto,
   SmbServer,
   RemoteServer,
+  RemoteServerStatus,
 } from "./generated/bindings";
 import { globMatch } from "./glob";
 import defaultConfigJson from "./generated/default-config.json";
@@ -948,6 +949,50 @@ export class FakeBackend implements Backend {
 
   async remoteForgetPassword(index: number) {
     this.remotePasswords.delete(FakeBackend.remoteKey(this.remoteServer(index)));
+  }
+
+  /** 테스트용: 내장 서버에 저장된 비밀번호(키체인 흉내). */
+  remoteServerPassword = "";
+  private remoteServerRunning = false;
+  private remoteServerLastError: string | null = null;
+
+  private remoteServerState(): RemoteServerStatus {
+    const c = this.loaded.config.remote_server;
+    return {
+      running: this.remoteServerRunning,
+      addresses: this.remoteServerRunning ? [`${c.bind}:${c.port}`] : [],
+      fingerprint: this.remoteServerRunning ? "SHA256:fake-fingerprint" : null,
+      hasPassword: this.remoteServerPassword !== "",
+      lastError: this.remoteServerLastError,
+    };
+  }
+
+  /** 실제 구현처럼 루트나 비밀번호가 비어 있으면 거부하고 사유를 `lastError`에 남긴다. */
+  async remoteServerStart() {
+    const fail = (m: string): never => {
+      this.remoteServerLastError = m;
+      throw new BackendError(m);
+    };
+    if (!this.loaded.config.remote_server.root.trim()) fail("공유할 루트 폴더가 비어 있어 서버를 켤 수 없습니다");
+    if (this.remoteServerPassword === "") fail("비밀번호가 설정되지 않아 서버를 켤 수 없습니다");
+    this.remoteServerRunning = true;
+    this.remoteServerLastError = null;
+    return this.remoteServerState();
+  }
+
+  async remoteServerStop() {
+    this.remoteServerRunning = false;
+    this.remoteServerLastError = null;
+    return this.remoteServerState();
+  }
+
+  async remoteServerStatus() {
+    return this.remoteServerState();
+  }
+
+  async setRemoteServerPassword(password: string) {
+    this.remoteServerPassword = password;
+    return this.remoteServerState();
   }
 
   /** 테스트용: 설정 폴더 열기를 누른 횟수. */

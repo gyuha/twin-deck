@@ -208,6 +208,48 @@ fn validate_text_color(merged: &mut Table, warnings: &mut Vec<Warning>) {
     }
 }
 
+/// `remote_server`의 포트 범위(1~65535)와 bind·user가 비지 않았는지 본다. 어긋나면 경고와 함께 기본값으로 되돌린다.
+fn validate_remote_server(merged: &mut Table, defaults: &Table, warnings: &mut Vec<Warning>) {
+    let Some(t) = merged
+        .get_mut("remote_server")
+        .and_then(Value::as_table_mut)
+    else {
+        return;
+    };
+    let default = |k: &str| {
+        defaults
+            .get("remote_server")
+            .and_then(Value::as_table)
+            .and_then(|d| d.get(k))
+            .cloned()
+    };
+    let port_ok = matches!(t.get("port"), Some(Value::Integer(n)) if (1..=65535).contains(n));
+    if t.contains_key("port") && !port_ok {
+        warnings.push(Warning::new(
+            "config.toml",
+            "remote_server.port: 1~65535여야 합니다 (기본값을 씁니다)",
+        ));
+        if let Some(d) = default("port") {
+            t.insert("port".into(), d);
+        }
+    }
+    for key in ["bind", "user"] {
+        let empty = t
+            .get(key)
+            .and_then(Value::as_str)
+            .is_some_and(|s| s.trim().is_empty());
+        if empty {
+            warnings.push(Warning::new(
+                "config.toml",
+                format!("remote_server.{key}: 비워 둘 수 없습니다 (기본값을 씁니다)"),
+            ));
+            if let Some(d) = default(key) {
+                t.insert(key.into(), d);
+            }
+        }
+    }
+}
+
 fn parse_favorites(value: Option<Value>, warnings: &mut Vec<Warning>) -> Vec<FavoriteDto> {
     let Some(Value::Array(items)) = value else {
         return Vec::new();
@@ -402,6 +444,7 @@ pub fn load_from_strs(
     }
     validate_enums(&mut merged, &defaults, &mut warnings);
     validate_text_color(&mut merged, &mut warnings);
+    validate_remote_server(&mut merged, &defaults, &mut warnings);
     let favorites = parse_favorites(merged.remove("favorites"), &mut warnings);
     let smb_servers = parse_smb_servers(
         merged

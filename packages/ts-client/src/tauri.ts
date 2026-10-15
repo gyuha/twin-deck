@@ -288,6 +288,18 @@ export class TauriBackend implements Backend {
   async remoteForgetPassword(index: number) {
     unwrap(await commands.remoteForgetPassword(index));
   }
+  async remoteServerStart() {
+    return unwrap(await commands.remoteServerStart());
+  }
+  async remoteServerStop() {
+    return commands.remoteServerStop();
+  }
+  async remoteServerStatus() {
+    return commands.remoteServerStatus();
+  }
+  async setRemoteServerPassword(password: string) {
+    return unwrap(await commands.setRemoteServerPassword(password));
+  }
   async revealConfigDir() {
     unwrap(await commands.revealConfigDir());
   }

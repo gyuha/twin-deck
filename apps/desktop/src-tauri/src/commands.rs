@@ -12,8 +12,8 @@ use td_volumes::{SystemUnmounter, Volumes};
 
 use crate::service::{
     edit, open_file, open_releases, reveal, reveal_config, ConflictDto, EntryDto, ExpectedFileDto,
-    FileInfoDto, FindSpecDto, JobDto, JobKindDto, PreviewDto, QueueItemDto, SearchStartDto,
-    SearchSummaryDto, Service, ServiceResult, WriteTextResultDto,
+    FileInfoDto, FindSpecDto, JobDto, JobKindDto, PreviewDto, QueueItemDto, RemoteServerStatus,
+    SearchStartDto, SearchSummaryDto, Service, ServiceResult, WriteTextResultDto,
 };
 
 pub type AppService = Service<SystemTrash>;
@@ -755,6 +755,51 @@ pub fn remote_forget_password(config: State<'_, ConfigState>, index: u32) -> Ser
         .map_err(|e| e.to_string())
 }
 
+/// 내장 서버의 호스트키 파일 경로(앱 데이터 폴더, `state.json` 옆).
+pub fn remote_server_host_key_path(config: &ConfigState) -> ServiceResult<std::path::PathBuf> {
+    Ok(state_dir(config)?.join(crate::service::REMOTE_SERVER_HOST_KEY_FILE))
+}
+
+/// 내장 서버(Twin Deck Remote)를 현재 설정(`remote_server.*`)으로 켠다. `enabled` 값과 무관하게 켠다(그 키는 시작 때만 본다).
+/// 비밀번호가 없거나 루트가 비었으면 사람이 읽을 사유와 함께 거부한다.
+#[tauri::command]
+#[specta::specta]
+pub fn remote_server_start(
+    svc: State<'_, AppService>,
+    config: State<'_, ConfigState>,
+) -> ServiceResult<RemoteServerStatus> {
+    let cfg = config.current().config.remote_server;
+    svc.remote_server_start(
+        &cfg,
+        &remote_server_host_key_path(&config)?,
+        &td_remote::KeyringStore,
+    )
+}
+
+/// 내장 서버를 끈다. 꺼져 있어도 성공이다.
+#[tauri::command]
+#[specta::specta]
+pub fn remote_server_stop(svc: State<'_, AppService>) -> RemoteServerStatus {
+    svc.remote_server_stop(&td_remote::KeyringStore)
+}
+
+/// 내장 서버의 상태. 비밀번호 값은 돌려주지 않고 설정 여부(`hasPassword`)만 준다.
+#[tauri::command]
+#[specta::specta]
+pub fn remote_server_status(svc: State<'_, AppService>) -> RemoteServerStatus {
+    svc.remote_server_status(&td_remote::KeyringStore)
+}
+
+/// 내장 서버의 비밀번호를 OS 키체인에 저장한다(빈 문자열이면 지운다). 설정 파일에는 쓰지 않는다.
+#[tauri::command]
+#[specta::specta]
+pub fn set_remote_server_password(
+    svc: State<'_, AppService>,
+    password: String,
+) -> ServiceResult<RemoteServerStatus> {
+    svc.set_remote_server_password(&password, &td_remote::KeyringStore)
+}
+
 /// 설정 화면: 설정 폴더를 파일 관리자로 연다.
 #[tauri::command]
 #[specta::specta]
@@ -1452,6 +1497,10 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             remote_disconnect,
             remote_connections,
             remote_forget_password,
+            remote_server_start,
+            remote_server_stop,
+            remote_server_status,
+            set_remote_server_password,
             pick_folder,
             pick_save_file,
             pick_file,

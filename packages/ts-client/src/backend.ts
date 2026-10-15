@@ -1,4 +1,4 @@
-import type { CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigLocationDto, ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, EpubInfoDto, ExpectedFileDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, NormalizeResultDto, LoadedState, LocationConflict, PreviewDto, RemoteErrorKindDto, RemoteServer, SmbErrorKindDto, SmbServer, QueueItemDto, OfficePreviewDto, SearchStartDto, SearchSummaryDto, Snapshot, UpdateInfoDto, UserDirsDto, VolumeDto, WriteTextResultDto } from "./generated/bindings";
+import type { CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigLocationDto, ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, EpubInfoDto, ExpectedFileDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, NormalizeResultDto, LoadedState, LocationConflict, PreviewDto, RemoteErrorKindDto, RemoteServer, RemoteServerStatus, SmbErrorKindDto, SmbServer, QueueItemDto, OfficePreviewDto, SearchStartDto, SearchSummaryDto, Snapshot, UpdateInfoDto, UserDirsDto, VolumeDto, WriteTextResultDto } from "./generated/bindings";
 
 /** Look Up / Flatten / Disk Usage가 스트리밍으로 보내는 이벤트. 작업마다 마지막은 `done`이다. */
 export type SearchEvent =
@@ -187,6 +187,17 @@ export interface Backend {
   remoteConnections(): Promise<number[]>;
   /** 설정의 `index`번째 원격 서버에 저장된 비밀번호를 키체인에서 지운다. 저장된 값이 없어도 성공이다. */
   remoteForgetPassword(index: number): Promise<void>;
+  /**
+   * 내장 서버(Twin Deck Remote)를 현재 설정(`config.remote_server`)으로 켜고 상태를 돌려준다. `enabled` 값과 무관하게 켠다(그 키는 앱을 켤 때만 본다).
+   * 루트(`root`)나 비밀번호가 비어 있으면 사람이 읽을 사유와 함께 `BackendError`로 거부되고, 그 사유는 상태의 `lastError`에도 남는다.
+   */
+  remoteServerStart(): Promise<RemoteServerStatus>;
+  /** 내장 서버를 끄고 상태를 돌려준다. 꺼져 있어도 성공이다. */
+  remoteServerStop(): Promise<RemoteServerStatus>;
+  /** 내장 서버 상태(실행 여부·수신 주소·호스트키 지문·비밀번호 설정 여부·마지막 오류). 비밀번호 값은 돌려주지 않는다. */
+  remoteServerStatus(): Promise<RemoteServerStatus>;
+  /** 내장 서버의 비밀번호를 키체인에 저장한다(빈 문자열이면 지운다). 설정 파일에는 쓰지 않는다. 바뀐 상태를 돌려준다. */
+  setRemoteServerPassword(password: string): Promise<RemoteServerStatus>;
   /** 설정 폴더를 파일 관리자로 연다. */
   revealConfigDir(): Promise<void>;
   /** 지금 설정 파일(`config.toml`·`keybindings.toml`) 저장 경로와 기본 위치. */

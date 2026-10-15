@@ -214,10 +214,22 @@ export const RUST_MESSAGES: readonly (readonly [ko: string, en: string])[] = [
   ["remote.servers[{}]: protocol은 sftp 또는 ftp여야 합니다", "remote.servers[{}]: protocol must be sftp or ftp"],
   ["remote.servers[{}]: host가 필요합니다", "remote.servers[{}]: host is required"],
   ["remote: 테이블이 아닙니다", "remote: not a table"],
+  ["서버가 원격 셸을 허용하지 않습니다", "The server does not allow a remote shell"],
+  ["remote_server.port: 1~65535여야 합니다 (기본값을 씁니다)", "remote_server.port must be between 1 and 65535 (using the default)"],
+  ["remote_server.{key}: 비워 둘 수 없습니다 (기본값을 씁니다)", "remote_server.{key} cannot be empty (using the default)"],
+  ["공유할 루트 폴더가 비어 있어 서버를 켤 수 없습니다", "The root folder to share is empty, so the server cannot be started"],
+  ["비밀번호를 읽지 못했습니다: {e}", "Could not read the password: {e}"],
+  ["비밀번호가 설정되지 않아 서버를 켤 수 없습니다", "No password is set, so the server cannot be started"],
+  ["서버를 켜지 못했습니다: {e}", "Could not start the server: {e}"],
+  ["비밀번호를 저장하지 못했습니다: {e}", "Could not save the password: {e}"],
 ];
 
 /** 사용자에게 그대로 보이지 않는 한국어 리터럴: 개발자용 진단·테스트 확인 문구, 더 큰 문구를 이루는 조각. 한국어로 둔다. */
 export const RUST_INTERNAL: readonly string[] = [
+  "경고: 내장 서버가 켜져 있지만 비밀번호가 없어 시작하지 않습니다",
+  "경고: 내장 서버를 켜지 못했습니다: {e}",
+  "루트 밖을 가리키는 링크는 목록에서 감춘다",
+  "'{needle}'이 나오지 않았다: {out:?}",
   "td: 앱 실행 파일 위치를 알 수 없습니다: {e}",
   "경로는 최대 2개입니다: {}개",
   "지원하지 않는 옵션: {opt}",

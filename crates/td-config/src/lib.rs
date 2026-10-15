@@ -15,8 +15,8 @@ pub use columns::{normalize_columns, parse_column, ColumnSpec, SortMarker, COLUM
 pub use config::{
     Behavior, BehaviorLayout, BehaviorTable, Config, ConfirmConfig, Display, Environment,
     FavoriteDto, FavoriteLeaf, FileSystemsConfig, LayoutConfig, PreviewConfig, QuickSelect,
-    RemoteConfig, RemoteServer, SelectionConfig, SmbConfig, SmbServer, TableView, ViewConfig,
-    ZipConfig,
+    RemoteConfig, RemoteServer, RemoteServerConfig, SelectionConfig, SmbConfig, SmbServer,
+    TableView, ViewConfig, ZipConfig,
 };
 pub use keybindings::BindingSpec;
 pub use load::{load_dir, load_from_strs, Loaded, Platform, Warning};
