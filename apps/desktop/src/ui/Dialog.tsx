@@ -142,14 +142,16 @@ export function Dialog() {
                 {bar(t("dialog.total_progress_aria"), Math.round(countRatio * 100), countRatio, isActiveJob(job) && job.filesDone === 0)}
               </>
             ) : (
-              bar(t("dialog.progress_aria"), byBytes || job.filesTotal ? Math.round(ratio * 100) : undefined, ratio, isActiveJob(job) && !started)
+              bar(t("dialog.progress_aria"), byBytes || job.filesTotal ? Math.round(ratio * 100) : undefined, ratio, isActiveJob(job) && (!started || (transfer && job.filesTotal === 0 && !byBytes)))
             )}
             <p className="mt-1">
               {byBytes && !multi
                 ? `${formatSpace(job.bytesDone, sizeFormat)} / ${formatSpace(job.bytesTotal!, sizeFormat)}`
                 : job.filesTotal === null
                   ? t("dialog.counting")
-                  : t("dialog.files_progress", { done: job.filesDone, total: job.filesTotal })}
+                  : transfer && job.filesTotal === 0
+                    ? t("dialog.files_done_only", { done: job.filesDone }) // 원격 폴더처럼 전체 개수를 세지 못한 복사·이동
+                    : t("dialog.files_progress", { done: job.filesDone, total: job.filesTotal })}
             </p>
             {job.current && isActiveJob(job) && <p className="truncate text-xs text-ink-dull">{job.current}</p>}
             {job.errors.length > 0 && (

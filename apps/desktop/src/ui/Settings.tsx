@@ -4,7 +4,7 @@ import { Button, Input, Select, SelectOption } from "@spacedrive/primitives";
 import { defaultBindingsFor } from "@twin-deck/actions";
 import type { Platform } from "@twin-deck/keybinds";
 import { defaultLoaded } from "@twin-deck/ts-client";
-import type { SmbServer } from "@twin-deck/ts-client";
+import type { RemoteServer, SmbServer } from "@twin-deck/ts-client";
 import { APP_ACTIONS, APP_LAUNCH_ACTION, APP_OPEN_FOLDER_ACTION } from "../lib/fkeys";
 import { THEMES } from "../lib/themes.generated";
 import { parseThemeList } from "../lib/themeColors";
@@ -31,7 +31,9 @@ type Control =
   /** 전역 단축키: 수식키 체크 + 키 선택 상자. 값은 `Mod+Alt+O` 문자열이다. */
   | { type: "hotkey" }
   /** 저장된 SMB 서버 목록(`smb.servers`): 목록 + 선택 항목 편집 폼. 목록 전체를 한 번에 저장한다. */
-  | { type: "smb-servers" };
+  | { type: "smb-servers" }
+  /** 저장된 원격(SFTP·FTP) 서버 목록(`remote.servers`): SMB 목록과 같은 모양의 편집기. */
+  | { type: "remote-servers" };
 
 interface Item {
   key: string;
@@ -91,6 +93,12 @@ const TAB_POSITIONS = ["top", "bottom"] as const;
 const TERMINAL_SHELLS = ["default", "cmd", "powershell", "gitbash"] as const;
 const COLUMN_LINES = ["none", "solid", "dash"] as const;
 const FOLDER_STYLES =["none", "brackets", "parens", "slash"] as const;
+
+const remoteSection: { title: string; desc?: string; items: Item[] } = {
+  get title() { return translate("settings.section.remote.title"); },
+  get desc() { return translate("settings.section.remote.desc"); },
+  items: [{ key: "remote.servers", get title() { return translate("settings.remote.list"); }, control: { type: "remote-servers" } }],
+};
 
 const smbSection: { title: string; desc?: string; items: Item[] } = {
   get title() { return translate("settings.section.smb.title"); },
@@ -197,6 +205,7 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
     ],
   },
   smbSection,
+  remoteSection,
 ];
 
 /**
@@ -207,11 +216,13 @@ export const SECTION_GROUPS: { titleKey: Key; count: number }[] = [
   { titleKey: "settings.group.view", count: 4 },
   { titleKey: "settings.group.behavior", count: 3 },
   { titleKey: "settings.group.system", count: 1 },
-  { titleKey: "settings.group.connection", count: 1 },
+  { titleKey: "settings.group.connection", count: 2 },
 ];
 
 /** SMB 서버 탭의 순번. `api.openSettings(SMB_SECTION)`으로 이 탭을 바로 연다. */
 export const SMB_SECTION = SECTIONS.indexOf(smbSection);
+/** 원격(SFTP·FTP) 서버 탭의 순번. `api.openSettings(REMOTE_SECTION)`으로 이 탭을 바로 연다. */
+export const REMOTE_SECTION = SECTIONS.indexOf(remoteSection);
 
 const valueAt = (obj: unknown, key: string): unknown => key.split(".").reduce<unknown>((o, k) => (o as Record<string, unknown> | undefined)?.[k], obj);
 
@@ -485,11 +496,15 @@ function SmbServersControl({ label, disabled }: { label: string; disabled: boole
   };
   // 비밀번호는 저장된 항목 순번으로 지운다. 저장 전 변경이 있으면 순번이 어긋날 수 있어 막는다.
   const canForget = !disabled && !dirty && !!current?.user;
+  // 설정 화면이 활성 패널을 덮고 있으므로 연결 결과는 반대편 패널에서 보인다. 저장 전 변경이 있으면 항목 순번이 어긋날 수 있어 막는다.
+  const activePane = useApp((s) => s.activePane);
+  const otherPane = activePane === "left" ? "right" : "left";
+  const canConnect = !disabled && !dirty && !!current;
   return (
     <div role="group" aria-label={label} className="flex flex-col gap-3 py-2.5">
       <div className="flex min-h-0 gap-4">
         <div className="flex w-56 shrink-0 flex-col gap-2">
-          <ul role="listbox" aria-label={label} className="min-h-24 overflow-auto rounded border border-app-line">
+          <ul role="listbox" aria-label={label} className="h-80 overflow-auto rounded border border-app-line">
             {draft.length === 0 && <li className="px-2 py-1.5 text-xs text-ink-faint">{t("settings.smb.empty")}</li>}
             {draft.map((s, i) => (
               <li
@@ -524,6 +539,23 @@ function SmbServersControl({ label, disabled }: { label: string; disabled: boole
               }}
             >
               {t("settings.smb.add")}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="gray"
+              disabled={disabled || !current}
+              onClick={() => {
+                if (!current) return;
+                // 선택한 항목 바로 뒤에 같은 내용으로 복제한다. 이름이 있으면 구분되게 "(복사)"를 붙인다.
+                const copy = { ...current, name: current.name ? `${current.name} ${t("settings.smb.copy_suffix")}` : "" };
+                setDraft([...draft.slice(0, selected + 1), copy, ...draft.slice(selected + 1)]);
+                setSelected(selected + 1);
+                setInvalid(null);
+                setNotice(null);
+              }}
+            >
+              {t("settings.smb.duplicate")}
             </Button>
             <Button
               type="button"
@@ -583,8 +615,243 @@ function SmbServersControl({ label, disabled }: { label: string; disabled: boole
         {invalid && <span className="text-xs text-status-error">{invalid}</span>}
         {!invalid && notice && <span role="status" className="text-xs text-ink-dull">{notice}</span>}
         {!invalid && !notice && dirty && <span className="text-xs text-ink-faint">{t("settings.smb.unsaved")}</span>}
+        <Button
+          type="button"
+          size="sm"
+          variant="gray"
+          disabled={!canConnect}
+          title={dirty ? t("settings.smb.connect_unsaved") : undefined}
+          onClick={() => void api.connectSmb(otherPane, selected)}
+        >
+          {t("settings.smb.connect")}
+        </Button>
         <Button type="button" size="sm" variant="accent" disabled={disabled || !dirty} onClick={() => void save()}>
           {t("settings.smb.save")}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+const EMPTY_REMOTE: RemoteServer = { name: "", protocol: "sftp", host: "", port: 0, user: "", base_dir: "" };
+const REMOTE_TEXT_FIELDS = ["name", "host", "user", "base_dir"] as const;
+
+/**
+ * 저장된 원격(SFTP·FTP) 서버 목록과 선택 항목 편집 폼. SMB 목록처럼 "저장"을 눌러 목록 전체를 쓴다.
+ * 비밀번호는 여기서 받지 않고 지우기만 한다(연결할 때 묻고, 기억하면 OS 키체인에 둔다). FTP 항목에는 암호화되지 않는다는 경고를 보인다.
+ */
+function RemoteServersControl({ label, disabled }: { label: string; disabled: boolean }) {
+  const t = useT();
+  const { api } = useAppStore();
+  const saved = useApp((s) => s.loaded.config.remote.servers ?? []);
+  const [draft, setDraft] = useState<RemoteServer[]>(saved);
+  const [selected, setSelected] = useState(0);
+  const [invalid, setInvalid] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const savedKey = JSON.stringify(saved);
+  useEffect(() => {
+    setDraft(JSON.parse(savedKey) as RemoteServer[]);
+    setSelected((i) => Math.min(i, Math.max(0, (JSON.parse(savedKey) as RemoteServer[]).length - 1)));
+  }, [savedKey]);
+  const dirty = JSON.stringify(draft) !== savedKey;
+  const current = draft[selected] as RemoteServer | undefined;
+  const patch = (change: Partial<RemoteServer>) => {
+    setDraft(draft.map((s, i) => (i === selected ? { ...s, ...change } : s)));
+    setInvalid(null);
+    setNotice(null);
+  };
+  const save = async () => {
+    const bad = draft.findIndex((s) => !s.host.trim());
+    if (bad >= 0) {
+      setSelected(bad);
+      setInvalid(t("settings.remote.required", { n: bad + 1 }));
+      return;
+    }
+    const badPort = draft.findIndex((s) => !Number.isInteger(s.port) || s.port < 0 || s.port > 65535);
+    if (badPort >= 0) {
+      setSelected(badPort);
+      setInvalid(t("settings.remote.bad_port", { n: badPort + 1 }));
+      return;
+    }
+    setInvalid(null);
+    await api.setRemoteServers(draft);
+  };
+  const defaultPort = (p: string) => (p === "ftp" ? 21 : 22);
+  const canForget = !disabled && !dirty && !!current?.user;
+  // 설정 화면이 활성 패널을 덮고 있으므로 연결 결과는 반대편 패널에서 보인다. 저장 전 변경이 있으면 항목 순번이 어긋날 수 있어 막는다.
+  const activePane = useApp((s) => s.activePane);
+  const otherPane = activePane === "left" ? "right" : "left";
+  const canConnect = !disabled && !dirty && !!current;
+  return (
+    <div role="group" aria-label={label} className="flex flex-col gap-3 py-2.5">
+      <div className="flex min-h-0 gap-4">
+        <div className="flex w-56 shrink-0 flex-col gap-2">
+          <ul role="listbox" aria-label={label} className="h-80 overflow-auto rounded border border-app-line">
+            {draft.length === 0 && <li className="px-2 py-1.5 text-xs text-ink-faint">{t("settings.remote.empty")}</li>}
+            {draft.map((s, i) => (
+              <li
+                key={i}
+                role="option"
+                aria-selected={i === selected}
+                tabIndex={0}
+                onClick={() => setSelected(i)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") setSelected(i);
+                }}
+                className={"cursor-default px-2 py-1.5 text-sm " + (i === selected ? "bg-app-selected" : "hover:bg-app-hover")}
+              >
+                <div className="truncate">{s.name || (s.user ? `${s.user}@${s.host}` : s.host)}</div>
+                <div className="truncate text-xs text-ink-faint">
+                  {s.protocol.toUpperCase()} · {s.host}
+                  {s.port ? `:${s.port}` : ""}
+                </div>
+              </li>
+            ))}
+          </ul>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="gray"
+              disabled={disabled}
+              onClick={() => {
+                setDraft([...draft, { ...EMPTY_REMOTE }]);
+                setSelected(draft.length);
+                setNotice(null);
+              }}
+            >
+              {t("settings.remote.add")}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="gray"
+              disabled={disabled || !current}
+              onClick={() => {
+                if (!current) return;
+                // 선택한 항목 바로 뒤에 같은 내용으로 복제한다. 이름이 있으면 구분되게 "(복사)"를 붙인다.
+                const copy = { ...current, name: current.name ? `${current.name} ${t("settings.remote.copy_suffix")}` : "" };
+                setDraft([...draft.slice(0, selected + 1), copy, ...draft.slice(selected + 1)]);
+                setSelected(selected + 1);
+                setInvalid(null);
+                setNotice(null);
+              }}
+            >
+              {t("settings.remote.duplicate")}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="gray"
+              disabled={disabled || !current}
+              onClick={() => {
+                setDraft(draft.filter((_, i) => i !== selected));
+                setSelected(Math.max(0, selected - 1));
+                setInvalid(null);
+                setNotice(null);
+              }}
+            >
+              {t("settings.remote.delete")}
+            </Button>
+          </div>
+        </div>
+        {current && (
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <label className="flex items-center gap-3 text-sm">
+              <span className="w-24 shrink-0">{t("settings.remote.protocol")}</span>
+              <select
+                aria-label={t("settings.remote.protocol")}
+                value={current.protocol}
+                disabled={disabled}
+                onChange={(e) => patch({ protocol: e.target.value })}
+                className="rounded border border-app-line bg-app-box px-2 py-1 text-sm"
+              >
+                <option value="sftp">SFTP</option>
+                <option value="ftp">FTP</option>
+              </select>
+            </label>
+            {current.protocol === "ftp" && (
+              <p role="note" className="text-xs text-status-error">
+                {t("settings.remote.ftp_warning")}
+              </p>
+            )}
+            {REMOTE_TEXT_FIELDS.map((field) => (
+              <label key={field} className="flex items-center gap-3 text-sm">
+                <span className="w-24 shrink-0">{t(`settings.remote.${field}`)}</span>
+                <Input
+                  aria-label={t(`settings.remote.${field}`)}
+                  type="text"
+                  size="sm"
+                  className="w-full"
+                  value={current[field]}
+                  disabled={disabled}
+                  placeholder={
+                    field === "name"
+                      ? t("settings.remote.name_placeholder")
+                      : field === "user"
+                        ? t(current.protocol === "ftp" ? "settings.remote.user_placeholder_ftp" : "settings.remote.user_placeholder")
+                        : field === "host"
+                          ? "files.example.com"
+                          : t("settings.remote.base_dir_placeholder")
+                  }
+                  onChange={(e) => patch({ [field]: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void save();
+                  }}
+                />
+              </label>
+            ))}
+            <label className="flex items-center gap-3 text-sm">
+              <span className="w-24 shrink-0">{t("settings.remote.port")}</span>
+              <Input
+                aria-label={t("settings.remote.port")}
+                type="text"
+                inputMode="numeric"
+                size="sm"
+                className="w-full"
+                value={current.port ? String(current.port) : ""}
+                disabled={disabled}
+                placeholder={String(defaultPort(current.protocol))}
+                onChange={(e) => patch({ port: Number(e.target.value.replace(/\D/g, "")) || 0 })}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void save();
+                }}
+              />
+            </label>
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                size="sm"
+                variant="gray"
+                disabled={!canForget}
+                onClick={() =>
+                  void api.remoteForgetPassword(selected).then((ok) => {
+                    if (ok) setNotice(t("settings.remote.forgotten"));
+                  })
+                }
+              >
+                {t("settings.remote.forget")}
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="flex items-center justify-end gap-3">
+        {invalid && <span className="text-xs text-status-error">{invalid}</span>}
+        {!invalid && notice && <span role="status" className="text-xs text-ink-dull">{notice}</span>}
+        {!invalid && !notice && dirty && <span className="text-xs text-ink-faint">{t("settings.remote.unsaved")}</span>}
+        <Button
+          type="button"
+          size="sm"
+          variant="gray"
+          disabled={!canConnect}
+          title={dirty ? t("settings.remote.connect_unsaved") : undefined}
+          onClick={() => void api.connectRemote(otherPane, selected)}
+        >
+          {t("settings.remote.connect")}
+        </Button>
+        <Button type="button" size="sm" variant="accent" disabled={disabled || !dirty} onClick={() => void save()}>
+          {t("settings.remote.save")}
         </Button>
       </div>
     </div>
@@ -700,6 +967,7 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
             {items.map((item) => {
               // SMB 서버 목록은 한 줄짜리 항목이 아니라 탭 전체를 쓰는 편집기다(기본값으로 버튼도 없다).
               if (item.control.type === "smb-servers") return <SmbServersControl key={item.key} label={item.title} disabled={!!broken} />;
+              if (item.control.type === "remote-servers") return <RemoteServersControl key={item.key} label={item.title} disabled={!!broken} />;
               const combo = item.key.startsWith("fkeys.") && item.title.includes("+") && item.title in config.fkeys;
               // 설정 파일에 없는 내장 조합키는 값이 없다 → 기본값("")으로 본다.
               const extensionColumn = item.control.type === "extension-column";

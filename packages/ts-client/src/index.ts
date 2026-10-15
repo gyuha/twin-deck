@@ -50,6 +50,9 @@ export type {
   SmbConfig,
   SmbServer,
   SmbErrorKindDto,
+  RemoteConfig,
+  RemoteServer,
+  RemoteErrorKindDto,
 } from "./generated/bindings";
 export * from "./backend";
 export { archiveFileName, archiveRoot, isArchiveName, isArchivePath } from "./archive";
