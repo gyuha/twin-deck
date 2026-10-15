@@ -11,6 +11,7 @@ testing = ["dep:tempfile"]
 
 [dependencies]
 thiserror.workspace = true
+td-terminal = { path = "../td-terminal" }
 suppaftp = "12"
 russh = "0.63"
 russh-sftp = "3"

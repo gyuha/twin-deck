@@ -4,6 +4,7 @@
 mod host_key;
 mod jail;
 mod sftp;
+mod shell;
 
 use std::collections::HashMap;
 use std::net::TcpListener;
@@ -23,6 +24,8 @@ pub struct ServerConfig {
     pub port: u16,
     pub root: PathBuf,
     pub allow_write: bool,
+    /// 원격 셸(PTY) 허용. 쓰기 허용과 별개다.
+    pub allow_shell: bool,
     pub user: String,
     pub password: String,
     pub host_key_path: PathBuf,
@@ -67,6 +70,8 @@ impl russh::server::Server for Server {
             cfg: self.cfg.clone(),
             jail: self.jail.clone(),
             channels: HashMap::new(),
+            pty_size: (80, 24),
+            shell: None,
         }
     }
 }
@@ -75,6 +80,8 @@ struct Handler {
     cfg: Arc<ServerConfig>,
     jail: jail::Jail,
     channels: HashMap<ChannelId, Channel<Msg>>,
+    pty_size: (u16, u16),
+    shell: Option<shell::Shell>,
 }
 
 impl russh::server::Handler for Handler {
@@ -112,6 +119,79 @@ impl russh::server::Handler for Handler {
         session: &mut Session,
     ) -> std::result::Result<(), Self::Error> {
         session.close(channel)?;
+        Ok(())
+    }
+
+    async fn pty_request(
+        &mut self,
+        channel: ChannelId,
+        _term: &str,
+        col_width: u32,
+        row_height: u32,
+        _pix_width: u32,
+        _pix_height: u32,
+        _modes: &[(russh::Pty, u32)],
+        session: &mut Session,
+    ) -> std::result::Result<(), Self::Error> {
+        self.pty_size = (
+            col_width.min(u16::MAX as u32) as u16,
+            row_height.min(u16::MAX as u32) as u16,
+        );
+        session.channel_success(channel)?;
+        Ok(())
+    }
+
+    async fn shell_request(
+        &mut self,
+        channel: ChannelId,
+        session: &mut Session,
+    ) -> std::result::Result<(), Self::Error> {
+        // 셸은 PTY 요청 뒤, 허용 설정이 켜져 있을 때, 한 채널에 하나만 연다.
+        let ok = self.cfg.allow_shell && self.shell.is_none();
+        let shell = if ok {
+            // 이 채널의 메시지는 핸들러 콜백(data·window_change)으로 받는다.
+            self.channels.remove(&channel);
+            shell::Shell::open(self.jail.root(), self.pty_size, session.handle(), channel).ok()
+        } else {
+            None
+        };
+        match shell {
+            Some(s) => {
+                self.shell = Some(s);
+                session.channel_success(channel)?;
+            }
+            None => session.channel_failure(channel)?,
+        }
+        Ok(())
+    }
+
+    async fn data(
+        &mut self,
+        _channel: ChannelId,
+        data: &[u8],
+        _session: &mut Session,
+    ) -> std::result::Result<(), Self::Error> {
+        if let Some(s) = &self.shell {
+            s.write(data);
+        }
+        Ok(())
+    }
+
+    async fn window_change_request(
+        &mut self,
+        _channel: ChannelId,
+        col_width: u32,
+        row_height: u32,
+        _pix_width: u32,
+        _pix_height: u32,
+        _session: &mut Session,
+    ) -> std::result::Result<(), Self::Error> {
+        if let Some(s) = &self.shell {
+            s.resize(
+                col_width.min(u16::MAX as u32) as u16,
+                row_height.min(u16::MAX as u32) as u16,
+            );
+        }
         Ok(())
     }
 

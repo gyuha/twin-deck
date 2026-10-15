@@ -16,6 +16,10 @@ impl Jail {
         })
     }
 
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+
     /// 클라이언트의 `/` 표기 경로를 `/a/b` 꼴로 정리한다. `..`은 루트 위로 올라가지 못하고 루트에서 멈춘다.
     pub fn virtual_path(virt: &str) -> String {
         let mut parts: Vec<&str> = Vec::new();

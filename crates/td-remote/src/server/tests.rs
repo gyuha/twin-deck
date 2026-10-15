@@ -18,6 +18,7 @@ fn cfg(dir: &std::path::Path) -> ServerConfig {
         port: 0,
         root: dir.to_path_buf(),
         allow_write: false,
+        allow_shell: false,
         user: "me".into(),
         password: "secret".into(),
         host_key_path: dir.join("host_key"),
@@ -204,5 +205,76 @@ mod sftp_tests {
             "hello"
         );
         assert!(!dir.path().join("share/x").exists() && !dir.path().join("share/n.txt").exists());
+    }
+}
+
+#[cfg(unix)]
+mod shell_tests {
+    use super::*;
+    use crate::{RemoteError, SftpConfig, ShellEvent, ShellSession};
+    use std::time::{Duration, Instant};
+
+    fn serve(allow_shell: bool) -> (tempfile::TempDir, ServerHandle) {
+        let dir = tempfile::tempdir().unwrap();
+        let mut c = cfg(dir.path());
+        c.allow_shell = allow_shell;
+        let s = start(c).unwrap();
+        (dir, s)
+    }
+
+    fn open(s: &ServerHandle, cols: u16, rows: u16) -> Result<ShellSession> {
+        ShellSession::open(
+            SftpConfig {
+                host: "127.0.0.1".into(),
+                port: s.local_addr.port(),
+                user: "me".into(),
+                password: "secret".into(),
+            },
+            cols,
+            rows,
+        )
+    }
+
+    /// 출력에 `needle`이 나올 때까지 모은다.
+    fn wait_for(sh: &ShellSession, needle: &str) -> String {
+        let mut out = String::new();
+        let end = Instant::now() + Duration::from_secs(15);
+        while Instant::now() < end {
+            if let Ok(ShellEvent::Output(b)) = sh.events.recv_timeout(Duration::from_millis(200)) {
+                out.push_str(&String::from_utf8_lossy(&b));
+                if out.contains(needle) {
+                    return out;
+                }
+            }
+        }
+        panic!("'{needle}'이 나오지 않았다: {out:?}");
+    }
+
+    #[test]
+    fn server_shell_echo_marker() {
+        let (_dir, s) = serve(true);
+        let sh = open(&s, 80, 24).unwrap();
+        sh.write(b"echo TD_$((40+2))_MARK\n").unwrap();
+        wait_for(&sh, "TD_42_MARK");
+        sh.close();
+    }
+
+    #[test]
+    fn server_shell_denied_when_not_allowed() {
+        let (_dir, s) = serve(false);
+        assert!(matches!(open(&s, 80, 24), Err(RemoteError::Other(_))));
+    }
+
+    #[test]
+    fn server_shell_resize_changes_stty_size() {
+        let (_dir, s) = serve(true);
+        let sh = open(&s, 80, 24).unwrap();
+        sh.write(b"stty size\n").unwrap();
+        wait_for(&sh, "24 80");
+        sh.resize(100, 30).unwrap();
+        std::thread::sleep(Duration::from_millis(300));
+        sh.write(b"stty size\n").unwrap();
+        wait_for(&sh, "30 100");
+        sh.close();
     }
 }
