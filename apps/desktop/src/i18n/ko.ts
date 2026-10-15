@@ -469,6 +469,8 @@ export const ko = {
   "settings.config_location.reset": "기본 위치로",
   "settings.config_export": "내보내기…",
   "settings.config_import": "가져오기…",
+  "settings.config_transfer.label": "설정 내보내기·가져오기",
+  "settings.config_transfer.desc": "config.toml과 keybindings.toml을 zip 파일 하나로 내보내거나, 내보낸 zip에서 가져옵니다. 가져오면 지금 파일은 .bak으로 남습니다",
   "settings.close": "닫기",
   "settings.toml_broken": "config.toml에 문법 오류가 있어 설정을 바꿀 수 없습니다{line}. 파일을 고친 뒤 다시 열어 주세요.",
   "settings.toml_broken_line": " ({line}번째 줄)",

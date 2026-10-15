@@ -471,6 +471,8 @@ export const en: Record<Key, string> = {
   "settings.config_location.reset": "Use Default",
   "settings.config_export": "Export…",
   "settings.config_import": "Import…",
+  "settings.config_transfer.label": "Export / Import Settings",
+  "settings.config_transfer.desc": "Export config.toml and keybindings.toml as a single zip, or import them from an exported zip. Importing keeps the current files as .bak",
   "settings.close": "Close",
   "settings.toml_broken": "config.toml has a syntax error, so settings cannot be changed{line}. Fix the file and reopen this screen.",
   "settings.toml_broken_line": " (line {line})",

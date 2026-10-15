@@ -623,18 +623,30 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
                   <span data-testid="config-location" className="min-w-0 truncate text-sm text-ink-dull" title={location?.dir}>
                     {location ? (location.custom ? location.dir : `${t("settings.config_location.default")} (${location.dir})`) : ""}
                   </span>
-                  <Button size="sm" variant="gray" onClick={() => void api.pickConfigLocation()}>
+                  <Button size="sm" variant="gray" className="shrink-0 whitespace-nowrap" onClick={() => void api.pickConfigLocation()}>
                     {t("settings.config_location.change")}
                   </Button>
                   {location?.custom && (
-                    <Button size="sm" variant="gray" onClick={() => void api.resetConfigLocation()}>
+                    <Button size="sm" variant="gray" className="shrink-0 whitespace-nowrap" onClick={() => void api.resetConfigLocation()}>
                       {t("settings.config_location.reset")}
                     </Button>
                   )}
-                  <Button size="sm" variant="gray" onClick={() => void api.exportConfig()}>
+                </div>
+              </div>
+            )}
+            {current.title === t("settings.section.environment.title") && (
+              <div role="group" aria-label={t("settings.config_transfer.label")} className="flex items-center justify-between gap-4 border-b border-app-line py-2.5">
+                <div className="w-48 shrink-0">
+                  <div className="flex items-center gap-1.5 text-sm">
+                    {t("settings.config_transfer.label")}
+                    <InfoTip text={t("settings.config_transfer.desc")} />
+                  </div>
+                </div>
+                <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+                  <Button size="sm" variant="gray" className="shrink-0 whitespace-nowrap" onClick={() => void api.exportConfig()}>
                     {t("settings.config_export")}
                   </Button>
-                  <Button size="sm" variant="gray" onClick={() => void api.importConfig()}>
+                  <Button size="sm" variant="gray" className="shrink-0 whitespace-nowrap" onClick={() => void api.importConfig()}>
                     {t("settings.config_import")}
                   </Button>
                 </div>
