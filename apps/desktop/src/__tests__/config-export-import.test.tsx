@@ -7,6 +7,7 @@ describe("설정 내보내기·가져오기 (이슈 #71)", () => {
     const r = await renderApp(backend);
     await r.user.keyboard("{Control>},{/Control}");
     await screen.findByRole("dialog", { name: "설정" });
+    await r.user.click(screen.getByRole("tab", { name: "환경" }));
     const bar = within(await screen.findByRole("group", { name: "설정 저장 경로" }));
     return { ...r, bar };
   };
