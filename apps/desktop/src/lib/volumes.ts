@@ -1,3 +1,4 @@
+import { isRemotePath } from "@twin-deck/ts-client";
 import type { VolumeDto } from "@twin-deck/ts-client";
 
 /**
@@ -5,6 +6,8 @@ import type { VolumeDto } from "@twin-deck/ts-client";
  * Windows 드라이브(`C:\`)는 `\`와 `/`를 모두 구분자로 보고 대소문자를 가리지 않는다. macOS는 OS가 주는 NFD 마운트 경로와 UI의 NFC 경로를 같게 본다.
  */
 export function isInside(path: string, mountPoint: string): boolean {
+  // 원격(`sftp://…`) 위치는 어느 로컬 볼륨에도 속하지 않는다(루트 볼륨 `/`도 아니다).
+  if (isRemotePath(path)) return false;
   if (mountPoint === "/") return true;
   const drive = /^[A-Za-z]:/.test(mountPoint);
   const norm = (t: string) => (drive ? t.toLowerCase() : t.normalize("NFC"));

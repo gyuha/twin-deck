@@ -616,6 +616,146 @@ pub fn smb_forget_password(config: State<'_, ConfigState>, index: u32) -> Servic
         .map_err(|e| e.to_string())
 }
 
+/// 저장된 원격(SFTP·FTP) 서버 목록(`[[remote.servers]]`) 전체를 바꾸고, 새로 병합된 설정을 바로 돌려준다.
+/// 목록은 설정(`Loaded`)의 `remote.servers`로 읽는다. protocol이 sftp·ftp가 아니거나 host가 빈 항목이 있으면 쓰지 않고 거부한다.
+/// 비밀번호는 목록에 없다(OS 키체인).
+#[tauri::command]
+#[specta::specta]
+pub fn set_remote_servers(
+    config: State<'_, ConfigState>,
+    servers: Vec<td_config::RemoteServer>,
+) -> ServiceResult<Loaded> {
+    config.update(|dir| td_config::set_remote_servers(dir, &servers))
+}
+
+/// 원격 연결 실패의 종류. UI는 `auth`면 비밀번호를 다시 묻는다.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub enum RemoteErrorKindDto {
+    Auth,
+    Unreachable,
+    Other,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct RemoteFailureDto {
+    pub kind: RemoteErrorKindDto,
+    pub message: String,
+}
+
+/// `remote_connect`의 결과: 패널이 이동할 원격 루트 경로(`sftp://<id>/..`), 또는 종류가 구분된 실패.
+/// 설정 디렉터리 없음·없는 항목 번호 같은 그 밖의 문제는 명령 오류(문자열)로 온다.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub enum RemoteConnectDto {
+    Connected(String),
+    Failed(RemoteFailureDto),
+}
+
+impl From<Result<String, td_remote::RemoteError>> for RemoteConnectDto {
+    fn from(r: Result<String, td_remote::RemoteError>) -> Self {
+        match r {
+            Ok(root) => Self::Connected(root),
+            Err(e) => {
+                let kind = match e {
+                    td_remote::RemoteError::Auth => RemoteErrorKindDto::Auth,
+                    td_remote::RemoteError::Unreachable => RemoteErrorKindDto::Unreachable,
+                    _ => RemoteErrorKindDto::Other,
+                };
+                Self::Failed(RemoteFailureDto {
+                    kind,
+                    message: e.to_string(),
+                })
+            }
+        }
+    }
+}
+
+/// 설정의 `index`번째 원격 서버 항목을 연결 대상으로 바꾼다.
+fn remote_target(config: &ConfigState, index: u32) -> ServiceResult<td_remote::RemoteTarget> {
+    let loaded = config.current();
+    let s = loaded
+        .config
+        .remote
+        .servers
+        .get(index as usize)
+        .ok_or_else(|| format!("원격 서버 항목이 없습니다: {index}"))?;
+    Ok(td_remote::RemoteTarget {
+        protocol: if s.protocol == "ftp" {
+            td_remote::Protocol::Ftp
+        } else {
+            td_remote::Protocol::Sftp
+        },
+        host: s.host.clone(),
+        port: s.port,
+        user: s.user.clone(),
+        base_dir: s.base_dir.clone(),
+    })
+}
+
+/// 설정의 `index`번째 원격 서버에 연결한다. 이미 연결돼 있으면 같은 연결의 루트 경로를 돌려준다.
+/// `password`가 없으면 키체인 값을 쓴다. 성공했고 `remember`면 받은 비밀번호를 키체인에 저장한다.
+/// 접속은 블로킹이라 UI 스레드를 막지 않게 따로 돌린다.
+#[tauri::command]
+#[specta::specta]
+pub async fn remote_connect(
+    svc: State<'_, AppService>,
+    config: State<'_, ConfigState>,
+    index: u32,
+    password: Option<String>,
+    remember: bool,
+) -> ServiceResult<RemoteConnectDto> {
+    let target = remote_target(&config, index)?;
+    let registry = svc.remote_registry();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        crate::service::connect_remote(
+            &registry,
+            &target,
+            password,
+            remember,
+            &td_remote::KeyringStore,
+            &td_remote::connect_session,
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    Ok(result.into())
+}
+
+/// 설정의 `index`번째 원격 서버 연결을 끊는다(세션을 닫는다). 연결돼 있지 않아도 성공이다.
+#[tauri::command]
+#[specta::specta]
+pub fn remote_disconnect(
+    svc: State<'_, AppService>,
+    config: State<'_, ConfigState>,
+    index: u32,
+) -> ServiceResult<()> {
+    let target = remote_target(&config, index)?;
+    svc.remote_registry().remove(&target.id());
+    Ok(())
+}
+
+/// 지금 연결돼 있는 원격 서버 항목의 번호들(설정 목록 기준).
+#[tauri::command]
+#[specta::specta]
+pub fn remote_connections(svc: State<'_, AppService>, config: State<'_, ConfigState>) -> Vec<u32> {
+    let registry = svc.remote_registry();
+    (0..config.current().config.remote.servers.len() as u32)
+        .filter(|i| remote_target(&config, *i).is_ok_and(|t| registry.contains(&t.id())))
+        .collect()
+}
+
+/// 설정의 `index`번째 원격 서버에 저장된 비밀번호를 키체인에서 지운다. 저장된 값이 없어도 성공이다.
+#[tauri::command]
+#[specta::specta]
+pub fn remote_forget_password(config: State<'_, ConfigState>, index: u32) -> ServiceResult<()> {
+    use td_remote::SecretStore;
+    let target = remote_target(&config, index)?;
+    td_remote::KeyringStore
+        .delete(&td_remote::secret_key(&target))
+        .map_err(|e| e.to_string())
+}
+
 /// 설정 화면: 설정 폴더를 파일 관리자로 연다.
 #[tauri::command]
 #[specta::specta]
@@ -1409,6 +1549,11 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             set_smb_servers,
             smb_connect,
             smb_forget_password,
+            set_remote_servers,
+            remote_connect,
+            remote_disconnect,
+            remote_connections,
+            remote_forget_password,
             pick_folder,
             pick_save_file,
             pick_file,

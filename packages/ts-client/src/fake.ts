@@ -1,5 +1,5 @@
 import { archiveRoot, isArchivePath } from "./archive";
-import { BackendError, SmbConnectError, baseName, joinPath, parentPath } from "./backend";
+import { BackendError, RemoteConnectError, SmbConnectError, baseName, joinPath, parentPath, remoteServerId, remoteUrl, splitRemote } from "./backend";
 import type { Backend, FileDropEvent, SearchEvent, TerminalEvent } from "./backend";
 import type {
   ConfigLocationDto,
@@ -32,6 +32,7 @@ import type {
   CliOutcomeDto,
   CliStatusDto,
   SmbServer,
+  RemoteServer,
 } from "./generated/bindings";
 import { globMatch } from "./glob";
 import defaultConfigJson from "./generated/default-config.json";
@@ -141,6 +142,19 @@ export class FakeBackend implements Backend {
   }
 
   private ensureDir(path: string) {
+    const remote = splitRemote(path);
+    if (remote) {
+      // 원격 위치는 `sftp://<id>/`가 루트 키다(Rust의 경로 표기와 같다).
+      const root = remoteUrl(remote.scheme, remote.id, "/");
+      if (!this.nodes.has(root)) this.nodes.set(root, { kind: "dir", content: "" });
+      let at = "";
+      for (const part of remote.path.split("/").filter(Boolean)) {
+        at = `${at}/${part}`;
+        const key = remoteUrl(remote.scheme, remote.id, at);
+        if (!this.nodes.has(key)) this.nodes.set(key, { kind: "dir", content: "" });
+      }
+      return;
+    }
     let cur = "";
     for (const part of path.split("/").filter(Boolean)) {
       cur = `${cur}/${part}`;
@@ -203,7 +217,7 @@ export class FakeBackend implements Backend {
     const node = this.need(path);
     const real = node.link && this.nodes.get(node.link)?.kind === "dir" ? node.link : path;
     if (this.need(real).kind !== "dir") throw new BackendError(`폴더가 아님: ${path}`);
-    const prefix = real === "/" ? "/" : `${real}/`;
+    const prefix = real.endsWith("/") ? real : `${real}/`;
     const out: EntryDto[] = [];
     for (const [rp, n] of this.nodes) {
       if (rp === real || !rp.startsWith(prefix) || rp.slice(prefix.length).includes("/")) continue;
@@ -888,6 +902,87 @@ export class FakeBackend implements Backend {
 
   async smbForgetPassword(index: number) {
     this.smbPasswords.delete(FakeBackend.smbKey(this.smbServer(index)));
+  }
+
+  /** 실제 구현처럼 목록 전체를 바꾼다. protocol이 sftp·ftp가 아니거나 host가 빈 항목이 있으면 거부하고, 빈 name은 `user@host`(사용자가 없으면 `host`)로, 0인 포트는 기본 포트로 채운다. */
+  async setRemoteServers(servers: RemoteServer[]) {
+    const items = servers.map((v) => ({
+      name: v.name.trim(),
+      protocol: v.protocol,
+      host: v.host.trim(),
+      port: v.port,
+      user: v.user.trim(),
+      base_dir: v.base_dir.trim(),
+    }));
+    const bad = items.findIndex((v) => (v.protocol !== "sftp" && v.protocol !== "ftp") || !v.host);
+    if (bad >= 0) throw new BackendError(`remote.servers[${bad + 1}]: protocol은 sftp 또는 ftp여야 하고 host가 필요합니다`);
+    this.setConfig((l) => {
+      l.config.remote = {
+        servers: items.map((v) => ({
+          ...v,
+          port: v.port || (v.protocol === "sftp" ? 22 : 21),
+          name: v.name || (v.user ? `${v.user}@${v.host}` : v.host),
+        })),
+      };
+    });
+    return structuredClone(this.loaded);
+  }
+
+  /** 테스트용: 키체인에 저장된 원격 비밀번호(키 `user@host:port/protocol`). */
+  readonly remotePasswords = new Map<string, string>();
+  /** 연결된 원격 서버의 연결 id(`user@host:port`). */
+  private readonly remoteOpen = new Set<string>();
+
+  private remoteServer(index: number): RemoteServer {
+    const s = this.loaded.config.remote.servers?.[index];
+    if (!s) throw new BackendError(`원격 서버 항목이 없습니다: ${index}`);
+    return s;
+  }
+
+  private static remoteId(s: RemoteServer) {
+    return remoteServerId(s);
+  }
+
+  private static remoteKey(s: RemoteServer) {
+    return `${FakeBackend.remoteId(s)}/${s.protocol}`;
+  }
+
+  /**
+   * 가짜 연결: host가 "offline"이면 unreachable, 비밀번호가 "bad"이거나 사용자가 있는데 비밀번호(인자·저장값)가 없으면 auth 오류.
+   * 사용자가 없는 SFTP는 auth 오류, 사용자가 없는 FTP는 익명. 이미 연결돼 있으면 그대로 루트를 돌려준다.
+   * 루트는 `base_dir`(없으면 `/`)이고, 성공하면 그 폴더가 가짜 트리에 생긴다(`seed`로 미리 넣은 파일이 보인다).
+   */
+  async remoteConnect(index: number, password: string | null, remember: boolean) {
+    const s = this.remoteServer(index);
+    const id = FakeBackend.remoteId(s);
+    const key = FakeBackend.remoteKey(s);
+    const scheme = s.protocol === "ftp" ? "ftp" : "sftp";
+    const root = remoteUrl(scheme, id, s.base_dir || "/");
+    if (!this.remoteOpen.has(id)) {
+      const authError = new RemoteConnectError("auth", "인증에 실패했습니다. 사용자 이름과 비밀번호를 확인하세요");
+      const pw = password ?? this.remotePasswords.get(key) ?? null;
+      if (!s.user && scheme === "sftp") throw authError;
+      if (s.user && (pw === null || pw === "")) throw authError;
+      if (s.host === "offline") throw new RemoteConnectError("unreachable", "서버에 연결할 수 없습니다");
+      if (pw === "bad") throw authError;
+      this.remoteOpen.add(id);
+      if (remember && password && s.user) this.remotePasswords.set(key, password);
+    }
+    this.ensureDir(root);
+    return root;
+  }
+
+  async remoteDisconnect(index: number) {
+    this.remoteOpen.delete(FakeBackend.remoteId(this.remoteServer(index)));
+  }
+
+  async remoteConnections() {
+    const servers = this.loaded.config.remote.servers ?? [];
+    return servers.flatMap((s, i) => (this.remoteOpen.has(FakeBackend.remoteId(s)) ? [i] : []));
+  }
+
+  async remoteForgetPassword(index: number) {
+    this.remotePasswords.delete(FakeBackend.remoteKey(this.remoteServer(index)));
   }
 
   /** 테스트용: 설정 폴더 열기를 누른 횟수. */

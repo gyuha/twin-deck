@@ -363,6 +363,60 @@ async smbForgetPassword(index: number) : Promise<Result<null, string>> {
 }
 },
 /**
+ * 저장된 원격(SFTP·FTP) 서버 목록(`[[remote.servers]]`) 전체를 바꾸고, 새로 병합된 설정을 바로 돌려준다.
+ * 목록은 설정(`Loaded`)의 `remote.servers`로 읽는다. protocol이 sftp·ftp가 아니거나 host가 빈 항목이 있으면 쓰지 않고 거부한다.
+ * 비밀번호는 목록에 없다(OS 키체인).
+ */
+async setRemoteServers(servers: RemoteServer[]) : Promise<Result<Loaded, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_remote_servers", { servers }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 설정의 `index`번째 원격 서버에 연결한다. 이미 연결돼 있으면 같은 연결의 루트 경로를 돌려준다.
+ * `password`가 없으면 키체인 값을 쓴다. 성공했고 `remember`면 받은 비밀번호를 키체인에 저장한다.
+ * 접속은 블로킹이라 UI 스레드를 막지 않게 따로 돌린다.
+ */
+async remoteConnect(index: number, password: string | null, remember: boolean) : Promise<Result<RemoteConnectDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("remote_connect", { index, password, remember }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 설정의 `index`번째 원격 서버 연결을 끊는다(세션을 닫는다). 연결돼 있지 않아도 성공이다.
+ */
+async remoteDisconnect(index: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("remote_disconnect", { index }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 지금 연결돼 있는 원격 서버 항목의 번호들(설정 목록 기준).
+ */
+async remoteConnections() : Promise<number[]> {
+    return await TAURI_INVOKE("remote_connections");
+},
+/**
+ * 설정의 `index`번째 원격 서버에 저장된 비밀번호를 키체인에서 지운다. 저장된 값이 없어도 성공이다.
+ */
+async remoteForgetPassword(index: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("remote_forget_password", { index }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * 폴더 선택 창을 띄워 고른 폴더의 경로를 돌려준다. 취소하면 None.
  */
 async pickFolder() : Promise<Result<string | null, string>> {
@@ -922,7 +976,11 @@ favorites?: FavoriteDto[];
 /**
  * 저장된 SMB 서버 목록. 비밀번호는 여기 두지 않고 OS 키체인에 둔다(ADR-0018).
  */
-smb: SmbConfig }
+smb: SmbConfig; 
+/**
+ * 저장된 SFTP·FTP 서버 목록. 비밀번호는 여기 두지 않고 OS 키체인에 둔다(ADR-0019).
+ */
+remote: RemoteConfig }
 /**
  * 설정이 바뀌었다(파일 감시). 문법 오류가 있으면 이전 유효 설정과 경고가 온다.
  */
@@ -1168,6 +1226,27 @@ export type QuickLookDto = { html: string; dir: string; sheets: QuickLookSheetDt
  */
 export type QuickLookSheetDto = { name: string; html: string }
 export type QuickSelect = { match_only_prefix: boolean; activate_on_any_character: boolean }
+export type RemoteConfig = { 
+/**
+ * 병합 후 항목별로 검증해서 채운다(protocol이 sftp·ftp가 아니거나 host가 빈 항목은 경고와 함께 빠진다).
+ */
+servers?: RemoteServer[] }
+/**
+ * `remote_connect`의 결과: 패널이 이동할 원격 루트 경로(`sftp://<id>/..`), 또는 종류가 구분된 실패.
+ * 설정 디렉터리 없음·없는 항목 번호 같은 그 밖의 문제는 명령 오류(문자열)로 온다.
+ */
+export type RemoteConnectDto = { connected: string } | { failed: RemoteFailureDto }
+/**
+ * 원격 연결 실패의 종류. UI는 `auth`면 비밀번호를 다시 묻는다.
+ */
+export type RemoteErrorKindDto = "auth" | "unreachable" | "other"
+export type RemoteFailureDto = { kind: RemoteErrorKindDto; message: string }
+/**
+ * SFTP·FTP 서버 항목(`[[remote.servers]]`). `name`이 비면 읽을 때 `user@host`(user가 없으면 `host`)로 채우고,
+ * `port`가 0이거나 없으면 프로토콜 기본 포트(sftp 22, ftp 21)로 채운다. `user`가 비면 FTP는 `anonymous`로 연결한다.
+ * `base_dir`은 접속 직후 이동할 폴더이고 비면 서버가 알려 주는 홈이다.
+ */
+export type RemoteServer = { name: string; protocol: string; host: string; port: number; user: string; base_dir: string }
 /**
  * Look Up / Flatten 결과가 더 도착했다.
  */

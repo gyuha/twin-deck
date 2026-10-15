@@ -219,7 +219,7 @@ describe("드라이브 바", () => {
       backend.setConfig((l) => (l.config.smb = { servers }));
       return backend;
     };
-    const menu = () => screen.getByRole("dialog", { name: "SMB 서버에 연결" });
+    const menu = () => screen.getByRole("dialog", { name: "서버에 연결" });
     const options = () => within(menu()).getAllByRole("option").map((o) => o.textContent?.trim());
     const openConnect = async (user: Awaited<ReturnType<typeof renderApp>>["user"], side: "왼쪽" | "오른쪽" = "왼쪽") => {
       await user.click(within(bar(side)).getByRole("button", { name: "연결" }));
@@ -236,14 +236,14 @@ describe("드라이브 바", () => {
     it("연결 메뉴에 저장된 항목과 구분선, 서버 관리…가 보인다", async () => {
       const { user } = await renderApp(withServers(NAS, GUEST));
       await openConnect(user);
-      expect(options()).toEqual(["1NAS", "2공용", "3서버 관리…"]);
+      expect(options()).toEqual(["1NAS", "2공용", "3서버 관리…", "4원격 서버 관리…"]);
       expect(within(menu()).getByRole("separator")).toBeInTheDocument();
     });
 
     it("저장된 항목이 없으면 서버 관리…만 있다", async () => {
       const { user } = await renderApp(setup());
       await openConnect(user);
-      expect(options()).toEqual(["1서버 관리…"]);
+      expect(options()).toEqual(["1서버 관리…", "2원격 서버 관리…"]);
       expect(within(menu()).queryByRole("separator")).toBeNull();
     });
 
@@ -252,7 +252,7 @@ describe("드라이브 바", () => {
       await openConnect(user, "오른쪽");
       await pick(user, "공용");
       await waitFor(() => expect(rightCrumbs()).toEqual(["/", "Volumes", "public"]));
-      expect(screen.queryByRole("dialog", { name: "SMB 서버에 연결" })).toBeNull();
+      expect(screen.queryByRole("dialog", { name: "서버에 연결" })).toBeNull();
       expect(volButton("오른쪽", "public")).toHaveAttribute("aria-pressed", "true");
       expect(leftCrumbs()).toEqual(["/", "home", "a"]); // 다른 패널은 그대로
     });
@@ -377,7 +377,7 @@ describe("드라이브 바", () => {
       await openConnect(user);
       await pick(user, "NAS");
       await openConnect(user);
-      await pick(user, "서버 관리…");
+      await user.click(within(menu()).getByRole("option", { name: /^(?!.*원격).*서버 관리…/ }));
       const group = await screen.findByRole("group", { name: "저장된 SMB 서버" });
       await user.click(within(group).getByRole("button", { name: "삭제" })); // 0번 NAS를 지운다 → 0번이 "다른 서버"가 된다
       await user.click(within(group).getByRole("button", { name: "저장" }));
@@ -393,7 +393,7 @@ describe("드라이브 바", () => {
     it("서버 관리…를 고르면 설정의 SMB 서버 탭이 열린다", async () => {
       const { user } = await renderApp(withServers(NAS));
       await openConnect(user);
-      await pick(user, "서버 관리…");
+      await user.click(within(menu()).getByRole("option", { name: /^(?!.*원격).*서버 관리…/ }));
       expect(await screen.findByRole("tab", { name: "SMB 서버" })).toHaveAttribute("aria-selected", "true");
     });
 
@@ -402,6 +402,156 @@ describe("드라이브 바", () => {
       await openConnect(user);
       await user.keyboard("{ArrowDown}{Enter}");
       expect(await screen.findByRole("tab", { name: "SMB 서버" })).toHaveAttribute("aria-selected", "true");
+    });
+  });
+
+  describe("원격 연결 메뉴 (이슈 #76)", () => {
+    const SFTP = { name: "회사", protocol: "sftp", host: "nas", port: 22, user: "kim", base_dir: "" };
+    const FTP = { name: "공개", protocol: "ftp", host: "ftp.example.com", port: 21, user: "", base_dir: "/pub" };
+    const OFFLINE = { name: "꺼진 서버", protocol: "sftp", host: "offline", port: 22, user: "kim", base_dir: "" };
+    const withRemotes = (...servers: (typeof SFTP)[]) => {
+      const backend = setup();
+      backend.setConfig((l) => (l.config.remote = { servers }));
+      backend.seed({ "sftp://kim@nas:22/docs/a.txt": "a", "sftp://kim@nas:22/b.txt": "b", "ftp://ftp.example.com:21/pub/p.txt": "p" });
+      return backend;
+    };
+    const menu = () => screen.getByRole("dialog", { name: "서버에 연결" });
+    const options = () => within(menu()).getAllByRole("option").map((o) => o.textContent?.trim());
+    const openConnect = async (user: Awaited<ReturnType<typeof renderApp>>["user"], side: "왼쪽" | "오른쪽" = "왼쪽") => {
+      await user.click(within(bar(side)).getByRole("button", { name: "연결" }));
+      return menu();
+    };
+    const pick = async (user: Awaited<ReturnType<typeof renderApp>>["user"], name: string) =>
+      user.click(within(menu()).getByRole("option", { name: new RegExp(name) }));
+    const rightCrumbs = () =>
+      within(pathNav("오른쪽"))
+        .getAllByRole("button")
+        .map((b) => b.textContent);
+    const passwordDialog = () => screen.findByRole("dialog", { name: "회사 비밀번호" });
+
+    it("연결 메뉴에 저장된 원격 항목이 프로토콜과 함께 보이고 원격 서버 관리…가 있다", async () => {
+      const { user } = await renderApp(withRemotes(SFTP, FTP));
+      await openConnect(user);
+      expect(options()).toEqual(["1SFTP · 회사", "2FTP · 공개", "3서버 관리…", "4원격 서버 관리…"]);
+    });
+
+    it("SFTP 항목을 고르면 비밀번호를 묻고 맞으면 그 패널이 원격 루트로 이동한다(기억하면 저장된다)", async () => {
+      const backend = withRemotes(SFTP);
+      const { user } = await renderApp(backend);
+      await openConnect(user, "오른쪽");
+      await pick(user, "SFTP · 회사");
+      let d = await passwordDialog();
+      await user.type(within(d).getByLabelText("비밀번호"), "bad{Enter}");
+      d = await passwordDialog();
+      expect(await within(d).findByRole("alert")).toHaveTextContent("비밀번호가 맞지 않습니다");
+      await user.click(within(d).getByRole("checkbox", { name: "비밀번호 기억" }));
+      await user.type(within(d).getByLabelText("비밀번호"), "secret");
+      await user.click(within(d).getByRole("button", { name: "확인" }));
+      await waitFor(() => expect(rightCrumbs()).toEqual(["sftp://kim@nas:22"]));
+      expect(screen.queryByRole("dialog", { name: "회사 비밀번호" })).toBeNull();
+      expect(backend.remotePasswords.get("kim@nas:22/sftp")).toBe("secret");
+      expect(leftCrumbs()).toEqual(["/", "home", "a"]); // 다른 패널은 그대로
+      // 원격 폴더는 어느 로컬 볼륨에도 속하지 않아 볼륨 버튼이 강조되지 않고 "연결 끊기"가 보인다.
+      expect(volButton("오른쪽", "/")).toHaveAttribute("aria-pressed", "false");
+      expect(within(bar("오른쪽")).getByRole("button", { name: "연결 끊기" })).toBeInTheDocument();
+      expect(within(bar("왼쪽")).queryByRole("button", { name: "연결 끊기" })).toBeNull();
+    });
+
+    it("저장된 비밀번호가 있으면 묻지 않고 연결하고, 익명 FTP는 시작 폴더로 간다", async () => {
+      const backend = withRemotes(SFTP, FTP);
+      backend.remotePasswords.set("kim@nas:22/sftp", "secret");
+      const { user } = await renderApp(backend);
+      await openConnect(user, "오른쪽");
+      await pick(user, "SFTP · 회사");
+      await waitFor(() => expect(rightCrumbs()).toEqual(["sftp://kim@nas:22"]));
+      expect(screen.queryByRole("dialog", { name: "회사 비밀번호" })).toBeNull();
+      await openConnect(user, "오른쪽");
+      await pick(user, "FTP · 공개");
+      await waitFor(() => expect(rightCrumbs()).toEqual(["ftp://ftp.example.com:21", "pub"]));
+    });
+
+    it("비밀번호 창에서 Esc로 취소하면 연결하지 않고 이동하지 않는다", async () => {
+      const backend = withRemotes(SFTP);
+      const { user } = await renderApp(backend);
+      await openConnect(user);
+      await pick(user, "SFTP · 회사");
+      await passwordDialog();
+      await user.keyboard("{Escape}");
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: "회사 비밀번호" })).toBeNull());
+      expect(leftCrumbs()).toEqual(["/", "home", "a"]);
+      expect(await backend.remoteConnections()).toEqual([]);
+    });
+
+    it("서버에 닿지 않으면 오류 메시지를 보이고 이동하지 않는다", async () => {
+      const backend = withRemotes(OFFLINE);
+      backend.remotePasswords.set("kim@offline:22/sftp", "pw");
+      const { user } = await renderApp(backend);
+      await openConnect(user);
+      await pick(user, "꺼진 서버");
+      expect(await screen.findByText("서버에 연결할 수 없습니다")).toBeInTheDocument();
+      expect(leftCrumbs()).toEqual(["/", "home", "a"]);
+    });
+
+    it("연결 중인 항목은 메뉴에서 '연결 중…'으로 비활성이고 다시 연결하지 않는다", async () => {
+      const backend = withRemotes(FTP);
+      let release!: () => void;
+      const gate = new Promise<void>((r) => (release = r));
+      const original = backend.remoteConnect.bind(backend);
+      let calls = 0;
+      backend.remoteConnect = async (...args) => {
+        calls += 1;
+        await gate;
+        return original(...args);
+      };
+      const { user } = await renderApp(backend);
+      await openConnect(user);
+      await pick(user, "FTP · 공개");
+      await openConnect(user);
+      const busy = within(menu()).getByRole("option", { name: /FTP · 공개 — 연결 중…/ });
+      expect(busy).toHaveAttribute("aria-disabled", "true");
+      await user.click(busy);
+      release();
+      await waitFor(() => expect(leftCrumbs()).toEqual(["ftp://ftp.example.com:21", "pub"]));
+      expect(calls).toBe(1);
+    });
+
+    it("연결 중에 서버 목록이 바뀌면 비밀번호를 묻지 않고 멈춘다", async () => {
+      const backend = withRemotes(SFTP);
+      let release!: () => void;
+      const gate = new Promise<void>((r) => (release = r));
+      const original = backend.remoteConnect.bind(backend);
+      backend.remoteConnect = async (...args) => {
+        await gate;
+        return original(...args);
+      };
+      const { user } = await renderApp(backend);
+      await openConnect(user);
+      await pick(user, "SFTP · 회사");
+      await backend.setRemoteServers([{ ...SFTP, host: "other" }]);
+      release();
+      expect(await screen.findByText(/원격 서버 목록이 바뀌어 연결을 멈췄습니다/)).toBeInTheDocument();
+      expect(screen.queryByRole("dialog", { name: "회사 비밀번호" })).toBeNull();
+    });
+
+    it("원격 서버 관리…를 고르면 설정의 SFTP·FTP 서버 탭이 열린다", async () => {
+      const { user } = await renderApp(withRemotes(SFTP));
+      await openConnect(user);
+      await pick(user, "원격 서버 관리…");
+      expect(await screen.findByRole("tab", { name: "SFTP·FTP 서버" })).toHaveAttribute("aria-selected", "true");
+    });
+
+    it("연결 끊기를 누르면 그 연결 안의 모든 탭이 홈으로 나오고 연결이 닫힌다", async () => {
+      const backend = withRemotes(SFTP);
+      backend.remotePasswords.set("kim@nas:22/sftp", "pw");
+      const { user } = await renderApp(backend);
+      await openConnect(user, "오른쪽");
+      await pick(user, "SFTP · 회사");
+      await waitFor(() => expect(rightCrumbs()).toEqual(["sftp://kim@nas:22"]));
+      expect(await backend.remoteConnections()).toEqual([0]);
+      await user.click(within(bar("오른쪽")).getByRole("button", { name: "연결 끊기" }));
+      await waitFor(() => expect(rightCrumbs()).toEqual(["/", "home", "a"]));
+      expect(await backend.remoteConnections()).toEqual([]);
+      expect(within(bar("오른쪽")).queryByRole("button", { name: "연결 끊기" })).toBeNull();
     });
   });
 });

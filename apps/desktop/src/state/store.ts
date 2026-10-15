@@ -13,10 +13,14 @@ import {
   isArchiveName,
   isArchivePath,
   isDriveRoot,
+  isRemotePath,
   joinPath,
   parentPath,
+  RemoteConnectError,
+  remoteServerId,
   setBackendErrorTranslator,
   SmbConnectError,
+  splitRemote,
   trimTrailingSep,
 } from "@twin-deck/ts-client";
 import type {
@@ -44,6 +48,7 @@ import type {
   DiskSpaceDto,
   FindSpecDto,
   SmbServer,
+  RemoteServer,
 } from "@twin-deck/ts-client";
 import type { ActionContext } from "@twin-deck/actions";
 import type { Scope } from "@twin-deck/keybinds";
@@ -201,8 +206,10 @@ export interface MenuItem {
   /** 즐겨찾기 항목의 변수 확장 전 경로(삭제할 때 설정 파일과 맞춘다). */
   raw?: string;
   separator?: boolean;
-  /** SMB 연결 메뉴: 연결할 서버 항목 번호(`smb.servers`의 순번). */
+  /** 연결 메뉴: 연결할 SMB 서버 항목 번호(`smb.servers`의 순번). */
   smb?: number;
+  /** 연결 메뉴: 연결할 원격(SFTP·FTP) 서버 항목 번호(`remote.servers`의 순번). */
+  remote?: number;
   /** SMB 연결 메뉴의 "서버 관리…": 이 순번의 설정 탭을 연다. */
   settings?: number;
   /** 보이지만 고를 수 없다(연결 중인 SMB 항목). */
@@ -210,7 +217,7 @@ export interface MenuItem {
 }
 
 /** 팝업 메뉴에서 고를 수 있는 항목인지(머리글·구분선·비활성 항목이 아님). */
-export const pickable = (it: MenuItem) => !it.disabled && (it.path !== undefined || it.smb !== undefined || it.settings !== undefined);
+export const pickable = (it: MenuItem) => !it.disabled && (it.path !== undefined || it.smb !== undefined || it.remote !== undefined || it.settings !== undefined);
 
 export interface MenuState {
   kind: MenuKind;
@@ -386,6 +393,8 @@ export interface AppState {
   settingsError: string | null;
   /** 연결 중인 SMB 서버 항목 번호. 그동안 같은 항목은 다시 연결하지 않고, 메뉴에 "연결 중…"으로 보인다. */
   smbConnecting: number[];
+  /** 연결 중인 원격(SFTP·FTP) 서버 항목 번호. `smbConnecting`과 같은 방식이다. */
+  remoteConnecting: number[];
   /** 설정 파일 저장 경로. 설정 화면이 열릴 때 읽는다. */
   configLocation: ConfigLocationDto | null;
   queueCursor: number;
@@ -582,6 +591,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     settingsSection: 0,
     settingsError: null,
     smbConnecting: [],
+    remoteConnecting: [],
     configLocation: null,
     queueCursor: 0,
     loaded: defaultLoaded(),
@@ -804,7 +814,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     const out: string[] = [];
     for (const pane of ["left", "right"] as const) {
       const t = activeTab(s, pane);
-      if (t.virtual || isArchivePath(t.path) || t.selection.size === 0) continue;
+      if (t.virtual || isArchivePath(t.path) || isRemotePath(t.path) || t.selection.size === 0) continue;
       for (const e of t.entries) if (e.kind === "dir" && t.selection.has(e.path)) out.push(e.path);
     }
     return out;
@@ -1135,6 +1145,11 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
   async function loadPreview(entry: EntryDto) {
     const seq = ++previewSeq;
     const base = { path: entry.path, name: entry.name, isDir: entry.kind === "dir" };
+    // 원격 파일은 내려받지 않고는 읽을 수 없어 미리 보지 않는다(로컬 패널로 복사해서 본다).
+    if (isRemotePath(entry.path) && entry.kind !== "dir") {
+      set({ preview: { ...base, status: "error", error: tr("store.remote.no_open") } });
+      return;
+    }
     // 항목을 넘기는 동안은 이전 내용을 그대로 두어 창이 비었다 채워지며 깜빡이지 않게 한다.
     set((s) => ({ preview: { ...base, status: "loading", data: s.preview?.data } }));
     try {
@@ -1439,6 +1454,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (tab.cursor < 0 && parentRowVisible(tab, cfg().behavior.table.show_parent_row)) return api.goUp(); // `..` 행
       const c = cursorEntry(tab);
       if (c && isFolderEntry(c)) await api.navigate(c.path);
+      else if (c?.kind === "file" && isRemotePath(c.path)) fail(tr("store.remote.no_open"));
       else if (c?.kind === "file" && isArchiveName(c.name, cfg().file_systems.zip.additional_extensions)) {
         await api.navigate(archiveRoot(c.path));
       } else if (c && tab.virtual) {
@@ -2164,7 +2180,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         const value = await ask<string>({ kind: "name", title, label: tr("store.transfer.dest_label"), value: destDir, error, selectStem: false, confirmLabel: tr("store.transfer.start") });
         if (value === null) return;
         destDir = value.trim();
-        if (destDir.length > 1) destDir = destDir.replace(/\/+$/, "");
+        if (isRemotePath(destDir)) destDir = trimTrailingSep(destDir); // 원격 루트(`sftp://id/`)의 끝 `/`는 떼지 않는다
+        else if (destDir.length > 1) destDir = destDir.replace(/\/+$/, "");
         error = await transferDestError(destDir, targets);
         if (!error) break;
       }
@@ -2386,6 +2403,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         fail(tr("store.trash.archive"));
         return;
       }
+      // 원격 서버에는 휴지통이 없다. 영구 삭제로 바꾸고, 되돌릴 수 없으므로 설정과 무관하게 확인한다.
+      if (targets.some((t) => isRemotePath(t.path))) return api.deleteTargets(true);
       if (cfg().core.confirm.trash && !(await api.confirmTargets(tr("store.trash.confirm", { count: targets.length }), targets))) return;
       set({ notice: null });
       patchActive({ selection: new Set() });
@@ -2598,6 +2617,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     async revealCursor() {
       const tab = activeTab(get());
       set({ notice: null });
+      if (isRemotePath(cursorEntry(tab)?.path ?? hereOf(tab))) return fail(tr("store.remote.no_open"));
       try {
         await backend.revealPath(cursorEntry(tab)?.path ?? hereOf(tab));
       } catch (e) {
@@ -2609,6 +2629,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const targets = targetsOf(activeTab(get()));
       if (targets.length === 0) return;
       set({ notice: null });
+      if (targets.some((t) => isRemotePath(t.path))) return fail(tr("store.remote.no_open"));
       try {
         await backend.editPaths(targets.map((t) => t.path));
       } catch (e) {
@@ -2618,6 +2639,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     /** 폴더 편집 (OP-09, Shift+F4): 현재 폴더를 편집기로 연다. */
     async editFolder() {
       set({ notice: null });
+      if (isRemotePath(hereOf(activeTab(get())))) return fail(tr("store.remote.no_open"));
       try {
         await backend.editPaths([hereOf(activeTab(get()))]);
       } catch (e) {
@@ -2635,10 +2657,10 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       return ok === true;
     },
     /** 영구 삭제 (OP-07). `core.confirm.delete`가 켜져 있으면 확인을 거친다 (OP-13). */
-    async deleteTargets() {
+    async deleteTargets(forceConfirm = false) {
       const targets = targetsOf(activeTab(get()));
       if (targets.length === 0) return;
-      if (cfg().core.confirm.delete && !(await api.confirmTargets(tr("store.delete.confirm", { count: targets.length }), targets))) return;
+      if ((forceConfirm || cfg().core.confirm.delete) && !(await api.confirmTargets(tr("store.delete.confirm", { count: targets.length }), targets))) return;
       set({ notice: null });
       patchActive({ selection: new Set() });
       api.recheckVirtual(targets.map((t) => t.path));
@@ -2812,6 +2834,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       set({ menu: null });
       if (item.settings !== undefined) return api.openSettings(item.settings);
       if (item.smb !== undefined) return api.connectSmb(m.pane ?? get().activePane, item.smb);
+      if (item.remote !== undefined) return api.connectRemote(m.pane ?? get().activePane, item.remote);
       if (item.path) await api.navigate(item.path);
     },
     /** 숫자키: n번째로 고를 수 있는 항목 (1~9, 0은 10번째). */
@@ -2823,17 +2846,23 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (idx !== undefined) await api.menuSelect(idx);
     },
     /**
-     * 드라이브 바의 "연결" 메뉴: 저장된 SMB 서버 항목(연결 중이면 비활성)과 "서버 관리…"(설정의 `settingsSection` 탭을 연다).
-     * 탭 순번은 설정 화면(UI)이 정하므로 부르는 쪽이 넘긴다.
+     * 드라이브 바의 "연결" 메뉴: 저장된 SMB 서버 항목, 원격(SFTP·FTP) 서버 항목(연결 중이면 비활성), 그리고 각 설정 탭을 여는
+     * "서버 관리…"·"원격 서버 관리…". 탭 순번은 설정 화면(UI)이 정하므로 부르는 쪽이 넘긴다.
      */
-    openSmbMenu(pane: PaneId, settingsSection: number) {
+    openSmbMenu(pane: PaneId, smbSection: number, remoteSection?: number) {
       api.activate(pane);
       const s = get();
       const items: MenuItem[] = (s.loaded.config.smb.servers ?? []).map((v, i) =>
         s.smbConnecting.includes(i) ? { label: tr("store.smb.connecting", { name: v.name }), smb: i, disabled: true } : { label: v.name, smb: i },
       );
+      const remotes = s.loaded.config.remote.servers ?? [];
+      remotes.forEach((v, i) => {
+        const label = `${v.protocol.toUpperCase()} · ${v.name}`;
+        items.push(s.remoteConnecting.includes(i) ? { label: tr("store.remote.connecting", { name: label }), remote: i, disabled: true } : { label, remote: i });
+      });
       if (items.length > 0) items.push({ label: "", separator: true });
-      items.push({ label: tr("store.smb.manage"), settings: settingsSection });
+      items.push({ label: tr("store.smb.manage"), settings: smbSection });
+      if (remoteSection !== undefined) items.push({ label: tr("store.remote.manage"), settings: remoteSection });
       set({ notice: null, ctxMenu: null, menu: { kind: "smb", title: tr("store.menu.smb"), items, cursor: Math.max(items.findIndex(pickable), 0), pane } });
     },
     /**
@@ -2881,6 +2910,81 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         }
       } finally {
         set((s) => ({ smbConnecting: s.smbConnecting.filter((i) => i !== index) }));
+      }
+    },
+    /**
+     * 저장된 원격(SFTP·FTP) 서버 항목에 연결하고 그 패널을 원격 루트로 옮긴다. 이미 연결돼 있으면 바로 옮긴다.
+     * 먼저 저장된 비밀번호(키체인)로 시도하고, 인증이 필요하거나 틀리면 비밀번호를 물어 다시 시도한다(취소하면 그만둔다).
+     * 그 밖의 실패는 오류로 알린다. 연결 중에도 UI는 막지 않고, 같은 항목은 끝날 때까지 다시 연결하지 않는다.
+     */
+    async connectRemote(pane: PaneId, index: number) {
+      const server = get().loaded.config.remote.servers?.[index];
+      if (!server || get().remoteConnecting.includes(index)) return;
+      set((s) => ({ notice: null, remoteConnecting: [...s.remoteConnecting, index] }));
+      // 백엔드는 항목을 순번으로 찾는다. 기다리는 사이 목록이 바뀌어 이 순번이 다른 서버가 되면 비밀번호를 엉뚱한 서버로 보내지 않도록 멈춘다.
+      const changed = () => {
+        const now = get().loaded.config.remote.servers?.[index];
+        return !now || now.protocol !== server.protocol || remoteServerId(now) !== remoteServerId(server);
+      };
+      try {
+        let password: string | null = null;
+        let remember = false;
+        for (;;) {
+          if (changed()) return fail(tr("store.remote.changed"));
+          let root: string;
+          try {
+            root = await backend.remoteConnect(index, password, remember);
+          } catch (e) {
+            // 다른 창이 떠 있으면 그 창의 응답을 가로채지 않도록 묻지 않고 오류로 알린다.
+            if (!(e instanceof RemoteConnectError) || e.kind !== "auth" || get().dialog) return fail(e);
+            if (changed()) return fail(tr("store.remote.changed"));
+            const answer: { value: string; remember: boolean } | null = await ask<{ value: string; remember: boolean }>({
+              kind: "password",
+              title: tr("store.remote.password_title", { name: server.name }),
+              value: "",
+              remember,
+              error: password === null ? null : tr("store.remote.password_wrong"),
+            });
+            if (answer === null) return;
+            password = answer.value;
+            remember = answer.remember;
+            continue;
+          }
+          api.activate(pane);
+          await api.navigate(root, undefined, "push", pane);
+          return;
+        }
+      } finally {
+        set((s) => ({ remoteConnecting: s.remoteConnecting.filter((i) => i !== index) }));
+      }
+    },
+    /**
+     * 패널이 놓인 원격 연결을 끊는다. 그 연결 안에 있는 모든 탭(양쪽 패널, 배경 탭 포함)을 먼저 홈(없으면 `/`)으로 옮기고 연결을 닫는다.
+     * 원격 위치가 아니거나 설정에서 지워진 서버면 아무것도 하지 않는다.
+     */
+    async disconnectRemote(pane: PaneId) {
+      const loc = splitRemote(activeTab(get(), pane).path);
+      if (!loc) return;
+      const index = (get().loaded.config.remote.servers ?? []).findIndex((v) => remoteServerId(v) === loc.id);
+      set({ notice: null });
+      const dest = get().userDirs.home ?? "/";
+      for (const p of ["left", "right"] as const) {
+        const pn = get().panes[p];
+        for (const [i, t] of pn.tabs.entries()) {
+          if (t.virtual || splitRemote(t.path)?.id !== loc.id) continue;
+          if (i === pn.active) await api.navigate(dest, undefined, "push", p);
+          else {
+            patchTab(p, t.id, { path: dest, history: [...t.history, dest], back: [], forward: [], cursor: 0, selection: new Set(), quick: null, entries: [] });
+            await reload(p, t.id);
+          }
+        }
+      }
+      await syncWatches();
+      if (index < 0) return;
+      try {
+        await backend.remoteDisconnect(index);
+      } catch (e) {
+        fail(e);
       }
     },
     /** 마운트된 볼륨 목록과 두 패널의 용량을 다시 읽는다(앱 시작, 창이 포커스를 얻을 때). 목록을 못 읽으면 이전 목록을 유지한다. */
@@ -3341,6 +3445,27 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     async setSmbServers(servers: SmbServer[]) {
       try {
         set({ loaded: await backend.setSmbServers(servers), settingsError: null });
+        return true;
+      } catch (e) {
+        set({ settingsError: String(e instanceof Error ? e.message : e) });
+        return false;
+      }
+    },
+    /** 저장된 원격(SFTP·FTP) 서버 목록 전체를 바꾼다. 성공하면 돌려받은 설정을 바로 적용하고 `true`, 실패하면 설정 화면에 오류를 보이고 `false`. */
+    async setRemoteServers(servers: RemoteServer[]) {
+      try {
+        set({ loaded: await backend.setRemoteServers(servers), settingsError: null });
+        return true;
+      } catch (e) {
+        set({ settingsError: String(e instanceof Error ? e.message : e) });
+        return false;
+      }
+    },
+    /** 저장된 원격 서버 항목(`index`)의 비밀번호를 키체인에서 지운다. 실패하면 설정 화면에 오류를 보이고 `false`. */
+    async remoteForgetPassword(index: number) {
+      try {
+        await backend.remoteForgetPassword(index);
+        set({ settingsError: null });
         return true;
       } catch (e) {
         set({ settingsError: String(e instanceof Error ? e.message : e) });

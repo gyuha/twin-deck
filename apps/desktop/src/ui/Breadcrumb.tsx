@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { joinPath } from "@twin-deck/ts-client";
+import { joinPath, remoteUrl, splitRemote } from "@twin-deck/ts-client";
 import { formatSpace } from "../lib/format";
 import { useApp, useAppStore, useT } from "../state/context";
 import type { PaneId } from "../state/store";
@@ -30,11 +30,13 @@ export function Breadcrumb({ pane, path }: { pane: PaneId; path: string }) {
     setEditing(false);
     if (go && value.trim() !== "" && value.trim() !== path) void api.goToPath(value);
   };
-  // Windows 드라이브(`C:\`, `C:/`)는 그 자체가 루트이고, 그 밖에는 `/`가 루트다.
-  const drive = /^[A-Za-z]:[\\/]?/.exec(path)?.[0];
-  const root = drive ? (/[\\/]$/.test(drive) ? drive : drive + "\\") : "/";
-  const segments = [{ label: root, path: root }];
-  for (const part of path.slice(drive?.length ?? 0).split(/[\\/]/).filter(Boolean)) {
+  // 원격 위치(`sftp://<연결 id>/..`)는 연결이 루트이고, Windows 드라이브(`C:\`, `C:/`)는 그 자체가 루트이고, 그 밖에는 `/`가 루트다.
+  const remote = splitRemote(path);
+  const drive = remote ? undefined : /^[A-Za-z]:[\\/]?/.exec(path)?.[0];
+  const root = remote ? remoteUrl(remote.scheme, remote.id, "/") : drive ? (/[\\/]$/.test(drive) ? drive : drive + "\\") : "/";
+  const segments = [{ label: remote ? `${remote.scheme}://${remote.id}` : root, path: root }];
+  const rest = remote ? remote.path : path.slice(drive?.length ?? 0);
+  for (const part of rest.split(remote ? "/" : /[\\/]/).filter(Boolean)) {
     segments.push({ label: part, path: joinPath(segments[segments.length - 1].path, part) });
   }
   const go = (target: string) => {

@@ -214,6 +214,19 @@ export const RUST_MESSAGES: readonly (readonly [ko: string, en: string])[] = [
   ["잘못된 SMB 주소: {url_str}", "Invalid SMB address: {url_str}"],
   ["마운트 지점을 받지 못했습니다", "No mount point was returned"],
   ["SMB 서버 항목이 없습니다: {index}", "No such SMB server entry: {index}"],
+  ["원격과 아카이브 사이는 바로 복사할 수 없습니다", "Cannot copy directly between a remote server and an archive"],
+  ["원격 심볼릭 링크는 지원하지 않습니다", "Remote symbolic links are not supported"],
+  ["원격에는 심볼릭 링크를 만들 수 없습니다", "Cannot create symbolic links on a remote server"],
+  ["원격 연결이 열려 있지 않습니다", "The remote connection is not open"],
+  ["서버에 연결할 수 없습니다", "Cannot connect to the server"],
+  ["이 운영체제에서는 비밀번호를 저장할 수 없습니다", "Passwords cannot be saved on this operating system"],
+  ["원격 서버 항목이 없습니다: {index}", "No such remote server entry: {index}"],
+  ["protocol은 sftp 또는 ftp여야 합니다", "protocol must be sftp or ftp"],
+  ["host가 필요합니다", "host is required"],
+  ["port는 1~65535여야 합니다", "port must be between 1 and 65535"],
+  ["remote.servers[{}]: protocol은 sftp 또는 ftp여야 합니다", "remote.servers[{}]: protocol must be sftp or ftp"],
+  ["remote.servers[{}]: host가 필요합니다", "remote.servers[{}]: host is required"],
+  ["remote: 테이블이 아닙니다", "remote: not a table"],
 ];
 
 /** 사용자에게 그대로 보이지 않는 한국어 리터럴: 개발자용 진단·테스트 확인 문구, 더 큰 문구를 이루는 조각. 한국어로 둔다. */

@@ -22,6 +22,7 @@ tauri-specta = { version = "=2.0.0-rc.21", features = ["derive", "typescript"] }
 td-archive = { path = "../../../crates/td-archive" }
 td-search = { path = "../../../crates/td-search" }
 td-smb = { path = "../../../crates/td-smb" }
+td-remote = { path = "../../../crates/td-remote" }
 td-vfs = { path = "../../../crates/td-vfs" }
 td-config = { path = "../../../crates/td-config" }
 td-icons = { path = "../../../crates/td-icons" }
@@ -60,3 +61,6 @@ windows = { version = "0.61", features = [
   "Win32_UI_Shell_PropertiesSystem",
   "Win32_UI_WindowsAndMessaging",
 ] }
+
+[dev-dependencies]
+td-remote = { path = "../../../crates/td-remote", features = ["testing"] }

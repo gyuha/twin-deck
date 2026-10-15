@@ -1,4 +1,4 @@
-import type { CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigLocationDto, ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, EpubInfoDto, ExpectedFileDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, NormalizeResultDto, LoadedState, LocationConflict, PreviewDto, SmbErrorKindDto, SmbServer, PreviewRectDto, QueueItemDto, QuickLookDto, SearchStartDto, ShowOutcome, SearchSummaryDto, Snapshot, UpdateInfoDto, UserDirsDto, VolumeDto, WriteTextResultDto } from "./generated/bindings";
+import type { CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigLocationDto, ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, EpubInfoDto, ExpectedFileDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, NormalizeResultDto, LoadedState, LocationConflict, PreviewDto, RemoteErrorKindDto, RemoteServer, SmbErrorKindDto, SmbServer, PreviewRectDto, QueueItemDto, QuickLookDto, SearchStartDto, ShowOutcome, SearchSummaryDto, Snapshot, UpdateInfoDto, UserDirsDto, VolumeDto, WriteTextResultDto } from "./generated/bindings";
 
 /** Look Up / Flatten / Disk Usage가 스트리밍으로 보내는 이벤트. 작업마다 마지막은 `done`이다. */
 export type SearchEvent =
@@ -24,6 +24,16 @@ export class BackendError extends Error {
 export class SmbConnectError extends BackendError {
   constructor(
     readonly kind: SmbErrorKindDto,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+/** 원격(SFTP·FTP) 연결 실패. `kind`가 `auth`면 비밀번호가 없거나 틀렸으니 다시 묻는다. */
+export class RemoteConnectError extends BackendError {
+  constructor(
+    readonly kind: RemoteErrorKindDto,
     message: string,
   ) {
     super(message);
@@ -180,6 +190,20 @@ export interface Backend {
   smbConnect(index: number, password: string | null, remember: boolean): Promise<string>;
   /** 설정의 `index`번째 SMB 서버에 저장된 비밀번호를 키체인에서 지운다. 저장된 값이 없어도 성공이다. */
   smbForgetPassword(index: number): Promise<void>;
+  /** 저장된 원격(SFTP·FTP) 서버 목록 전체를 바꾸고 새로 병합된 설정을 돌려준다. 목록은 `Loaded`의 `config.remote.servers`로 읽는다. protocol이 sftp·ftp가 아니거나 host가 빈 항목이 있으면 거부된다. 비밀번호는 목록에 없다(키체인). */
+  setRemoteServers(servers: RemoteServer[]): Promise<Loaded>;
+  /**
+   * 설정의 `index`번째 원격 서버에 연결하고 패널이 이동할 루트 경로(`sftp://<id>/..`)를 돌려준다. 이미 연결돼 있으면 같은 연결의 루트다.
+   * `password`가 없으면 키체인 값을 쓰고, 성공했고 `remember`면 받은 비밀번호를 키체인에 저장한다.
+   * 연결 실패는 `RemoteConnectError`(`kind`로 인증 실패를 구분), 없는 항목 번호 같은 문제는 `BackendError`로 거부된다.
+   */
+  remoteConnect(index: number, password: string | null, remember: boolean): Promise<string>;
+  /** 설정의 `index`번째 원격 서버 연결을 끊는다. 연결돼 있지 않아도 성공이다. */
+  remoteDisconnect(index: number): Promise<void>;
+  /** 지금 연결돼 있는 원격 서버 항목의 번호들(설정 목록 기준). */
+  remoteConnections(): Promise<number[]>;
+  /** 설정의 `index`번째 원격 서버에 저장된 비밀번호를 키체인에서 지운다. 저장된 값이 없어도 성공이다. */
+  remoteForgetPassword(index: number): Promise<void>;
   /** 설정 폴더를 파일 관리자로 연다. */
   revealConfigDir(): Promise<void>;
   /** 지금 설정 파일(`config.toml`·`keybindings.toml`) 저장 경로와 기본 위치. */
@@ -243,8 +267,31 @@ const lastSep = (path: string) => Math.max(path.lastIndexOf("/"), path.lastIndex
 /** `C:\`, `C:/` 같은 Windows 드라이브 루트. */
 export const isDriveRoot = (path: string) => /^[A-Za-z]:[\\/]?$/.test(path);
 
-/** 경로 끝의 구분자를 뗀다. 루트(`/`, `C:\`)는 그대로 둔다. */
-export const trimTrailingSep = (path: string) => (path.length > 1 && !isDriveRoot(path) ? path.replace(/[\\/]+$/, "") : path);
+/** 원격(SFTP·FTP) 위치: `sftp://<연결 id>/절대/경로`(ADR-0019). 연결 id는 `/`를 담지 않는다. */
+export type RemoteLoc = { scheme: "sftp" | "ftp"; id: string; path: string };
+
+/** 원격 경로를 분해한다. 원격 경로가 아니면 null. 경로가 비면 루트(`/`)다. */
+export function splitRemote(path: string): RemoteLoc | null {
+  const m = /^(sftp|ftp):\/\/([^/]+)(\/.*)?$/.exec(path);
+  if (!m) return null;
+  const rest = (m[3] ?? "/").replace(/\/+$/, "") || "/";
+  return { scheme: m[1] as RemoteLoc["scheme"], id: m[2], path: rest };
+}
+
+export const isRemotePath = (path: string) => splitRemote(path) !== null;
+
+/** 원격 서버 항목의 연결 id. Rust의 `RemoteTarget::id`와 같다: `user@host:port`(사용자가 없으면 `host:port`). 경로(`sftp://<id>/..`)의 id와 맞춘다. */
+export const remoteServerId = (s: { host: string; port: number; user: string }) => (s.user ? `${s.user}@${s.host}:${s.port}` : `${s.host}:${s.port}`);
+
+/** `splitRemote`의 역. 루트는 항상 `sftp://<id>/`처럼 끝에 `/`가 있다. */
+export const remoteUrl = (scheme: RemoteLoc["scheme"], id: string, path: string) => `${scheme}://${id}${path.startsWith("/") ? "" : "/"}${path}`;
+
+/** 경로 끝의 구분자를 뗀다. 루트(`/`, `C:\`, `sftp://id/`)는 그대로 둔다. */
+export const trimTrailingSep = (path: string) => {
+  const r = splitRemote(path);
+  if (r) return remoteUrl(r.scheme, r.id, r.path);
+  return path.length > 1 && !isDriveRoot(path) ? path.replace(/[\\/]+$/, "") : path;
+};
 
 export function joinPath(dir: string, name: string): string {
   if (/[\\/]$/.test(dir)) return dir + name;
@@ -254,6 +301,12 @@ export function joinPath(dir: string, name: string): string {
 }
 
 export function parentPath(path: string): string | null {
+  const r = splitRemote(path);
+  if (r) {
+    if (r.path === "/") return null;
+    const cut = r.path.lastIndexOf("/");
+    return remoteUrl(r.scheme, r.id, cut <= 0 ? "/" : r.path.slice(0, cut));
+  }
   if (isDriveRoot(path)) return null;
   const i = lastSep(path);
   if (i < 0) return null;
@@ -263,6 +316,8 @@ export function parentPath(path: string): string | null {
 }
 
 export function baseName(path: string): string {
+  const r = splitRemote(path);
+  if (r) return r.path === "/" ? r.id : r.path.slice(r.path.lastIndexOf("/") + 1);
   return path.slice(lastSep(path) + 1);
 }
 

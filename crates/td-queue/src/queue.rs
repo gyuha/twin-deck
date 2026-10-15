@@ -301,6 +301,9 @@ where
     }
 }
 
+/// 원격 원본의 전체 파일 수 집계에 허용하는 시간.
+const COUNT_BUDGET: std::time::Duration = std::time::Duration::from_secs(3);
+
 fn run_job<V, T>(shared: &Shared, ops: &Ops<V, T>, hook: Option<&ItemHookBox>, id: JobId)
 where
     V: Vfs,
@@ -317,12 +320,19 @@ where
     // 복사/이동/삭제/추출은 먼저 항목별 진행 단위(파일) 수를 세어 분모를 정한다. 세지 못한 항목은 0으로 친다.
     // 휴지통은 OS 호출 한 번이 한 항목이라 항목 수가 곧 단위 수다.
     let counts: Option<Vec<usize>> = match kind {
-        JobKind::Copy | JobKind::Move => Some(
-            items
+        // 원격 원본은 폴더마다 네트워크 왕복이 들어 끝까지 세면 복사가 시작도 못 한다. 시간 안에 못 세면 개수를 모르는 채(0) 시작한다.
+        JobKind::Copy | JobKind::Move => {
+            let counted: Vec<Option<usize>> = items
                 .iter()
-                .map(|i| ops.count_files(&i.src).unwrap_or(0))
-                .collect(),
-        ),
+                .map(|i| ops.count_files_within(&i.src, COUNT_BUDGET).ok().flatten())
+                .collect();
+            // `None`은 시간 제한이 있는(원격) 원본이 제한 안에 다 세어지지 않은 경우뿐이다. 일부만 더하면 분모가 틀리므로 모두 0으로 둔다.
+            if counted.iter().any(Option::is_none) {
+                Some(vec![0; items.len()])
+            } else {
+                Some(counted.into_iter().map(|c| c.unwrap_or(0)).collect())
+            }
+        }
         JobKind::Delete => Some(
             items
                 .iter()

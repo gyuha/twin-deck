@@ -2,7 +2,8 @@ import { volumeOf } from "../lib/volumes";
 import { useApp, useAppStore, useT } from "../state/context";
 import { activeTab } from "../state/store";
 import type { PaneId } from "../state/store";
-import { SMB_SECTION } from "./Settings";
+import { REMOTE_SECTION, SMB_SECTION } from "./Settings";
+import { isRemotePath } from "@twin-deck/ts-client";
 
 /**
  * 패널 위의 드라이브 바(Double Commander 방식). 한 줄이다: 마운트된 볼륨 버튼(현재 볼륨 강조, 누르면 그 루트로 이동)이 왼쪽에 있고,
@@ -42,10 +43,17 @@ export function DriveBar({ pane }: { pane: PaneId }) {
           type="button"
           title={t("drive.connect_title")}
           className="rounded border border-dashed border-app-line px-2 py-0.5 text-ink-dull hover:bg-app-selected"
-          onClick={() => api.openSmbMenu(pane, SMB_SECTION)}
+          onClick={() => api.openSmbMenu(pane, SMB_SECTION, REMOTE_SECTION)}
         >
           {t("drive.connect")}
         </button>
+        {isRemotePath(path) && (
+          <span role="group" aria-label={t("drive.current_aria", { side })} className="ml-auto flex shrink-0 items-center gap-2">
+            <button type="button" aria-label={t("drive.disconnect")} className="rounded border border-app-line px-2 py-0.5 hover:bg-app-selected" onClick={() => void api.disconnectRemote(pane)}>
+              ⏏ {t("drive.disconnect")}
+            </button>
+          </span>
+        )}
         {current && current.mountPoint !== "/" && current.mountPoint !== volumes[0].mountPoint && (
           <span role="group" aria-label={t("drive.current_aria", { side })} className="ml-auto flex shrink-0 items-center gap-2">
             <button type="button" aria-label={t("drive.unmount")} className="rounded border border-app-line px-2 py-0.5 hover:bg-app-selected" onClick={() => void api.unmountVolume(pane)}>

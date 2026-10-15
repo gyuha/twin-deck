@@ -1,10 +1,10 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { BackendError, SmbConnectError } from "./backend";
+import { BackendError, RemoteConnectError, SmbConnectError } from "./backend";
 import type { Backend, FileDropEvent, SearchEvent, TerminalEvent } from "./backend";
 import { commands, events } from "./generated/bindings";
-import type { CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigValue, ConflictDto, LocationConflict, ExpectedFileDto, FileInfoDto, FindSpecDto, JobDto, LoadedState, PreviewDto, PreviewRectDto, QuickLookDto, EpubInfoDto, ShowOutcome, Snapshot, JobKindDto, Loaded, QueueItemDto, Result, SmbServer, WriteTextResultDto } from "./generated/bindings";
+import type { CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigValue, ConflictDto, LocationConflict, ExpectedFileDto, FileInfoDto, FindSpecDto, JobDto, LoadedState, PreviewDto, PreviewRectDto, QuickLookDto, EpubInfoDto, ShowOutcome, Snapshot, JobKindDto, Loaded, QueueItemDto, RemoteServer, Result, SmbServer, WriteTextResultDto } from "./generated/bindings";
 
 function unwrap<T>(r: Result<T, string>): T {
   if (r.status === "error") throw new BackendError(r.error);
@@ -285,6 +285,23 @@ export class TauriBackend implements Backend {
   }
   async smbForgetPassword(index: number) {
     unwrap(await commands.smbForgetPassword(index));
+  }
+  async setRemoteServers(servers: RemoteServer[]) {
+    return unwrap(await commands.setRemoteServers(servers));
+  }
+  async remoteConnect(index: number, password: string | null, remember: boolean) {
+    const r = unwrap(await commands.remoteConnect(index, password, remember));
+    if ("failed" in r) throw new RemoteConnectError(r.failed.kind, r.failed.message);
+    return r.connected;
+  }
+  async remoteDisconnect(index: number) {
+    unwrap(await commands.remoteDisconnect(index));
+  }
+  async remoteConnections() {
+    return commands.remoteConnections();
+  }
+  async remoteForgetPassword(index: number) {
+    unwrap(await commands.remoteForgetPassword(index));
   }
   async revealConfigDir() {
     unwrap(await commands.revealConfigDir());

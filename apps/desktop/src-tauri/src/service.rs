@@ -89,7 +89,7 @@ impl From<&Entry> for EntryDto {
             mode: e.mode,
             hidden: e.hidden,
             link_is_dir: e.kind == EntryKind::Symlink
-                && std::fs::metadata(e.path.as_path()).is_ok_and(|m| m.is_dir()),
+                && (e.link_is_dir || std::fs::metadata(e.path.as_path()).is_ok_and(|m| m.is_dir())),
         }
     }
 }
@@ -744,6 +744,33 @@ fn starts_with_pdf_header(path: &str) -> bool {
         && &head == b"%PDF"
 }
 
+/// 원격 서버 항목으로 세션을 열어 레지스트리에 넣고, 패널이 이동할 루트 경로(`sftp://<id>/..`)를 돌려준다(ADR-0019).
+/// 이미 열려 있으면 다시 접속하지 않고 같은 연결을 쓴다. 블로킹이라 호출하는 쪽이 UI 스레드를 피해야 한다.
+pub fn connect_remote<S: td_remote::SecretStore>(
+    registry: &td_archive::RemoteRegistry,
+    target: &td_remote::RemoteTarget,
+    password: Option<String>,
+    remember: bool,
+    secrets: &S,
+    opener: td_remote::SessionOpener<'_>,
+) -> Result<String, td_remote::RemoteError> {
+    let id = target.id();
+    let proto = match target.protocol {
+        td_remote::Protocol::Sftp => td_vfs::RemoteProto::Sftp,
+        td_remote::Protocol::Ftp => td_vfs::RemoteProto::Ftp,
+    };
+    if let Some(session) = registry.get(&id) {
+        let root = match target.base_dir.trim() {
+            "" => session.home()?,
+            dir => dir.to_string(),
+        };
+        return Ok(td_vfs::remote_url(proto, &id, &root));
+    }
+    let (session, root) = td_remote::open_session(target, password, remember, secrets, opener)?;
+    registry.insert(&id, session);
+    Ok(td_vfs::remote_url(proto, &id, &root))
+}
+
 pub struct Service<T: Trasher> {
     /// 즉시 실행하는 짧은 작업(폴더/파일 만들기, 이름 변경, 충돌 확인).
     ops: Ops<CompositeFs, T>,
@@ -882,6 +909,11 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
                 terminal_events,
             },
         ))
+    }
+
+    /// 열린 원격(SFTP·FTP) 세션 레지스트리. 연결하면 세션을 넣고 끊으면 뺀다(ADR-0019).
+    pub fn remote_registry(&self) -> td_archive::RemoteRegistry {
+        self.fs.remote_registry()
     }
 
     /// `cwd` 폴더에서 `shell`(설정 `environment.terminal`)로 고른 셸을 pty로 연다. 돌려주는 값은 세션 번호다.
@@ -1479,6 +1511,10 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
     }
 
     pub fn watch(&self, path: &str) -> ServiceResult<()> {
+        // 원격 폴더는 파일 감시가 없다(UI가 다시 읽는다).
+        if td_vfs::is_remote(path) {
+            return Ok(());
+        }
         self.watcher
             .lock()
             .unwrap()
@@ -1487,6 +1523,9 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
     }
 
     pub fn unwatch(&self, path: &str) -> ServiceResult<()> {
+        if td_vfs::is_remote(path) {
+            return Ok(());
+        }
         self.watcher
             .lock()
             .unwrap()
@@ -3404,5 +3443,590 @@ mod tests {
             svc.preview(&small).unwrap().data_url.is_some(),
             "꺼짐이면 지금처럼 데이터로 싣는다"
         );
+    }
+
+    /// 가짜 FTP·SFTP 서버를 띄우고 그 세션을 서비스의 원격 레지스트리에 넣어, 패널이 원격 폴더를 다루는 것처럼 확인한다(ADR-0019).
+    mod remote {
+        use super::*;
+        use std::sync::Arc;
+        use td_remote::testing::{ftp::FakeFtp, sftp::FakeSftp};
+        use td_remote::{FtpSession, RemoteSession, SftpSession};
+
+        /// 서버 쪽 임시 폴더를 일반 경로로 다루게 하는 얇은 손잡이.
+        struct Server {
+            _keep: Box<dyn std::any::Any>,
+            root: PathBuf,
+            url: String,
+        }
+
+        impl Server {
+            fn path(&self, rel: &str) -> PathBuf {
+                self.root.join(rel)
+            }
+            fn url(&self, rel: &str) -> String {
+                format!("{}/{rel}", self.url.trim_end_matches('/'))
+            }
+        }
+
+        fn ftp(svc: &Service<FakeTrash>) -> Server {
+            let s = FakeFtp::start(true);
+            let session = FtpSession::connect(s.cfg("u", "p")).unwrap();
+            svc.remote_registry()
+                .insert("ftpbox", Arc::new(session) as Arc<dyn RemoteSession>);
+            Server {
+                root: s.path(""),
+                url: "ftp://ftpbox/".to_string(),
+                _keep: Box::new(s),
+            }
+        }
+
+        fn sftp(svc: &Service<FakeTrash>) -> Server {
+            let s = FakeSftp::start();
+            let session = SftpSession::connect(s.cfg("u", "p")).unwrap();
+            svc.remote_registry()
+                .insert("sftpbox", Arc::new(session) as Arc<dyn RemoteSession>);
+            Server {
+                root: s.path(""),
+                url: "sftp://sftpbox/".to_string(),
+                _keep: Box::new(s),
+            }
+        }
+
+        fn run_job(svc: &Service<FakeTrash>, kind: JobKindDto, items: Vec<QueueItemDto>) -> JobDto {
+            let id = svc.enqueue(kind, items);
+            wait_finished(svc, id)
+        }
+
+        fn big() -> Vec<u8> {
+            (0..(300 * 1024u32))
+                .map(|i| (i % 253) as u8)
+                .chain(*b"\r\n\n")
+                .collect()
+        }
+
+        fn lists_remote_entries_sorted(make: fn(&Service<FakeTrash>) -> Server) {
+            let (_t, svc, _ch, _root) = setup();
+            let s = make(&svc);
+            std::fs::create_dir(s.path("zdir")).unwrap();
+            std::fs::write(s.path("a.txt"), b"1").unwrap();
+            std::fs::write(s.path(".hidden"), b"2").unwrap();
+            let visible = svc.list_dir(&s.url(""), false).unwrap();
+            let names: Vec<_> = visible.iter().map(|e| e.name.as_str()).collect();
+            assert_eq!(names, ["zdir", "a.txt"]);
+            assert_eq!(visible[0].kind, KindDto::Dir);
+            assert!(visible[1].path.starts_with(s.url.as_str()));
+            assert_eq!(svc.list_dir(&s.url(""), true).unwrap().len(), 3);
+        }
+
+        fn copies_remote_file_to_local_and_back(make: fn(&Service<FakeTrash>) -> Server) {
+            let (_t, svc, _ch, root) = setup();
+            let s = make(&svc);
+            let data = big();
+            std::fs::write(s.path("down.bin"), &data).unwrap();
+            let job = run_job(
+                &svc,
+                JobKindDto::Copy,
+                vec![item(&s.url("down.bin"), Some(&root), ConflictDto::Skip)],
+            );
+            assert_eq!(job.status, JobStatusDto::Done, "{:?}", job.errors);
+            assert_eq!(std::fs::read(format!("{root}/down.bin")).unwrap(), data);
+
+            std::fs::write(format!("{root}/up.bin"), &data).unwrap();
+            let job = run_job(
+                &svc,
+                JobKindDto::Copy,
+                vec![item(
+                    &format!("{root}/up.bin"),
+                    Some(&s.url("")),
+                    ConflictDto::Skip,
+                )],
+            );
+            assert_eq!(job.status, JobStatusDto::Done, "{:?}", job.errors);
+            assert_eq!(std::fs::read(s.path("up.bin")).unwrap(), data);
+        }
+
+        fn copies_folders_recursively_both_ways(make: fn(&Service<FakeTrash>) -> Server) {
+            let (_t, svc, _ch, root) = setup();
+            let s = make(&svc);
+            std::fs::create_dir_all(s.path("proj/sub/deep")).unwrap();
+            std::fs::write(s.path("proj/a.txt"), b"a").unwrap();
+            std::fs::write(s.path("proj/sub/b.txt"), b"bb").unwrap();
+            std::fs::write(s.path("proj/sub/deep/한글.txt"), b"ccc").unwrap();
+            let job = run_job(
+                &svc,
+                JobKindDto::Copy,
+                vec![item(&s.url("proj"), Some(&root), ConflictDto::Skip)],
+            );
+            assert_eq!(job.status, JobStatusDto::Done, "{:?}", job.errors);
+            assert_eq!(
+                std::fs::read(format!("{root}/proj/sub/deep/한글.txt")).unwrap(),
+                b"ccc"
+            );
+            assert_eq!(
+                std::fs::read(format!("{root}/proj/sub/b.txt")).unwrap(),
+                b"bb"
+            );
+
+            std::fs::create_dir_all(format!("{root}/local/x")).unwrap();
+            std::fs::write(format!("{root}/local/x/f.txt"), b"up").unwrap();
+            let job = run_job(
+                &svc,
+                JobKindDto::Copy,
+                vec![item(
+                    &format!("{root}/local"),
+                    Some(&s.url("")),
+                    ConflictDto::Skip,
+                )],
+            );
+            assert_eq!(job.status, JobStatusDto::Done, "{:?}", job.errors);
+            assert_eq!(std::fs::read(s.path("local/x/f.txt")).unwrap(), b"up");
+        }
+
+        fn creates_renames_and_moves_inside_remote(make: fn(&Service<FakeTrash>) -> Server) {
+            let (_t, svc, _ch, _root) = setup();
+            let s = make(&svc);
+            svc.mkdir(&s.url("a/b")).unwrap();
+            assert!(s.path("a/b").is_dir());
+            svc.touch(&s.url("a/new.txt")).unwrap();
+            assert!(s.path("a/new.txt").is_file());
+            let renamed = svc.rename(&s.url("a/new.txt"), "renamed.txt").unwrap();
+            assert_eq!(renamed, s.url("a/renamed.txt"));
+            assert!(s.path("a/renamed.txt").is_file() && !s.path("a/new.txt").exists());
+            let job = run_job(
+                &svc,
+                JobKindDto::Move,
+                vec![item(
+                    &s.url("a/renamed.txt"),
+                    Some(&s.url("a/b")),
+                    ConflictDto::Skip,
+                )],
+            );
+            assert_eq!(job.status, JobStatusDto::Done, "{:?}", job.errors);
+            assert!(s.path("a/b/renamed.txt").is_file() && !s.path("a/renamed.txt").exists());
+        }
+
+        fn moves_between_remote_and_local_by_copy_then_delete(
+            make: fn(&Service<FakeTrash>) -> Server,
+        ) {
+            let (_t, svc, _ch, root) = setup();
+            let s = make(&svc);
+            std::fs::write(s.path("m.txt"), b"move me").unwrap();
+            let job = run_job(
+                &svc,
+                JobKindDto::Move,
+                vec![item(&s.url("m.txt"), Some(&root), ConflictDto::Skip)],
+            );
+            assert_eq!(job.status, JobStatusDto::Done, "{:?}", job.errors);
+            assert_eq!(std::fs::read(format!("{root}/m.txt")).unwrap(), b"move me");
+            assert!(!s.path("m.txt").exists(), "원본이 지워져야 한다");
+            let job = run_job(
+                &svc,
+                JobKindDto::Move,
+                vec![item(
+                    &format!("{root}/m.txt"),
+                    Some(&s.url("")),
+                    ConflictDto::Skip,
+                )],
+            );
+            assert_eq!(job.status, JobStatusDto::Done, "{:?}", job.errors);
+            assert_eq!(std::fs::read(s.path("m.txt")).unwrap(), b"move me");
+            assert!(!std::path::Path::new(&format!("{root}/m.txt")).exists());
+        }
+
+        fn deletes_permanently_and_refuses_trash(make: fn(&Service<FakeTrash>) -> Server) {
+            let (_t, svc, _ch, _root) = setup();
+            let s = make(&svc);
+            std::fs::create_dir_all(s.path("d/e")).unwrap();
+            std::fs::write(s.path("d/e/f.txt"), b"x").unwrap();
+            std::fs::write(s.path("g.txt"), b"y").unwrap();
+            let job = run_job(
+                &svc,
+                JobKindDto::Trash,
+                vec![item(&s.url("g.txt"), None, ConflictDto::Skip)],
+            );
+            assert_eq!(job.status, JobStatusDto::Failed, "원격에는 휴지통이 없다");
+            assert!(s.path("g.txt").exists());
+            let job = run_job(
+                &svc,
+                JobKindDto::Delete,
+                vec![
+                    item(&s.url("d"), None, ConflictDto::Skip),
+                    item(&s.url("g.txt"), None, ConflictDto::Skip),
+                ],
+            );
+            assert_eq!(job.status, JobStatusDto::Done, "{:?}", job.errors);
+            assert!(!s.path("d").exists() && !s.path("g.txt").exists());
+        }
+
+        fn detects_conflicts_and_applies_policy(make: fn(&Service<FakeTrash>) -> Server) {
+            let (_t, svc, _ch, root) = setup();
+            let s = make(&svc);
+            std::fs::write(s.path("same.txt"), b"remote").unwrap();
+            std::fs::write(format!("{root}/same.txt"), b"local").unwrap();
+            assert_eq!(
+                svc.detect_conflict(&format!("{root}/same.txt"), &s.url("")),
+                Some(s.url("same.txt"))
+            );
+            let job = run_job(
+                &svc,
+                JobKindDto::Copy,
+                vec![item(
+                    &format!("{root}/same.txt"),
+                    Some(&s.url("")),
+                    ConflictDto::Skip,
+                )],
+            );
+            assert_eq!(job.status, JobStatusDto::Done);
+            assert_eq!(
+                std::fs::read(s.path("same.txt")).unwrap(),
+                b"remote",
+                "건너뛰면 그대로"
+            );
+            let job = run_job(
+                &svc,
+                JobKindDto::Copy,
+                vec![item(
+                    &format!("{root}/same.txt"),
+                    Some(&s.url("")),
+                    ConflictDto::Overwrite,
+                )],
+            );
+            assert_eq!(job.status, JobStatusDto::Done, "{:?}", job.errors);
+            assert_eq!(
+                std::fs::read(s.path("same.txt")).unwrap(),
+                b"local",
+                "덮어쓰기"
+            );
+            assert!(
+                std::fs::read_dir(s.path("")).unwrap().all(|e| !e
+                    .unwrap()
+                    .file_name()
+                    .to_string_lossy()
+                    .contains("td-replaced")),
+                "치워 둔 임시 파일이 남지 않는다"
+            );
+        }
+
+        fn aborts_a_queued_transfer_and_leaves_the_queue_usable(
+            make: fn(&Service<FakeTrash>) -> Server,
+        ) {
+            let (_t, svc, _ch, root) = setup();
+            let s = make(&svc);
+            std::fs::write(s.path("x.bin"), big()).unwrap();
+            let id = svc.enqueue(
+                JobKindDto::Copy,
+                vec![item(&s.url("x.bin"), Some(&root), ConflictDto::Skip)],
+            );
+            svc.queue_abort(id);
+            let job = wait_finished(&svc, id);
+            assert!(
+                matches!(job.status, JobStatusDto::Aborted | JobStatusDto::Done),
+                "{:?}",
+                job.status
+            );
+            // 중단 뒤에도 같은 연결로 다음 작업이 된다.
+            let job = run_job(
+                &svc,
+                JobKindDto::Copy,
+                vec![item(
+                    &s.url("x.bin"),
+                    Some(&format!("{root}/again")),
+                    ConflictDto::Skip,
+                )],
+            );
+            assert!(matches!(
+                job.status,
+                JobStatusDto::Done | JobStatusDto::Failed
+            ));
+            assert_eq!(svc.list_dir(&s.url(""), true).unwrap().len(), 1);
+        }
+
+        macro_rules! per_protocol {
+            ($($module:ident => $make:ident),*) => {$(
+                mod $module {
+                    use super::*;
+                    #[test] fn 원격_목록은_폴더_먼저_이름순이고_숨김을_거른다() { lists_remote_entries_sorted($make) }
+                    #[test] fn 원격과_로컬_사이_파일_복사는_바이트가_같다() { copies_remote_file_to_local_and_back($make) }
+                    #[test] fn 폴더를_양방향으로_재귀_복사한다() { copies_folders_recursively_both_ways($make) }
+                    #[test] fn 원격_안에서_폴더_파일_만들기_이름_바꾸기_이동() { creates_renames_and_moves_inside_remote($make) }
+                    #[test] fn 원격과_로컬_사이_이동은_복사_뒤_원본_삭제다() { moves_between_remote_and_local_by_copy_then_delete($make) }
+                    #[test] fn 원격은_영구_삭제만_되고_휴지통은_거부한다() { deletes_permanently_and_refuses_trash($make) }
+                    #[test] fn 충돌을_감지하고_정책을_적용한다() { detects_conflicts_and_applies_policy($make) }
+                    #[test] fn 큐_작업을_중단해도_연결은_계속_쓸_수_있다() { aborts_a_queued_transfer_and_leaves_the_queue_usable($make) }
+                }
+            )*};
+        }
+
+        per_protocol!(ftp_session => ftp, sftp_session => sftp);
+
+        mod connect {
+            use super::*;
+            use std::cell::{Cell, RefCell};
+            use std::collections::HashMap;
+            use td_remote::{connect_session, Protocol, RemoteError, RemoteTarget, SecretStore};
+
+            #[derive(Default)]
+            struct Mem(RefCell<HashMap<String, String>>);
+            impl SecretStore for Mem {
+                fn get(&self, k: &str) -> td_remote::Result<Option<String>> {
+                    Ok(self.0.borrow().get(k).cloned())
+                }
+                fn set(&self, k: &str, p: &str) -> td_remote::Result<()> {
+                    self.0.borrow_mut().insert(k.into(), p.into());
+                    Ok(())
+                }
+                fn delete(&self, k: &str) -> td_remote::Result<()> {
+                    self.0.borrow_mut().remove(k);
+                    Ok(())
+                }
+            }
+
+            fn target(protocol: Protocol, port: u16, base: &str) -> RemoteTarget {
+                RemoteTarget {
+                    protocol,
+                    host: "127.0.0.1".into(),
+                    port,
+                    user: "u".into(),
+                    base_dir: base.into(),
+                }
+            }
+
+            /// 가짜 서버 하나를 띄우고 (대상, 서버 폴더, 서버 손잡이)를 돌려준다.
+            fn start(
+                protocol: Protocol,
+                base: &str,
+            ) -> (RemoteTarget, PathBuf, Box<dyn std::any::Any>) {
+                match protocol {
+                    Protocol::Ftp => {
+                        let s = FakeFtp::start(true);
+                        (target(protocol, s.port, base), s.path(""), Box::new(s))
+                    }
+                    Protocol::Sftp => {
+                        let s = FakeSftp::start();
+                        (target(protocol, s.port, base), s.path(""), Box::new(s))
+                    }
+                }
+            }
+
+            fn each(f: impl Fn(Protocol)) {
+                f(Protocol::Ftp);
+                f(Protocol::Sftp);
+            }
+
+            #[test]
+            fn 연결하면_루트_경로를_돌려주고_그_경로를_읽을_수_있다() {
+                each(|p| {
+                    let (_t, svc, _ch, _root) = setup();
+                    let (t, dir, _srv) = start(p, "");
+                    std::fs::write(dir.join("hello.txt"), b"hi").unwrap();
+                    let url = connect_remote(
+                        &svc.remote_registry(),
+                        &t,
+                        Some("p".into()),
+                        false,
+                        &Mem::default(),
+                        &connect_session,
+                    )
+                    .unwrap();
+                    assert!(
+                        url.starts_with(&format!("{}://u@127.0.0.1:{}/", p.name(), t.port)),
+                        "{url}"
+                    );
+                    let names: Vec<_> = svc
+                        .list_dir(&url, false)
+                        .unwrap()
+                        .into_iter()
+                        .map(|e| e.name)
+                        .collect();
+                    assert_eq!(names, ["hello.txt"]);
+                });
+            }
+
+            #[test]
+            fn 시작_폴더가_있으면_그_폴더가_루트다() {
+                each(|p| {
+                    let (_t, svc, _ch, _root) = setup();
+                    let (t, dir, _srv) = start(p, "/sub");
+                    std::fs::create_dir(dir.join("sub")).unwrap();
+                    let url = connect_remote(
+                        &svc.remote_registry(),
+                        &t,
+                        Some("p".into()),
+                        false,
+                        &Mem::default(),
+                        &connect_session,
+                    )
+                    .unwrap();
+                    assert!(url.ends_with("/sub"), "{url}");
+                });
+            }
+
+            #[test]
+            fn 이미_열린_연결은_다시_접속하지_않고_재사용한다() {
+                each(|p| {
+                    let (_t, svc, _ch, _root) = setup();
+                    let (t, _dir, _srv) = start(p, "");
+                    let calls = Cell::new(0);
+                    let opener = |t: &RemoteTarget, u: &str, pw: &str| {
+                        calls.set(calls.get() + 1);
+                        connect_session(t, u, pw)
+                    };
+                    let reg = svc.remote_registry();
+                    let a =
+                        connect_remote(&reg, &t, Some("p".into()), false, &Mem::default(), &opener)
+                            .unwrap();
+                    let b =
+                        connect_remote(&reg, &t, None, false, &Mem::default(), &opener).unwrap();
+                    assert_eq!(a, b);
+                    assert_eq!(calls.get(), 1);
+                });
+            }
+
+            #[test]
+            fn 비밀번호가_없거나_틀리면_인증_오류이고_저장된_값은_남는다() {
+                each(|p| {
+                    let (_t, svc, _ch, _root) = setup();
+                    let (t, _dir, _srv) = start(p, "");
+                    let reg = svc.remote_registry();
+                    let store = Mem::default();
+                    let err = connect_remote(&reg, &t, None, false, &store, &connect_session)
+                        .unwrap_err();
+                    assert_eq!(err, RemoteError::Auth);
+                    store.set(&td_remote::secret_key(&t), "p").unwrap();
+                    let err = connect_remote(
+                        &reg,
+                        &t,
+                        Some("틀림".into()),
+                        true,
+                        &store,
+                        &connect_session,
+                    )
+                    .unwrap_err();
+                    assert_eq!(err, RemoteError::Auth);
+                    assert_eq!(
+                        store.get(&td_remote::secret_key(&t)).unwrap().as_deref(),
+                        Some("p")
+                    );
+                    assert!(!reg.contains(&t.id()));
+                    // 저장된 비밀번호로는 열린다.
+                    connect_remote(&reg, &t, None, false, &store, &connect_session).unwrap();
+                    assert!(reg.contains(&t.id()));
+                });
+            }
+
+            #[test]
+            fn 기억을_고르면_성공한_비밀번호를_키체인에_저장한다() {
+                each(|p| {
+                    let (_t, svc, _ch, _root) = setup();
+                    let (t, _dir, _srv) = start(p, "");
+                    let store = Mem::default();
+                    connect_remote(
+                        &svc.remote_registry(),
+                        &t,
+                        Some("p".into()),
+                        true,
+                        &store,
+                        &connect_session,
+                    )
+                    .unwrap();
+                    assert_eq!(
+                        store.get(&td_remote::secret_key(&t)).unwrap().as_deref(),
+                        Some("p")
+                    );
+                });
+            }
+
+            #[test]
+            fn 닫힌_포트는_연결_불가_오류다() {
+                each(|p| {
+                    let (_t, svc, _ch, _root) = setup();
+                    let port = {
+                        let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+                        l.local_addr().unwrap().port()
+                    };
+                    let t = target(p, port, "");
+                    let err = connect_remote(
+                        &svc.remote_registry(),
+                        &t,
+                        Some("p".into()),
+                        false,
+                        &Mem::default(),
+                        &connect_session,
+                    )
+                    .unwrap_err();
+                    assert_eq!(err, RemoteError::Unreachable);
+                });
+            }
+
+            #[test]
+            fn 끊으면_세션이_닫혀_그_경로를_더_읽을_수_없다() {
+                each(|p| {
+                    let (_t, svc, _ch, _root) = setup();
+                    let (t, _dir, _srv) = start(p, "");
+                    let reg = svc.remote_registry();
+                    let url = connect_remote(
+                        &reg,
+                        &t,
+                        Some("p".into()),
+                        false,
+                        &Mem::default(),
+                        &connect_session,
+                    )
+                    .unwrap();
+                    assert!(svc.list_dir(&url, false).is_ok());
+                    assert!(reg.remove(&t.id()));
+                    let err = svc.list_dir(&url, false).unwrap_err();
+                    assert!(err.contains("원격 연결이 열려 있지 않습니다"), "{err}");
+                });
+            }
+        }
+
+        #[cfg(unix)]
+        #[test]
+        fn 순환_심볼릭_링크가_있는_원격_폴더도_복사가_끝나고_나머지_파일은_복사된다() {
+            let (_t, svc, _ch, root) = setup();
+            let s = sftp(&svc);
+            std::fs::create_dir_all(s.path("proj/sub")).unwrap();
+            std::fs::write(s.path("proj/a.txt"), b"a").unwrap();
+            std::fs::write(s.path("proj/sub/b.txt"), b"b").unwrap();
+            std::os::unix::fs::symlink(s.path("proj"), s.path("proj/sub/loop")).unwrap(); // 자기 조상을 가리키는 링크
+            std::os::unix::fs::symlink(s.path("proj/a.txt"), s.path("proj/alias.txt")).unwrap();
+            let job = run_job(
+                &svc,
+                JobKindDto::Copy,
+                vec![item(&s.url("proj"), Some(&root), ConflictDto::Skip)],
+            );
+            // 폴더 링크는 따라가지 않아 건너뛰고(오류로 알림) 나머지는 복사한다.
+            assert_eq!(std::fs::read(format!("{root}/proj/a.txt")).unwrap(), b"a");
+            assert_eq!(
+                std::fs::read(format!("{root}/proj/sub/b.txt")).unwrap(),
+                b"b"
+            );
+            assert_eq!(
+                std::fs::read(format!("{root}/proj/alias.txt")).unwrap(),
+                b"a",
+                "파일 링크는 내용이 복사된다"
+            );
+            assert!(!std::path::Path::new(&format!("{root}/proj/sub/loop")).exists());
+            assert!(
+                job.errors.iter().any(|e| e.path.ends_with("loop")),
+                "{:?}",
+                job.errors
+            );
+        }
+
+        #[test]
+        fn 연결이_없는_원격_경로는_오류다() {
+            let (_t, svc, _ch, _root) = setup();
+            let err = svc.list_dir("sftp://nobody/", false).unwrap_err();
+            assert!(err.contains("원격 연결이 열려 있지 않습니다"), "{err}");
+        }
+
+        #[test]
+        fn 원격_경로는_감시하지_않고_성공으로_본다() {
+            let (_t, svc, _ch, _root) = setup();
+            assert!(svc.watch("sftp://x/a").is_ok());
+            assert!(svc.unwatch("ftp://x/a").is_ok());
+        }
     }
 }

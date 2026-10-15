@@ -498,6 +498,42 @@ impl<V: Vfs, T: Trasher> Ops<V, T> {
         self.count_entry(&entry)
     }
 
+    /// `count_files`와 같지만 원격처럼 폴더를 훑는 데 오래 걸리는 곳은 `budget` 안에 다 못 세면 `None`이다
+    /// (그동안 복사가 시작도 못 하는 일을 막는다). 로컬은 시간 제한 없이 센다.
+    pub fn count_files_within(
+        &self,
+        src: &VfsPath,
+        budget: std::time::Duration,
+    ) -> Result<Option<usize>> {
+        let entry = self.vfs.stat(src)?;
+        if !self.vfs.is_slow(src) {
+            return self.count_entry(&entry).map(Some);
+        }
+        self.count_entry_until(&entry, std::time::Instant::now() + budget)
+    }
+
+    fn count_entry_until(
+        &self,
+        entry: &Entry,
+        deadline: std::time::Instant,
+    ) -> Result<Option<usize>> {
+        if entry.kind != EntryKind::Dir {
+            return Ok(Some(1));
+        }
+        if std::time::Instant::now() >= deadline {
+            return Ok(None);
+        }
+        let opts = ListOptions { show_hidden: true };
+        let mut n = 0;
+        for child in self.vfs.list(&entry.path, &opts)? {
+            match self.count_entry_until(&child, deadline)? {
+                Some(c) => n += c,
+                None => return Ok(None),
+            }
+        }
+        Ok(Some(n))
+    }
+
     fn count_entry(&self, entry: &Entry) -> Result<usize> {
         if entry.kind != EntryKind::Dir {
             return Ok(1);

@@ -6,13 +6,17 @@ use std::io;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 
-use td_vfs::{Entry, EntryKind, Info, ListOptions, LocalFs, Result, Vfs, VfsError, VfsPath};
+use td_vfs::{
+    split_remote, Entry, EntryKind, Info, ListOptions, LocalFs, RemoteLoc, Result, Vfs, VfsError,
+    VfsPath,
+};
 use unicode_normalization::UnicodeNormalization;
 
 use crate::archive::{Archive, EntryInfo};
 use crate::error::ArchiveError;
 use crate::kind::sniff_kind;
 use crate::path::{split_archive_path_with, ArchivePath};
+use crate::remote_fs::RemoteRegistry;
 use crate::writer::{edit_in_with, Source, ZipEdit};
 
 /// 로컬 경로는 `LocalFs`로, `x.zip!/...` 경로는 아카이브로 보낸다.
@@ -23,11 +27,14 @@ pub struct CompositeFs {
     extra_zip_exts: Arc<RwLock<Vec<String>>>,
     /// "Open As"로 아카이브로 열기로 한 파일들(확장자와 무관). 세션 동안만 유지된다.
     forced: Arc<RwLock<HashSet<String>>>,
+    /// 열린 원격(SFTP·FTP) 세션들. 복제본끼리 공유한다.
+    remote: RemoteRegistry,
 }
 
 enum Loc {
     Local,
     Archive(ArchivePath),
+    Remote(RemoteLoc),
 }
 
 fn nfc(s: &str) -> String {
@@ -82,6 +89,7 @@ fn entry_of(path: VfsPath, name: String, e: &EntryInfo) -> Entry {
         created: None,
         mode: e.mode,
         file_id: None,
+        link_is_dir: false,
     }
 }
 
@@ -91,7 +99,13 @@ impl CompositeFs {
             local: LocalFs,
             extra_zip_exts: Arc::new(RwLock::new(extra_zip_exts)),
             forced: Arc::default(),
+            remote: RemoteRegistry::default(),
         }
+    }
+
+    /// 원격 세션 레지스트리. 연결하면 세션을 넣고, 끊으면 뺀다.
+    pub fn remote_registry(&self) -> RemoteRegistry {
+        self.remote.clone()
     }
 
     /// 확장자와 무관하게 파일을 아카이브로 연다 (ARC-04). 내용(매직 바이트)이 아카이브가 아니면 오류.
@@ -131,11 +145,19 @@ impl CompositeFs {
 
     fn locate(&self, path: &VfsPath) -> Loc {
         let s = path.as_path().to_string_lossy();
+        if let Some(loc) = split_remote(&s) {
+            return Loc::Remote(loc);
+        }
         let forced = |p: &str| self.is_forced(p);
         match split_archive_path_with(&s, &self.extra(), &|p| Path::new(p).is_file(), &forced) {
             Some(ap) => Loc::Archive(ap),
             None => Loc::Local,
         }
+    }
+
+    /// 경로가 원격(`sftp://`·`ftp://`) 위치인가.
+    pub fn is_remote_path(&self, path: &VfsPath) -> bool {
+        matches!(self.locate(path), Loc::Remote(_))
     }
 
     /// 경로가 아카이브 안(또는 아카이브 루트)을 가리키는가.
@@ -206,8 +228,10 @@ impl CompositeFs {
 
 impl Vfs for CompositeFs {
     fn list(&self, dir: &VfsPath, opts: &ListOptions) -> Result<Vec<Entry>> {
-        let Loc::Archive(ap) = self.locate(dir) else {
-            return self.local.list(dir, opts);
+        let ap = match self.locate(dir) {
+            Loc::Archive(ap) => ap,
+            Loc::Remote(r) => return self.remote.list(dir, &r, opts),
+            Loc::Local => return self.local.list(dir, opts),
         };
         let a = self.open(dir, &ap)?;
         if !ap.inner.is_empty() && !a.stat(&ap.inner).is_some_and(|e| e.is_dir) {
@@ -224,8 +248,10 @@ impl Vfs for CompositeFs {
     }
 
     fn stat(&self, path: &VfsPath) -> Result<Entry> {
-        let Loc::Archive(ap) = self.locate(path) else {
-            return self.local.stat(path);
+        let ap = match self.locate(path) {
+            Loc::Archive(ap) => ap,
+            Loc::Remote(r) => return self.remote.stat(path, &r),
+            Loc::Local => return self.local.stat(path),
         };
         let a = self.open(path, &ap)?;
         let e = a
@@ -240,8 +266,10 @@ impl Vfs for CompositeFs {
     }
 
     fn mkdir(&self, path: &VfsPath) -> Result<()> {
-        let Loc::Archive(ap) = self.locate(path) else {
-            return self.local.mkdir(path);
+        let ap = match self.locate(path) {
+            Loc::Archive(ap) => ap,
+            Loc::Remote(r) => return self.remote.mkdir(path, &r),
+            Loc::Local => return self.local.mkdir(path),
         };
         Self::require_inner(path, &ap, "만들")?;
         if self.open(path, &ap)?.stat(&ap.inner).is_some() {
@@ -253,8 +281,10 @@ impl Vfs for CompositeFs {
     }
 
     fn create_file(&self, path: &VfsPath) -> Result<()> {
-        let Loc::Archive(ap) = self.locate(path) else {
-            return self.local.create_file(path);
+        let ap = match self.locate(path) {
+            Loc::Archive(ap) => ap,
+            Loc::Remote(r) => return self.remote.create_file(path, &r),
+            Loc::Local => return self.local.create_file(path),
         };
         Self::require_inner(path, &ap, "만들")?;
         if self.open(path, &ap)?.stat(&ap.inner).is_some() {
@@ -276,6 +306,7 @@ impl Vfs for CompositeFs {
                     z.rename(&a.inner, &b.inner);
                 })
             }
+            (Loc::Remote(a), Loc::Remote(b)) => self.remote.rename(from, &a, to, &b),
             // 파일시스템/아카이브 경계를 넘는 이동은 복사 후 삭제로 처리하도록 알린다.
             _ => Err(VfsError::Io {
                 path: from.clone(),
@@ -285,8 +316,10 @@ impl Vfs for CompositeFs {
     }
 
     fn remove_file(&self, path: &VfsPath) -> Result<()> {
-        let Loc::Archive(ap) = self.locate(path) else {
-            return self.local.remove_file(path);
+        let ap = match self.locate(path) {
+            Loc::Archive(ap) => ap,
+            Loc::Remote(r) => return self.remote.remove_file(path, &r),
+            Loc::Local => return self.local.remove_file(path),
         };
         Self::require_inner(path, &ap, "지울")?;
         self.require_exists(path, &ap)?;
@@ -296,8 +329,10 @@ impl Vfs for CompositeFs {
     }
 
     fn remove_dir_all(&self, path: &VfsPath) -> Result<()> {
-        let Loc::Archive(ap) = self.locate(path) else {
-            return self.local.remove_dir_all(path);
+        let ap = match self.locate(path) {
+            Loc::Archive(ap) => ap,
+            Loc::Remote(r) => return self.remote.remove_dir_all(path, &r),
+            Loc::Local => return self.local.remove_dir_all(path),
         };
         Self::require_inner(path, &ap, "지울")?;
         self.require_exists(path, &ap)?;
@@ -308,6 +343,14 @@ impl Vfs for CompositeFs {
 
     fn copy_file(&self, from: &VfsPath, to: &VfsPath) -> Result<u64> {
         match (self.locate(from), self.locate(to)) {
+            (Loc::Remote(a), Loc::Remote(b)) => self.remote.transfer(from, &a, to, &b),
+            (Loc::Remote(a), Loc::Local) => self.remote.download(from, &a, to),
+            (Loc::Local, Loc::Remote(b)) => self.remote.upload(from, to, &b),
+            // 원격과 아카이브 사이는 지원하지 않는다(압축 풀기·압축으로 다룬다).
+            (Loc::Remote(_), Loc::Archive(_)) | (Loc::Archive(_), Loc::Remote(_)) => Err(other(
+                from,
+                "원격과 아카이브 사이는 바로 복사할 수 없습니다",
+            )),
             (Loc::Local, Loc::Local) => self.local.copy_file(from, to),
             (Loc::Local, Loc::Archive(b)) => {
                 Self::require_inner(to, &b, "덮어쓸")?;
@@ -355,8 +398,10 @@ impl Vfs for CompositeFs {
     }
 
     fn read_head(&self, path: &VfsPath, max: usize) -> Result<Vec<u8>> {
-        let Loc::Archive(ap) = self.locate(path) else {
-            return self.local.read_head(path, max);
+        let ap = match self.locate(path) {
+            Loc::Archive(ap) => ap,
+            Loc::Remote(r) => return self.remote.read_head(path, &r, max),
+            Loc::Local => return self.local.read_head(path, max),
         };
         let a = self.open(path, &ap)?;
         let mut head = HeadWriter {
@@ -374,6 +419,9 @@ impl Vfs for CompositeFs {
     }
 
     fn info(&self, path: &VfsPath) -> Result<Info> {
+        if let Loc::Remote(r) = self.locate(path) {
+            return self.remote.info(path, &r);
+        }
         if !self.is_archive_path(path) {
             return self.local.info(path);
         }
@@ -394,6 +442,9 @@ impl Vfs for CompositeFs {
     }
 
     fn read_link(&self, path: &VfsPath) -> Result<VfsPath> {
+        if self.is_remote_path(path) {
+            return Err(other(path, "원격 심볼릭 링크는 지원하지 않습니다"));
+        }
         if self.is_archive_path(path) {
             return Err(other(path, "아카이브 안의 심볼릭 링크는 지원하지 않습니다"));
         }
@@ -401,6 +452,9 @@ impl Vfs for CompositeFs {
     }
 
     fn symlink(&self, target: &VfsPath, link: &VfsPath, target_is_dir: bool) -> Result<()> {
+        if self.is_remote_path(link) {
+            return Err(other(link, "원격에는 심볼릭 링크를 만들 수 없습니다"));
+        }
         if self.is_archive_path(link) {
             return Err(other(
                 link,
@@ -410,8 +464,12 @@ impl Vfs for CompositeFs {
         self.local.symlink(target, link, target_is_dir)
     }
 
+    fn is_slow(&self, path: &VfsPath) -> bool {
+        self.is_remote_path(path)
+    }
+
     fn can_trash(&self, path: &VfsPath) -> bool {
-        !self.is_archive_path(path)
+        !self.is_archive_path(path) && !self.is_remote_path(path)
     }
 }
 

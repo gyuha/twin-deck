@@ -78,6 +78,7 @@ flowchart TB
 | `td-search` | Look Up, Flatten, Disk Usage | `search(query, scope)` 스트림, `walk_sizes(path)` 스트림 | `td-vfs` |
 | `td-volumes` | 마운트된 볼륨 목록과 변경 이벤트 | `list()`, `subscribe()`, `unmount(id)` | OS API |
 | `td-smb` | SMB 마운트, 키체인 비밀번호, 이미 마운트됨 판정 ([ADR-0018](adr/0018-smb-via-os-mount.md)) | `Mounter` trait(macOS NetFS, Windows 네트워크 드라이브), 키체인 get/set/delete, 마운트 지점 조회 | OS API, `keyring` |
+| `td-remote` | SFTP·FTP 블로킹 세션, 서버 항목으로 세션 열기, 키체인 비밀번호 ([ADR-0019](adr/0019-remote-fs-in-process.md)) | `RemoteSession` trait(list·stat·mkdir_all·rename·remove·read·write), `FtpSession`, `SftpSession`, `open_session`, `SecretStore`. `testing` 기능은 가짜 FTP·SFTP 서버를 노출한다 | `suppaftp`, `russh`, `russh-sftp`, `tokio`, `keyring` |
 | `td-terminal` | 패널별 pty 세션 | `open(cwd, shell)`, `write`, `resize`, 출력 스트림 | `portable-pty` |
 | `td-config` | 기본값 + 사용자 TOML 병합, 검증, 감시 | `load()` → `Config`, 변경 이벤트 | `toml`, `serde` |
 | `td-plugin` (M4) | Lua 플러그인 실행과 샌드박스 | 액션 등록/호출 | `mlua` |
