@@ -82,3 +82,127 @@ fn server_empty_password_rejects_everyone() {
     let s = start(c).unwrap();
     assert!(!login(s.local_addr, "me", ""));
 }
+
+mod sftp_tests {
+    use super::*;
+    use crate::{RemoteError, RemoteKind, RemoteSession, SftpConfig, SftpSession};
+    use std::io::{Read, Write};
+
+    fn serve(allow_write: bool) -> (tempfile::TempDir, ServerHandle, SftpSession) {
+        let dir = tempfile::tempdir().unwrap();
+        let share = dir.path().join("share");
+        std::fs::create_dir_all(&share).unwrap();
+        let mut c = cfg(dir.path());
+        c.root = share;
+        c.allow_write = allow_write;
+        let s = start(c).unwrap();
+        let sess = SftpSession::connect(SftpConfig {
+            host: "127.0.0.1".into(),
+            port: s.local_addr.port(),
+            user: "me".into(),
+            password: "secret".into(),
+        })
+        .unwrap();
+        (dir, s, sess)
+    }
+
+    #[test]
+    fn server_sftp_wrong_password_is_auth_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let s = start(cfg(dir.path())).unwrap();
+        let r = SftpSession::connect(SftpConfig {
+            host: "127.0.0.1".into(),
+            port: s.local_addr.port(),
+            user: "me".into(),
+            password: "nope".into(),
+        });
+        assert!(matches!(r, Err(RemoteError::Auth)));
+    }
+
+    #[test]
+    fn server_sftp_list_read_write_rename_delete() {
+        let (dir, _s, sess) = serve(true);
+        std::fs::write(dir.path().join("share/a.txt"), "hello").unwrap();
+        let names: Vec<_> = sess
+            .list("/")
+            .unwrap()
+            .into_iter()
+            .map(|e| e.name)
+            .collect();
+        assert_eq!(names, ["a.txt"]);
+        let mut buf = String::new();
+        sess.read("/a.txt")
+            .unwrap()
+            .read_to_string(&mut buf)
+            .unwrap();
+        assert_eq!(buf, "hello");
+
+        sess.mkdir_all("/d/e").unwrap();
+        let mut w = sess.write("/d/e/b.txt").unwrap();
+        w.write_all(b"data").unwrap();
+        w.finish().unwrap();
+        assert_eq!(
+            std::fs::read(dir.path().join("share/d/e/b.txt")).unwrap(),
+            b"data"
+        );
+        assert_eq!(sess.stat("/d").unwrap().kind, RemoteKind::Dir);
+
+        sess.rename("/d/e/b.txt", "/d/c.txt").unwrap();
+        assert!(dir.path().join("share/d/c.txt").exists());
+        sess.remove_file("/d/c.txt").unwrap();
+        sess.remove_dir_all("/d").unwrap();
+        assert!(!dir.path().join("share/d").exists());
+    }
+
+    #[test]
+    fn server_jail_blocks_escape() {
+        let (dir, _s, sess) = serve(true);
+        std::fs::write(dir.path().join("secret.txt"), "top").unwrap();
+        // `..`은 루트에서 멈춰 루트 안의 같은 이름을 가리킨다(바깥 파일이 읽히면 안 된다).
+        assert!(sess.read("/../secret.txt").is_err());
+        assert!(sess.read("../../secret.txt").is_err());
+        // 절대경로도 루트 기준이라 바깥 실제 경로는 닿지 않는다.
+        let abs = dir.path().join("secret.txt");
+        assert!(sess.read(abs.to_str().unwrap()).is_err());
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(
+                dir.path().join("secret.txt"),
+                dir.path().join("share/link"),
+            )
+            .unwrap();
+            std::os::unix::fs::symlink(dir.path(), dir.path().join("share/dirlink")).unwrap();
+            assert!(sess.read("/link").is_err());
+            assert!(sess.list("/dirlink").is_err());
+            assert!(
+                sess.list("/").unwrap().is_empty(),
+                "루트 밖을 가리키는 링크는 목록에서 감춘다"
+            );
+            assert!(sess.write("/dirlink/new.txt").is_err());
+            assert!(!dir.path().join("new.txt").exists());
+        }
+    }
+
+    #[test]
+    fn server_jail_read_only_rejects_writes() {
+        let (dir, _s, sess) = serve(false);
+        std::fs::write(dir.path().join("share/a.txt"), "hello").unwrap();
+        let mut buf = String::new();
+        sess.read("/a.txt")
+            .unwrap()
+            .read_to_string(&mut buf)
+            .unwrap();
+        assert_eq!(buf, "hello");
+        assert!(sess.mkdir_all("/x").is_err());
+        assert!(sess.create_empty("/n.txt").is_err());
+        assert!(sess.rename("/a.txt", "/b.txt").is_err());
+        assert!(sess.remove_file("/a.txt").is_err());
+        let w = sess.write("/a.txt");
+        assert!(w.is_err() || w.unwrap().finish().is_err());
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("share/a.txt")).unwrap(),
+            "hello"
+        );
+        assert!(!dir.path().join("share/x").exists() && !dir.path().join("share/n.txt").exists());
+    }
+}
