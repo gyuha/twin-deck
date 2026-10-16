@@ -1614,6 +1614,31 @@ fn remote_servers_write_rejects_invalid_entries_without_touching_the_file() {
 }
 
 #[test]
+fn remote_servers_accept_twindeck_with_default_port_2222_and_keep_other_protocols() {
+    let l = load("[[remote.servers]]\nprotocol = \"twindeck\"\nhost = \"h\"\n\n[[remote.servers]]\nprotocol = \"sftp\"\nhost = \"s\"\n");
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    let ports: Vec<_> = l
+        .config
+        .remote
+        .servers
+        .iter()
+        .map(|s| (s.protocol.as_str(), s.port))
+        .collect();
+    assert_eq!(ports, [("twindeck", 2222), ("sftp", 22)]);
+
+    let d = user_value_dir(None);
+    let servers = [
+        remote("집", "twindeck", "home.local", 2222, "me", ""),
+        remote("회사", "sftp", "files", 22, "kim", ""),
+    ];
+    td_config::set_remote_servers(d.path(), &servers).unwrap();
+    assert_eq!(
+        load_dir(d.path(), Platform::Linux).config.remote.servers,
+        servers
+    );
+}
+
+#[test]
 fn remote_server_password_is_never_written_to_or_kept_from_config() {
     // 서버 항목에는 비밀번호 필드가 없다: 저장한 config.toml에도, 읽은 설정(JSON)에도 비밀번호가 나오지 않는다.
     let d = user_value_dir(None);

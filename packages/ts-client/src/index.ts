@@ -50,6 +50,7 @@ export type {
   SmbErrorKindDto,
   RemoteConfig,
   RemoteServer,
+  RemoteServerStatus,
   RemoteErrorKindDto,
 } from "./generated/bindings";
 export * from "./backend";

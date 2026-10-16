@@ -363,7 +363,7 @@ fn parse_smb_servers(value: Option<Value>, warnings: &mut Vec<Warning>) -> Vec<S
     out
 }
 
-/// `remote.servers`를 항목별로 검증한다. protocol이 `sftp`·`ftp`가 아니거나 host가 빈 항목, 포트가 범위를 벗어난 항목은
+/// `remote.servers`를 항목별로 검증한다. protocol이 `sftp`·`ftp`·`twindeck`이 아니거나 host가 빈 항목, 포트가 범위를 벗어난 항목은
 /// 경고와 함께 빼고, 빈 `name`은 `user@host`로, 없는 포트는 프로토콜 기본 포트로 채운다.
 fn parse_remote_servers(value: Option<Value>, warnings: &mut Vec<Warning>) -> Vec<RemoteServer> {
     let Some(Value::Array(items)) = value else {
@@ -389,8 +389,11 @@ fn parse_remote_servers(value: Option<Value>, warnings: &mut Vec<Warning>) -> Ve
                 .to_string()
         };
         let protocol = text("protocol").to_ascii_lowercase();
-        if protocol != "sftp" && protocol != "ftp" {
-            bad(warnings, "protocol은 sftp 또는 ftp여야 합니다");
+        if !matches!(protocol.as_str(), "sftp" | "ftp" | "twindeck") {
+            bad(
+                warnings,
+                "protocol은 sftp, ftp, twindeck 중 하나여야 합니다",
+            );
             continue;
         }
         let host = text("host");
@@ -398,7 +401,11 @@ fn parse_remote_servers(value: Option<Value>, warnings: &mut Vec<Warning>) -> Ve
             bad(warnings, "host가 필요합니다");
             continue;
         }
-        let default_port = if protocol == "sftp" { 22 } else { 21 };
+        let default_port = match protocol.as_str() {
+            "sftp" => 22,
+            "twindeck" => 2222,
+            _ => 21,
+        };
         let port = match t.get("port") {
             None => default_port,
             Some(Value::Integer(n)) if *n == 0 => default_port,

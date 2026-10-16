@@ -4,7 +4,7 @@ import { Button, Input, Select, SelectOption } from "@spacedrive/primitives";
 import { defaultBindingsFor } from "@twin-deck/actions";
 import type { Platform } from "@twin-deck/keybinds";
 import { defaultLoaded } from "@twin-deck/ts-client";
-import type { RemoteServer, SmbServer } from "@twin-deck/ts-client";
+import type { RemoteServer, RemoteServerStatus, SmbServer } from "@twin-deck/ts-client";
 import { APP_ACTIONS, APP_LAUNCH_ACTION, APP_OPEN_FOLDER_ACTION } from "../lib/fkeys";
 import { THEMES } from "../lib/themes.generated";
 import { parseThemeList } from "../lib/themeColors";
@@ -33,7 +33,11 @@ type Control =
   /** 저장된 SMB 서버 목록(`smb.servers`): 목록 + 선택 항목 편집 폼. 목록 전체를 한 번에 저장한다. */
   | { type: "smb-servers" }
   /** 저장된 원격(SFTP·FTP) 서버 목록(`remote.servers`): SMB 목록과 같은 모양의 편집기. */
-  | { type: "remote-servers" };
+  | { type: "remote-servers" }
+  /** 내장 서버(Twin Deck Remote) 켜기·끄기와 설정·비밀번호·접속 정보. */
+  | { type: "twindeck-server" }
+  /** `remote.servers` 중 `protocol = "twindeck"` 항목만 보이는 접속 주소 편집기. */
+  | { type: "twindeck-servers" };
 
 interface Item {
   key: string;
@@ -98,6 +102,15 @@ const remoteSection: { title: string; desc?: string; items: Item[] } = {
   get title() { return translate("settings.section.remote.title"); },
   get desc() { return translate("settings.section.remote.desc"); },
   items: [{ key: "remote.servers", get title() { return translate("settings.remote.list"); }, control: { type: "remote-servers" } }],
+};
+
+const twinDeckRemoteSection: { title: string; desc?: string; items: Item[] } = {
+  get title() { return translate("settings.section.twindeck.title"); },
+  get desc() { return translate("settings.section.twindeck.desc"); },
+  items: [
+    { key: "remote_server", get title() { return translate("settings.twindeck.server"); }, control: { type: "twindeck-server" } },
+    { key: "remote.servers", get title() { return translate("settings.twindeck.list"); }, control: { type: "twindeck-servers" } },
+  ],
 };
 
 const smbSection: { title: string; desc?: string; items: Item[] } = {
@@ -205,6 +218,7 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
   },
   smbSection,
   remoteSection,
+  twinDeckRemoteSection,
 ];
 
 /**
@@ -215,13 +229,15 @@ export const SECTION_GROUPS: { titleKey: Key; count: number }[] = [
   { titleKey: "settings.group.view", count: 4 },
   { titleKey: "settings.group.behavior", count: 3 },
   { titleKey: "settings.group.system", count: 1 },
-  { titleKey: "settings.group.connection", count: 2 },
+  { titleKey: "settings.group.connection", count: 3 },
 ];
 
 /** SMB 서버 탭의 순번. `api.openSettings(SMB_SECTION)`으로 이 탭을 바로 연다. */
 export const SMB_SECTION = SECTIONS.indexOf(smbSection);
 /** 원격(SFTP·FTP) 서버 탭의 순번. `api.openSettings(REMOTE_SECTION)`으로 이 탭을 바로 연다. */
 export const REMOTE_SECTION = SECTIONS.indexOf(remoteSection);
+/** Twin Deck Remote 탭의 순번. */
+export const TWIN_DECK_REMOTE_SECTION = SECTIONS.indexOf(twinDeckRemoteSection);
 
 const valueAt = (obj: unknown, key: string): unknown => key.split(".").reduce<unknown>((o, k) => (o as Record<string, unknown> | undefined)?.[k], obj);
 
@@ -697,45 +713,62 @@ const REMOTE_TEXT_FIELDS = ["name", "host", "user", "base_dir"] as const;
  * 저장된 원격(SFTP·FTP) 서버 목록과 선택 항목 편집 폼. SMB 목록처럼 "저장"을 눌러 목록 전체를 쓴다.
  * 비밀번호는 여기서 받지 않고 지우기만 한다(연결할 때 묻고, 기억하면 OS 키체인에 둔다). FTP 항목에는 암호화되지 않는다는 경고를 보인다.
  */
-function RemoteServersControl({ label, disabled }: { label: string; disabled: boolean }) {
+function RemoteServersControl({
+  label,
+  disabled,
+  protocols = ["sftp", "ftp"],
+  addProtocol = "sftp",
+}: {
+  label: string;
+  disabled: boolean;
+  /** 이 편집기가 다루는 protocol. 목록에는 이것만 보이고, 나머지 항목은 저장할 때 그대로 보존된다. */
+  protocols?: readonly string[];
+  /** "추가"로 만드는 항목의 protocol. */
+  addProtocol?: string;
+}) {
   const t = useT();
   const { api } = useAppStore();
   const saved = useApp((s) => s.loaded.config.remote.servers ?? []);
   const [draft, setDraft] = useState<RemoteServer[]>(saved);
-  const [selected, setSelected] = useState(0);
+  // 목록 전체(draft)를 한 번에 저장하므로 선택은 전체 목록의 순번이고, 이 편집기의 protocol이 아닌 항목은 보이지 않을 뿐 그대로 둔다.
+  const visibleOf = (list: RemoteServer[]) => list.flatMap((s, i) => (protocols.includes(s.protocol) ? [i] : []));
+  const [selected, setSelected] = useState(() => visibleOf(saved)[0] ?? -1);
   const [invalid, setInvalid] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const savedKey = JSON.stringify(saved);
   useEffect(() => {
-    setDraft(JSON.parse(savedKey) as RemoteServer[]);
-    setSelected((i) => Math.min(i, Math.max(0, (JSON.parse(savedKey) as RemoteServer[]).length - 1)));
+    const next = JSON.parse(savedKey) as RemoteServer[];
+    setDraft(next);
+    setSelected((i) => (visibleOf(next).includes(i) ? i : (visibleOf(next)[0] ?? -1)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedKey]);
   const dirty = JSON.stringify(draft) !== savedKey;
-  const current = draft[selected] as RemoteServer | undefined;
+  const current = (selected >= 0 ? draft[selected] : undefined) as RemoteServer | undefined;
+  const visible = visibleOf(draft);
   const patch = (change: Partial<RemoteServer>) => {
     setDraft(draft.map((s, i) => (i === selected ? { ...s, ...change } : s)));
     setInvalid(null);
     setNotice(null);
   };
   const save = async () => {
-    const bad = draft.findIndex((s) => !s.host.trim());
+    const bad = draft.findIndex((s) => protocols.includes(s.protocol) && !s.host.trim());
     if (bad >= 0) {
       setSelected(bad);
-      setInvalid(t("settings.remote.required", { n: bad + 1 }));
+      setInvalid(t("settings.remote.required", { n: visible.indexOf(bad) + 1 }));
       return false;
     }
-    const badPort = draft.findIndex((s) => !Number.isInteger(s.port) || s.port < 0 || s.port > 65535);
+    const badPort = draft.findIndex((s) => protocols.includes(s.protocol) && (!Number.isInteger(s.port) || s.port < 0 || s.port > 65535));
     if (badPort >= 0) {
       setSelected(badPort);
-      setInvalid(t("settings.remote.bad_port", { n: badPort + 1 }));
+      setInvalid(t("settings.remote.bad_port", { n: visible.indexOf(badPort) + 1 }));
       return false;
     }
     setInvalid(null);
     await api.setRemoteServers(draft);
     return true;
   };
-  const defaultPort = (p: string) => (p === "ftp" ? 21 : 22);
+  const defaultPort = (p: string) => (p === "ftp" ? 21 : p === "twindeck" ? 2222 : 22);
   const canForget = !disabled && !dirty && !!current?.user;
   // 연결을 누르면 (저장 전 변경이 있으면 먼저 저장하고) 설정 화면을 닫고, 설정이 덮고 있던 그 패널에서 연결한다. 저장이 거부되면 닫지도 연결하지도 않는다.
   const settingsPane = useApp((s) => s.settingsPane);
@@ -743,8 +776,8 @@ function RemoteServersControl({ label, disabled }: { label: string; disabled: bo
   return (
     <div role="group" aria-label={label} className="flex min-h-0 flex-1 flex-col gap-3 py-2.5">
       <ul role="listbox" aria-label={label} className="min-h-[12rem] flex-1 overflow-auto rounded border border-app-line">
-        {draft.length === 0 && <li className="px-2 py-1.5 text-xs text-ink-faint">{t("settings.remote.empty")}</li>}
-        {draft.map((s, i) => (
+        {visible.length === 0 && <li className="px-2 py-1.5 text-xs text-ink-faint">{t("settings.remote.empty")}</li>}
+        {draft.map((s, i) => !protocols.includes(s.protocol) ? null : (
           <li
             key={i}
             role="option"
@@ -783,7 +816,7 @@ function RemoteServersControl({ label, disabled }: { label: string; disabled: bo
             variant="gray"
             disabled={disabled}
             onClick={() => {
-              setDraft([...draft, { ...EMPTY_REMOTE }]);
+              setDraft([...draft, { ...EMPTY_REMOTE, protocol: addProtocol }]);
               setSelected(draft.length);
               setEditing(true);
               setNotice(null);
@@ -817,8 +850,10 @@ function RemoteServersControl({ label, disabled }: { label: string; disabled: bo
             variant="gray"
             disabled={disabled || !current}
             onClick={() => {
-              setDraft(draft.filter((_, i) => i !== selected));
-              setSelected(Math.max(0, selected - 1));
+              const next = draft.filter((_, i) => i !== selected);
+              const left = visibleOf(next);
+              setDraft(next);
+              setSelected(left.filter((i) => i < selected).pop() ?? left[0] ?? -1);
               setInvalid(null);
               setNotice(null);
             }}
@@ -848,9 +883,9 @@ function RemoteServersControl({ label, disabled }: { label: string; disabled: bo
         </div>
       </div>
       {editing && current && (
-        <ServerModal title={t("settings.remote.edit_title")} onClose={() => setEditing(false)}>
+        <ServerModal title={t(current.protocol === "twindeck" ? "settings.twindeck.edit_title" : "settings.remote.edit_title")} onClose={() => setEditing(false)}>
           <div className="flex flex-col gap-2">
-            <label className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+            {protocols.length > 1 && <label className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
               <span className="w-24 shrink-0">{t("settings.remote.protocol")}</span>
               <select
                 aria-label={t("settings.remote.protocol")}
@@ -862,13 +897,13 @@ function RemoteServersControl({ label, disabled }: { label: string; disabled: bo
                 <option value="sftp">SFTP</option>
                 <option value="ftp">FTP</option>
               </select>
-            </label>
+            </label>}
             {current.protocol === "ftp" && (
               <p role="note" className="text-xs text-status-error">
                 {t("settings.remote.ftp_warning")}
               </p>
             )}
-            {REMOTE_TEXT_FIELDS.map((field) => (
+            {REMOTE_TEXT_FIELDS.filter((field) => !(field === "base_dir" && current.protocol === "twindeck")).map((field) => (
               <label key={field} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                 <span className="w-24 shrink-0">{t(`settings.remote.${field}`)}</span>
                 <Input
@@ -929,6 +964,157 @@ function RemoteServersControl({ label, disabled }: { label: string; disabled: bo
           </div>
         </ServerModal>
       )}
+    </div>
+  );
+}
+
+const TD_REMOTE_KEYS = ["bind", "port", "root", "user"] as const;
+
+/**
+ * 내장 서버(Twin Deck Remote) 영역. 켜기·끄기는 Backend를 바로 부르고(설정의 `enabled`도 함께 맞춰 다음 실행에도 이어진다),
+ * 수신 주소·포트·루트·사용자·쓰기·셸은 설정 키로 저장한다. 켜져 있는 동안 바꾼 값은 서버를 다시 켜야 적용되므로 안내만 보인다(자동 재시작은 하지 않는다).
+ * 비밀번호는 입력창에서 받아 키체인으로만 보내고, 상태에는 설정 여부만 있어 화면에 되돌려 보이지 않는다.
+ */
+function TwinDeckServerControl({ label, disabled }: { label: string; disabled: boolean }) {
+  const t = useT();
+  const { api, backend } = useAppStore();
+  const cfg = useApp((s) => s.loaded.config.remote_server);
+  const [status, setStatus] = useState<RemoteServerStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [password, setPassword] = useState("");
+  /** 서버가 켜질 때(또는 이 화면을 열었을 때 이미 켜져 있던) 설정. 지금 설정과 다르면 다시 켜야 적용된다. */
+  const [applied, setApplied] = useState<string | null>(null);
+  const cfgKey = JSON.stringify([cfg.bind, cfg.port, cfg.root, cfg.user, cfg.allow_write, cfg.allow_shell]);
+  const cfgKeyRef = useRef(cfgKey);
+  cfgKeyRef.current = cfgKey;
+  useEffect(() => {
+    let alive = true;
+    void backend.remoteServerStatus().then((st) => {
+      if (!alive) return;
+      setStatus(st);
+      if (st.running) setApplied((a) => a ?? cfgKeyRef.current);
+    }, () => {});
+    return () => {
+      alive = false;
+    };
+  }, [backend]);
+  const msg = (e: unknown) => String(e instanceof Error ? e.message : e);
+  const run = async (job: () => Promise<void>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await job();
+    } catch (e) {
+      setError(msg(e));
+      void backend.remoteServerStatus().then(setStatus, () => {});
+    } finally {
+      setBusy(false);
+    }
+  };
+  const running = !!status?.running;
+  const hasPassword = !!status?.hasPassword;
+  const rootEmpty = !cfg.root.trim();
+  const blocker = !hasPassword ? t("settings.twindeck.need_password") : rootEmpty ? t("settings.twindeck.need_root") : null;
+  const toggle = (on: boolean) =>
+    void run(async () => {
+      if (on) {
+        const next = await backend.remoteServerStart();
+        setStatus(next);
+        setApplied(cfgKeyRef.current);
+      } else {
+        setStatus(await backend.remoteServerStop());
+        setApplied(null);
+      }
+      await api.setConfigValue("remote_server.enabled", { kind: "bool", value: on });
+    });
+  const setPw = (value: string) =>
+    void run(async () => {
+      setStatus(await backend.setRemoteServerPassword(value));
+      setPassword("");
+    });
+  const field = (key: (typeof TD_REMOTE_KEYS)[number]) => {
+    const item: Item = { key: `remote_server.${key}`, title: t(`settings.twindeck.${key}`), control: { type: key === "port" ? "int" : "text" } };
+    return (
+      <div key={key} role="group" aria-label={item.title} className="flex items-center justify-between gap-4 border-b border-app-line py-2.5">
+        <div className="w-48 shrink-0 text-sm">{item.title}</div>
+        <div className="flex min-w-0 flex-1 justify-end">
+          <EditableControl
+            item={item}
+            value={cfg[key]}
+            disabled={disabled}
+            onCommit={(v) => void api.setConfigValue(item.key, key === "port" ? { kind: "int", value: Math.round(Number(v)) } : { kind: "str", value: v })}
+          />
+        </div>
+      </div>
+    );
+  };
+  const flag = (key: "allow_write" | "allow_shell") => (
+    <div key={key} role="group" aria-label={t(`settings.twindeck.${key}`)} className="flex items-center justify-between gap-4 border-b border-app-line py-2.5">
+      <div className="min-w-0">
+        <div className="text-sm">{t(`settings.twindeck.${key}`)}</div>
+        <div className="text-xs text-ink-faint">{t(`settings.twindeck.${key}_desc`)}</div>
+      </div>
+      <Switch aria-label={t(`settings.twindeck.${key}`)} checked={cfg[key]} disabled={disabled} onCheckedChange={(v) => void api.setConfigValue(`remote_server.${key}`, { kind: "bool", value: v })} />
+    </div>
+  );
+  return (
+    <div role="group" aria-label={label} className="flex flex-col">
+      <div role="group" aria-label={t("settings.twindeck.enable")} className="flex items-center justify-between gap-4 border-b border-app-line py-2.5">
+        <div className="min-w-0">
+          <div className="text-sm">{t("settings.twindeck.enable")}</div>
+          {!running && blocker && <div role="note" className="text-xs text-ink-faint">{blocker}</div>}
+        </div>
+        <Switch aria-label={t("settings.twindeck.enable")} checked={running} disabled={disabled || busy || status === null || (!running && !!blocker)} onCheckedChange={toggle} />
+      </div>
+      {(error || status?.lastError) && (
+        <div role="alert" className="border-b border-app-line py-2 text-xs text-status-error">
+          {error ?? status?.lastError}
+        </div>
+      )}
+      {running && applied !== null && applied !== cfgKey && (
+        <div role="status" className="border-b border-app-line py-2 text-xs text-ink-dull">{t("settings.twindeck.restart")}</div>
+      )}
+      {running && status && (
+        <div role="group" aria-label={t("settings.twindeck.connect_info")} className="flex flex-col gap-1 border-b border-app-line py-2.5 text-sm">
+          <div>
+            {t("settings.twindeck.addresses")}: <span data-testid="twindeck-addresses">{status.addresses.join(", ")}</span>
+          </div>
+          <div className="break-all">
+            {t("settings.twindeck.fingerprint")}: <span data-testid="twindeck-fingerprint">{status.fingerprint}</span>
+          </div>
+        </div>
+      )}
+      {TD_REMOTE_KEYS.map(field)}
+      {flag("allow_write")}
+      {flag("allow_shell")}
+      <div role="group" aria-label={t("settings.twindeck.password")} className="flex items-center justify-between gap-4 border-b border-app-line py-2.5">
+        <div className="min-w-0">
+          <div className="text-sm">{t("settings.twindeck.password")}</div>
+          <div className="text-xs text-ink-faint">{hasPassword ? t("settings.twindeck.password_set") : t("settings.twindeck.password_unset")}</div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Input
+            aria-label={t("settings.twindeck.password_input")}
+            type="password"
+            autoComplete="new-password"
+            size="sm"
+            className="w-48"
+            value={password}
+            disabled={disabled || busy}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && password) setPw(password);
+            }}
+          />
+          <Button type="button" size="sm" variant="gray" disabled={disabled || busy || !password} onClick={() => setPw(password)}>
+            {t("settings.twindeck.password_save")}
+          </Button>
+          <Button type="button" size="sm" variant="gray" disabled={disabled || busy || !hasPassword} onClick={() => setPw("")}>
+            {t("settings.twindeck.password_delete")}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1036,13 +1222,15 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
               { start: 0, nodes: [] },
             ).nodes}
           </nav>
-          <section role="tabpanel" aria-label={current.title} className={"min-w-0 flex-1 overflow-auto px-6 py-3" + (items.some((i) => i.control.type === "smb-servers" || i.control.type === "remote-servers") ? " flex flex-col" : "")}>
+          <section role="tabpanel" aria-label={current.title} className={"min-w-0 flex-1 overflow-auto px-6 py-3" + (items.some((i) => i.control.type === "smb-servers" || i.control.type === "remote-servers" || i.control.type === "twindeck-servers") ? " flex flex-col" : "")}>
             <h3 className="text-sm font-semibold">{current.title}</h3>
             {current.desc ? <p className="mb-2 text-xs text-ink-faint">{current.desc}</p> : <div className="mb-2" />}
             {items.map((item) => {
               // SMB 서버 목록은 한 줄짜리 항목이 아니라 탭 전체를 쓰는 편집기다(기본값으로 버튼도 없다).
               if (item.control.type === "smb-servers") return <SmbServersControl key={item.key} label={item.title} disabled={!!broken} />;
               if (item.control.type === "remote-servers") return <RemoteServersControl key={item.key} label={item.title} disabled={!!broken} />;
+              if (item.control.type === "twindeck-server") return <TwinDeckServerControl key={item.key} label={item.title} disabled={!!broken} />;
+              if (item.control.type === "twindeck-servers") return <RemoteServersControl key={item.key} label={item.title} disabled={!!broken} protocols={["twindeck"]} addProtocol="twindeck" />;
               const combo = item.key.startsWith("fkeys.") && item.title.includes("+") && item.title in config.fkeys;
               // 설정 파일에 없는 내장 조합키는 값이 없다 → 기본값("")으로 본다.
               const extensionColumn = item.control.type === "extension-column";

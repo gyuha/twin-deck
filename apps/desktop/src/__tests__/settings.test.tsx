@@ -35,12 +35,12 @@ describe("설정 화면 열기와 닫기", () => {
     expect(cursorName("left")).toBe("docs");
   });
 
-  it("섹션 10개가 왼쪽에 있고 처음에는 모양이 열린다", async () => {
+  it("섹션 11개가 왼쪽에 있고 처음에는 모양이 열린다", async () => {
     const { user } = await renderApp();
     await open(user);
     await dialog();
     const tabs = within(screen.getByRole("tablist", { name: "설정 섹션" })).getAllByRole("tab").map((t) => t.textContent);
-    expect(tabs).toEqual(["모양", "목록과 선택", "표시 형식", "미리보기", "확인", "폴더 단축키", "F키", "환경", "SMB 서버", "SFTP·FTP 서버"]);
+    expect(tabs).toEqual(["모양", "목록과 선택", "표시 형식", "미리보기", "확인", "폴더 단축키", "F키", "환경", "SMB 서버", "SFTP·FTP 서버", "Twin Deck Remote"]);
     expect(screen.getByRole("tab", { name: "모양" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("switch", { name: "액션바 표시" })).toBeInTheDocument();
   });
@@ -56,12 +56,12 @@ describe("설정 화면 열기와 닫기", () => {
       ["화면", ["모양", "목록과 선택", "표시 형식", "미리보기"]],
       ["동작", ["확인", "폴더 단축키", "F키"]],
       ["시스템", ["환경"]],
-      ["연결", ["SMB 서버", "SFTP·FTP 서버"]],
+      ["연결", ["SMB 서버", "SFTP·FTP 서버", "Twin Deck Remote"]],
     ]);
     // 그룹을 건너도 탭 번호(settingsSection)는 SECTIONS 순서 그대로라 다른 그룹의 탭도 열린다.
     await user.click(screen.getByRole("tab", { name: "SMB 서버" }));
     expect(screen.getByRole("tab", { name: "SMB 서버" })).toHaveAttribute("aria-selected", "true");
-    expect(SECTION_GROUPS.reduce((n, g) => n + g.count, 0)).toBe(10);
+    expect(SECTION_GROUPS.reduce((n, g) => n + g.count, 0)).toBe(11);
   });
 });
 
