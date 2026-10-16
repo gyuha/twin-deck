@@ -1149,11 +1149,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
   async function loadPreview(entry: EntryDto) {
     const seq = ++previewSeq;
     const base = { path: entry.path, name: entry.name, isDir: entry.kind === "dir" };
-    // 원격 파일은 내려받지 않고는 읽을 수 없어 미리 보지 않는다(로컬 패널로 복사해서 본다).
-    if (isRemotePath(entry.path) && entry.kind !== "dir") {
-      set({ preview: { ...base, status: "error", error: tr("store.remote.no_open") } });
-      return;
-    }
+    // 원격 파일도 서비스에 맡긴다: 텍스트(앞부분)와 이미지(한도 안)만 읽고, 나머지 형식은 "미리 볼 수 없는 형식"으로 돌아온다.
     // 항목을 넘기는 동안은 이전 내용을 그대로 두어 창이 비었다 채워지며 깜빡이지 않게 한다.
     set((s) => ({ preview: { ...base, status: "loading", data: s.preview?.data } }));
     try {

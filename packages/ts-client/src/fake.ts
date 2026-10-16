@@ -375,6 +375,8 @@ export class FakeBackend implements Backend {
     const ext = path.slice(path.lastIndexOf(".") + 1).toLowerCase();
     const mime = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", svg: "image/svg+xml" }[ext];
     if (mime) return { ...base, kind: "image", dataUrl: `data:${mime};base64,${btoa(n.content)}` };
+    // 실제 서비스처럼 원격(sftp://·ftp://) 파일은 PDF·오디오·동영상을 읽지 않고 "기타"로만 돌려준다.
+    if (splitRemote(path) !== null && ["pdf", "mp3", "wav", "ogg", "oga", "opus", "flac", "m4a", "aac", "weba", "mp4", "m4v", "mov", "webm", "ogv", "mkv", "avi"].includes(ext)) return { ...base, kind: "other" };
     const audio = { mp3: "audio/mpeg", wav: "audio/wav", ogg: "audio/ogg", oga: "audio/ogg", opus: "audio/ogg", flac: "audio/flac", m4a: "audio/mp4", aac: "audio/aac", weba: "audio/webm" }[ext];
     if (audio) return { ...base, kind: "audio", dataUrl: `data:${audio};base64,${btoa(n.content)}` };
     if (["mp4", "m4v", "mov", "webm", "ogv", "mkv", "avi"].includes(ext)) return { ...base, kind: "video" };

@@ -1,5 +1,5 @@
 import { t as translate } from "../i18n";
-import { isArchivePath } from "@twin-deck/ts-client";
+import { isArchivePath, isRemotePath } from "@twin-deck/ts-client";
 
 export type Eol = "lf" | "crlf";
 
@@ -33,6 +33,7 @@ export interface EditCandidate {
 export function editBlockReason(c: EditCandidate): string | null {
   if (c.kind !== "text" || c.text === null || c.text === undefined) return translate("edit.block.not_text");
   if (isArchivePath(c.path)) return translate("edit.block.archive");
+  if (isRemotePath(c.path)) return translate("edit.block.remote");
   if (c.truncated) return translate("edit.block.truncated");
   if (detectEol(c.text) === "mixed") return translate("edit.block.mixed_eol");
   return null;

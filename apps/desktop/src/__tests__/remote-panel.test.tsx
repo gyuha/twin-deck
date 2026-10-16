@@ -87,7 +87,7 @@ describe("원격 폴더 안에서 파일 작업 (이슈 #76)", () => {
     const { user, backend } = await connected();
     await user.keyboard("{ArrowDown}{ArrowDown}"); // report.txt
     await user.keyboard("{Enter}");
-    expect(await screen.findByText(/원격 파일은 바로 열거나 미리 볼 수 없습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/원격 파일은 바로 열 수 없습니다/)).toBeInTheDocument();
     expect(backend.opened).toEqual([]);
     await user.keyboard("{F4}");
     expect(backend.edited).toEqual([]);

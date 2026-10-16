@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import type { PreviewRect } from "@twin-deck/ts-client";
 import { languageFor } from "../lib/highlight";
-import { isArchiveName, isArchivePath } from "@twin-deck/ts-client";
+import { isArchiveName, isArchivePath, isRemotePath } from "@twin-deck/ts-client";
 import { clampRect, defaultRect, moveRect, resizeRect } from "../lib/previewRect";
 import type { Edge } from "../lib/previewRect";
 import { rustText, t as translate } from "../i18n";
@@ -103,13 +103,15 @@ export function Preview() {
   const d = p.data;
   // 항목을 넘기는 동안 `data`는 이전 파일의 것이다. 크기·내용으로 파일을 읽는 뷰어(3D·Office)는 새 항목의 데이터가 온 뒤에만 띄운다.
   const fresh = p.status === "ready";
-  const model = p.isDir || isArchivePath(p.path) ? null : modelKindOf(p.name); // 3D 모델이면 서비스가 돌려준 kind와 무관하게 3D 뷰어로 보여 준다(압축 파일 안은 asset 프로토콜로 읽을 수 없어 제외)
+  // 디스크 위 로컬 파일만 앱이 직접 읽는 뷰어(3D·Office·epub·HWP)를 쓴다. 압축 파일 안과 원격(sftp://·ftp://) 파일은 쓰지 않는다.
+  const onDisk = !isArchivePath(p.path) && !isRemotePath(p.path);
+  const model = p.isDir || !onDisk ? null : modelKindOf(p.name); // 3D 모델이면 서비스가 돌려준 kind와 무관하게 3D 뷰어로 보여 준다(압축 파일 안은 asset 프로토콜로 읽을 수 없어 제외)
   // Office 문서는 디스크 위 파일만 Rust가 office_oxide로 읽은 글자·표(Markdown)로 보여 준다. 압축 안은 "미리 볼 수 없는 형식"이다.
-  const office = !p.isDir && !model && !isArchivePath(p.path) && isOfficeFile(p.name);
+  const office = !p.isDir && !model && onDisk && isOfficeFile(p.name);
   // epub은 디스크 위 파일만 앱이 읽어 보여 준다(압축 안은 읽지 않고 "미리 볼 수 없는 형식"). 3D·Office와 겹치지 않는다.
-  const epub = !p.isDir && !model && !isArchivePath(p.path) && /\.epub$/i.test(p.name);
+  const epub = !p.isDir && !model && onDisk && /\.epub$/i.test(p.name);
   // HWP·HWPX도 디스크 위 파일만 앱이 쪽 단위로 그려 보여 준다(압축 안은 "미리 볼 수 없는 형식").
-  const hwp = !p.isDir && !model && !isArchivePath(p.path) && /\.hwpx?$/i.test(p.name);
+  const hwp = !p.isDir && !model && onDisk && /\.hwpx?$/i.test(p.name);
   // 텍스트 본문. 3D 뷰어가 모델을 읽지 못하면 텍스트 형식은 이것으로 돌아간다.
   // 텍스트 계열(텍스트·코드·마크다운·JSON)이 3D·Office 뷰어 없이 그려질 때만 복사 버튼을 보인다.
   const showCopy = fresh && d?.kind === "text" && !model && !office;

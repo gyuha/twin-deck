@@ -1696,6 +1696,13 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
     }
 
     pub fn preview(&self, path: &str) -> ServiceResult<PreviewDto> {
+        // 원격(`sftp://`·`ftp://`) 경로는 로컬 파일이 아니라 가상 파일시스템으로 읽는다. 텍스트는 앞부분만, 이미지는 한도 안에서만 내려받고,
+        // PDF·오디오·동영상은 읽지 않고 `Other`로 돌려준다. 로컬 전용 분기(cbz·PDF 직접 열기·폴더·압축 파일 미리보기)보다 먼저 가른다.
+        if td_vfs::is_remote(path) {
+            return td_vfs::read_preview_vfs(&self.fs, &vp(path), self.limits())
+                .map(PreviewDto::from)
+                .map_err(|e| e.to_string());
+        }
         if path.to_ascii_lowercase().ends_with(".cbz") && std::path::Path::new(path).is_file() {
             return Ok(cbz_preview(path, self.limits().image_bytes).into());
         }
@@ -4265,6 +4272,56 @@ mod tests {
             assert_eq!(svc.list_dir(&s.url(""), true).unwrap().len(), 1);
         }
 
+        /// 원격 경로의 미리보기: 텍스트(앞부분)와 이미지(한도 안)만 보이고, 나머지 형식은 읽지 않고 `Other`로 돌려준다.
+        fn previews_remote_text_and_image_and_refuses_others(
+            make: fn(&Service<FakeTrash>) -> Server,
+        ) {
+            let (_t, svc, _ch, _root) = setup();
+            let s = make(&svc);
+            // 작은 이미지는 한도 안이고, 1MB 한도를 두고 한도보다 큰 이미지는 데이터 없이 잘림으로 표시한다.
+            svc.set_preview_limits(&limits_cfg(1, 10, 20));
+            std::fs::write(s.path("note.txt"), "원격 본문").unwrap();
+            std::fs::write(s.path("small.png"), vec![0x89u8; 64]).unwrap();
+            std::fs::write(s.path("big.png"), vec![0u8; 1024 * 1024 + 1]).unwrap();
+            std::fs::write(s.path("doc.pdf"), b"%PDF-1.4").unwrap();
+            std::fs::write(s.path("clip.mp4"), b"x").unwrap();
+            std::fs::write(s.path("song.mp3"), b"x").unwrap();
+            std::fs::create_dir(s.path("dir")).unwrap();
+
+            let t = svc.preview(&s.url("note.txt")).unwrap();
+            assert_eq!(t.kind, PreviewKindDto::Text);
+            assert_eq!(t.text.as_deref(), Some("원격 본문"));
+            assert!(!t.truncated);
+
+            let i = svc.preview(&s.url("small.png")).unwrap();
+            assert_eq!(i.kind, PreviewKindDto::Image);
+            assert!(i
+                .data_url
+                .as_deref()
+                .is_some_and(|d| d.starts_with("data:image/png;base64,")));
+            assert!(!i.truncated);
+
+            let b = svc.preview(&s.url("big.png")).unwrap();
+            assert_eq!(b.kind, PreviewKindDto::Image);
+            assert!(
+                b.truncated && b.data_url.is_none(),
+                "한도를 넘은 이미지는 내려받지 않는다"
+            );
+
+            for name in ["doc.pdf", "clip.mp4", "song.mp3"] {
+                assert_eq!(
+                    svc.preview(&s.url(name)).unwrap().kind,
+                    PreviewKindDto::Other,
+                    "{name}"
+                );
+            }
+            assert_eq!(
+                svc.preview(&s.url("dir")).unwrap().kind,
+                PreviewKindDto::Directory
+            );
+            assert!(svc.preview(&s.url("nope.txt")).is_err());
+        }
+
         macro_rules! per_protocol {
             ($($module:ident => $make:ident),*) => {$(
                 mod $module {
@@ -4277,6 +4334,7 @@ mod tests {
                     #[test] fn 원격은_영구_삭제만_되고_휴지통은_거부한다() { deletes_permanently_and_refuses_trash($make) }
                     #[test] fn 충돌을_감지하고_정책을_적용한다() { detects_conflicts_and_applies_policy($make) }
                     #[test] fn 큐_작업을_중단해도_연결은_계속_쓸_수_있다() { aborts_a_queued_transfer_and_leaves_the_queue_usable($make) }
+                    #[test] fn 원격_미리보기는_텍스트와_이미지를_보여_주고_나머지는_거절한다() { previews_remote_text_and_image_and_refuses_others($make) }
                 }
             )*};
         }
