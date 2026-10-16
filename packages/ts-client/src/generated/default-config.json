@@ -152,7 +152,7 @@
     },
     "remote_server": {
       "enabled": false,
-      "bind": "127.0.0.1",
+      "bind": "0.0.0.0",
       "port": 2222,
       "root": "",
       "allow_write": false,

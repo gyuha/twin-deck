@@ -743,6 +743,30 @@ fn starts_with_pdf_header(path: &str) -> bool {
         && &head == b"%PDF"
 }
 
+/// 접속할 사람에게 알려 줄 주소. `0.0.0.0`(모든 주소 수신)은 접속 주소로 쓸 수 없으므로 이 컴퓨터가 네트워크로 나갈 때 쓰는
+/// 주소(LAN 주소)로 바꿔 보인다. 알아내지 못하면(오프라인 등) 받은 그대로 둔다.
+fn reachable_address(addr: std::net::SocketAddr) -> String {
+    if addr.ip().is_unspecified() {
+        if let Some(ip) = primary_lan_ip(addr.is_ipv6()) {
+            return std::net::SocketAddr::new(ip, addr.port()).to_string();
+        }
+    }
+    addr.to_string()
+}
+
+/// 라우팅 표로 정해지는 대표 LAN 주소. UDP 소켓을 연결만 하고 패킷은 보내지 않는다.
+fn primary_lan_ip(v6: bool) -> Option<std::net::IpAddr> {
+    let (bind, probe) = if v6 {
+        ("[::]:0", "[2001:4860:4860::8888]:80")
+    } else {
+        ("0.0.0.0:0", "8.8.8.8:80")
+    };
+    let socket = std::net::UdpSocket::bind(bind).ok()?;
+    socket.connect(probe).ok()?;
+    let ip = socket.local_addr().ok()?.ip();
+    (!ip.is_unspecified()).then_some(ip)
+}
+
 /// 원격 서버 항목으로 세션을 열어 레지스트리에 넣고, 패널이 이동할 루트 경로(`sftp://<id>/..`)를 돌려준다(ADR-0019).
 /// 이미 열려 있으면 다시 접속하지 않고 같은 연결을 쓴다. 블로킹이라 호출하는 쪽이 UI 스레드를 피해야 한다.
 pub fn connect_remote<S: td_remote::SecretStore>(
@@ -961,7 +985,7 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
             addresses: state
                 .handle
                 .iter()
-                .map(|h| h.local_addr.to_string())
+                .map(|h| reachable_address(h.local_addr))
                 .collect(),
             fingerprint: state.handle.as_ref().map(|h| h.fingerprint.clone()),
             has_password,
@@ -4387,6 +4411,23 @@ mod tests {
             assert!(svc.watch("sftp://x/a").is_ok());
             assert!(svc.unwatch("ftp://x/a").is_ok());
         }
+    }
+
+    #[test]
+    fn reachable_address_replaces_unspecified_with_a_lan_address_and_keeps_others() {
+        assert_eq!(
+            reachable_address("127.0.0.1:2222".parse().unwrap()),
+            "127.0.0.1:2222"
+        );
+        assert_eq!(
+            reachable_address("192.168.0.7:2222".parse().unwrap()),
+            "192.168.0.7:2222"
+        );
+        let shown = reachable_address("0.0.0.0:2222".parse().unwrap());
+        let addr: std::net::SocketAddr = shown.parse().unwrap();
+        assert_eq!(addr.port(), 2222);
+        // 네트워크가 있으면 LAN 주소로, 없으면 0.0.0.0 그대로다. 어느 쪽이든 접속에 못 쓰는 "미지정" 주소를 새로 만들지는 않는다.
+        assert!(!addr.ip().is_unspecified() || shown == "0.0.0.0:2222");
     }
 
     mod remote_server {

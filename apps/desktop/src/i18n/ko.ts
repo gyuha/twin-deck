@@ -568,6 +568,7 @@ export const ko = {
   "settings.twindeck.addresses": "접속 주소",
   "settings.twindeck.fingerprint": "호스트키 지문",
   "settings.twindeck.bind": "수신 주소",
+  "settings.twindeck.bind_desc": "0.0.0.0은 같은 네트워크의 다른 컴퓨터에서도 접속할 수 있고, 127.0.0.1은 이 컴퓨터에서만 접속됩니다. 기본값 0.0.0.0은 외부에 열리므로 신뢰하는 네트워크에서만 켜세요",
   "settings.twindeck.port": "포트",
   "settings.twindeck.root": "루트 폴더",
   "settings.twindeck.user": "사용자 이름",

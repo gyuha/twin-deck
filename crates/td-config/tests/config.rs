@@ -1656,10 +1656,10 @@ fn remote_server_password_is_never_written_to_or_kept_from_config() {
 }
 
 #[test]
-fn 원격_서버_기본값은_꺼짐_로컬_전용_읽기_전용이다() {
+fn 원격_서버_기본값은_꺼짐_모든_주소_수신_읽기_전용이다() {
     let c = load("").config.remote_server;
     assert!(!c.enabled);
-    assert_eq!(c.bind, "127.0.0.1");
+    assert_eq!(c.bind, "0.0.0.0");
     assert_eq!(c.port, 2222);
     assert_eq!(c.root, "");
     assert!(!c.allow_write);
@@ -1680,7 +1680,7 @@ fn 원격_서버_포트_범위와_빈_bind는_경고하고_기본값으로_돌�
         );
     }
     let l = load("[remote_server]\nbind = \"  \"\nuser = \"\"\n");
-    assert_eq!(l.config.remote_server.bind, "127.0.0.1");
+    assert_eq!(l.config.remote_server.bind, "0.0.0.0");
     assert_eq!(l.config.remote_server.user, "twindeck");
     assert_eq!(l.warnings.len(), 2);
     let ok = load("[remote_server]\nport = 65535\nbind = \"0.0.0.0\"\nenabled = true\n");
@@ -1715,5 +1715,5 @@ fn 원격_서버_설정은_사용자_설정_저장과_다시_읽기가_된다() 
     assert!(c.enabled);
     assert_eq!(c.port, 2200);
     assert_eq!(c.root, "/tmp/share");
-    assert_eq!(c.bind, "127.0.0.1");
+    assert_eq!(c.bind, "0.0.0.0");
 }

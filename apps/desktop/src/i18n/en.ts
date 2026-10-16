@@ -570,6 +570,7 @@ export const en: Record<Key, string> = {
   "settings.twindeck.addresses": "Addresses",
   "settings.twindeck.fingerprint": "Host key fingerprint",
   "settings.twindeck.bind": "Listen address",
+  "settings.twindeck.bind_desc": "0.0.0.0 lets other computers on the network connect; 127.0.0.1 only allows this computer. The default 0.0.0.0 is open to the network, so turn the server on only on networks you trust",
   "settings.twindeck.port": "Port",
   "settings.twindeck.root": "Root folder",
   "settings.twindeck.user": "User name",

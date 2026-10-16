@@ -60,7 +60,7 @@ describe("Twin Deck Remote 탭", () => {
       await user.click(sw);
       await waitFor(() => expect(sw).toHaveAttribute("aria-checked", "true"));
       expect((await backend.remoteServerStatus()).running).toBe(true);
-      expect(screen.getByTestId("twindeck-addresses")).toHaveTextContent("127.0.0.1:2222");
+      expect(screen.getByTestId("twindeck-addresses")).toHaveTextContent("192.168.0.10:2222");
       expect(screen.getByTestId("twindeck-fingerprint")).toHaveTextContent("SHA256:");
 
       await user.click(sw);

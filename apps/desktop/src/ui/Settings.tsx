@@ -1071,7 +1071,10 @@ function TwinDeckServerControl({ label, disabled }: { label: string; disabled: b
     const item: Item = { key: `remote_server.${key}`, title: t(`settings.twindeck.${key}`), control: { type: key === "port" ? "int" : "text" } };
     return (
       <div key={key} role="group" aria-label={item.title} className="flex items-center justify-between gap-4 border-b border-app-line py-2.5">
-        <div className="w-48 shrink-0 text-sm">{item.title}</div>
+        <div className="w-48 shrink-0">
+          <div className="text-sm">{item.title}</div>
+          {key === "bind" && <div className="text-xs text-ink-faint">{t("settings.twindeck.bind_desc")}</div>}
+        </div>
         <div className="flex min-w-0 flex-1 justify-end">
           <EditableControl
             item={item}

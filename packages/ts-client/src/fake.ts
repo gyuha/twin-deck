@@ -960,7 +960,7 @@ export class FakeBackend implements Backend {
     const c = this.loaded.config.remote_server;
     return {
       running: this.remoteServerRunning,
-      addresses: this.remoteServerRunning ? [`${c.bind}:${c.port}`] : [],
+      addresses: this.remoteServerRunning ? [`${c.bind === "0.0.0.0" ? "192.168.0.10" : c.bind}:${c.port}`] : [], // 모든 주소 수신이면 실제 앱처럼 이 컴퓨터의 LAN 주소로 보인다
       fingerprint: this.remoteServerRunning ? "SHA256:fake-fingerprint" : null,
       hasPassword: this.remoteServerPassword !== "",
       lastError: this.remoteServerLastError,
