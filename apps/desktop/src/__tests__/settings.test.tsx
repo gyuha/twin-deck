@@ -653,7 +653,7 @@ describe("설정 화면에서 바로 연결 (이슈 #76)", () => {
     await user.type(within(d).getByLabelText("비밀번호"), "pw{Enter}");
     await waitFor(async () => expect(await backend.remoteConnections()).toEqual([0]));
     await waitFor(() =>
-      expect(within(screen.getAllByRole("navigation", { name: "경로" }).at(0)!).getAllByRole("button").map((b) => b.textContent)).toEqual(["sftp://kim@nas:22"]),
+      expect(within(screen.getAllByRole("navigation", { name: "경로" }).at(0)!).getAllByRole("button").map((b) => b.textContent)).toEqual(["sftp://kim@nas:22/"]),
     );
   });
 

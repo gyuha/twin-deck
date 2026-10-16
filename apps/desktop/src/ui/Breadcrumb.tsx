@@ -30,11 +30,11 @@ export function Breadcrumb({ pane, path }: { pane: PaneId; path: string }) {
     setEditing(false);
     if (go && value.trim() !== "" && value.trim() !== path) void api.goToPath(value);
   };
-  // 원격 위치(`sftp://<연결 id>/..`)는 연결이 루트이고, Windows 드라이브(`C:\`, `C:/`)는 그 자체가 루트이고, 그 밖에는 `/`가 루트다.
+  // 원격 위치(`sftp://<연결 id>/..`)는 연결이 루트이고(루트 조각은 `sftp://<연결 id>/`로 뒤에 `/`를 붙여 다음 조각이 붙어 보이지 않게 한다), Windows 드라이브(`C:\`, `C:/`)는 그 자체가 루트이고, 그 밖에는 `/`가 루트다.
   const remote = splitRemote(path);
   const drive = remote ? undefined : /^[A-Za-z]:[\\/]?/.exec(path)?.[0];
   const root = remote ? remoteUrl(remote.scheme, remote.id, "/") : drive ? (/[\\/]$/.test(drive) ? drive : drive + "\\") : "/";
-  const segments = [{ label: remote ? `${remote.scheme}://${remote.id}` : root, path: root }];
+  const segments = [{ label: remote ? `${remote.scheme}://${remote.id}/` : root, path: root }];
   const rest = remote ? remote.path : path.slice(drive?.length ?? 0);
   for (const part of rest.split(remote ? "/" : /[\\/]/).filter(Boolean)) {
     segments.push({ label: part, path: joinPath(segments[segments.length - 1].path, part) });

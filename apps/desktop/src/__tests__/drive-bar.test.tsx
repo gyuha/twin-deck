@@ -521,7 +521,7 @@ describe("드라이브 바", () => {
       await user.click(within(d).getByRole("checkbox", { name: "비밀번호 기억" }));
       await user.type(within(d).getByLabelText("비밀번호"), "secret");
       await user.click(within(d).getByRole("button", { name: "확인" }));
-      await waitFor(() => expect(rightCrumbs()).toEqual(["sftp://kim@nas:22"]));
+      await waitFor(() => expect(rightCrumbs()).toEqual(["sftp://kim@nas:22/"]));
       expect(screen.queryByRole("dialog", { name: "회사 비밀번호" })).toBeNull();
       expect(backend.remotePasswords.get("kim@nas:22/sftp")).toBe("secret");
       expect(leftCrumbs()).toEqual(["/", "home", "a"]); // 다른 패널은 그대로
@@ -537,11 +537,11 @@ describe("드라이브 바", () => {
       const { user } = await renderApp(backend);
       await openConnect(user, "오른쪽");
       await pick(user, "SFTP · 회사");
-      await waitFor(() => expect(rightCrumbs()).toEqual(["sftp://kim@nas:22"]));
+      await waitFor(() => expect(rightCrumbs()).toEqual(["sftp://kim@nas:22/"]));
       expect(screen.queryByRole("dialog", { name: "회사 비밀번호" })).toBeNull();
       await openConnect(user, "오른쪽");
       await pick(user, "FTP · 공개");
-      await waitFor(() => expect(rightCrumbs()).toEqual(["ftp://ftp.example.com:21", "pub"]));
+      await waitFor(() => expect(rightCrumbs()).toEqual(["ftp://ftp.example.com:21/", "pub"]));
     });
 
     it("비밀번호 창에서 Esc로 취소하면 연결하지 않고 이동하지 않는다", async () => {
@@ -585,7 +585,7 @@ describe("드라이브 바", () => {
       expect(busy).toHaveAttribute("aria-disabled", "true");
       await user.click(busy);
       release();
-      await waitFor(() => expect(leftCrumbs()).toEqual(["ftp://ftp.example.com:21", "pub"]));
+      await waitFor(() => expect(leftCrumbs()).toEqual(["ftp://ftp.example.com:21/", "pub"]));
       expect(calls).toBe(1);
     });
 
@@ -620,7 +620,7 @@ describe("드라이브 바", () => {
       const { user } = await renderApp(backend);
       await openConnect(user, "오른쪽");
       await pick(user, "SFTP · 회사");
-      await waitFor(() => expect(rightCrumbs()).toEqual(["sftp://kim@nas:22"]));
+      await waitFor(() => expect(rightCrumbs()).toEqual(["sftp://kim@nas:22/"]));
       expect(await backend.remoteConnections()).toEqual([0]);
       await user.click(within(bar("오른쪽")).getByRole("button", { name: "연결 끊기" }));
       await waitFor(() => expect(rightCrumbs()).toEqual(["/", "home", "a"]));

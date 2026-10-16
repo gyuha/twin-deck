@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { cursorName, entryNames, renderApp, seedBackend } from "./helpers";
+import { cursorName, entryNames, list, renderApp, seedBackend } from "./helpers";
 
 // 오른쪽 패널을 원격 서버에 연결해 두고 복사·이동·삭제가 로컬 패널과 같은 키로 되는지 확인한다(이슈 #76).
 const SFTP = { name: "회사", protocol: "sftp", host: "nas", port: 22, user: "kim", base_dir: "" };
@@ -22,6 +22,15 @@ describe("원격 폴더 안에서 파일 작업 (이슈 #76)", () => {
   it("연결한 원격 폴더가 오른쪽 패널에 폴더 먼저 이름순으로 보인다", async () => {
     await connected();
     expect(entryNames("right")[0]).toBe("photos");
+  });
+
+  it("경로 막대에서 연결 이름 뒤에 /가 붙고 폴더 이름과 이어 읽힌다 (이슈 #83)", async () => {
+    const { user } = await connected();
+    await user.click(within(list("right")).getByRole("option", { name: /photos/ }));
+    await user.keyboard("{ArrowRight}");
+    const nav = screen.getAllByRole("navigation", { name: "경로" }).at(-1)!;
+    await waitFor(() => expect(nav.textContent).toContain("sftp://kim@nas:22/photos"));
+    expect(nav.textContent).not.toContain("22photos");
   });
 
   it("왼쪽(로컬) → 오른쪽(원격) F5 복사: 원격에 같은 내용으로 생긴다", async () => {
