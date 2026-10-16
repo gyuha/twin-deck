@@ -978,6 +978,25 @@ fn show_parent_row_defaults_off_and_user_can_turn_it_on() {
 }
 
 #[test]
+fn keep_extension_defaults_off_and_user_can_turn_it_on() {
+    use td_config::{set_user_value, ConfigValue};
+    let none = load("");
+    assert!(none.warnings.is_empty(), "{:?}", none.warnings);
+    assert!(!none.config.behavior.table.keep_extension);
+
+    let dir = tempfile::tempdir().unwrap();
+    set_user_value(
+        dir.path(),
+        "behavior.table.keep_extension",
+        ConfigValue::Bool(true),
+    )
+    .unwrap();
+    let l = load_dir(dir.path(), Platform::Linux);
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert!(l.config.behavior.table.keep_extension);
+}
+
+#[test]
 fn group_by_modified_defaults_off_and_user_can_turn_it_on() {
     use td_config::{set_user_value, ConfigValue};
     let none = load("");

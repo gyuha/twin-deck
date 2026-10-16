@@ -82,6 +82,8 @@ pub struct BehaviorTable {
     pub show_parent_row: bool,
     /// 파일 목록을 수정일 구간(오늘·어제·이전 7일·이전 30일·월·연도)으로 나눠 구간 제목 행을 보인다(이슈 #62). 단일 컬럼 목록 보기에만 적용된다.
     pub group_by_modified: bool,
+    /// 확장자 컬럼이 보일 때도 파일 이름에 확장자를 그대로 두고 확장자 칸은 비운다(이슈 #86). 확장자 컬럼이 꺼져 있으면 영향이 없다.
+    pub keep_extension: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

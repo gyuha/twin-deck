@@ -385,6 +385,8 @@ export const en: Record<Key, string> = {
   "settings.item.behavior.table.show_marks.desc": "The leading column of each row with the selection (●) and folder (▸) marks. When off the column disappears and selection shows only as bold accent-colored text",
   "settings.extension_column.title": "Show extension column",
   "settings.extension_column.desc": "Shows the extension in its own column after the name. For files the extension is removed from the name and shown in that column; folders keep their full name and leave the extension cell empty. Click the header to switch between ascending and descending extension order",
+  "settings.item.behavior.table.keep_extension.title": "Keep extension",
+  "settings.item.behavior.table.keep_extension.desc": "Applies when the extension column is shown. When on, file names keep their extension and the extension cells stay empty (the header still sorts by extension). When off, the extension is removed from the name and shown in the extension column",
   "settings.item.behavior.table.column_lines.title": "Column lines",
   "settings.item.behavior.table.column_lines.desc": "Draws vertical lines between columns: none, solid, dash. Applies to the header and every row",
   "settings.item.behavior.table.folder_style.title": "Folder style",

@@ -148,8 +148,9 @@ export function FileTable({ pane }: { pane: PaneId }) {
   );
   const sort = effectiveSort(tab, config.view.table.columns);
 
-  // 확장자 컬럼이 보이면 파일 이름에서는 확장자를 뺀다(그 컬럼이 보여 준다).
-  const hasExtColumn = columns.some((c) => c.name === "extension");
+  // 확장자 컬럼이 보이면 파일 이름에서는 확장자를 뺀다(그 컬럼이 보여 준다). `확장자 유지`(이슈 #86)가 켜져 있으면 이름에 확장자를 두고 확장자 칸은 비운다.
+  const keepExt = config.behavior.table.keep_extension;
+  const hasExtColumn = columns.some((c) => c.name === "extension") && !keepExt;
   // 수정일 구간 그룹핑(이슈 #62): 구간이 바뀌는 곳에 제목 행을 끼운다. 제목 행은 항목이 아니라 커서·선택 번호는 그대로 `tab.entries`의 번호다.
   const grouping = groupingActive(tab, config.behavior.table.group_by_modified);
   const language = config.behavior.language;
@@ -357,6 +358,8 @@ export function FileTable({ pane }: { pane: PaneId }) {
               </>
             ) : c.name === "name" ? (
               `${pre}${hasExtColumn && !(e.kind === "dir" || (e.kind === "symlink" && e.linkIsDir)) ? splitExtension(e.name)[0] : cellText(e, c.name, config.display, undefined, tab.virtual?.kind === "usage", dirSizes[e.path])}${post}`
+            ) : c.name === "extension" && keepExt ? (
+              ""
             ) : (
               cellText(e, c.name, config.display, undefined, tab.virtual?.kind === "usage", dirSizes[e.path])
             )}
