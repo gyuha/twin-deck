@@ -152,6 +152,17 @@ async openReleasesPage() : Promise<Result<null, string>> {
 }
 },
 /**
+ * Markdown 링크 같은 외부 주소(`http`·`https`·`mailto`만)를 기본 브라우저·메일 앱으로 연다 (이슈 #89).
+ */
+async openExternalUrl(url: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("open_external_url", { url }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * 설정의 `environment.text_editor`로 항목을 연다.
  */
 async editPaths(paths: string[]) : Promise<Result<null, string>> {

@@ -1085,6 +1085,13 @@ pub fn open_path(launch: State<'_, AppLaunch>, path: String) -> ServiceResult<()
     open_file(&launch, &path)
 }
 
+/// Markdown 링크 같은 외부 주소(`http`·`https`·`mailto`만)를 기본 브라우저·메일 앱으로 연다 (이슈 #89).
+#[tauri::command]
+#[specta::specta]
+pub fn open_external_url(launch: State<'_, AppLaunch>, url: String) -> ServiceResult<()> {
+    crate::service::open_external_url(&launch, &url)
+}
+
 /// GitHub 릴리스 목록을 기본 브라우저로 연다 (이슈 #70). 주소는 Rust 상수 하나이고 인수는 없다.
 #[tauri::command]
 #[specta::specta]
@@ -1569,6 +1576,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             reveal_path,
             open_path,
             open_releases_page,
+            open_external_url,
             edit_paths,
             launch_app,
             open_as_archive,

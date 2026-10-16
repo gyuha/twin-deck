@@ -1892,12 +1892,41 @@ pub fn open_file<L: Launcher>(launch: &Launch<L>, path: &str) -> ServiceResult<(
     launch.open(path)
 }
 
-/// "변경 사항" 버튼이 여는 GitHub 릴리스 목록(이슈 #70). 주소는 여기 한 곳에서만 정하고, 임의 URL을 받는 명령은 두지 않는다.
+/// "변경 사항" 버튼이 여는 GitHub 릴리스 목록(이슈 #70). 이 버튼은 인수 없이 이 상수만 연다. (임의 외부 주소는 `open_external_url`이 스킴을 가려 연다.)
 pub const RELEASES_URL: &str = "https://github.com/gyuha/twin-deck/releases";
 
 /// GitHub 릴리스 목록을 기본 브라우저로 연다. OS의 기본 열기 명령(macOS `open`·Windows `explorer`·Linux `xdg-open`)을 쓴다.
 pub fn open_releases<L: Launcher>(launch: &Launch<L>) -> ServiceResult<()> {
     launch.open(RELEASES_URL)
+}
+
+/// Markdown 링크 같은 외부 주소를 기본 브라우저·메일 앱으로 연다(이슈 #89). 임의 문자열을 OS 열기 명령에 넘기지 않도록 스킴을 `http`·`https`·`mailto`로
+/// 한정하고 공백·제어 문자가 든 주소는 거부한다(`javascript:`·`file:`·`data:`나 `-`로 시작하는 값은 열기 명령의 옵션·실행 파일 경로가 될 수 있다).
+pub fn open_external_url<L: Launcher>(launch: &Launch<L>, url: &str) -> ServiceResult<()> {
+    check_external_url(url)?;
+    launch.open(url)
+}
+
+fn check_external_url(url: &str) -> ServiceResult<()> {
+    if url.is_empty() || url.chars().any(|c| c.is_whitespace() || c.is_control()) {
+        return Err("열 수 없는 주소입니다".into());
+    }
+    let Some((scheme, rest)) = url.split_once(':') else {
+        return Err("열 수 없는 주소입니다".into());
+    };
+    let ok = match scheme.to_ascii_lowercase().as_str() {
+        // 호스트가 있어야 한다(`http:`·`http://`만 있는 값은 거부).
+        "http" | "https" => rest
+            .strip_prefix("//")
+            .is_some_and(|h| !h.is_empty() && !h.starts_with('/')),
+        "mailto" => !rest.is_empty(),
+        _ => false,
+    };
+    if ok {
+        Ok(())
+    } else {
+        Err(format!("열 수 없는 주소입니다: {url}"))
+    }
 }
 
 /// 설정한 편집기로 열기 (OP-09). 없는 경로가 하나라도 있으면 실행하지 않는다.
@@ -2746,6 +2775,89 @@ mod tests {
             log[1].args,
             ["-R".to_string(), format!("{dir}/config.toml")]
         );
+    }
+
+    #[test]
+    fn 외부_주소는_http_https_mailto만_열기_명령으로_넘어간다() {
+        use std::cell::RefCell;
+        use std::rc::Rc;
+        struct Rec(Rc<RefCell<Vec<td_launch::Command>>>);
+        impl Launcher for Rec {
+            fn run(&self, c: &td_launch::Command) -> Result<(), String> {
+                self.0.borrow_mut().push(c.clone());
+                Ok(())
+            }
+        }
+        for (os, program) in [
+            (td_launch::Os::Mac, "open"),
+            (td_launch::Os::Windows, "explorer"),
+            (td_launch::Os::Linux, "xdg-open"),
+        ] {
+            for url in [
+                "https://example.com/a?b=1#c",
+                "http://example.com",
+                "HTTPS://Example.com",
+                "mailto:me@example.com",
+            ] {
+                let log = Rc::new(RefCell::new(Vec::new()));
+                open_external_url(&Launch::new(Rec(log.clone()), os), url).unwrap();
+                let log = log.borrow();
+                assert_eq!(log.len(), 1, "{url}");
+                assert_eq!(log[0].program, program);
+                assert_eq!(log[0].args, [url.to_string()]);
+            }
+        }
+    }
+
+    #[test]
+    fn 외부_주소는_위험한_스킴과_모양을_열기_명령을_부르지_않고_거부한다() {
+        use std::cell::Cell;
+        use std::rc::Rc;
+        struct Count(Rc<Cell<u32>>);
+        impl Launcher for Count {
+            fn run(&self, _: &td_launch::Command) -> Result<(), String> {
+                self.0.set(self.0.get() + 1);
+                Ok(())
+            }
+        }
+        let calls = Rc::new(Cell::new(0));
+        for url in [
+            "javascript:alert(1)",
+            "file:///etc/passwd",
+            "data:text/html,<script>1</script>",
+            "ftp://example.com/x",
+            "-a Calculator",
+            "--help",
+            "/etc/passwd",
+            "C:\\Windows\\System32\\calc.exe",
+            "",
+            "http:",
+            "http://",
+            "https:///x",
+            "mailto:",
+            "https://exa mple.com",
+            "https://example.com/\nnext",
+            "example.com",
+        ] {
+            let r = open_external_url(&Launch::new(Count(calls.clone()), td_launch::Os::Mac), url);
+            assert!(r.is_err(), "거부되어야 한다: {url:?}");
+        }
+        assert_eq!(calls.get(), 0, "거부한 주소로 열기 명령을 부르면 안 된다");
+    }
+
+    #[test]
+    fn 외부_주소_열기가_실패하면_오류로_돌아온다() {
+        struct Fail;
+        impl Launcher for Fail {
+            fn run(&self, _: &td_launch::Command) -> Result<(), String> {
+                Err("열기 실패".into())
+            }
+        }
+        let r = open_external_url(
+            &Launch::new(Fail, td_launch::Os::Linux),
+            "https://example.com",
+        );
+        assert_eq!(r, Err("열기 실패".into()));
     }
 
     #[test]

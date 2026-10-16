@@ -227,6 +227,8 @@ export interface Backend {
   importConfig(src: string): Promise<Loaded>;
   /** GitHub 릴리스 목록(변경 사항)을 기본 브라우저로 연다(이슈 #70). */
   openReleasesPage(): Promise<void>;
+  /** 외부 주소(`http`·`https`·`mailto`만)를 기본 브라우저·메일 앱으로 연다(Markdown 링크, 이슈 #89). 다른 스킴이나 공백·제어 문자가 든 주소는 거부된다. */
+  openExternalUrl(url: string): Promise<void>;
   /** GitHub 릴리스의 최신 버전을 확인한다. 새 버전이 없으면 null. 확인에 실패하면 BackendError. */
   checkUpdate(): Promise<UpdateInfoDto | null>;
   /** 새 버전을 내려받아 설치하고 앱을 다시 시작한다. 실패하면 BackendError(서명 불일치 포함). */

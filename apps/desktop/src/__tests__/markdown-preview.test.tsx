@@ -51,7 +51,8 @@ describe("마크다운 미리보기", () => {
     expect(view.querySelector("script")).toBeNull();
     expect(view.querySelector("[onerror]")).toBeNull();
     expect(view.querySelector("img")).toBeNull();
-    expect(view.querySelector("a")).toBeNull();
+    // 링크는 이제 눌리는 요소지만(이슈 #89), 위험한 주소는 href에서 지워지고 눌러도 아무것도 열지 않는다.
+    for (const a of Array.from(view.querySelectorAll("a"))) expect((a.getAttribute("href") ?? "").toLowerCase()).not.toContain("javascript:");
     expect(view.innerHTML).not.toContain("javascript:");
     expect((window as unknown as { __pwned?: number }).__pwned).toBeUndefined();
     expect(view.textContent).toContain("클릭");

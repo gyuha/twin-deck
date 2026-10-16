@@ -121,7 +121,7 @@ export function Preview() {
   const textBody = d?.kind === "text" ? (
     <>
               {isMarkdown(p.name) ? (
-                <MarkdownView text={d.text ?? ""} resolveImage={(src) => resolveMarkdownImage(src, p.path, api.fileUrl)} />
+                <MarkdownView text={d.text ?? ""} docPath={p.path} resolveImage={(src) => resolveMarkdownImage(src, p.path, api.fileUrl)} />
               ) : isJson(p.name) ? (
                 <JsonView text={d.text ?? ""} />
               ) : languageFor(p.name) ? (

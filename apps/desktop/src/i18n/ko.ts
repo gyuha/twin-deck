@@ -311,6 +311,7 @@ export const ko = {
   "store.remote.password_title": "{name} 비밀번호",
   "store.remote.password_wrong": "비밀번호가 맞지 않습니다",
   "store.remote.changed": "연결하는 동안 원격 서버 목록이 바뀌어 연결을 멈췄습니다. 다시 골라 주세요",
+  "store.link.missing": "링크한 항목을 찾을 수 없습니다: {path}",
   "store.remote.no_open": "원격 파일은 바로 열 수 없습니다. 로컬 패널로 복사(F5)한 뒤 여세요 (이미지·텍스트는 Space로 미리 볼 수 있습니다)",
   "store.goto.title": "경로로 이동",
   "store.open_dir.arg": "core.open.directory에는 문자열 인수 src가 필요합니다",

@@ -1018,6 +1018,11 @@ export class FakeBackend implements Backend {
   async openReleasesPage() {
     this.openedUrls.push("https://github.com/gyuha/twin-deck/releases");
   }
+  /** 실제 서비스처럼 `http`·`https`·`mailto`만 열고 나머지는 거부한다. 연 주소는 `openedUrls`에 쌓인다. */
+  async openExternalUrl(url: string) {
+    if (!/^(https?:\/\/[^\s/][^\s]*|mailto:[^\s]+)$/i.test(url) || /[\u0000-\u001f]/.test(url)) throw new BackendError(`열 수 없는 주소입니다: ${url}`);
+    this.openedUrls.push(url);
+  }
 
   /** 테스트용: 설정 파일 저장 경로. */
   configLocation: ConfigLocationDto = { dir: "/config", defaultDir: "/config", custom: false };

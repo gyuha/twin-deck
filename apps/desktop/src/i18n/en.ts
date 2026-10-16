@@ -313,6 +313,7 @@ export const en: Record<Key, string> = {
   "store.remote.password_title": "Password for {name}",
   "store.remote.password_wrong": "The password is incorrect",
   "store.remote.changed": "The remote server list changed while connecting, so the connection was stopped. Please pick it again",
+  "store.link.missing": "The linked item was not found: {path}",
   "store.remote.no_open": "Remote files cannot be opened directly. Copy them to a local pane (F5) first (images and text can be previewed with Space)",
   "store.goto.title": "Go to Path",
   "store.open_dir.arg": "core.open.directory requires a string argument src",

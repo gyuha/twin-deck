@@ -3233,6 +3233,35 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       api.setCursor(0);
       await loadPreview(first);
     },
+    /**
+     * Markdown 미리보기의 상대 경로 링크(이슈 #89): 파일이면 그 폴더로 패널을 옮기고 커서를 맞춰 미리보기로 열고, 폴더면 미리보기를 닫고 그 폴더로 간다.
+     * 없는 항목은 안내만 한다.
+     */
+    async previewLink(path: string) {
+      if (get().previewEdit && !(await api.previewEditEnd())) return;
+      let info;
+      try {
+        info = await backend.fileInfo(path);
+      } catch {
+        return fail(tr("store.link.missing", { path }));
+      }
+      if (info.kind === "dir") {
+        api.previewClose();
+        await api.navigate(path);
+        return;
+      }
+      const dir = parentPath(path);
+      if (dir !== null && activeTab(get()).path !== dir) await api.navigate(dir);
+      const tab = activeTab(get());
+      const i = tab.entries.findIndex((e) => e.path === path);
+      if (i >= 0) {
+        api.setCursor(i);
+        await loadPreview(tab.entries[i]);
+      } else {
+        // 숨김 파일처럼 목록에 없는 항목도 미리보기는 연다.
+        await loadPreview({ name: info.name, path, kind: info.kind, size: info.size, modifiedMs: info.modifiedMs, createdMs: info.createdMs } as EntryDto);
+      }
+    },
     /** 미리보기를 연 채 커서를 옮기고 새 항목을 보여 준다. */
     async previewMove(delta: 1 | -1) {
       if (get().previewEdit && !(await api.previewEditEnd())) return;
@@ -3537,6 +3566,14 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       }
     },
     /** GitHub 릴리스 목록(변경 사항)을 기본 브라우저로 연다(이슈 #70). */
+    /** 외부 주소(`http`·`https`·`mailto`)를 기본 브라우저·메일 앱으로 연다(Markdown 링크, 이슈 #89). 실패하면 안내만 띄운다. */
+    async openExternalUrl(url: string) {
+      try {
+        await backend.openExternalUrl(url);
+      } catch (e) {
+        fail(e);
+      }
+    },
     async openReleasesPage() {
       try {
         await backend.openReleasesPage();

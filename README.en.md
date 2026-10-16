@@ -153,6 +153,7 @@ Put the cursor on a file and press `→` (or `Mod+Y`) to see its contents right 
 - On a folder, `Shift+→` previews the folder without entering it.
 - Drag the preview window's title bar to move it and its edges to resize it; it remembers position and size.
 - To play sound and video as soon as they open, turn it on in the **Preview** tab of Settings.
+- **Markdown links**: in a Markdown preview, clicking a link opens `http(s)://` and `mailto:` addresses in your default browser or mail app, scrolls a `#heading` link to that heading in the same document, and opens a relative path link (`./other.md`, `../docs/a.md`) in the preview (or moves the pane there for a folder), or shows a notice if the item does not exist. Links with any other scheme such as `javascript:` or `file:` do nothing when clicked. `other.md#heading` opens only the file and does not scroll to the heading.
 - **Office documents (docx, xlsx, pptx, doc, xls, ppt, docm, xlsm, pptm)**: always shown regardless of settings, and the same on all three OSes. The text and tables read by Rust's [office_oxide](https://github.com/yfedoseev/office_oxide) are drawn as Markdown. It shows only the text and tables inside, not the document itself, so formatting, pages, shapes, and pictures do not appear, and "This is a data preview and differs from the real document" is always shown at the top. Files over 20 MB are not read, an overly long result is cut to its first part, and documents inside archives are "a format that cannot be previewed".
 
 ### Find files

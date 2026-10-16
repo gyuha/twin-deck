@@ -51,6 +51,8 @@ export const RUST_MESSAGES: readonly (readonly [ko: string, en: string])[] = [
   ["챕터가 너무 커서(2MB 초과) 미리 볼 수 없습니다", "The chapter is too large (over 2 MB) to preview"],
   ["압축 파일 안의 epub은 미리 볼 수 없습니다", "An epub inside an archive cannot be previewed"],
   ["챕터 {n}", "Chapter {n}"],
+  ["열 수 없는 주소입니다", "This address cannot be opened"],
+  ["열 수 없는 주소입니다: {url}", "This address cannot be opened: {url}"],
   ["Office 문서가 아닙니다", "Not an Office document"],
   ["파일이 너무 커서(20MB 초과) 미리 볼 수 없습니다", "The file is too large (over 20 MB) to preview"],
   ["Office 문서를 읽을 수 없습니다: {e}", "Could not read the Office document: {e}"],
