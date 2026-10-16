@@ -1132,6 +1132,7 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
         password: Option<String>,
         remember: bool,
         secrets: &S,
+        shell_host_key: td_remote::HostKeyPolicy,
         opener: td_remote::SessionOpener<'_>,
     ) -> Result<String, td_remote::RemoteError> {
         let logins = &self.remote_logins;
@@ -1145,6 +1146,7 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
                         port: t.port,
                         user: user.into(),
                         password: pw.into(),
+                        host_key: shell_host_key.clone(),
                     },
                 );
             }
@@ -4147,6 +4149,18 @@ mod tests {
                 }
             }
 
+            /// 가짜 서버가 생성한 공개 키만 테스트 전용 임시 저장소에 승인한다.
+            fn verified_opener(
+                server: &dyn std::any::Any,
+            ) -> impl Fn(&RemoteTarget, &str, &str) -> td_remote::Result<Arc<dyn RemoteSession>>
+            {
+                let policy = server
+                    .downcast_ref::<FakeSftp>()
+                    .map(|s| s.cfg("u", "p").host_key)
+                    .unwrap_or_default();
+                move |t, u, pw| td_remote::connect_session_verified(t, u, pw, policy.clone())
+            }
+
             fn each(f: impl Fn(Protocol)) {
                 f(Protocol::Ftp);
                 f(Protocol::Sftp);
@@ -4157,6 +4171,7 @@ mod tests {
                 each(|p| {
                     let (_t, svc, _ch, _root) = setup();
                     let (t, dir, _srv) = start(p, "");
+                    let connect_session = verified_opener(_srv.as_ref());
                     std::fs::write(dir.join("hello.txt"), b"hi").unwrap();
                     let url = connect_remote(
                         &svc.remote_registry(),
@@ -4186,6 +4201,7 @@ mod tests {
                 each(|p| {
                     let (_t, svc, _ch, _root) = setup();
                     let (t, dir, _srv) = start(p, "/sub");
+                    let connect_session = verified_opener(_srv.as_ref());
                     std::fs::create_dir(dir.join("sub")).unwrap();
                     let url = connect_remote(
                         &svc.remote_registry(),
@@ -4205,6 +4221,7 @@ mod tests {
                 each(|p| {
                     let (_t, svc, _ch, _root) = setup();
                     let (t, _dir, _srv) = start(p, "");
+                    let connect_session = verified_opener(_srv.as_ref());
                     let calls = Cell::new(0);
                     let opener = |t: &RemoteTarget, u: &str, pw: &str| {
                         calls.set(calls.get() + 1);
@@ -4226,6 +4243,7 @@ mod tests {
                 each(|p| {
                     let (_t, svc, _ch, _root) = setup();
                     let (t, _dir, _srv) = start(p, "");
+                    let connect_session = verified_opener(_srv.as_ref());
                     let reg = svc.remote_registry();
                     let store = Mem::default();
                     let err = connect_remote(&reg, &t, None, false, &store, &connect_session)
@@ -4258,6 +4276,7 @@ mod tests {
                 each(|p| {
                     let (_t, svc, _ch, _root) = setup();
                     let (t, _dir, _srv) = start(p, "");
+                    let connect_session = verified_opener(_srv.as_ref());
                     let store = Mem::default();
                     connect_remote(
                         &svc.remote_registry(),
@@ -4302,6 +4321,7 @@ mod tests {
                 each(|p| {
                     let (_t, svc, _ch, _root) = setup();
                     let (t, _dir, _srv) = start(p, "");
+                    let connect_session = verified_opener(_srv.as_ref());
                     let reg = svc.remote_registry();
                     let url = connect_remote(
                         &reg,
@@ -4403,12 +4423,51 @@ mod tests {
             }
         }
 
-        fn connect(port: u16, password: &str) -> td_remote::Result<SftpSession> {
+        /// 서버의 호스트 키를 사용자가 승인한 것처럼 정책을 만든다: 처음 접속은 키를 보여 주며 거부되고, 그 키를 승인 키로 쓴다.
+        pub(super) fn trusting(port: u16, dir: &Path) -> td_remote::HostKeyPolicy {
+            let policy = td_remote::HostKeyPolicy {
+                directory: Some(dir.to_path_buf()),
+                approved_key: None,
+            };
+            let probe = SftpSession::connect(SftpConfig {
+                host: "127.0.0.1".into(),
+                port,
+                user: "me".into(),
+                password: String::new(),
+                host_key: policy.clone(),
+            });
+            match probe.err() {
+                Some(RemoteError::HostKey(c)) => td_remote::HostKeyPolicy {
+                    approved_key: Some(c.public_key),
+                    ..policy
+                },
+                // 이미 저장된 키면 검증을 통과해 비밀번호 단계(Auth)까지 간다: 승인 없이도 접속된다.
+                Some(RemoteError::Auth) | None => policy,
+                other => panic!("호스트 키 확인 단계에서 거부되거나 통과해야 한다: {other:?}"),
+            }
+        }
+
+        /// 이미 신뢰 저장소에 저장된 키로만 접속한다(서버가 꺼진 뒤의 접속 확인용).
+        fn connect_saved(port: u16, password: &str, dir: &Path) -> td_remote::Result<SftpSession> {
             SftpSession::connect(SftpConfig {
                 host: "127.0.0.1".into(),
                 port,
                 user: "me".into(),
                 password: password.into(),
+                host_key: td_remote::HostKeyPolicy {
+                    directory: Some(dir.to_path_buf()),
+                    approved_key: None,
+                },
+            })
+        }
+
+        fn connect(port: u16, password: &str, dir: &Path) -> td_remote::Result<SftpSession> {
+            SftpSession::connect(SftpConfig {
+                host: "127.0.0.1".into(),
+                port,
+                user: "me".into(),
+                password: password.into(),
+                host_key: trusting(port, dir),
             })
         }
 
@@ -4435,7 +4494,8 @@ mod tests {
             assert!(on.running && on.has_password && on.last_error.is_none());
             assert!(on.fingerprint.as_deref().is_some_and(|f| !f.is_empty()));
             let port = port_of(&on);
-            let sess = connect(port, "pw").unwrap();
+            let trust = t.path().join("trust");
+            let sess = connect(port, "pw", &trust).unwrap();
             let names: Vec<_> = sess
                 .list("/")
                 .unwrap()
@@ -4443,16 +4503,19 @@ mod tests {
                 .map(|e| e.name)
                 .collect();
             assert!(names.contains(&"hello.txt".to_string()), "{names:?}");
-            assert_eq!(connect(port, "틀림").err(), Some(RemoteError::Auth));
+            assert_eq!(connect(port, "틀림", &trust).err(), Some(RemoteError::Auth));
             drop(sess);
 
             let off = svc.remote_server_stop(&secrets);
             assert!(!off.running && off.addresses.is_empty() && off.fingerprint.is_none());
             let deadline = Instant::now() + Duration::from_secs(5);
-            while connect(port, "pw").is_ok() && Instant::now() < deadline {
+            while connect_saved(port, "pw", &trust).is_ok() && Instant::now() < deadline {
                 std::thread::sleep(Duration::from_millis(50));
             }
-            assert!(connect(port, "pw").is_err(), "끈 뒤에도 접속된다");
+            assert!(
+                connect_saved(port, "pw", &trust).is_err(),
+                "끈 뒤에도 접속된다"
+            );
         }
 
         #[test]
@@ -4520,7 +4583,7 @@ mod tests {
     mod remote_terminal {
         use super::*;
         use std::cell::RefCell;
-        use td_remote::{connect_session, Protocol, RemoteTarget, SecretStore};
+        use td_remote::{Protocol, RemoteTarget, SecretStore};
 
         #[derive(Default)]
         struct Mem(RefCell<HashMap<String, String>>);
@@ -4581,13 +4644,23 @@ mod tests {
         }
 
         fn connect(svc: &Service<FakeTrash>, t: &RemoteTarget) -> String {
+            // 신뢰 저장소는 이어지는 원격 셸 접속에서도 쓰이므로 시험이 끝날 때까지 남긴다.
+            let dir = tempfile::tempdir().unwrap().keep();
+            let approved = super::remote_server::trusting(t.port, &dir);
+            let shell_policy = td_remote::HostKeyPolicy {
+                approved_key: None,
+                ..approved.clone()
+            };
             let url = svc
                 .connect_remote(
                     t,
                     Some("pw".into()),
                     false,
                     &Mem::default(),
-                    &connect_session,
+                    shell_policy,
+                    &|t, user, password| {
+                        td_remote::connect_session_verified(t, user, password, approved.clone())
+                    },
                 )
                 .unwrap();
             // `sftp://<id>/...`에서 연결 id만 뽑는다.

@@ -12,6 +12,15 @@ impl client::Handler for Client {
     }
 }
 
+/// 시험용 접속 설정이 이 서버의 호스트 키를 신뢰하게 한다(처음 보는 키의 승인을 대신한다).
+fn trust(dir: &std::path::Path) -> crate::HostKeyPolicy {
+    let key = host_key::load_or_create(&dir.join("host_key")).unwrap();
+    crate::HostKeyPolicy {
+        directory: Some(dir.join("trusted")),
+        approved_key: Some(key.public_key().to_openssh().unwrap()),
+    }
+}
+
 fn cfg(dir: &std::path::Path) -> ServerConfig {
     ServerConfig {
         bind: "127.0.0.1".into(),
@@ -102,6 +111,7 @@ mod sftp_tests {
             port: s.local_addr.port(),
             user: "me".into(),
             password: "secret".into(),
+            host_key: trust(dir.path()),
         })
         .unwrap();
         (dir, s, sess)
@@ -116,6 +126,7 @@ mod sftp_tests {
             port: s.local_addr.port(),
             user: "me".into(),
             password: "nope".into(),
+            host_key: trust(dir.path()),
         });
         assert!(matches!(r, Err(RemoteError::Auth)));
     }
@@ -222,13 +233,14 @@ mod shell_tests {
         (dir, s)
     }
 
-    fn open(s: &ServerHandle, cols: u16, rows: u16) -> Result<ShellSession> {
+    fn open(dir: &std::path::Path, s: &ServerHandle, cols: u16, rows: u16) -> Result<ShellSession> {
         ShellSession::open(
             SftpConfig {
                 host: "127.0.0.1".into(),
                 port: s.local_addr.port(),
                 user: "me".into(),
                 password: "secret".into(),
+                host_key: trust(dir),
             },
             cols,
             rows,
@@ -252,8 +264,8 @@ mod shell_tests {
 
     #[test]
     fn server_shell_echo_marker() {
-        let (_dir, s) = serve(true);
-        let sh = open(&s, 80, 24).unwrap();
+        let (dir, s) = serve(true);
+        let sh = open(dir.path(), &s, 80, 24).unwrap();
         sh.write(b"echo TD_$((40+2))_MARK\n").unwrap();
         wait_for(&sh, "TD_42_MARK");
         sh.close();
@@ -261,14 +273,17 @@ mod shell_tests {
 
     #[test]
     fn server_shell_denied_when_not_allowed() {
-        let (_dir, s) = serve(false);
-        assert!(matches!(open(&s, 80, 24), Err(RemoteError::Other(_))));
+        let (dir, s) = serve(false);
+        assert!(matches!(
+            open(dir.path(), &s, 80, 24),
+            Err(RemoteError::Other(_))
+        ));
     }
 
     #[test]
     fn server_shell_resize_changes_stty_size() {
-        let (_dir, s) = serve(true);
-        let sh = open(&s, 80, 24).unwrap();
+        let (dir, s) = serve(true);
+        let sh = open(dir.path(), &s, 80, 24).unwrap();
         sh.write(b"stty size\n").unwrap();
         wait_for(&sh, "24 80");
         sh.resize(100, 30).unwrap();

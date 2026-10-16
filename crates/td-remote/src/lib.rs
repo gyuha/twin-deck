@@ -14,11 +14,13 @@ pub mod testing;
 use std::io::{Read, Write};
 use std::time::SystemTime;
 
-pub use connect::{connect_session, open_session, Protocol, RemoteTarget, SessionOpener};
+pub use connect::{
+    connect_session, connect_session_verified, open_session, Protocol, RemoteTarget, SessionOpener,
+};
 pub use error::{RemoteError, Result};
 pub use ftp::{FtpConfig, FtpSession};
 pub use secret::{secret_key, KeyringStore, SecretStore, SECRET_SERVICE};
-pub use sftp::{SftpConfig, SftpSession};
+pub use sftp::{HostKeyChallenge, HostKeyPolicy, SftpConfig, SftpSession};
 pub use shell::{ShellEvent, ShellSession};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

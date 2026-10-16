@@ -918,7 +918,7 @@ export class FakeBackend implements Backend {
    * 사용자가 없는 SFTP는 auth 오류, 사용자가 없는 FTP는 익명. 이미 연결돼 있으면 그대로 루트를 돌려준다.
    * 루트는 `base_dir`(없으면 `/`)이고, 성공하면 그 폴더가 가짜 트리에 생긴다(`seed`로 미리 넣은 파일이 보인다).
    */
-  async remoteConnect(index: number, password: string | null, remember: boolean) {
+  async remoteConnect(index: number, password: string | null, remember: boolean, _approvedHostKey?: string) {
     const s = this.remoteServer(index);
     const id = FakeBackend.remoteId(s);
     const key = FakeBackend.remoteKey(s);

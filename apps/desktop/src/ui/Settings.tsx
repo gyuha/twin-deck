@@ -931,6 +931,7 @@ function RemoteServersControl({
                 <option value="ftp">FTP</option>
               </select>
             </label>}
+            {current.protocol === "sftp" && <p role="note" className="text-xs text-ink-dull">{t("settings.remote.sftp_warning")}</p>}
             {current.protocol === "ftp" && (
               <p role="note" className="text-xs text-status-error">
                 {t("settings.remote.ftp_warning")}

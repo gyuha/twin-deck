@@ -16,6 +16,7 @@ import {
   isRemotePath,
   joinPath,
   parentPath,
+  HostKeyError,
   RemoteConnectError,
   remoteServerId,
   setBackendErrorTranslator,
@@ -180,7 +181,8 @@ export interface DragState {
 export const CONFLICT_CHOICES: readonly ConflictDto[] = ["overwrite", "skip", "rename"];
 
 export type DialogState =
-  | { kind: "name"; title: string; value: string; error: string | null; selectStem: boolean; goto?: boolean; label?: string; confirmLabel?: string; option?: { label: string; checked: boolean } }
+  | { kind: "hostKey"; title: string; host: string; port: number; algorithm: string; fingerprint: string; confirmed: boolean }
+  | { kind: "name"; title: string; value: string; error: string | null; selectStem: boolean; lines?: string[]; goto?: boolean; label?: string; confirmLabel?: string; option?: { label: string; checked: boolean } }
   | { kind: "multirename"; title: string; items: { path: string; name: string; isDir: boolean; modifiedMs: number | null }[]; existing: string[]; options: RenameOptions }
   | { kind: "confirm"; title: string; lines: string[]; confirmLabel?: string }
   /** 선택지 중 하나를 고르는 창(확인이면 고른 번호, 취소면 null). */
@@ -1950,6 +1952,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       set((s) =>
         s.dialog?.kind === "name" && s.dialog.option
           ? { dialog: { ...s.dialog, option: { ...s.dialog.option, checked } } }
+          : s.dialog?.kind === "hostKey"
+            ? { dialog: { ...s.dialog, confirmed: checked } }
           : s.dialog?.kind === "password"
             ? { dialog: { ...s.dialog, remember: checked } }
             : {},
@@ -1993,6 +1997,9 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         const errors = validateNames(d.items, newNames, d.existing);
         if (errors.some((e) => e !== null) || d.items.every((it, i) => it.name === newNames[i])) return;
         result = { items: d.items, newNames };
+      } else if (d.kind === "hostKey") {
+        if (!d.confirmed) return;
+        result = true;
       } else if (d.kind === "name") {
         if (d.value.trim() === "") {
           set({ dialog: { ...d, error: tr("store.name.required") } });
@@ -2926,12 +2933,25 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       try {
         let password: string | null = null;
         let remember = false;
+        let approvedHostKey: string | undefined;
         for (;;) {
           if (changed()) return fail(tr("store.remote.changed"));
           let root: string;
           try {
-            root = await backend.remoteConnect(index, password, remember);
+            root = await backend.remoteConnect(index, password, remember, approvedHostKey);
           } catch (e) {
+            if (e instanceof HostKeyError) {
+              const k = e.key;
+              if (k.previousFingerprint) return fail(tr("store.remote.hostkey_changed", { host: k.host, port: k.port, algorithm: k.algorithm, previous: k.previousFingerprint, fingerprint: k.fingerprint }));
+              if (get().dialog || changed()) return fail(tr("store.remote.hostkey_unfinished"));
+              const answer = await ask<boolean>({
+                kind: "hostKey", title: tr("sftp.trust.title"), host: k.host, port: k.port,
+                algorithm: k.algorithm, fingerprint: k.fingerprint, confirmed: false,
+              });
+              if (answer !== true || changed()) return;
+              approvedHostKey = k.publicKey;
+              continue;
+            }
             // 다른 창이 떠 있으면 그 창의 응답을 가로채지 않도록 묻지 않고 오류로 알린다.
             if (!(e instanceof RemoteConnectError) || e.kind !== "auth" || get().dialog) return fail(e);
             if (changed()) return fail(tr("store.remote.changed"));

@@ -22,6 +22,9 @@ pub const PASS: &str = "p";
 pub struct FakeSftp {
     pub port: u16,
     root: tempfile::TempDir,
+    trust: tempfile::TempDir,
+    pub public_key: String,
+    pub auth_attempts: Arc<std::sync::atomic::AtomicUsize>,
     // 서버 런타임을 테스트가 끝날 때까지 살려 둔다.
     rt: Option<tokio::runtime::Runtime>,
 }
@@ -47,20 +50,27 @@ impl FakeSftp {
         let port = std_listener.local_addr().unwrap().port();
         std_listener.set_nonblocking(true).unwrap();
         let base = Arc::new(root.path().to_path_buf());
+        let key = PrivateKey::random(&mut rand::rng(), Algorithm::Ed25519).unwrap();
+        let public_key = key.public_key().to_openssh().unwrap();
+        let auth_attempts = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let attempts = auth_attempts.clone();
         let config = russh::server::Config {
             auth_rejection_time: std::time::Duration::from_millis(0),
             auth_rejection_time_initial: Some(std::time::Duration::from_millis(0)),
-            keys: vec![PrivateKey::random(&mut rand::rng(), Algorithm::Ed25519).unwrap()],
+            keys: vec![key],
             ..Default::default()
         };
         rt.spawn(async move {
             let listener = tokio::net::TcpListener::from_std(std_listener).unwrap();
-            let mut server = FakeServer { base };
+            let mut server = FakeServer { base, attempts };
             let _ = server.run_on_socket(Arc::new(config), &listener).await;
         });
         Self {
             port,
             root,
+            trust: tempfile::tempdir().unwrap(),
+            public_key,
+            auth_attempts,
             rt: Some(rt),
         }
     }
@@ -75,6 +85,10 @@ impl FakeSftp {
             port: self.port,
             user: user.into(),
             password: pass.into(),
+            host_key: crate::HostKeyPolicy {
+                directory: Some(self.trust.path().into()),
+                approved_key: Some(self.public_key.clone()),
+            },
         }
     }
 
@@ -86,6 +100,7 @@ impl FakeSftp {
 #[derive(Clone)]
 struct FakeServer {
     base: Arc<PathBuf>,
+    attempts: Arc<std::sync::atomic::AtomicUsize>,
 }
 
 impl russh::server::Server for FakeServer {
@@ -93,6 +108,7 @@ impl russh::server::Server for FakeServer {
     fn new_client(&mut self, _: Option<std::net::SocketAddr>) -> SshHandler {
         SshHandler {
             base: self.base.clone(),
+            attempts: self.attempts.clone(),
             channels: HashMap::new(),
         }
     }
@@ -100,6 +116,7 @@ impl russh::server::Server for FakeServer {
 
 struct SshHandler {
     base: Arc<PathBuf>,
+    attempts: Arc<std::sync::atomic::AtomicUsize>,
     channels: HashMap<ChannelId, Channel<Msg>>,
 }
 
@@ -107,6 +124,8 @@ impl russh::server::Handler for SshHandler {
     type Error = anyhow::Error;
 
     async fn auth_password(&mut self, user: &str, password: &str) -> Result<Auth, Self::Error> {
+        self.attempts
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         if user == USER && password == PASS {
             Ok(Auth::Accept)
         } else {

@@ -225,6 +225,11 @@ export const RUST_MESSAGES: readonly (readonly [ko: string, en: string])[] = [
   ["원격 셸은 SFTP 연결에서만 열 수 있습니다", "A remote shell can only be opened on an SFTP connection"],
   ["원격 연결 '{connection_id}'이(가) 열려 있지 않습니다", "The remote connection '{connection_id}' is not open"],
   ["원격 셸을 열지 못했습니다: {e}", "Could not open the remote shell: {e}"],
+  ["SFTP 서버 키 확인이 필요합니다: {0:?}", "SFTP server key confirmation is required: {0:?}"],
+  ["SFTP 신뢰 키 저장소 오류(인증 중단): {e}", "SFTP trusted key store error (authentication aborted): {e}"],
+  ["저장 경로 없음", "no storage path"],
+  ["동시에 다른 키가 등록됨; 다시 연결하여 확인하세요", "A different key was registered at the same time; reconnect to confirm"],
+  ["SSH 호스트 인증서는 지원하지 않습니다", "SSH host certificates are not supported"],
 ];
 
 /** 사용자에게 그대로 보이지 않는 한국어 리터럴: 개발자용 진단·테스트 확인 문구, 더 큰 문구를 이루는 조각. 한국어로 둔다. */

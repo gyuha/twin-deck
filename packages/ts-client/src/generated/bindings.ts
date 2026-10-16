@@ -337,9 +337,9 @@ async setRemoteServers(servers: RemoteServer[]) : Promise<Result<Loaded, string>
  * `password`가 없으면 키체인 값을 쓴다. 성공했고 `remember`면 받은 비밀번호를 키체인에 저장한다.
  * 접속은 블로킹이라 UI 스레드를 막지 않게 따로 돌린다.
  */
-async remoteConnect(index: number, password: string | null, remember: boolean) : Promise<Result<RemoteConnectDto, string>> {
+async remoteConnect(index: number, password: string | null, remember: boolean, approvedHostKey: string | null) : Promise<Result<RemoteConnectDto, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("remote_connect", { index, password, remember }) };
+    return { status: "ok", data: await TAURI_INVOKE("remote_connect", { index, password, remember, approvedHostKey }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -1094,6 +1094,10 @@ export type FileSystemsConfig = { zip: ZipConfig }
  * 파일 찾기 다이얼로그(기본 탭)의 조건. 필드의 뜻은 `td_search::FindSpec`과 같다.
  */
 export type FindSpecDto = { roots: string[]; onlyItems: string[] | null; followSymlinks: boolean; excludeDirs: string; maxDepth: number | null; mask: string; substring: boolean; regex: boolean; excludeFiles: string; text: TextSpecDto | null }
+/**
+ * 비밀번호를 보내기 전에 사용자가 대조해야 하는 호스트 키.
+ */
+export type HostKeyDto = { host: string; port: number; algorithm: string; fingerprint: string; publicKey: string; previousFingerprint: string | null }
 export type JobDto = { id: number; kind: JobKindDto; status: JobStatusDto; total: number; completed: number; 
 /**
  * 복사/이동의 전체 파일 수. 집계 전이거나 해당 없는 작업이면 `None`.
@@ -1228,7 +1232,7 @@ servers?: RemoteServer[] }
  * `remote_connect`의 결과: 패널이 이동할 원격 루트 경로(`sftp://<id>/..`), 또는 종류가 구분된 실패.
  * 설정 디렉터리 없음·없는 항목 번호 같은 그 밖의 문제는 명령 오류(문자열)로 온다.
  */
-export type RemoteConnectDto = { connected: string } | { failed: RemoteFailureDto }
+export type RemoteConnectDto = { connected: string } | { hostKey: HostKeyDto } | { failed: RemoteFailureDto }
 /**
  * 원격 연결 실패의 종류. UI는 `auth`면 비밀번호를 다시 묻는다.
  */

@@ -1,7 +1,7 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { BackendError, RemoteConnectError, SmbConnectError } from "./backend";
+import { HostKeyError, BackendError, RemoteConnectError, SmbConnectError } from "./backend";
 import type { Backend, FileDropEvent, SearchEvent, TerminalEvent } from "./backend";
 import { commands, events } from "./generated/bindings";
 import type { CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigValue, ConflictDto, LocationConflict, ExpectedFileDto, FileInfoDto, FindSpecDto, JobDto, LoadedState, PreviewDto, OfficePreviewDto, EpubInfoDto, Snapshot, JobKindDto, Loaded, QueueItemDto, RemoteServer, Result, SmbServer, WriteTextResultDto } from "./generated/bindings";
@@ -277,8 +277,9 @@ export class TauriBackend implements Backend {
   async setRemoteServers(servers: RemoteServer[]) {
     return unwrap(await commands.setRemoteServers(servers));
   }
-  async remoteConnect(index: number, password: string | null, remember: boolean) {
-    const r = unwrap(await commands.remoteConnect(index, password, remember));
+  async remoteConnect(index: number, password: string | null, remember: boolean, approvedHostKey?: string) {
+    const r = unwrap(await commands.remoteConnect(index, password, remember, approvedHostKey ?? null));
+    if ("hostKey" in r) throw new HostKeyError(r.hostKey);
     if ("failed" in r) throw new RemoteConnectError(r.failed.kind, r.failed.message);
     return r.connected;
   }

@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { BackendError } from "@twin-deck/ts-client";
+import { BackendError, HostKeyError } from "@twin-deck/ts-client";
 import { crumbs } from "./search-helpers";
 import { renderApp, seedBackend } from "./helpers";
 
@@ -428,6 +428,80 @@ describe("드라이브 바", () => {
         .getAllByRole("button")
         .map((b) => b.textContent);
     const passwordDialog = () => screen.findByRole("dialog", { name: "회사 비밀번호" });
+
+    const challenge = { host: "nas", port: 22, algorithm: "ssh-ed25519", fingerprint: "SHA256:test-fingerprint", publicKey: "ssh-ed25519 fake-test-key", previousFingerprint: null };
+
+    for (const answer of ["취소", "미확인", "대조 후 취소", "승인"]) {
+      it(`최초 SFTP 키 확인: ${answer} 때 명시적으로 대조한 키만 저장·연결한다`, async () => {
+        const backend = withRemotes(SFTP);
+        backend.remotePasswords.set("kim@nas:22/sftp", "secret");
+        const original = backend.remoteConnect.bind(backend);
+        const approvals: (string | undefined)[] = [];
+        let trusted = false;
+        backend.remoteConnect = async (i, p, r, approved) => {
+          approvals.push(approved);
+          if (!trusted && approved !== challenge.publicKey) throw new HostKeyError(challenge);
+          trusted = true;
+          return original(i, p, r);
+        };
+        const { user } = await renderApp(backend);
+        await openConnect(user);
+        await pick(user, "SFTP · 회사");
+        const d = await screen.findByRole("dialog", { name: "SFTP 서버 신원 확인" });
+        expect(within(d).getByText("nas:22")).toBeVisible();
+        expect(within(d).getByText("ssh-ed25519")).toBeVisible();
+        expect(within(d).getByText(challenge.fingerprint)).toBeVisible();
+        expect(within(d).queryByRole("textbox")).toBeNull();
+        const approve = within(d).getByRole("button", { name: "승인하고 연결" });
+        expect(approve).toBeDisabled();
+        expect(within(d).getByRole("button", { name: "취소" })).toHaveFocus();
+        if (answer === "승인") {
+          await user.click(within(d).getByRole("checkbox", { name: /신뢰할 경로/ }));
+          expect(approve).toBeEnabled();
+          await user.click(approve);
+        } else if (answer === "대조 후 취소") {
+          await user.click(within(d).getByRole("checkbox", { name: /신뢰할 경로/ }));
+          await user.keyboard("{Enter}");
+          expect(approvals).toEqual([undefined]);
+          await user.keyboard("{Escape}");
+        } else {
+          await user.click(approve);
+          expect(approvals).toEqual([undefined]);
+          if (answer === "미확인") {
+            await user.keyboard("{Enter}");
+            expect(approvals).toEqual([undefined]);
+            await user.click(within(d).getByRole("button", { name: "취소" }));
+          }
+          else await user.keyboard("{Escape}");
+        }
+        await waitFor(() => expect(screen.queryByRole("dialog", { name: "SFTP 서버 신원 확인" })).toBeNull());
+        if (answer === "승인") {
+          await waitFor(async () => expect(await backend.remoteConnections()).toEqual([0]));
+          expect(approvals).toEqual([undefined, challenge.publicKey]);
+          await user.click(within(bar("왼쪽")).getByRole("button", { name: "연결 끊기" }));
+          await openConnect(user);
+          await pick(user, "SFTP · 회사");
+          await waitFor(async () => expect(await backend.remoteConnections()).toEqual([0]));
+          expect(screen.queryByRole("dialog", { name: "SFTP 서버 신원 확인" })).toBeNull();
+        } else {
+          expect(trusted).toBe(false);
+          expect(await backend.remoteConnections()).toEqual([]);
+        }
+      });
+    }
+
+    it("변경된 SFTP 키는 기존·새 지문과 위험을 표시하고 다시 인증하지 않는다", async () => {
+      const backend = withRemotes(SFTP);
+      let calls = 0;
+      backend.remoteConnect = async () => { calls++; throw new HostKeyError({ ...challenge, previousFingerprint: "SHA256:old" }); };
+      const { user } = await renderApp(backend);
+      await openConnect(user);
+      await pick(user, "SFTP · 회사");
+      expect(await screen.findByText(/SFTP 서버 키가 변경되어 인증을 차단/)).toHaveTextContent(/SHA256:old.*SHA256:test-fingerprint/);
+      expect(screen.getByText(/서버 사칭 위험/)).toBeVisible();
+      expect(calls).toBe(1);
+      expect(screen.queryByRole("dialog", { name: "SFTP 서버 신원 확인" })).toBeNull();
+    });
 
     it("연결 메뉴에 저장된 원격 항목이 프로토콜과 함께 보이고 SFTP·FTP 관리…가 있다", async () => {
       const { user } = await renderApp(withRemotes(SFTP, FTP));

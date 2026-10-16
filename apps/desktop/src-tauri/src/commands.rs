@@ -648,13 +648,34 @@ pub struct RemoteFailureDto {
 #[serde(rename_all = "camelCase")]
 pub enum RemoteConnectDto {
     Connected(String),
+    HostKey(HostKeyDto),
     Failed(RemoteFailureDto),
+}
+
+/// 비밀번호를 보내기 전에 사용자가 대조해야 하는 호스트 키.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct HostKeyDto {
+    pub host: String,
+    pub port: u16,
+    pub algorithm: String,
+    pub fingerprint: String,
+    pub public_key: String,
+    pub previous_fingerprint: Option<String>,
 }
 
 impl From<Result<String, td_remote::RemoteError>> for RemoteConnectDto {
     fn from(r: Result<String, td_remote::RemoteError>) -> Self {
         match r {
             Ok(root) => Self::Connected(root),
+            Err(td_remote::RemoteError::HostKey(k)) => Self::HostKey(HostKeyDto {
+                host: k.host,
+                port: k.port,
+                algorithm: k.algorithm,
+                fingerprint: k.fingerprint,
+                public_key: k.public_key,
+                previous_fingerprint: k.previous_fingerprint,
+            }),
             Err(e) => {
                 let kind = match e {
                     td_remote::RemoteError::Auth => RemoteErrorKindDto::Auth,
@@ -692,6 +713,37 @@ fn remote_target(config: &ConfigState, index: u32) -> ServiceResult<td_remote::R
     })
 }
 
+/// 통합 시험이 같은 검증·저장·인증 경로를 쓰도록 한 접속 도우미(레지스트리만 쓰고 원격 셸용 접속 정보는 기억하지 않는다).
+#[cfg(test)]
+fn connect_remote_verified<S: td_remote::SecretStore>(
+    registry: &td_archive::RemoteRegistry,
+    target: &td_remote::RemoteTarget,
+    password: Option<String>,
+    remember: bool,
+    secrets: &S,
+    directory: Option<std::path::PathBuf>,
+    approved_host_key: Option<String>,
+) -> Result<String, td_remote::RemoteError> {
+    crate::service::connect_remote(
+        registry,
+        target,
+        password,
+        remember,
+        secrets,
+        &|target, user, password| {
+            td_remote::connect_session_verified(
+                target,
+                user,
+                password,
+                td_remote::HostKeyPolicy {
+                    directory: directory.clone(),
+                    approved_key: approved_host_key.clone(),
+                },
+            )
+        },
+    )
+}
+
 /// 설정의 `index`번째 원격 서버에 연결한다. 이미 연결돼 있으면 같은 연결의 루트 경로를 돌려준다.
 /// `password`가 없으면 키체인 값을 쓴다. 성공했고 `remember`면 받은 비밀번호를 키체인에 저장한다.
 /// 접속은 블로킹이라 UI 스레드를 막지 않게 따로 돌린다.
@@ -703,15 +755,34 @@ pub async fn remote_connect(
     index: u32,
     password: Option<String>,
     remember: bool,
+    approved_host_key: Option<String>,
 ) -> ServiceResult<RemoteConnectDto> {
     let target = remote_target(&config, index)?;
+    // 범용 설정 내보내기·사용자 지정 동기화 경로에 신뢰 저장소를 포함하지 않는다.
+    let directory = config.local_dir.as_ref().map(|p| p.join("sftp-host-keys"));
     let result = tauri::async_runtime::spawn_blocking(move || {
+        // 원격 셸이 나중에 같은 서버에 다시 접속할 때는 이미 저장된 신뢰 키로만 검증한다(승인 키는 한 번의 접속에만 쓴다).
+        let shell_policy = td_remote::HostKeyPolicy {
+            directory: directory.clone(),
+            approved_key: None,
+        };
         app.state::<AppService>().connect_remote(
             &target,
             password,
             remember,
             &td_remote::KeyringStore,
-            &td_remote::connect_session,
+            shell_policy,
+            &|target, user, password| {
+                td_remote::connect_session_verified(
+                    target,
+                    user,
+                    password,
+                    td_remote::HostKeyPolicy {
+                        directory: directory.clone(),
+                        approved_key: approved_host_key.clone(),
+                    },
+                )
+            },
         )
     })
     .await
@@ -1581,6 +1652,89 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
 mod tests {
     use super::*;
     use specta_typescript::Typescript;
+
+    #[test]
+    fn 서버키_확인을_일반_오류로_잃지_않고_ui에_전달한다() {
+        let k = td_remote::HostKeyChallenge {
+            host: "fake.test".into(),
+            port: 2222,
+            algorithm: "ssh-ed25519".into(),
+            fingerprint: "SHA256:fake".into(),
+            public_key: "fake-public-key".into(),
+            previous_fingerprint: Some("SHA256:old".into()),
+        };
+        let dto = RemoteConnectDto::from(Err(td_remote::RemoteError::HostKey(Box::new(k))));
+        let json = serde_json::to_value(dto).unwrap();
+        assert_eq!(json["hostKey"]["host"], "fake.test");
+        assert_eq!(json["hostKey"]["previousFingerprint"], "SHA256:old");
+        assert_eq!(json["hostKey"]["publicKey"], "fake-public-key");
+    }
+
+    /// 명시 실행하는 UI 통합 시험 전용. 임시 로컬 서버·키·자격증명만 사용한다.
+    #[test]
+    #[ignore = "TWIN_DECK_SFTP_TEST_BINARY로 UI 통합 시험에서만 실행"]
+    fn sftp_ui_fixture() {
+        if std::env::var("TWIN_DECK_SFTP_UI_FIXTURE").as_deref() != Ok("1") {
+            return;
+        }
+        use std::io::{BufRead, Write};
+        use td_remote::testing::sftp::{FakeSftp, USER};
+        #[derive(Default)]
+        struct Secrets(std::sync::Mutex<Option<String>>);
+        impl td_remote::SecretStore for Secrets {
+            fn get(&self, _: &str) -> td_remote::Result<Option<String>> {
+                Ok(self.0.lock().unwrap().clone())
+            }
+            fn set(&self, _: &str, p: &str) -> td_remote::Result<()> {
+                *self.0.lock().unwrap() = Some(p.into());
+                Ok(())
+            }
+            fn delete(&self, _: &str) -> td_remote::Result<()> {
+                *self.0.lock().unwrap() = None;
+                Ok(())
+            }
+        }
+        let server = FakeSftp::start();
+        let directory = tempfile::tempdir().unwrap();
+        let registry = td_archive::RemoteRegistry::default();
+        let secrets = Secrets::default();
+        let target = td_remote::RemoteTarget {
+            protocol: td_remote::Protocol::Sftp,
+            host: "127.0.0.1".into(),
+            port: server.port,
+            user: USER.into(),
+            base_dir: "".into(),
+        };
+        for line in std::io::stdin().lock().lines() {
+            let request: serde_json::Value = serde_json::from_str(&line.unwrap()).unwrap();
+            let response = match request["command"].as_str().unwrap() {
+                "remote_connect" => {
+                    assert_eq!(request["args"]["index"], 0);
+                    let args = &request["args"];
+                    serde_json::to_value(RemoteConnectDto::from(connect_remote_verified(
+                        &registry,
+                        &target,
+                        args["password"].as_str().map(String::from),
+                        args["remember"].as_bool().unwrap(),
+                        &secrets,
+                        Some(directory.path().into()),
+                        args["approvedHostKey"].as_str().map(String::from),
+                    )))
+                    .unwrap()
+                }
+                "remote_disconnect" => {
+                    registry.remove(&target.id());
+                    serde_json::Value::Null
+                }
+                "stats" => {
+                    serde_json::json!({ "port": server.port, "authAttempts": server.auth_attempts.load(std::sync::atomic::Ordering::SeqCst), "keys": std::fs::read_dir(directory.path()).unwrap().count(), "remembered": secrets.0.lock().unwrap().is_some() })
+                }
+                _ => panic!("가짜 서버 시험에서 허용하지 않은 명령"),
+            };
+            println!("SFTP_FIXTURE {}", response);
+            std::io::stdout().flush().unwrap();
+        }
+    }
 
     /// 커밋된 생성 파일이 Rust 정의와 어긋나면(타입 드리프트) 실패한다.
     /// 갱신: `UPDATE_BINDINGS=1 cargo test -p twin-deck-desktop bindings_are_up_to_date`

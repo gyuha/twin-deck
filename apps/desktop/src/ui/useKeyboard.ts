@@ -144,6 +144,14 @@ export function useKeyboard({ app, keymap, registry }: Options) {
         void api.usageExit();
         return;
       }
+      // 서버 신원 승인은 기본 취소다. 확인 버튼을 직접 선택한 경우에만 Enter로 승인한다.
+      if (top === "dialog" && s.dialog?.kind === "hostKey" && plain && e.key === "Enter") {
+        e.preventDefault();
+        const target = e.target as HTMLElement;
+        if (target.closest("[data-host-key-approve]") && s.dialog.confirmed) api.dialogConfirm();
+        else if (target.closest("[data-host-key-cancel]")) api.dialogCancel();
+        return;
+      }
       const hit = keymap.resolveBinding(e, stack);
       if (hit) {
         e.preventDefault();

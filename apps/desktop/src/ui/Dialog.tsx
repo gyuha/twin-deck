@@ -32,6 +32,10 @@ export function Dialog() {
   const activeJob = job ? isActiveJob(job) : false;
   // 열릴 때 입력칸이 있으면 거기에, 없으면 기본 버튼(확인)에 포커스한다. 이름 변경이면 확장자를 뺀 부분을 선택한다.
   useEffect(() => {
+    if (kind === "hostKey") {
+      root.current?.querySelector<HTMLButtonElement>("[data-host-key-cancel]")?.focus();
+      return;
+    }
     const el = input.current;
     if (el) {
       el.focus();
@@ -58,8 +62,23 @@ export function Dialog() {
         className={`${dialog.kind === "multirename" ? "w-[56rem]" : "w-96"} flex max-h-full max-w-full flex-col rounded border border-app-line bg-app-box p-4 text-sm shadow-lg`}
       >
         <h2 className="mb-2 font-semibold">{dialog.title}</h2>
+        {dialog.kind === "hostKey" && (
+          <>
+            <dl className="mb-3 select-text break-all">
+              <dt>{t("sftp.trust.target")}</dt><dd>{dialog.host}:{dialog.port}</dd>
+              <dt>{t("sftp.trust.algorithm")}</dt><dd>{dialog.algorithm}</dd>
+              <dt>{t("sftp.trust.fingerprint")}</dt><dd className="font-mono">{dialog.fingerprint}</dd>
+            </dl>
+            <p className="mb-3">{t("sftp.trust.explain")}</p>
+            <label className="flex items-start gap-2">
+              <input type="checkbox" checked={dialog.confirmed} onChange={(e) => api.dialogSetOption(e.target.checked)} />
+              {t("sftp.trust.checked")}
+            </label>
+          </>
+        )}
         {dialog.kind === "name" && (
           <>
+            {dialog.lines?.map((line, i) => <p key={i} className="mb-2 break-all select-text">{line}</p>)}
             <input
               ref={input}
               aria-label={dialog.label ?? t("dialog.name")}
@@ -241,18 +260,19 @@ export function Dialog() {
               </button>
             )}
             {dialog.kind !== "info" && (
-              <button type="button" className="rounded border border-app-line px-3 py-0.5 focus:ring-2 focus:ring-accent" onClick={() => api.dialogCancel()}>
+              <button type="button" data-host-key-cancel={dialog.kind === "hostKey" ? "" : undefined} className="rounded border border-app-line px-3 py-0.5 focus:ring-2 focus:ring-accent" onClick={() => api.dialogCancel()}>
                 {dialog.kind === "multirename" ? t("common.close") : t("common.cancel")}
               </button>
             )}
             <button
               type="button"
-              disabled={dialog.kind === "multirename" && !canMultiRename(dialog)}
+              disabled={(dialog.kind === "multirename" && !canMultiRename(dialog)) || (dialog.kind === "hostKey" && !dialog.confirmed)}
+              data-host-key-approve={dialog.kind === "hostKey" ? "" : undefined}
               data-dialog-primary={dialog.kind === "name" || dialog.kind === "password" || dialog.kind === "multirename" ? undefined : ""}
               className="rounded bg-accent px-3 py-0.5 text-accent-ink focus:ring-2 focus:ring-accent-ink disabled:opacity-40"
               onClick={() => api.dialogConfirm()}
             >
-              {(dialog.kind === "name" || dialog.kind === "confirm") && dialog.confirmLabel ? dialog.confirmLabel : dialog.kind === "multirename" ? t("dialog.rename") : t("common.ok")}
+              {dialog.kind === "hostKey" ? t("sftp.trust.approve") : (dialog.kind === "name" || dialog.kind === "confirm") && dialog.confirmLabel ? dialog.confirmLabel : dialog.kind === "multirename" ? t("dialog.rename") : t("common.ok")}
             </button>
           </div>
         )}
@@ -261,7 +281,7 @@ export function Dialog() {
             ? job && isActiveJob(job)
               ? t("dialog.hint_active")
               : t("dialog.hint_done")
-            : t("dialog.hint", { tab: dialog.kind === "name" && dialog.goto ? t("dialog.hint_tab") : "" })}
+            : dialog.kind === "hostKey" ? t("sftp.trust.hint") : t("dialog.hint", { tab: dialog.kind === "name" && dialog.goto ? t("dialog.hint_tab") : "" })}
         </p>
       </div>
     </div>

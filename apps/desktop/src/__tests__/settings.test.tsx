@@ -526,7 +526,7 @@ describe("SFTP·FTP 서버 탭 (이슈 #76)", () => {
   it("포트를 비우면 프로토콜 기본 포트로 저장되고 FTP는 암호화 경고를 보인다", async () => {
     const { user, backend } = await openRemote();
     await user.click(button("추가"));
-    expect(screen.queryByRole("note")).toBeNull();
+    expect(screen.getByRole("note")).toHaveTextContent(/SHA256.*신뢰할 경로/);
     await user.selectOptions(screen.getByRole("combobox", { name: "프로토콜" }), "ftp");
     expect(screen.getByRole("note")).toHaveTextContent("FTP는 암호화되지 않습니다");
     await user.type(field("호스트"), "ftp.example.com");

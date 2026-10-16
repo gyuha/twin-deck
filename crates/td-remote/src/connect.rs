@@ -49,11 +49,22 @@ impl RemoteTarget {
 pub type SessionOpener<'a> =
     &'a dyn Fn(&RemoteTarget, &str, &str) -> Result<Arc<dyn RemoteSession>>;
 
-/// 대상 서버에 실제로 접속한다.
+/// 대상 서버에 실제로 접속한다. SFTP는 명시적 신뢰 정책이 없으므로 거부한다.
+/// 앱에서는 `connect_session_verified`에 로컬 저장소와 사용자가 승인한 공개 키를 넘긴다.
 pub fn connect_session(
     target: &RemoteTarget,
     user: &str,
     password: &str,
+) -> Result<Arc<dyn RemoteSession>> {
+    connect_session_verified(target, user, password, Default::default())
+}
+
+/// 앱 전용 호스트 키 정책을 적용하는 연결 경로.
+pub fn connect_session_verified(
+    target: &RemoteTarget,
+    user: &str,
+    password: &str,
+    host_key: crate::HostKeyPolicy,
 ) -> Result<Arc<dyn RemoteSession>> {
     match target.protocol {
         Protocol::Sftp => Ok(Arc::new(SftpSession::connect(SftpConfig {
@@ -61,6 +72,7 @@ pub fn connect_session(
             port: target.port,
             user: user.into(),
             password: password.into(),
+            host_key,
         })?)),
         Protocol::Ftp => Ok(Arc::new(FtpSession::connect(FtpConfig {
             host: target.host.clone(),

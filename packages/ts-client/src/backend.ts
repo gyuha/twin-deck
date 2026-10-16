@@ -31,6 +31,10 @@ export class SmbConnectError extends BackendError {
 }
 
 /** 원격(SFTP·FTP) 연결 실패. `kind`가 `auth`면 비밀번호가 없거나 틀렸으니 다시 묻는다. */
+export class HostKeyError extends BackendError {
+  constructor(readonly key: import("./generated/bindings").HostKeyDto) { super("SFTP 서버 키 확인"); }
+}
+
 export class RemoteConnectError extends BackendError {
   constructor(
     readonly kind: RemoteErrorKindDto,
@@ -180,7 +184,7 @@ export interface Backend {
    * `password`가 없으면 키체인 값을 쓰고, 성공했고 `remember`면 받은 비밀번호를 키체인에 저장한다.
    * 연결 실패는 `RemoteConnectError`(`kind`로 인증 실패를 구분), 없는 항목 번호 같은 문제는 `BackendError`로 거부된다.
    */
-  remoteConnect(index: number, password: string | null, remember: boolean): Promise<string>;
+  remoteConnect(index: number, password: string | null, remember: boolean, approvedHostKey?: string): Promise<string>;
   /** 설정의 `index`번째 원격 서버 연결을 끊는다. 연결돼 있지 않아도 성공이다. */
   remoteDisconnect(index: number): Promise<void>;
   /** 지금 연결돼 있는 원격 서버 항목의 번호들(설정 목록 기준). */

@@ -36,6 +36,7 @@ fn 닫힌_포트는_연결_불가_오류다() {
         port,
         user: USER.into(),
         password: PASS.into(),
+        host_key: Default::default(),
     };
     assert_eq!(
         SftpSession::connect(cfg).err().unwrap(),
@@ -199,4 +200,118 @@ async fn 호출_스레드가_이미_tokio_런타임_안이어도_패닉하지_�
         .list("/")
         .unwrap();
     assert_eq!(list.len(), 1);
+}
+
+fn attempts(s: &Fixture) -> usize {
+    s.auth_attempts.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+#[test]
+fn 미승인_최초키와_취소는_인증하지_않고_승인후_재연결은_저장키를_쓴다() {
+    let s = Fixture::start();
+    let mut cfg = s.cfg(USER, PASS);
+    cfg.host_key.approved_key = None;
+    for _ in 0..2 {
+        let err = SftpSession::connect(cfg.clone()).err().unwrap();
+        let RemoteError::HostKey(k) = err else {
+            panic!("키 확인 필요")
+        };
+        assert_eq!(k.host, "127.0.0.1");
+        assert_eq!(k.port, s.port);
+        assert_eq!(k.algorithm, "ssh-ed25519");
+        assert!(k.fingerprint.starts_with("SHA256:"));
+        assert_eq!(k.previous_fingerprint, None);
+        assert_eq!(k.public_key, s.public_key);
+    }
+    assert_eq!(attempts(&s), 0);
+    assert_eq!(
+        SftpSession::connect(s.cfg(USER, PASS))
+            .unwrap()
+            .home()
+            .unwrap(),
+        "/"
+    );
+    assert_eq!(attempts(&s), 1);
+    assert_eq!(SftpSession::connect(cfg).unwrap().home().unwrap(), "/");
+    assert_eq!(attempts(&s), 2);
+}
+
+#[test]
+fn 변경키는_승인값이_있어도_차단하고_기존키를_보존한다() {
+    let s = Fixture::start();
+    let other = Fixture::start();
+    let cfg = s.cfg(USER, PASS);
+    let dir = cfg.host_key.directory.as_ref().unwrap();
+    fs::create_dir_all(dir).unwrap();
+    let path = dir.join(format!("3132372e302e302e31-{}.pub", s.port));
+    fs::write(&path, &other.public_key).unwrap();
+    let RemoteError::HostKey(k) = SftpSession::connect(cfg).err().unwrap() else {
+        panic!("변경키 차단")
+    };
+    assert!(k.previous_fingerprint.is_some());
+    assert_ne!(k.previous_fingerprint.unwrap(), k.fingerprint);
+    assert_eq!(fs::read_to_string(path).unwrap(), other.public_key);
+    assert_eq!(attempts(&s), 0);
+}
+
+#[test]
+fn 저장실패와_다른키_승인은_인증하지_않는다() {
+    let s = Fixture::start();
+    let mut cfg = s.cfg(USER, PASS);
+    let file = tempfile::NamedTempFile::new().unwrap();
+    cfg.host_key.directory = Some(file.path().into());
+    assert!(SftpSession::connect(cfg).is_err());
+    let mut cfg = s.cfg(USER, PASS);
+    cfg.host_key.approved_key = Some(Fixture::start().public_key.clone());
+    assert!(matches!(
+        SftpSession::connect(cfg),
+        Err(RemoteError::HostKey(_))
+    ));
+    assert_eq!(attempts(&s), 0);
+}
+
+#[test]
+fn 동시_승인_연결은_같은키만_저장한다() {
+    let s = Fixture::start();
+    std::thread::scope(|scope| {
+        let a = scope.spawn(|| SftpSession::connect(s.cfg(USER, PASS)));
+        let b = scope.spawn(|| SftpSession::connect(s.cfg(USER, PASS)));
+        assert!(a.join().unwrap().is_ok());
+        assert!(b.join().unwrap().is_ok());
+    });
+    assert_eq!(attempts(&s), 2);
+}
+
+#[test]
+fn 저장된_비밀번호도_미승인키_검증을_우회하지_않는다() {
+    struct FakeSecrets;
+    impl td_remote::SecretStore for FakeSecrets {
+        fn get(&self, _: &str) -> td_remote::Result<Option<String>> {
+            Ok(Some(PASS.into()))
+        }
+        fn set(&self, _: &str, _: &str) -> td_remote::Result<()> {
+            panic!("미인증 자격증명 저장 금지")
+        }
+        fn delete(&self, _: &str) -> td_remote::Result<()> {
+            panic!("자격증명 삭제 금지")
+        }
+    }
+    let s = Fixture::start();
+    let target = td_remote::RemoteTarget {
+        protocol: td_remote::Protocol::Sftp,
+        host: "127.0.0.1".into(),
+        port: s.port,
+        user: USER.into(),
+        base_dir: "".into(),
+    };
+    let mut policy = s.cfg(USER, PASS).host_key;
+    policy.approved_key = None;
+    let opener = |target: &td_remote::RemoteTarget, user: &str, password: &str| {
+        td_remote::connect_session_verified(target, user, password, policy.clone())
+    };
+    assert!(matches!(
+        td_remote::open_session(&target, None, true, &FakeSecrets, &opener),
+        Err(RemoteError::HostKey(_))
+    ));
+    assert_eq!(attempts(&s), 0);
 }
