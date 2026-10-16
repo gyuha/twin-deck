@@ -2597,6 +2597,36 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         fail(e);
       }
     },
+    /** 미리보기 중인 이미지를 클립보드에 이미지로 복사한다. 이미지가 표시되고 있지 않으면 아무것도 하지 않고, 실패하면 알림을 띄운다. 복사했으면 true. */
+    async previewCopyImage(): Promise<boolean> {
+      const pv = get().preview;
+      if (pv?.status !== "ready" || pv.data?.kind !== "image" || !pv.data.dataUrl) return false;
+      try {
+        await backend.copyImage(pv.path);
+        return true;
+      } catch (e) {
+        fail(e);
+        return false;
+      }
+    },
+    /**
+     * 미리보기에서 Mod+C: 이미지가 보이면 이미지로 복사하고, 아니면 선택한 글자를 복사한다(선택이 없으면 아무것도 하지 않는다).
+     * 이 키는 `useKeyboard`가 바인딩으로 해석하는 순간 `preventDefault`되므로, 브라우저가 하던 선택 글자 복사를 여기서 대신한다.
+     */
+    async previewCopy() {
+      const pv = get().preview;
+      if (pv?.status === "ready" && pv.data?.kind === "image" && pv.data.dataUrl) {
+        await api.previewCopyImage();
+        return;
+      }
+      const selected = window.getSelection?.()?.toString() ?? "";
+      if (!selected) return;
+      try {
+        await backend.copyText(selected);
+      } catch (e) {
+        fail(e);
+      }
+    },
     /** 폴더 경로 복사 (OP-15, F12). */
     async copyFolderPath() {
       const path = hereOf(activeTab(get()));

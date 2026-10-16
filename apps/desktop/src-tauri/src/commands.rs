@@ -1275,6 +1275,13 @@ pub fn get_clipboard_files(svc: State<'_, AppService>) -> ServiceResult<Vec<Stri
     svc.clipboard_files()
 }
 
+/// 경로의 이미지(압축 파일 안 포함)를 운영체제 클립보드에 이미지로 복사한다. 이미지가 아니면 클립보드를 건드리지 않고 오류를 돌려준다.
+#[tauri::command]
+#[specta::specta]
+pub fn copy_image_to_clipboard(svc: State<'_, AppService>, path: String) -> ServiceResult<()> {
+    svc.copy_image_to_clipboard(&path)
+}
+
 /// 복사/이동/휴지통/삭제를 작업 큐에 넣는다. 작업 id를 돌려준다.
 #[tauri::command]
 #[specta::specta]
@@ -1604,6 +1611,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             start_native_drag,
             set_clipboard_files,
             get_clipboard_files,
+            copy_image_to_clipboard,
             enqueue_job,
             enqueue_compress,
             enqueue_extract,

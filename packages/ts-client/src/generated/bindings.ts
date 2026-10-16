@@ -565,6 +565,17 @@ async getClipboardFiles() : Promise<Result<string[], string>> {
 }
 },
 /**
+ * 경로의 이미지(압축 파일 안 포함)를 운영체제 클립보드에 이미지로 복사한다. 이미지가 아니면 클립보드를 건드리지 않고 오류를 돌려준다.
+ */
+async copyImageToClipboard(path: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("copy_image_to_clipboard", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * 복사/이동/휴지통/삭제를 작업 큐에 넣는다. 작업 id를 돌려준다.
  */
 async enqueueJob(kind: JobKindDto, items: QueueItemDto[]) : Promise<number> {

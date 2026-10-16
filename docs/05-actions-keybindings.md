@@ -180,6 +180,7 @@ Shift+이동 키(범위의 선택 반전)는 액션이 아니라 `pane` 스코�
 | `core.preview.next_sheet` / `core.preview.prev_sheet` | 미리보기: 다음/이전 시트(epub은 챕터, HWP·HWPX는 쪽). epub 미리보기에서 챕터가, HWP 미리보기에서 쪽이 둘 이상일 때만 동작하고, 끝에서 처음으로 돌아간다. epub의 목차 선택 상자로 골라도 바뀐다 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | `Ctrl+Tab` / `Ctrl+Shift+Tab` | preview | 자체 ID |
 | `core.preview.delete` | 미리보기: 파일 삭제 (영구 삭제 확인을 거친다. 다음 파일로 넘어가고 남은 파일이 없으면 닫는다) | `Delete`, `Shift+F8` | `Delete`, `Shift+F8` | preview | 자체 ID |
 | `core.preview.save` | 미리보기: 편집 중인 내용을 파일에 저장한다(저장한 뒤에도 편집 상태 유지). 본문을 더블클릭해 편집을 시작한 뒤에만 동작한다 | `Mod+S` | `Mod+S` | preview | 자체 ID, 이슈 #38 |
+| `core.preview.copy` | 미리보기: 복사. 이미지가 보이면 그 이미지를 클립보드에 **이미지로** 복사하고, 그 밖에는 선택한 글자를 복사한다(선택이 없으면 아무것도 하지 않는다). 편집 상자 안에서는 상자가 받는다 | `Mod+C` | `Mod+C` | preview | 자체 ID, 이슈 #88 |
 | `core.find.open` | 파일 찾기(Double Commander "파일 찾기" 기본 탭, 하위 폴더 검색) | `Mod+F` | `Ctrl+F` | 자체 ID. 결과는 새 가상 탭. Quick Select는 이 키를 내주고 `Mod+Shift+F`로 옮겼다 |
 | `core.quickselect.start` | Quick Select 시작 | `Mod+Shift+F` | `Ctrl+Shift+F` | pane | 자체 ID. 문자 키를 치면 자동으로 시작되므로(`activate_on_any_character`) 이 키는 그 설정을 껐을 때 쓴다. 이전 기본 키 `Mod+F`는 파일 찾기가 가져갔다 |
 | `core.lookup.global` | Look Up (전역) | `Mod+P` | `Ctrl+P` | 자체 ID, 키 확인 |

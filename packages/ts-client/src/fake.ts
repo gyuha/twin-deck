@@ -456,6 +456,17 @@ export class FakeBackend implements Backend {
     this.clipboard.push(text);
   }
 
+  /** `copyImage`로 클립보드에 복사한 이미지 경로들(호출 순서). */
+  copiedImages: string[] = [];
+  /** 테스트용: 값이 있으면 `copyImage`가 이 문구로 거부된다(클립보드에 쓸 수 없는 상황을 흉내 낸다). */
+  copyImageError: string | null = null;
+
+  async copyImage(path: string) {
+    if (this.copyImageError) throw new Error(this.copyImageError);
+    this.need(path);
+    this.copiedImages.push(path);
+  }
+
   /** 창 밖으로 끌어 간 파일 목록들(`startNativeDrag` 호출 기록). */
   nativeDrags: string[][] = [];
 

@@ -156,6 +156,7 @@ export function paletteHandlers({ api }: AppStore): Partial<ActionHandlers> {
     "core.preview.forward": () => api.previewForward(),
     "core.preview.delete": () => api.previewDelete(),
     "core.preview.save": () => void api.previewEditSave(),
+    "core.preview.copy": () => void api.previewCopy(),
     "core.preview.page_up": () => scrollPreview(-1),
     "core.preview.page_down": () => scrollPreview(1),
     "core.preview.next_sheet": () => api.previewSheetStep(1),

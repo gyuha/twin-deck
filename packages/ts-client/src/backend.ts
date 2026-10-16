@@ -119,6 +119,8 @@ export interface Backend {
   startNativeDrag(paths: string[]): Promise<void>;
   /** 클립보드에 텍스트를 쓴다. */
   copyText(text: string): Promise<void>;
+  /** 경로의 이미지(압축 파일 안 포함)를 클립보드에 이미지로 복사한다. 이미지로 읽을 수 없으면 거부된다. */
+  copyImage(path: string): Promise<void>;
   /** 운영체제 파일 클립보드에 파일 경로 목록을 쓴다(Finder/탐색기에 붙여 넣을 수 있다). 빈 목록이면 비운다. */
   setClipboardFiles(paths: string[]): Promise<void>;
   /** 운영체제 파일 클립보드에 든 파일 경로(지금 있는 것만). 파일이 없으면 빈 목록. */

@@ -113,6 +113,8 @@ export function Preview() {
   // 텍스트 본문. 3D 뷰어가 모델을 읽지 못하면 텍스트 형식은 이것으로 돌아간다.
   // 텍스트 계열(텍스트·코드·마크다운·JSON)이 3D·Office 뷰어 없이 그려질 때만 복사 버튼을 보인다.
   const showCopy = fresh && d?.kind === "text" && !model && !office;
+  // 이미지가 실제로 보일 때만(너무 커서 표시하지 못한 이미지는 제외) 이미지 복사 버튼을 보인다.
+  const showCopyImage = fresh && d?.kind === "image" && !!d.dataUrl && !model && !office;
   const editing = !!edit && edit.path === p.path && d?.kind === "text" && !model && !office;
   const textBody = d?.kind === "text" ? (
     <>
@@ -161,16 +163,22 @@ export function Preview() {
               {edit.saved ? t("preview.saved") : edit.text !== edit.base ? t("preview.editing_dirty") : t("preview.editing")}
             </span>
           )}
-          {showCopy && (
+          {(showCopy || showCopyImage) && (
             <button
               type="button"
-              aria-label={t("preview.copy")}
-              title={d?.truncated ? t("preview.copy_truncated", { size: size(d.size) }) : t("preview.copy")}
+              aria-label={showCopyImage ? t("preview.copy_image") : t("preview.copy")}
+              title={showCopyImage ? t("preview.copy_image") : d?.truncated ? t("preview.copy_truncated", { size: size(d.size) }) : t("preview.copy")}
               onClick={() => {
-                void api.previewCopyText();
-                setCopied(true);
-                clearTimeout(copiedTimer.current);
-                copiedTimer.current = setTimeout(() => setCopied(false), 1500);
+                const done = () => {
+                  setCopied(true);
+                  clearTimeout(copiedTimer.current);
+                  copiedTimer.current = setTimeout(() => setCopied(false), 1500);
+                };
+                if (showCopyImage) void api.previewCopyImage().then((ok) => ok && done());
+                else {
+                  void api.previewCopyText();
+                  done();
+                }
               }}
               data-copied={copied ? "true" : undefined}
               className="mr-1 flex size-6 shrink-0 items-center justify-center rounded text-ink-dull hover:bg-app-selected hover:text-ink"

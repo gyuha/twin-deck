@@ -733,6 +733,25 @@ impl FileClipboard for SystemFileClipboard {
     }
 }
 
+/// 클립보드로 복사할 이미지의 최대 크기. 이보다 크면 메모리를 아끼려고 복사하지 않는다.
+const COPY_IMAGE_MAX_BYTES: u64 = 256 * 1024 * 1024;
+
+/// 운영체제 클립보드에 이미지 하나를 넣는 곳. 테스트는 실제 클립보드 대신 가짜를 주입한다.
+pub trait ImageClipboard: Send + Sync {
+    fn set_image(&self, image: clipboard_rs::RustImageData) -> ServiceResult<()>;
+}
+
+/// `clipboard-rs`로 운영체제 클립보드에 이미지를 쓰는 구현.
+pub struct SystemImageClipboard;
+
+impl ImageClipboard for SystemImageClipboard {
+    fn set_image(&self, image: clipboard_rs::RustImageData) -> ServiceResult<()> {
+        use clipboard_rs::Clipboard;
+        let ctx = clipboard_rs::ClipboardContext::new().map_err(|e| e.to_string())?;
+        ctx.set_image(image).map_err(|e| e.to_string())
+    }
+}
+
 /// 파일 맨 앞 4바이트가 `%PDF`인가. 열지 못하거나 짧으면 아니다.
 fn starts_with_pdf_header(path: &str) -> bool {
     use std::io::Read;
@@ -836,6 +855,7 @@ pub struct Service<T: Trasher> {
     next_search: AtomicU32,
     search_tx: Sender<SearchMsg>,
     file_clipboard: Box<dyn FileClipboard>,
+    image_clipboard: Box<dyn ImageClipboard>,
     /// 이미지·PDF·사운드 미리보기의 파일 크기 한도. 설정(`preview.*_max_mb`)을 따라 바뀐다.
     preview_limits: Mutex<td_vfs::PreviewLimits>,
     /// (시험) 디스크 PDF를 읽지 않고 파일 주소로 열게 한다(`preview.pdf_direct`).
@@ -949,6 +969,7 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
                 next_search: AtomicU32::new(0),
                 search_tx,
                 file_clipboard: Box::new(SystemFileClipboard),
+                image_clipboard: Box::new(SystemImageClipboard),
                 preview_limits: Mutex::new(td_vfs::PreviewLimits::default()),
                 pdf_direct: std::sync::atomic::AtomicBool::new(false),
                 icons: Mutex::new(HashMap::new()),
@@ -1250,6 +1271,39 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
     pub fn with_file_clipboard(mut self, clipboard: Box<dyn FileClipboard>) -> Self {
         self.file_clipboard = clipboard;
         self
+    }
+
+    /// 이미지 클립보드 구현을 바꾼다(테스트용).
+    #[cfg(test)]
+    pub fn with_image_clipboard(mut self, clipboard: Box<dyn ImageClipboard>) -> Self {
+        self.image_clipboard = clipboard;
+        self
+    }
+
+    /// 경로의 이미지를 운영체제 클립보드에 이미지로 쓴다(미리보기의 복사 버튼·Mod+C).
+    pub fn copy_image_to_clipboard(&self, path: &str) -> ServiceResult<()> {
+        use clipboard_rs::common::RustImage;
+        let p = vp(path);
+        let name = p.file_name().unwrap_or_default();
+        if name.to_lowercase().ends_with(".svg") {
+            return Err(format!("SVG는 이미지로 복사할 수 없습니다: {name}"));
+        }
+        // 미리보기와 같은 가상 파일시스템으로 읽으므로 압축 파일 안의 이미지도 복사된다.
+        let size = self.fs.stat(&p).map_err(|e| e.to_string())?.size;
+        if size > COPY_IMAGE_MAX_BYTES {
+            return Err(format!(
+                "이미지가 너무 커서 복사할 수 없습니다 ({} MB): {name}",
+                size / (1024 * 1024)
+            ));
+        }
+        let bytes = self
+            .fs
+            .read_head(&p, size as usize)
+            .map_err(|e| e.to_string())?;
+        // 이미지로 읽히지 않으면 클립보드를 건드리지 않고 돌려보낸다.
+        let image = clipboard_rs::RustImageData::from_bytes(&bytes)
+            .map_err(|_| format!("이미지로 읽을 수 없는 파일입니다: {name}"))?;
+        self.image_clipboard.set_image(image)
     }
 
     /// 경로 목록을 운영체제 파일 클립보드에 쓴다 (Mod+C/X). 빈 목록이면 비운다.
@@ -2799,6 +2853,111 @@ mod tests {
             svc.with_file_clipboard(Box::new(Arc::new(MemClipboard::default()))),
             root,
         )
+    }
+
+    /// 이미지 클립보드 가짜: 받은 이미지의 (너비, 높이)만 기록한다. 실제 운영체제 클립보드는 건드리지 않는다.
+    #[derive(Default)]
+    struct MemImageClipboard(Mutex<Vec<(u32, u32)>>);
+    impl ImageClipboard for Arc<MemImageClipboard> {
+        fn set_image(&self, image: clipboard_rs::RustImageData) -> ServiceResult<()> {
+            use clipboard_rs::common::RustImage;
+            self.0.lock().unwrap().push(image.get_size());
+            Ok(())
+        }
+    }
+
+    fn with_mem_image_clipboard() -> (
+        tempfile::TempDir,
+        Service<FakeTrash>,
+        Arc<MemImageClipboard>,
+        String,
+    ) {
+        let (t, svc, _ch, root) = setup();
+        let clip = Arc::new(MemImageClipboard::default());
+        (
+            t,
+            svc.with_image_clipboard(Box::new(clip.clone())),
+            clip,
+            root,
+        )
+    }
+
+    /// 3x2 PNG(85바이트)와 16x8 JPEG(883바이트). `sips`로 크기를 확인한 고정 파일이다.
+    const PNG_3X2_B64: &str = "iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAIAAAASFvFNAAAAHElEQVR4nGNgYGjQYGgIYGhgYIhq0IhqCIhqAAAoygT/AGlsywAAAABJRU5ErkJggg==";
+    const JPEG_16X8_B64: &str = "/9j/4AAQSkZJRgABAQAASABIAAD/4QBMRXhpZgAATU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAEKADAAQAAAABAAAACAAAAAD/7QA4UGhvdG9zaG9wIDMuMAA4QklNBAQAAAAAAAA4QklNBCUAAAAAABDUHYzZjwCyBOmACZjs+EJ+/8AAEQgACAAQAwEiAAIRAQMRAf/EAB8AAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMBAQEBAQEBAQEAAAAAAAABAgMEBQYHCAkKC//EALURAAIBAgQEAwQHBQQEAAECdwABAgMRBAUhMQYSQVEHYXETIjKBCBRCkaGxwQkjM1LwFWJy0QoWJDThJfEXGBkaJicoKSo1Njc4OTpDREVGR0hJSlNUVVZXWFlaY2RlZmdoaWpzdHV2d3h5eoKDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uLj5OXm5+jp6vLz9PX29/j5+v/bAEMAAgICAgICAwICAwUDAwMFBgUFBQUGCAYGBgYGCAoICAgICAgKCgoKCgoKCgwMDAwMDA4ODg4ODw8PDw8PDw8PD//bAEMBAgICBAQEBwQEBxALCQsQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEP/dAAQAAf/aAAwDAQACEQMRAD8A8Q8D+GvC3/CG6t/oWg/8eFz/AMwPWP8Ank3+1Rqfhrwt/wAIbpf+haD/AMf8X/MD1n/nlL/tV6D4H/5E3V/+vC5/9FNSap/yJul/9f8AF/6Klr9Mq4er9an+/n8fddn5H0uAwtf+wsP/ALTP/d31X88f7p//2Q==";
+
+    fn write_b64(path: &str, b64: &str) {
+        use base64::Engine;
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(b64)
+            .unwrap();
+        std::fs::write(path, bytes).unwrap();
+    }
+
+    #[test]
+    fn copy_image_png_gives_the_clipboard_the_original_size() {
+        let (_t, svc, clip, root) = with_mem_image_clipboard();
+        let path = format!("{root}/a.png");
+        write_b64(&path, PNG_3X2_B64);
+        svc.copy_image_to_clipboard(&path).unwrap();
+        assert_eq!(*clip.0.lock().unwrap(), vec![(3, 2)]);
+    }
+
+    #[test]
+    fn copy_image_jpeg_gives_the_clipboard_the_original_size() {
+        let (_t, svc, clip, root) = with_mem_image_clipboard();
+        let path = format!("{root}/한글 사진.jpg");
+        write_b64(&path, JPEG_16X8_B64);
+        svc.copy_image_to_clipboard(&path).unwrap();
+        assert_eq!(*clip.0.lock().unwrap(), vec![(16, 8)]);
+    }
+
+    #[test]
+    fn copy_image_rejects_non_images_without_touching_the_clipboard() {
+        let (_t, svc, clip, root) = with_mem_image_clipboard();
+        let text = format!("{root}/note.png"); // 이름만 이미지다
+        std::fs::write(&text, "hello").unwrap();
+        let broken = format!("{root}/broken.png");
+        write_b64(&broken, PNG_3X2_B64);
+        let bytes = std::fs::read(&broken).unwrap();
+        std::fs::write(&broken, &bytes[..bytes.len() / 2]).unwrap(); // 잘린 PNG
+        for path in [text, broken, format!("{root}/missing.png")] {
+            assert!(svc.copy_image_to_clipboard(&path).is_err(), "{path}");
+        }
+        assert!(
+            clip.0.lock().unwrap().is_empty(),
+            "실패하면 클립보드를 건드리지 않는다"
+        );
+    }
+
+    #[test]
+    fn copy_image_svg_is_a_clear_error_not_an_empty_image() {
+        let (_t, svc, clip, root) = with_mem_image_clipboard();
+        let path = format!("{root}/logo.svg");
+        std::fs::write(
+            &path,
+            r#"<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"/>"#,
+        )
+        .unwrap();
+        assert!(svc.copy_image_to_clipboard(&path).is_err());
+        assert!(clip.0.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn copy_image_inside_an_archive_uses_the_same_read_path_as_the_preview() {
+        let (_t, svc, clip, root) = with_mem_image_clipboard();
+        let png = format!("{root}/inner.png");
+        write_b64(&png, PNG_3X2_B64);
+        let zip = format!("{root}/pack.zip");
+        td_archive::compress(
+            &[std::path::PathBuf::from(&png)],
+            std::path::Path::new(&zip),
+            &mut |_| true,
+        )
+        .unwrap();
+        svc.copy_image_to_clipboard(&format!("{zip}!/inner.png"))
+            .unwrap();
+        assert_eq!(*clip.0.lock().unwrap(), vec![(3, 2)]);
     }
 
     #[test]
