@@ -51,6 +51,7 @@ import type {
 } from "@twin-deck/ts-client";
 import type { ActionContext } from "@twin-deck/actions";
 import type { Scope } from "@twin-deck/keybinds";
+import { appendQuick, backspaceQuick } from "../lib/hangulInput";
 import { quickMatch } from "../lib/names";
 import { parseColumns } from "../lib/columns";
 import { neighborTile, OTHER } from "../lib/treemap";
@@ -1913,7 +1914,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       patchActive((t) => {
         // 아무 문자로나 시작하지 않는 설정이면 `core.quickselect.start`로만 시작한다.
         if (t.quick === null && !q.activate_on_any_character) return {};
-        const text = (t.quick ?? "") + char;
+        const text = appendQuick(t.quick ?? "", char);
         return { quick: text, ...quickCursor(t, text, q.match_only_prefix) };
       });
     },
@@ -1923,7 +1924,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     quickBackspace() {
       const prefix = cfg().behavior.quick_select.match_only_prefix;
       patchActive((t) => {
-        const text = (t.quick ?? "").slice(0, -1);
+        const text = backspaceQuick(t.quick ?? "");
         return { quick: text, ...quickCursor(t, text, prefix) };
       });
     },
