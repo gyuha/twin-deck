@@ -38,6 +38,7 @@
 | [0017](0017-td-command-is-the-app-executable.md) | `td` 명령은 앱 실행 파일 자체이고, Windows 설치 훅은 앱을 한 번 실행해 설치한다 | Accepted |
 | [0018](0018-smb-via-os-mount.md) | SMB 연결은 OS 마운트로 하고, 자체 원격 파일시스템은 만들지 않는다 | Accepted |
 | [0019](0019-remote-fs-in-process.md) | SFTP·FTP는 앱 안의 원격 클라이언트를 `Vfs`로 감싸 패널에 통합한다 | Accepted |
+| [0021](0021-twin-deck-remote-server.md) | Twin Deck Remote: 앱 안의 SSH/SFTP 서버와 원격 셸 | Accepted |
 | [0020](0020-office-preview-via-office-oxide.md) | Office 문서 미리보기는 office_oxide로 글자·표를 뽑아 Markdown으로 보여 준다 | Accepted |
 
 Accepted는 2026-09-29에 사용자가 설계안을 승인한 결정이다. 세부 사항(버전, 라이브러리 선택)은 각 문서의 "미확인 과제"에 남아 있다.
