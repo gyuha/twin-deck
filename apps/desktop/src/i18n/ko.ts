@@ -263,6 +263,7 @@ export const ko = {
   "terminal.failed": "터미널을 그리지 못했습니다: {error}",
   "terminal.notice.virtual": "검색 결과 같은 가상 탭에서는 터미널을 열 수 없습니다",
   "terminal.notice.archive": "압축 파일 안에서는 터미널을 열 수 없습니다",
+  "terminal.notice.ftp": "FTP 연결에는 셸이 없어 터미널을 열 수 없습니다",
   "store.extract.select": "압축 파일(아카이브)을 선택하세요",
   "store.extract.nested": "아카이브 안의 아카이브는 먼저 밖으로 꺼낸 뒤 추출하세요",
   "store.extract.into_archive": "아카이브 안에는 추출할 수 없습니다",

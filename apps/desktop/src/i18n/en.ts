@@ -265,6 +265,7 @@ export const en: Record<Key, string> = {
   "terminal.failed": "Could not draw the terminal: {error}",
   "terminal.notice.virtual": "A terminal cannot be opened in a virtual tab such as search results",
   "terminal.notice.archive": "A terminal cannot be opened inside an archive",
+  "terminal.notice.ftp": "An FTP connection has no shell, so a terminal cannot be opened",
   "store.extract.select": "Select an archive",
   "store.extract.nested": "Take a nested archive out first, then extract it",
   "store.extract.into_archive": "Cannot extract into an archive",

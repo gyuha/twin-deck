@@ -685,6 +685,18 @@ async terminalOpen(cwd: string, cols: number, rows: number) : Promise<Result<num
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * 연결 `connection_id`(SFTP)의 서버에 원격 셸을 연다. 돌려주는 세션 번호는 `terminal_write/resize/close`와 `terminal` 이벤트가 로컬 터미널처럼 쓴다.
+ * 접속은 블로킹이라 UI 스레드를 막지 않게 따로 돌린다.
+ */
+async terminalOpenRemote(connectionId: string, cols: number, rows: number) : Promise<Result<number, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("terminal_open_remote", { connectionId, cols, rows }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async terminalWrite(id: number, data: string) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("terminal_write", { id, data }) };

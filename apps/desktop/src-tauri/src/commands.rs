@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
-use tauri::State;
+use tauri::{Manager, State};
 use tauri_specta::{collect_commands, collect_events, Builder, Event};
 use td_config::Loaded;
 use td_launch::{Launch, SystemLauncher};
@@ -698,17 +698,15 @@ fn remote_target(config: &ConfigState, index: u32) -> ServiceResult<td_remote::R
 #[tauri::command]
 #[specta::specta]
 pub async fn remote_connect(
-    svc: State<'_, AppService>,
+    app: tauri::AppHandle,
     config: State<'_, ConfigState>,
     index: u32,
     password: Option<String>,
     remember: bool,
 ) -> ServiceResult<RemoteConnectDto> {
     let target = remote_target(&config, index)?;
-    let registry = svc.remote_registry();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        crate::service::connect_remote(
-            &registry,
+        app.state::<AppService>().connect_remote(
             &target,
             password,
             remember,
@@ -730,7 +728,7 @@ pub fn remote_disconnect(
     index: u32,
 ) -> ServiceResult<()> {
     let target = remote_target(&config, index)?;
-    svc.remote_registry().remove(&target.id());
+    svc.disconnect_remote(&target.id());
     Ok(())
 }
 
@@ -1373,6 +1371,24 @@ pub fn terminal_open(
     svc.terminal_open(&shell, &cwd, cols, rows)
 }
 
+/// 연결 `connection_id`(SFTP)의 서버에 원격 셸을 연다. 돌려주는 세션 번호는 `terminal_write/resize/close`와 `terminal` 이벤트가 로컬 터미널처럼 쓴다.
+/// 접속은 블로킹이라 UI 스레드를 막지 않게 따로 돌린다.
+#[tauri::command]
+#[specta::specta]
+pub async fn terminal_open_remote(
+    app: tauri::AppHandle,
+    connection_id: String,
+    cols: u32,
+    rows: u32,
+) -> ServiceResult<u32> {
+    tauri::async_runtime::spawn_blocking(move || {
+        app.state::<AppService>()
+            .remote_terminal_open(&connection_id, cols, rows)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn terminal_write(svc: State<'_, AppService>, id: u32, data: String) -> ServiceResult<()> {
@@ -1534,6 +1550,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             cli_install,
             cli_uninstall,
             terminal_open,
+            terminal_open_remote,
             terminal_write,
             terminal_resize,
             terminal_close,

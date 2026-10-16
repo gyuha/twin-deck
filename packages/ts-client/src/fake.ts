@@ -1425,7 +1425,7 @@ export class FakeBackend implements Backend {
   }
 
   /** 열린 터미널 세션: 세션 번호 → 연 위치. */
-  terminals = new Map<number, { cwd: string; cols: number; rows: number }>();
+  terminals = new Map<number, { cwd: string; cols: number; rows: number; remote?: string }>();
   /** `terminalWrite`로 쓴 입력 기록. */
   terminalWrites: { id: number; data: string }[] = [];
   private nextTerminal = 1;
@@ -1493,9 +1493,21 @@ export class FakeBackend implements Backend {
     return id;
   }
 
+  /** 가짜 원격 셸: 입력을 그대로 되돌려 준다(에코). 열려 있는 SFTP 연결(`sftp://<id>/..`)만 연다. */
+  async terminalOpenRemote(connectionId: string, cols: number, rows: number) {
+    if (!this.remoteOpen.has(connectionId)) throw new Error(`원격 연결 '${connectionId}'이(가) 열려 있지 않습니다`);
+    const server = (this.loaded.config.remote.servers ?? []).find((s) => FakeBackend.remoteId(s) === connectionId);
+    if (server?.protocol === "ftp") throw new Error("원격 셸은 SFTP 연결에서만 열 수 있습니다");
+    const id = this.nextTerminal++;
+    this.terminals.set(id, { cwd: "", cols, rows, remote: connectionId });
+    return id;
+  }
+
   async terminalWrite(id: number, data: string) {
-    if (!this.terminals.has(id)) throw new Error(`터미널 세션 ${id}번이 없습니다`);
+    const t = this.terminals.get(id);
+    if (!t) throw new Error(`터미널 세션 ${id}번이 없습니다`);
     this.terminalWrites.push({ id, data });
+    if (t.remote) this.emitTerminalOutput(id, data); // 원격 셸 흉내: 입력을 되돌려 준다
   }
 
   async terminalResize(id: number, cols: number, rows: number) {
