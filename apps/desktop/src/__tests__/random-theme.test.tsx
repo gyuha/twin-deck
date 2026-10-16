@@ -46,6 +46,14 @@ describe("랜덤 테마 (이슈 #33)", () => {
     await waitFor(() => expect(applied()).toBe("catppuccin-mocha"));
   });
 
+  it("랜덤 테마 목록은 제목 아래 전체 폭을 쓴다(좁은 오른쪽 칸에 두어 왼쪽이 비지 않게)", async () => {
+    const { user } = await renderApp(seed(false, ""));
+    await open(user);
+    await screen.findByRole("dialog", { name: "설정" });
+    expect(screen.getByRole("group", { name: "랜덤 테마 목록" }).className).toContain("flex-col");
+    expect(screen.getByRole("group", { name: "테마" }).className).not.toContain("flex-col"); // 다른 줄은 그대로 한 줄
+  });
+
   it("설정에서 켜면 테마 상자가 비활성이 되고, 태그를 입력·삭제하면 저장된다", async () => {
     const { user, backend } = await renderApp(seed(false, ""));
     await open(user);

@@ -230,7 +230,7 @@ describe("기본값으로", () => {
     expect(within(row).getByRole("spinbutton")).toHaveValue(16);
   });
 
-  it("글자 없는 아이콘 버튼이고, 마우스를 올리면 뜨는 말풍선이 \"기본값으로\"를 알려 준다", async () => {
+  it("되돌리기 아이콘 버튼이고, 마우스를 올리면 뜨는 말풍선이 \"기본값으로\"를 알려 준다", async () => {
     const backend = seedBackend();
     backend.setConfig((l) => (l.config.behavior.table.icon_size = 20));
     const { user } = await renderApp(backend);
@@ -239,7 +239,7 @@ describe("기본값으로", () => {
     await listTab(user);
     const row = screen.getByRole("group", { name: "아이콘 크기" });
     const btn = within(row).getByRole("button", { name: "기본값으로" });
-    expect(btn.textContent).toBe(""); // 글자가 없다(빗자루 아이콘만)
+    expect(btn.textContent).toBe(""); // 글자가 없다(되돌리기 아이콘만)
     expect(btn.querySelector("svg")).not.toBeNull();
     expect(within(row).getAllByRole("tooltip").map((t) => t.textContent)).toContain("기본값으로");
   });
@@ -258,6 +258,32 @@ describe("기본값으로", () => {
     await act(async () => void (await backend.setConfigValue("behavior.table.icon_size", { kind: "int", value: 20 })));
     await within(row).findByRole("button", { name: "기본값으로" });
     expect(slot()!.className).toBe(before); // 같은 자리·같은 크기
+  });
+
+  it("폴더 단축키의 경로 입력은 줄의 남는 폭을 모두 쓴다(제목과 입력 사이가 비지 않게)", async () => {
+    const { user } = await renderApp();
+    await open(user);
+    await dialog();
+    await user.click(screen.getByRole("tab", { name: "폴더 단축키" }));
+    const input = within(screen.getByRole("group", { name: "Ctrl+1" })).getByRole("textbox");
+    expect(input.closest("div.flex-1")).not.toBeNull();
+    expect(screen.getByRole("group", { name: "Ctrl+1" }).firstElementChild!.className).toContain("w-12"); // 제목 칸은 키 이름만큼
+  });
+
+  it("F키 줄은 두 줄이다: 첫 줄은 제목·되돌리기·액션바 스위치, 둘째 줄은 동작 상자(와 앱 경로 입력)", async () => {
+    const backend = seedBackend();
+    backend.setConfig((l) => (l.config.fkeys.F9 = "core.app.open_folder"));
+    const { user } = await renderApp(backend);
+    await open(user);
+    await dialog();
+    await user.click(screen.getByRole("tab", { name: "F키" }));
+    const row = screen.getByRole("group", { name: "F1" });
+    expect(row.className).toContain("grid");
+    const second = within(row).getByRole("combobox", { name: /F1/ }).parentElement!;
+    expect(second.className).toContain("row-start-2"); // 동작 상자는 둘째 줄
+    expect(second.contains(within(row).getByRole("switch"))).toBe(false); // 스위치는 첫 줄
+    const app = within(screen.getByRole("group", { name: "F9" })).getByRole("textbox");
+    expect(app.closest("div.row-start-2")).not.toBeNull(); // 앱 경로 입력은 같은 둘째 줄
   });
 
   it("기본값과 같으면 버튼이 없다", async () => {

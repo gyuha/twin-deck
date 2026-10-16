@@ -61,7 +61,7 @@ function InfoTip({ text }: { text: string }) {
 }
 
 /**
- * 값이 기본값과 다를 때 나타나는 빗자루 아이콘 버튼("기본값으로"). 마우스를 올리거나 포커스하면 설명 말풍선이 뜬다.
+ * 값이 기본값과 다를 때 나타나는 되돌리기(반시계 화살표) 아이콘 버튼("기본값으로"). 마우스를 올리거나 포커스하면 설명 말풍선이 뜬다.
  * 버튼은 값이 기본값이면 없어지지만 자리(고정 크기)는 늘 남겨, 값을 바꿀 때 줄의 배치가 움직이지 않는다.
  */
 function ResetSlot({ label, show, onClick }: { label: string; show: boolean; onClick: () => void }) {
@@ -75,10 +75,9 @@ function ResetSlot({ label, show, onClick }: { label: string; show: boolean; onC
             onClick={onClick}
             className="flex size-6 items-center justify-center rounded text-ink-dull outline-none hover:bg-app-selected hover:text-ink focus:bg-app-selected"
           >
-            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M13 2.5 8.2 8.3" />
-              <path d="M8.6 7.9c-1.9-.9-3.9.2-4.6 2.3l-.6 2.3c-.1.4.3.8.7.6l2.3-.5c2.2-.5 3.3-2.5 2.4-4.4z" />
-              <path d="M4.6 10.4 6 12" />
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+              <path d="M3 3v5h5" />
             </svg>
           </button>
           <span role="tooltip" className="pointer-events-none absolute left-0 top-full z-30 mt-1 whitespace-nowrap rounded border border-app-line bg-app-box px-2 py-1 text-xs font-normal text-ink opacity-0 shadow-lg group-hover:opacity-100 group-focus-within:opacity-100">
@@ -263,7 +262,7 @@ function EditableControl({ item, value, disabled, onCommit }: { item: Item; valu
     if (draft !== String(value) && draft.trim() !== "") onCommit(draft);
     else setDraft(String(value));
   };
-  return (
+  const input = (
     <Input
       aria-label={item.title}
       type={item.control.type === "int" ? "number" : "text"}
@@ -278,6 +277,8 @@ function EditableControl({ item, value, disabled, onCommit }: { item: Item; valu
       }}
     />
   );
+  // 글자 입력은 줄에서 남는 폭을 모두 쓴다(입력 컴포넌트가 내용 폭으로 줄어들지 않게 감싼다). 숫자 입력은 고정 폭이다.
+  return item.control.type === "text" ? <div className="min-w-0 flex-1">{input}</div> : input;
 }
 
 /**
@@ -356,8 +357,10 @@ function FKeyControl({ name, value, disabled }: { name: string; value: string; d
     .sort((a, b) => a.label.localeCompare(b.label, currentLanguage()));
   const choose = (v: string) => (v === "default" ? api.resetConfigValue(`fkeys.${name}`) : api.setConfigValue(`fkeys.${name}`, { kind: "str", value: v }));
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-2">
+    // F키 줄의 둘째 줄: 동작 상자와 (앱 실행 동작이면) 앱 경로 입력이 나란히 남는 폭을 반씩 쓴다. 첫 줄은 제목·되돌리기·액션바 스위치다.
+    <div className="col-span-full row-start-2 flex min-w-0 items-center gap-2">
       <Combobox
+        className="min-w-0 flex-1 basis-0"
         label={t("settings.fkey.action", { name })}
         value={value === "" ? "default" : value}
         disabled={disabled}
@@ -1079,15 +1082,17 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
               const value = (extensionColumn ? config.view.table.columns.some((s) => parseColumn(s)?.name === "extension") : valueAt(config, item.key) ?? (item.control.type === "fkey" ? "" : undefined)) as string | number | boolean;
               const isDefault = extensionColumn ? !value : value === (valueAt(defaults, item.key) ?? (item.control.type === "fkey" ? "" : undefined));
               const wide = item.control.type === "text" || item.control.type === "fkey" || item.control.type === "tags" || item.control.type === "hotkey";
+              // 태그 목록은 칩이 여러 줄로 쌓이는 넓은 입력이라, 제목 오른쪽 좁은 칸에 두면 왼쪽이 크게 빈다. 제목 아래 전체 폭을 쓴다.
+              const stacked = item.control.type === "tags";
               return (
-                <div key={item.key} role="group" aria-label={item.title} className="flex items-center justify-between gap-4 border-b border-app-line py-2.5">
-                  <div className={wide ? "w-48 shrink-0" : "min-w-0"}>
+                <div key={item.key} role="group" aria-label={item.title} className={"border-b border-app-line py-2.5 " + (stacked ? "flex flex-col items-stretch gap-2" : item.control.type === "fkey" ? "grid grid-cols-[1fr_auto_auto] items-center gap-x-3 gap-y-2" : "flex items-center justify-between gap-4")}>
+                  <div className={stacked || item.control.type === "fkey" ? "min-w-0" : item.key.startsWith("shortcuts.") ? "w-12 shrink-0" : wide ? "w-48 shrink-0" : "min-w-0"}>
                     <div className="flex items-center gap-1.5 text-sm">
                       {item.title}
                       {item.desc && <InfoTip text={item.desc} />}
                     </div>
                   </div>
-                  <div className={"flex items-center gap-3 " + (wide ? "min-w-0 flex-1 justify-end" : "shrink-0")}>
+                  <div className={item.control.type === "fkey" ? "contents" : "flex items-center gap-3 " + (stacked ? "w-full min-w-0" : wide ? "min-w-0 flex-1 justify-end" : "shrink-0")}>
                     {!broken && !combo && (
                       <ResetSlot
                         label={t("settings.reset")}
