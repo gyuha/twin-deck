@@ -384,7 +384,7 @@ export const ko = {
   "settings.extension_column.title": "확장자 컬럼 표시",
   "settings.extension_column.desc": "이름 컬럼 뒤에 확장자 컬럼을 따로 표시합니다. 파일은 이름에서 확장자를 빼 확장자 컬럼에 보여 주고, 폴더는 이름을 그대로 두고 확장자 칸을 비웁니다. 헤더를 클릭하면 확장자 오름차순·내림차순으로 정렬됩니다",
   "settings.item.behavior.table.keep_extension.title": "확장자 유지",
-  "settings.item.behavior.table.keep_extension.desc": "확장자 컬럼 표시를 켰을 때 적용됩니다. 켜면 파일 이름에 확장자를 그대로 두고 확장자 칸은 비웁니다(헤더를 눌러 확장자로 정렬하는 것은 됩니다). 꺼 두면 확장자를 이름에서 빼 확장자 컬럼에 보여 줍니다",
+  "settings.item.behavior.table.keep_extension.desc": "확장자 컬럼 표시를 켰을 때만 켜고 끌 수 있습니다(컬럼이 없으면 원래대로 이름에 확장자가 보입니다). 켜면 파일 이름에 확장자를 그대로 두고 확장자 칸은 비웁니다(헤더를 눌러 확장자로 정렬하는 것은 됩니다). 꺼 두면 확장자를 이름에서 빼 확장자 컬럼에 보여 줍니다",
   "settings.item.behavior.table.column_lines.title": "컬럼 세로선",
   "settings.item.behavior.table.column_lines.desc": "컬럼 사이에 세로선을 그립니다: none(없음), solid(실선), dash(점선). 헤더와 모든 행에 적용됩니다",
   "settings.item.behavior.table.folder_style.title": "폴더 모양",

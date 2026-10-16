@@ -1272,6 +1272,8 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
               const combo = item.key.startsWith("fkeys.") && item.title.includes("+") && item.title in config.fkeys;
               // 설정 파일에 없는 내장 조합키는 값이 없다 → 기본값("")으로 본다.
               const extensionColumn = item.control.type === "extension-column";
+              // `확장자 유지`는 확장자 컬럼이 보일 때만 켜고 끌 수 있다(컬럼이 없으면 원래 확장자가 이름에 보인다, 이슈 #86).
+              const keepExtensionOff = item.key === "behavior.table.keep_extension" && !config.view.table.columns.some((c) => parseColumn(c)?.name === "extension");
               const value = (extensionColumn ? config.view.table.columns.some((s) => parseColumn(s)?.name === "extension") : valueAt(config, item.key) ?? (item.control.type === "fkey" ? "" : undefined)) as string | number | boolean;
               const isDefault = extensionColumn ? !value : value === (valueAt(defaults, item.key) ?? (item.control.type === "fkey" ? "" : undefined));
               const wide = item.control.type === "text" || item.control.type === "fkey" || item.control.type === "tags" || item.control.type === "hotkey";
@@ -1329,7 +1331,7 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
                       <Switch
                         aria-label={item.title}
                         checked={value as boolean}
-                        disabled={!!broken}
+                        disabled={!!broken || keepExtensionOff}
                         onCheckedChange={(v) => void api.setConfigValue(item.key, extensionColumn ? { kind: "strList", value: withExtensionColumn(config.view.table.columns, v) } : { kind: "bool", value: v })}
                       />
                     )}

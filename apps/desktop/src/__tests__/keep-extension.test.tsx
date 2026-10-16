@@ -63,9 +63,25 @@ describe("확장자 유지 옵션 (이슈 #86)", () => {
     const keep = within(d).getByRole("group", { name: "확장자 유지" });
     expect(keep.previousElementSibling).toBe(within(d).getByRole("group", { name: "확장자 컬럼 표시" }));
     const sw = within(keep).getByRole("switch", { name: "확장자 유지" });
+    expect(sw).toBeEnabled();
     expect(sw).toHaveAttribute("aria-checked", "false");
     await user.click(sw);
     await waitFor(async () => expect((await backend.getConfig()).config.behavior.table.keep_extension).toBe(true));
+  });
+
+  it("확장자 컬럼이 꺼져 있으면 확장자 유지 스위치는 비활성이고 눌러도 저장되지 않는다", async () => {
+    const backend = seed(false, false);
+    const { user } = await renderApp(backend);
+    await open(user);
+    const d = await screen.findByRole("dialog", { name: "설정" });
+    await user.click(within(d).getByRole("tab", { name: "목록과 선택" }));
+    const sw = within(within(d).getByRole("group", { name: "확장자 유지" })).getByRole("switch", { name: "확장자 유지" });
+    expect(sw).toBeDisabled();
+    await user.click(sw);
+    expect((await backend.getConfig()).config.behavior.table.keep_extension).toBe(false);
+    // 확장자 컬럼을 켜면 활성이 된다.
+    await user.click(within(d).getByRole("switch", { name: "확장자 컬럼 표시" }));
+    await waitFor(() => expect(within(within(d).getByRole("group", { name: "확장자 유지" })).getByRole("switch", { name: "확장자 유지" })).toBeEnabled());
   });
 
   it("영어에서는 Keep extension이다", async () => {
