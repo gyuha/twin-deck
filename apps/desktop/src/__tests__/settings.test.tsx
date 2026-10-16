@@ -87,6 +87,16 @@ describe("환경 섹션: 터미널 셸은 Windows에서만 보인다", () => {
 });
 
 describe("설정 값 바꾸기", () => {
+  it("확장자 컬럼 설명은 실제 동작과 같다: 이름에서 확장자를 빼 별도 컬럼에 보이고 폴더 칸은 빈다 (이슈 #85)", async () => {
+    const { user } = await renderApp();
+    await open(user);
+    await dialog();
+    await listTab(user);
+    const tip = within(screen.getByRole("group", { name: "확장자 컬럼 표시" })).getAllByRole("tooltip")[0].textContent!;
+    expect(tip).toContain("이름에서 확장자를 빼 확장자 컬럼에 보여 주고");
+    expect(tip).not.toContain("확장자를 포함해 그대로 보이고");
+  });
+
   it("확장자 컬럼 설정은 다시 로드해도 유지되고 해제·기본값 복원은 다른 컬럼을 보존한다", async () => {
     const backend = seedBackend();
     const original = ["<name:220", "size:90", "modified:130", "permissions"];
