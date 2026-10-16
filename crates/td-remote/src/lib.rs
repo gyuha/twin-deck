@@ -5,7 +5,9 @@ mod connect;
 mod error;
 mod ftp;
 mod secret;
+pub mod server;
 mod sftp;
+mod shell;
 #[cfg(feature = "testing")]
 pub mod testing;
 
@@ -17,6 +19,7 @@ pub use error::{RemoteError, Result};
 pub use ftp::{FtpConfig, FtpSession};
 pub use secret::{secret_key, KeyringStore, SecretStore, SECRET_SERVICE};
 pub use sftp::{SftpConfig, SftpSession};
+pub use shell::{ShellEvent, ShellSession};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RemoteKind {

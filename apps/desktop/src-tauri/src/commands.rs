@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
-use tauri::State;
+use tauri::{Manager, State};
 use tauri_specta::{collect_commands, collect_events, Builder, Event};
 use td_config::Loaded;
 use td_launch::{Launch, SystemLauncher};
@@ -12,8 +12,8 @@ use td_volumes::{SystemUnmounter, Volumes};
 
 use crate::service::{
     edit, open_file, open_releases, reveal, reveal_config, ConflictDto, EntryDto, ExpectedFileDto,
-    FileInfoDto, FindSpecDto, JobDto, JobKindDto, PreviewDto, QueueItemDto, SearchStartDto,
-    SearchSummaryDto, Service, ServiceResult, WriteTextResultDto,
+    FileInfoDto, FindSpecDto, JobDto, JobKindDto, PreviewDto, QueueItemDto, RemoteServerStatus,
+    SearchStartDto, SearchSummaryDto, Service, ServiceResult, WriteTextResultDto,
 };
 
 pub type AppService = Service<SystemTrash>;
@@ -698,17 +698,15 @@ fn remote_target(config: &ConfigState, index: u32) -> ServiceResult<td_remote::R
 #[tauri::command]
 #[specta::specta]
 pub async fn remote_connect(
-    svc: State<'_, AppService>,
+    app: tauri::AppHandle,
     config: State<'_, ConfigState>,
     index: u32,
     password: Option<String>,
     remember: bool,
 ) -> ServiceResult<RemoteConnectDto> {
     let target = remote_target(&config, index)?;
-    let registry = svc.remote_registry();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        crate::service::connect_remote(
-            &registry,
+        app.state::<AppService>().connect_remote(
             &target,
             password,
             remember,
@@ -730,7 +728,7 @@ pub fn remote_disconnect(
     index: u32,
 ) -> ServiceResult<()> {
     let target = remote_target(&config, index)?;
-    svc.remote_registry().remove(&target.id());
+    svc.disconnect_remote(&target.id());
     Ok(())
 }
 
@@ -753,6 +751,51 @@ pub fn remote_forget_password(config: State<'_, ConfigState>, index: u32) -> Ser
     td_remote::KeyringStore
         .delete(&td_remote::secret_key(&target))
         .map_err(|e| e.to_string())
+}
+
+/// 내장 서버의 호스트키 파일 경로(앱 데이터 폴더, `state.json` 옆).
+pub fn remote_server_host_key_path(config: &ConfigState) -> ServiceResult<std::path::PathBuf> {
+    Ok(state_dir(config)?.join(crate::service::REMOTE_SERVER_HOST_KEY_FILE))
+}
+
+/// 내장 서버(Twin Deck Remote)를 현재 설정(`remote_server.*`)으로 켠다. `enabled` 값과 무관하게 켠다(그 키는 시작 때만 본다).
+/// 비밀번호가 없거나 루트가 비었으면 사람이 읽을 사유와 함께 거부한다.
+#[tauri::command]
+#[specta::specta]
+pub fn remote_server_start(
+    svc: State<'_, AppService>,
+    config: State<'_, ConfigState>,
+) -> ServiceResult<RemoteServerStatus> {
+    let cfg = config.current().config.remote_server;
+    svc.remote_server_start(
+        &cfg,
+        &remote_server_host_key_path(&config)?,
+        &td_remote::KeyringStore,
+    )
+}
+
+/// 내장 서버를 끈다. 꺼져 있어도 성공이다.
+#[tauri::command]
+#[specta::specta]
+pub fn remote_server_stop(svc: State<'_, AppService>) -> RemoteServerStatus {
+    svc.remote_server_stop(&td_remote::KeyringStore)
+}
+
+/// 내장 서버의 상태. 비밀번호 값은 돌려주지 않고 설정 여부(`hasPassword`)만 준다.
+#[tauri::command]
+#[specta::specta]
+pub fn remote_server_status(svc: State<'_, AppService>) -> RemoteServerStatus {
+    svc.remote_server_status(&td_remote::KeyringStore)
+}
+
+/// 내장 서버의 비밀번호를 OS 키체인에 저장한다(빈 문자열이면 지운다). 설정 파일에는 쓰지 않는다.
+#[tauri::command]
+#[specta::specta]
+pub fn set_remote_server_password(
+    svc: State<'_, AppService>,
+    password: String,
+) -> ServiceResult<RemoteServerStatus> {
+    svc.set_remote_server_password(&password, &td_remote::KeyringStore)
 }
 
 /// 설정 화면: 설정 폴더를 파일 관리자로 연다.
@@ -1328,6 +1371,24 @@ pub fn terminal_open(
     svc.terminal_open(&shell, &cwd, cols, rows)
 }
 
+/// 연결 `connection_id`(SFTP)의 서버에 원격 셸을 연다. 돌려주는 세션 번호는 `terminal_write/resize/close`와 `terminal` 이벤트가 로컬 터미널처럼 쓴다.
+/// 접속은 블로킹이라 UI 스레드를 막지 않게 따로 돌린다.
+#[tauri::command]
+#[specta::specta]
+pub async fn terminal_open_remote(
+    app: tauri::AppHandle,
+    connection_id: String,
+    cols: u32,
+    rows: u32,
+) -> ServiceResult<u32> {
+    tauri::async_runtime::spawn_blocking(move || {
+        app.state::<AppService>()
+            .remote_terminal_open(&connection_id, cols, rows)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn terminal_write(svc: State<'_, AppService>, id: u32, data: String) -> ServiceResult<()> {
@@ -1452,6 +1513,10 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             remote_disconnect,
             remote_connections,
             remote_forget_password,
+            remote_server_start,
+            remote_server_stop,
+            remote_server_status,
+            set_remote_server_password,
             pick_folder,
             pick_save_file,
             pick_file,
@@ -1485,6 +1550,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             cli_install,
             cli_uninstall,
             terminal_open,
+            terminal_open_remote,
             terminal_write,
             terminal_resize,
             terminal_close,

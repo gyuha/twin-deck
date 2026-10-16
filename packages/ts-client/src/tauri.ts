@@ -109,6 +109,9 @@ export class TauriBackend implements Backend {
   async terminalOpen(cwd: string, cols: number, rows: number) {
     return unwrap(await commands.terminalOpen(cwd, cols, rows));
   }
+  async terminalOpenRemote(connectionId: string, cols: number, rows: number) {
+    return unwrap(await commands.terminalOpenRemote(connectionId, cols, rows));
+  }
   async terminalWrite(id: number, data: string) {
     unwrap(await commands.terminalWrite(id, data));
   }
@@ -287,6 +290,18 @@ export class TauriBackend implements Backend {
   }
   async remoteForgetPassword(index: number) {
     unwrap(await commands.remoteForgetPassword(index));
+  }
+  async remoteServerStart() {
+    return unwrap(await commands.remoteServerStart());
+  }
+  async remoteServerStop() {
+    return commands.remoteServerStop();
+  }
+  async remoteServerStatus() {
+    return commands.remoteServerStatus();
+  }
+  async setRemoteServerPassword(password: string) {
+    return unwrap(await commands.setRemoteServerPassword(password));
   }
   async revealConfigDir() {
     unwrap(await commands.revealConfigDir());

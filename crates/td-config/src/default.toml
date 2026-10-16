@@ -90,6 +90,18 @@ servers = []
 [remote]
 servers = []
 
+# 이 앱 안에서 도는 SSH/SFTP 서버(Twin Deck Remote). 꺼 둔 채로 시작하고, 기본은 이 컴퓨터에서만 접속할 수 있다(bind).
+# root는 접속한 사람이 볼 수 있는 폴더의 맨 위이고, 비어 있으면 서버를 켤 수 없다. allow_write를 켜지 않으면 읽기만 되고,
+# allow_shell은 원격 셸(터미널) 접속 허용이다. 비밀번호는 설정 파일이 아니라 OS 키체인에 둔다.
+[remote_server]
+enabled = false
+bind = "127.0.0.1"
+port = 2222
+root = ""
+allow_write = false
+allow_shell = false
+user = "twindeck"
+
 # Ctrl+0~9로 바로 가는 폴더. 비워 두면 그 키는 아무 일도 하지 않는다.
 [shortcuts]
 "0" = ""

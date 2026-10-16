@@ -770,6 +770,32 @@ pub fn connect_remote<S: td_remote::SecretStore>(
     Ok(td_vfs::remote_url(proto, &id, &root))
 }
 
+/// 내장 서버(Twin Deck Remote)의 비밀번호를 담는 키체인 계정 이름.
+pub const REMOTE_SERVER_SECRET_KEY: &str = "twindeck-remote-server";
+
+/// 내장 서버의 호스트키 파일 이름. 앱 데이터 폴더(`state.json` 옆)에 둔다.
+pub const REMOTE_SERVER_HOST_KEY_FILE: &str = "remote_server_host_key";
+
+/// 내장 서버 상태. 비밀번호 값은 어디에도 담지 않고, 설정됐는지(`has_password`)만 알린다.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteServerStatus {
+    pub running: bool,
+    /// 수신 중인 주소(`host:port`). 꺼져 있으면 비어 있다.
+    pub addresses: Vec<String>,
+    /// 호스트키 지문. 꺼져 있으면 None.
+    pub fingerprint: Option<String>,
+    pub has_password: bool,
+    /// 마지막 켜기 실패의 사람이 읽을 사유. 켜는 데 성공하거나 끄면 지운다.
+    pub last_error: Option<String>,
+}
+
+#[derive(Default)]
+struct RemoteServerState {
+    handle: Option<td_remote::server::ServerHandle>,
+    last_error: Option<String>,
+}
+
 pub struct Service<T: Trasher> {
     /// 즉시 실행하는 짧은 작업(폴더/파일 만들기, 이름 변경, 충돌 확인).
     ops: Ops<CompositeFs, T>,
@@ -794,6 +820,12 @@ pub struct Service<T: Trasher> {
     icons: Mutex<HashMap<(String, u32), Option<String>>>,
     /// 내장 터미널의 pty 세션들.
     terminals: Terminals,
+    /// 원격 셸 세션들(번호는 `terminals`와 같은 번호 공간). 출력·종료는 같은 `terminal_events`로 흐른다.
+    remote_shells: Arc<Mutex<HashMap<u32, Arc<Mutex<td_remote::ShellSession>>>>>,
+    /// SFTP 연결 id → 접속 정보. 원격 셸을 열 때 쓴다. 비밀번호가 들어 있어 메모리에만 두고 디스크·로그에 쓰지 않는다.
+    remote_logins: Mutex<HashMap<String, td_remote::SftpConfig>>,
+    /// 내장 SSH/SFTP 서버(Twin Deck Remote).
+    remote_server: Mutex<RemoteServerState>,
 }
 
 /// 시스템 아이콘 캐시의 최대 항목 수.
@@ -897,6 +929,9 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
                 pdf_direct: std::sync::atomic::AtomicBool::new(false),
                 icons: Mutex::new(HashMap::new()),
                 terminals,
+                remote_shells: Arc::default(),
+                remote_logins: Mutex::new(HashMap::new()),
+                remote_server: Mutex::new(RemoteServerState::default()),
             },
             Channels {
                 dir_changes,
@@ -910,6 +945,110 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
     /// 열린 원격(SFTP·FTP) 세션 레지스트리. 연결하면 세션을 넣고 끊으면 뺀다(ADR-0019).
     pub fn remote_registry(&self) -> td_archive::RemoteRegistry {
         self.fs.remote_registry()
+    }
+
+    fn remote_server_status_of<S: td_remote::SecretStore>(
+        state: &RemoteServerState,
+        secrets: &S,
+    ) -> RemoteServerStatus {
+        let has_password = secrets
+            .get(REMOTE_SERVER_SECRET_KEY)
+            .ok()
+            .flatten()
+            .is_some_and(|p| !p.is_empty());
+        RemoteServerStatus {
+            running: state.handle.is_some(),
+            addresses: state
+                .handle
+                .iter()
+                .map(|h| h.local_addr.to_string())
+                .collect(),
+            fingerprint: state.handle.as_ref().map(|h| h.fingerprint.clone()),
+            has_password,
+            last_error: state.last_error.clone(),
+        }
+    }
+
+    /// 내장 서버를 켠다. 이미 켜져 있으면 설정을 바꿔 다시 켠다. `root`나 비밀번호가 비었으면 거부한다.
+    /// 실패하면 그 사유를 `last_error`에 남기고 오류로 돌려준다. 블로킹이라 UI 스레드를 피해야 한다.
+    pub fn remote_server_start<S: td_remote::SecretStore>(
+        &self,
+        cfg: &td_config::RemoteServerConfig,
+        host_key_path: &Path,
+        secrets: &S,
+    ) -> ServiceResult<RemoteServerStatus> {
+        let mut state = self.remote_server.lock().unwrap();
+        let result = (|| {
+            let root = cfg.root.trim();
+            if root.is_empty() {
+                return Err("공유할 루트 폴더가 비어 있어 서버를 켤 수 없습니다".to_string());
+            }
+            let password = secrets
+                .get(REMOTE_SERVER_SECRET_KEY)
+                .map_err(|e| format!("비밀번호를 읽지 못했습니다: {e}"))?
+                .unwrap_or_default();
+            if password.is_empty() {
+                return Err("비밀번호가 설정되지 않아 서버를 켤 수 없습니다".to_string());
+            }
+            // 같은 포트를 다시 열 수 있게 먼저 닫는다.
+            if let Some(old) = state.handle.take() {
+                old.stop();
+            }
+            td_remote::server::start(td_remote::server::ServerConfig {
+                bind: cfg.bind.clone(),
+                port: cfg.port,
+                root: PathBuf::from(root),
+                allow_write: cfg.allow_write,
+                allow_shell: cfg.allow_shell,
+                user: cfg.user.clone(),
+                password,
+                host_key_path: host_key_path.to_path_buf(),
+            })
+            .map_err(|e| format!("서버를 켜지 못했습니다: {e}"))
+        })();
+        match result {
+            Ok(handle) => {
+                state.handle = Some(handle);
+                state.last_error = None;
+                Ok(Self::remote_server_status_of(&state, secrets))
+            }
+            Err(e) => {
+                state.last_error = Some(e.clone());
+                Err(e)
+            }
+        }
+    }
+
+    /// 내장 서버를 끈다. 꺼져 있어도 성공이다.
+    pub fn remote_server_stop<S: td_remote::SecretStore>(&self, secrets: &S) -> RemoteServerStatus {
+        let mut state = self.remote_server.lock().unwrap();
+        if let Some(h) = state.handle.take() {
+            h.stop();
+        }
+        state.last_error = None;
+        Self::remote_server_status_of(&state, secrets)
+    }
+
+    pub fn remote_server_status<S: td_remote::SecretStore>(
+        &self,
+        secrets: &S,
+    ) -> RemoteServerStatus {
+        Self::remote_server_status_of(&self.remote_server.lock().unwrap(), secrets)
+    }
+
+    /// 내장 서버의 비밀번호를 키체인에 저장한다. 빈 문자열이면 지운다. 켜져 있는 서버는 다음에 켤 때부터 새 값을 쓴다.
+    pub fn set_remote_server_password<S: td_remote::SecretStore>(
+        &self,
+        password: &str,
+        secrets: &S,
+    ) -> ServiceResult<RemoteServerStatus> {
+        if password.is_empty() {
+            secrets.delete(REMOTE_SERVER_SECRET_KEY)
+        } else {
+            secrets.set(REMOTE_SERVER_SECRET_KEY, password)
+        }
+        .map_err(|e| format!("비밀번호를 저장하지 못했습니다: {e}"))?;
+        Ok(self.remote_server_status(secrets))
     }
 
     /// `cwd` 폴더에서 `shell`(설정 `environment.terminal`)로 고른 셸을 pty로 연다. 돌려주는 값은 세션 번호다.
@@ -944,6 +1083,13 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
 
     /// 세션에 입력(키 입력을 UTF-8 글로 바꾼 것)을 쓴다.
     pub fn terminal_write(&self, id: u32, data: &str) -> ServiceResult<()> {
+        if let Some(shell) = self.remote_shell(id) {
+            return shell
+                .lock()
+                .unwrap()
+                .write(data.as_bytes())
+                .map_err(|e| e.to_string());
+        }
         self.terminals
             .write(id, data.as_bytes())
             .map_err(|e| e.to_string())
@@ -954,13 +1100,123 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
             cols.min(u16::MAX as u32) as u16,
             rows.min(u16::MAX as u32) as u16,
         );
+        if let Some(shell) = self.remote_shell(id) {
+            return shell
+                .lock()
+                .unwrap()
+                .resize(cols, rows)
+                .map_err(|e| e.to_string());
+        }
         self.terminals
             .resize(id, cols, rows)
             .map_err(|e| e.to_string())
     }
 
     pub fn terminal_close(&self, id: u32) -> ServiceResult<()> {
+        if let Some(shell) = self.remote_shells.lock().unwrap().remove(&id) {
+            // 끝나면 읽기 스레드가 `Exit`을 낸다.
+            shell.lock().unwrap().close();
+            return Ok(());
+        }
         self.terminals.close(id).map_err(|e| e.to_string())
+    }
+
+    fn remote_shell(&self, id: u32) -> Option<Arc<Mutex<td_remote::ShellSession>>> {
+        self.remote_shells.lock().unwrap().get(&id).cloned()
+    }
+
+    /// `connect_remote`로 연결하되, 성공한 SFTP 연결의 접속 정보를 메모리에 기억한다(원격 셸용).
+    pub fn connect_remote<S: td_remote::SecretStore>(
+        &self,
+        target: &td_remote::RemoteTarget,
+        password: Option<String>,
+        remember: bool,
+        secrets: &S,
+        opener: td_remote::SessionOpener<'_>,
+    ) -> Result<String, td_remote::RemoteError> {
+        let logins = &self.remote_logins;
+        let recording = |t: &td_remote::RemoteTarget, user: &str, pw: &str| {
+            let session = opener(t, user, pw)?;
+            if t.protocol == td_remote::Protocol::Sftp {
+                logins.lock().unwrap().insert(
+                    t.id(),
+                    td_remote::SftpConfig {
+                        host: t.host.clone(),
+                        port: t.port,
+                        user: user.into(),
+                        password: pw.into(),
+                    },
+                );
+            }
+            Ok(session)
+        };
+        connect_remote(
+            &self.fs.remote_registry(),
+            target,
+            password,
+            remember,
+            secrets,
+            &recording,
+        )
+    }
+
+    /// 연결을 끊는다: 세션을 레지스트리에서 빼고 기억한 접속 정보도 지운다. 이미 열린 원격 셸은 그대로 둔다.
+    pub fn disconnect_remote(&self, id: &str) {
+        self.fs.remote_registry().remove(id);
+        self.remote_logins.lock().unwrap().remove(id);
+    }
+
+    /// 연결 `connection_id`(SFTP)의 서버에 PTY 셸을 열고 세션 번호를 돌려준다. 입출력·종료는 로컬 터미널과 같은 번호·이벤트다.
+    /// 일반 SSH 서버도 되므로 SFTP 연결이면 모두 허용한다. 접속은 블로킹이다.
+    pub fn remote_terminal_open(
+        &self,
+        connection_id: &str,
+        cols: u32,
+        rows: u32,
+    ) -> ServiceResult<u32> {
+        let login = self
+            .remote_logins
+            .lock()
+            .unwrap()
+            .get(connection_id)
+            .cloned();
+        let Some(login) = login else {
+            return Err(if self.fs.remote_registry().contains(connection_id) {
+                "원격 셸은 SFTP 연결에서만 열 수 있습니다".to_string()
+            } else {
+                format!("원격 연결 '{connection_id}'이(가) 열려 있지 않습니다")
+            });
+        };
+        let (cols, rows) = (
+            cols.min(u16::MAX as u32) as u16,
+            rows.min(u16::MAX as u32) as u16,
+        );
+        let mut session = td_remote::ShellSession::open(login, cols, rows)
+            .map_err(|e| format!("원격 셸을 열지 못했습니다: {e}"))?;
+        let events = std::mem::replace(&mut session.events, std::sync::mpsc::channel().1);
+        let id = self.terminals.alloc_id();
+        self.remote_shells
+            .lock()
+            .unwrap()
+            .insert(id, Arc::new(Mutex::new(session)));
+        let tx = self.terminals.sender();
+        let shells = Arc::clone(&self.remote_shells);
+        std::thread::spawn(move || {
+            let code = loop {
+                match events.recv() {
+                    Ok(td_remote::ShellEvent::Output(data)) => {
+                        if tx.send(TermEvent::Output { id, data }).is_err() {
+                            return;
+                        }
+                    }
+                    Ok(td_remote::ShellEvent::Exit(code)) => break code,
+                    Err(_) => break None,
+                }
+            };
+            shells.lock().unwrap().remove(&id);
+            let _ = tx.send(TermEvent::Exit { id, code });
+        });
+        Ok(id)
     }
 
     /// 파일 클립보드 구현을 바꾼다(테스트용).
@@ -4110,6 +4366,303 @@ mod tests {
             let (_t, svc, _ch, _root) = setup();
             assert!(svc.watch("sftp://x/a").is_ok());
             assert!(svc.unwatch("ftp://x/a").is_ok());
+        }
+    }
+
+    mod remote_server {
+        use super::*;
+        use std::cell::RefCell;
+        use td_remote::{RemoteError, RemoteSession, SecretStore, SftpConfig, SftpSession};
+
+        /// 키체인 대신 메모리에 담는 비밀번호 저장소.
+        #[derive(Default)]
+        struct Mem(RefCell<HashMap<String, String>>);
+        impl SecretStore for Mem {
+            fn get(&self, k: &str) -> td_remote::Result<Option<String>> {
+                Ok(self.0.borrow().get(k).cloned())
+            }
+            fn set(&self, k: &str, p: &str) -> td_remote::Result<()> {
+                self.0.borrow_mut().insert(k.into(), p.into());
+                Ok(())
+            }
+            fn delete(&self, k: &str) -> td_remote::Result<()> {
+                self.0.borrow_mut().remove(k);
+                Ok(())
+            }
+        }
+
+        fn cfg(root: &str) -> td_config::RemoteServerConfig {
+            td_config::RemoteServerConfig {
+                enabled: true,
+                bind: "127.0.0.1".into(),
+                port: 0,
+                root: root.into(),
+                allow_write: false,
+                allow_shell: false,
+                user: "me".into(),
+            }
+        }
+
+        fn connect(port: u16, password: &str) -> td_remote::Result<SftpSession> {
+            SftpSession::connect(SftpConfig {
+                host: "127.0.0.1".into(),
+                port,
+                user: "me".into(),
+                password: password.into(),
+            })
+        }
+
+        fn port_of(status: &RemoteServerStatus) -> u16 {
+            status.addresses[0]
+                .rsplit(':')
+                .next()
+                .unwrap()
+                .parse()
+                .unwrap()
+        }
+
+        #[test]
+        fn remote_server_서비스에서_켜면_접속되고_끄면_닫힌다() {
+            let (t, svc, _ch, root) = setup();
+            let key = t.path().join(REMOTE_SERVER_HOST_KEY_FILE);
+            let secrets = Mem::default();
+            std::fs::write(format!("{root}/hello.txt"), "안녕").unwrap();
+            svc.set_remote_server_password("pw", &secrets).unwrap();
+
+            let on = svc
+                .remote_server_start(&cfg(&root), &key, &secrets)
+                .unwrap();
+            assert!(on.running && on.has_password && on.last_error.is_none());
+            assert!(on.fingerprint.as_deref().is_some_and(|f| !f.is_empty()));
+            let port = port_of(&on);
+            let sess = connect(port, "pw").unwrap();
+            let names: Vec<_> = sess
+                .list("/")
+                .unwrap()
+                .into_iter()
+                .map(|e| e.name)
+                .collect();
+            assert!(names.contains(&"hello.txt".to_string()), "{names:?}");
+            assert_eq!(connect(port, "틀림").err(), Some(RemoteError::Auth));
+            drop(sess);
+
+            let off = svc.remote_server_stop(&secrets);
+            assert!(!off.running && off.addresses.is_empty() && off.fingerprint.is_none());
+            let deadline = Instant::now() + Duration::from_secs(5);
+            while connect(port, "pw").is_ok() && Instant::now() < deadline {
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            assert!(connect(port, "pw").is_err(), "끈 뒤에도 접속된다");
+        }
+
+        #[test]
+        fn remote_server_비밀번호_없이_켜면_거부한다() {
+            let (t, svc, _ch, root) = setup();
+            let key = t.path().join(REMOTE_SERVER_HOST_KEY_FILE);
+            let secrets = Mem::default();
+            let err = svc
+                .remote_server_start(&cfg(&root), &key, &secrets)
+                .unwrap_err();
+            assert!(err.contains("비밀번호"), "{err}");
+            let st = svc.remote_server_status(&secrets);
+            assert!(!st.running);
+            assert_eq!(st.last_error.as_deref(), Some(err.as_str()));
+            // 빈 비밀번호 저장은 지우기라 여전히 거부된다.
+            svc.set_remote_server_password("", &secrets).unwrap();
+            assert!(svc
+                .remote_server_start(&cfg(&root), &key, &secrets)
+                .is_err());
+        }
+
+        #[test]
+        fn remote_server_루트가_비어_있으면_거부한다() {
+            let (t, svc, _ch, _root) = setup();
+            let key = t.path().join(REMOTE_SERVER_HOST_KEY_FILE);
+            let secrets = Mem::default();
+            svc.set_remote_server_password("pw", &secrets).unwrap();
+            let err = svc
+                .remote_server_start(&cfg("  "), &key, &secrets)
+                .unwrap_err();
+            assert!(err.contains("루트"), "{err}");
+            assert!(!svc.remote_server_status(&secrets).running);
+        }
+
+        #[test]
+        fn remote_server_상태는_비밀번호_값을_담지_않고_성공하면_오류를_지운다() {
+            let (t, svc, _ch, root) = setup();
+            let key = t.path().join(REMOTE_SERVER_HOST_KEY_FILE);
+            let secrets = Mem::default();
+            let st = svc.remote_server_status(&secrets);
+            assert_eq!(
+                st,
+                RemoteServerStatus {
+                    running: false,
+                    addresses: vec![],
+                    fingerprint: None,
+                    has_password: false,
+                    last_error: None,
+                }
+            );
+            assert!(svc
+                .remote_server_start(&cfg(&root), &key, &secrets)
+                .is_err());
+            let st = svc.set_remote_server_password("zq9-값", &secrets).unwrap();
+            assert!(st.has_password && st.last_error.is_some());
+            assert!(!format!("{st:?}").contains("zq9"));
+            let st = svc
+                .remote_server_start(&cfg(&root), &key, &secrets)
+                .unwrap();
+            assert!(st.running && st.last_error.is_none());
+            svc.remote_server_stop(&secrets);
+        }
+    }
+
+    mod remote_terminal {
+        use super::*;
+        use std::cell::RefCell;
+        use td_remote::{connect_session, Protocol, RemoteTarget, SecretStore};
+
+        #[derive(Default)]
+        struct Mem(RefCell<HashMap<String, String>>);
+        impl SecretStore for Mem {
+            fn get(&self, k: &str) -> td_remote::Result<Option<String>> {
+                Ok(self.0.borrow().get(k).cloned())
+            }
+            fn set(&self, k: &str, p: &str) -> td_remote::Result<()> {
+                self.0.borrow_mut().insert(k.into(), p.into());
+                Ok(())
+            }
+            fn delete(&self, k: &str) -> td_remote::Result<()> {
+                self.0.borrow_mut().remove(k);
+                Ok(())
+            }
+        }
+
+        /// 내장 서버를 띄우고 (임시 폴더 둘, 클라이언트 서비스, 그 채널, 서버 서비스, 접속 대상)을 돌려준다.
+        /// 앞의 임시 폴더와 서버 서비스는 시험이 끝날 때까지 살려 두려고 돌려준다.
+        #[allow(clippy::type_complexity)]
+        fn start_server(
+            allow_shell: bool,
+        ) -> (
+            (tempfile::TempDir, tempfile::TempDir),
+            Service<FakeTrash>,
+            Channels,
+            Service<FakeTrash>,
+            RemoteTarget,
+        ) {
+            let (t, server_svc, _ch, root) = setup();
+            let (t2, client, ch, _root2) = setup();
+            let key = t.path().join(REMOTE_SERVER_HOST_KEY_FILE);
+            let secrets = Mem::default();
+            server_svc
+                .set_remote_server_password("pw", &secrets)
+                .unwrap();
+            let cfg = td_config::RemoteServerConfig {
+                enabled: true,
+                bind: "127.0.0.1".into(),
+                port: 0,
+                root,
+                allow_write: false,
+                allow_shell,
+                user: "me".into(),
+            };
+            let st = server_svc
+                .remote_server_start(&cfg, &key, &secrets)
+                .unwrap();
+            let port: u16 = st.addresses[0].rsplit(':').next().unwrap().parse().unwrap();
+            let target = RemoteTarget {
+                protocol: Protocol::Sftp,
+                host: "127.0.0.1".into(),
+                port,
+                user: "me".into(),
+                base_dir: String::new(),
+            };
+            ((t, t2), client, ch, server_svc, target)
+        }
+
+        fn connect(svc: &Service<FakeTrash>, t: &RemoteTarget) -> String {
+            let url = svc
+                .connect_remote(
+                    t,
+                    Some("pw".into()),
+                    false,
+                    &Mem::default(),
+                    &connect_session,
+                )
+                .unwrap();
+            // `sftp://<id>/...`에서 연결 id만 뽑는다.
+            url.trim_start_matches("sftp://")
+                .split('/')
+                .next()
+                .unwrap()
+                .to_string()
+        }
+
+        #[test]
+        fn remote_terminal_셸이_허용된_서버에서_입출력과_종료가_흐른다() {
+            let (_t, svc, ch, _server, target) = start_server(true);
+            let id = connect(&svc, &target);
+            let term = svc.remote_terminal_open(&id, 80, 24).unwrap();
+            svc.terminal_write(term, "echo TD_$((40+2))_MARK\n")
+                .unwrap();
+            svc.terminal_resize(term, 100, 30).unwrap();
+            let mut out = Vec::new();
+            let deadline = Instant::now() + Duration::from_secs(10);
+            while Instant::now() < deadline {
+                if let Ok(TermEvent::Output { id: i, data }) =
+                    ch.terminal_events.recv_timeout(Duration::from_millis(200))
+                {
+                    assert_eq!(i, term);
+                    out.extend(data);
+                    if String::from_utf8_lossy(&out).contains("TD_42_MARK\r\n") {
+                        break;
+                    }
+                }
+            }
+            let text = String::from_utf8_lossy(&out);
+            assert!(text.contains("TD_42_MARK"), "{text}");
+            svc.terminal_close(term).unwrap();
+            let deadline = Instant::now() + Duration::from_secs(10);
+            let mut exited = false;
+            while Instant::now() < deadline && !exited {
+                if let Ok(TermEvent::Exit { id: i, .. }) =
+                    ch.terminal_events.recv_timeout(Duration::from_millis(200))
+                {
+                    assert_eq!(i, term);
+                    exited = true;
+                }
+            }
+            assert!(exited, "닫은 뒤 종료 이벤트가 없다");
+            assert!(svc.terminal_write(term, "x").is_err());
+        }
+
+        #[test]
+        fn remote_terminal_셸을_허용하지_않는_서버면_오류다() {
+            let (_t, svc, _ch, _server, target) = start_server(false);
+            let id = connect(&svc, &target);
+            let err = svc.remote_terminal_open(&id, 80, 24).unwrap_err();
+            assert!(err.contains("셸"), "{err}");
+        }
+
+        #[test]
+        fn remote_terminal_없는_연결과_ftp_연결은_오류다() {
+            let (_t, svc, _ch, _root) = setup();
+            let err = svc.remote_terminal_open("nobody@x:1", 80, 24).unwrap_err();
+            assert!(err.contains("열려 있지 않습니다"), "{err}");
+            let ftp = td_remote::testing::ftp::FakeFtp::start(true);
+            let session = td_remote::FtpSession::connect(ftp.cfg("u", "p")).unwrap();
+            svc.remote_registry()
+                .insert("ftpbox", std::sync::Arc::new(session));
+            let err = svc.remote_terminal_open("ftpbox", 80, 24).unwrap_err();
+            assert!(err.contains("SFTP"), "{err}");
+        }
+
+        #[test]
+        fn remote_terminal_연결을_끊으면_접속_정보도_지운다() {
+            let (_t, svc, _ch, _server, target) = start_server(true);
+            let id = connect(&svc, &target);
+            svc.disconnect_remote(&id);
+            assert!(svc.remote_terminal_open(&id, 80, 24).is_err());
         }
     }
 }

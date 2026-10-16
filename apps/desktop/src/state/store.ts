@@ -1494,16 +1494,19 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (!folder && here.virtual && !fromTerminal) return fail(tr("terminal.notice.virtual"));
       const cwd = folder ?? (fromTerminal ? here.virtual!.base : here.path);
       if (isArchivePath(cwd)) return fail(tr("terminal.notice.archive"));
+      // 원격 폴더(sftp://)면 로컬 셸 대신 그 서버의 셸을 연다. FTP에는 셸이 없다.
+      const remote = splitRemote(cwd);
+      if (remote?.scheme === "ftp") return fail(tr("terminal.notice.ftp"));
       const pane = fromTerminal ? s.activePane : other(s.activePane);
       try {
         // 처음 크기는 임시다. 터미널 화면이 그려지면 패널 크기에 맞춰 바로 바꾼다.
-        const id = await backend.terminalOpen(cwd, 80, 24);
+        const id = remote ? await backend.terminalOpenRemote(remote.id, 80, 24) : await backend.terminalOpen(cwd, 80, 24);
         const now = get();
         const p = now.panes[pane];
         const tab = newTab("");
         tab.path = `virtual:terminal:${tab.id}`;
         tab.history = [tab.path];
-        tab.virtual = { kind: "terminal", title: `${tr("terminal.tab")}: ${baseName(cwd) || cwd}`, base: cwd, jobId: id, running: false, cancelled: false, warnings: [], summary: null, totalBytes: 0, view: "list", recheck: [] };
+        tab.virtual = { kind: "terminal", title: `${tr("terminal.tab")}: ${remote ? remote.id : baseName(cwd) || cwd}`, base: cwd, jobId: id, running: false, cancelled: false, warnings: [], summary: null, totalBytes: 0, view: "list", recheck: [] };
         set({ activePane: pane, panes: { ...now.panes, [pane]: { tabs: [...p.tabs, tab], active: p.tabs.length } } });
       } catch (e) {
         fail(e);

@@ -142,6 +142,19 @@ impl Terminals {
         )
     }
 
+    /// 같은 번호 공간에서 세션 번호를 새로 낸다(원격 셸처럼 pty 밖에서 열리는 세션용).
+    pub fn alloc_id(&self) -> u32 {
+        let mut n = self.next.lock().unwrap();
+        let id = *n;
+        *n += 1;
+        id
+    }
+
+    /// 이벤트 송신기 복제본. 밖에서 열리는 세션도 같은 수신기로 출력·종료를 보낸다.
+    pub fn sender(&self) -> Sender<TermEvent> {
+        self.tx.clone()
+    }
+
     /// 설정 `environment.terminal`로 고른 셸을 `cwd`에서 연다. 값은 [`resolve_shell`]을 본다.
     pub fn open(&self, shell: &str, cwd: &Path, cols: u16, rows: u16) -> Result<u32> {
         let (program, args) =
@@ -181,12 +194,7 @@ impl Terminals {
         let mut reader = pair.master.try_clone_reader().map_err(pty_err)?;
         let writer = pair.master.take_writer().map_err(pty_err)?;
 
-        let id = {
-            let mut n = self.next.lock().unwrap();
-            let id = *n;
-            *n += 1;
-            id
-        };
+        let id = self.alloc_id();
         let cpr_pending = Arc::new(AtomicUsize::new(0));
         self.sessions.lock().unwrap().insert(
             id,

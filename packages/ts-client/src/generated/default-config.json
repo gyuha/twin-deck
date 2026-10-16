@@ -149,6 +149,15 @@
     },
     "remote": {
       "servers": []
+    },
+    "remote_server": {
+      "enabled": false,
+      "bind": "127.0.0.1",
+      "port": 2222,
+      "root": "",
+      "allow_write": false,
+      "allow_shell": false,
+      "user": "twindeck"
     }
   },
   "bindings": [],

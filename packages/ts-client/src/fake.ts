@@ -31,6 +31,7 @@ import type {
   CliStatusDto,
   SmbServer,
   RemoteServer,
+  RemoteServerStatus,
 } from "./generated/bindings";
 import { globMatch } from "./glob";
 import defaultConfigJson from "./generated/default-config.json";
@@ -879,13 +880,13 @@ export class FakeBackend implements Backend {
       user: v.user.trim(),
       base_dir: v.base_dir.trim(),
     }));
-    const bad = items.findIndex((v) => (v.protocol !== "sftp" && v.protocol !== "ftp") || !v.host);
-    if (bad >= 0) throw new BackendError(`remote.servers[${bad + 1}]: protocol은 sftp 또는 ftp여야 하고 host가 필요합니다`);
+    const bad = items.findIndex((v) => !["sftp", "ftp", "twindeck"].includes(v.protocol) || !v.host);
+    if (bad >= 0) throw new BackendError(`remote.servers[${bad + 1}]: protocol은 sftp, ftp, twindeck 중 하나여야 하고 host가 필요합니다`);
     this.setConfig((l) => {
       l.config.remote = {
         servers: items.map((v) => ({
           ...v,
-          port: v.port || (v.protocol === "sftp" ? 22 : 21),
+          port: v.port || (v.protocol === "sftp" ? 22 : v.protocol === "twindeck" ? 2222 : 21),
           name: v.name || (v.user ? `${v.user}@${v.host}` : v.host),
         })),
       };
@@ -948,6 +949,50 @@ export class FakeBackend implements Backend {
 
   async remoteForgetPassword(index: number) {
     this.remotePasswords.delete(FakeBackend.remoteKey(this.remoteServer(index)));
+  }
+
+  /** 테스트용: 내장 서버에 저장된 비밀번호(키체인 흉내). */
+  remoteServerPassword = "";
+  private remoteServerRunning = false;
+  private remoteServerLastError: string | null = null;
+
+  private remoteServerState(): RemoteServerStatus {
+    const c = this.loaded.config.remote_server;
+    return {
+      running: this.remoteServerRunning,
+      addresses: this.remoteServerRunning ? [`${c.bind}:${c.port}`] : [],
+      fingerprint: this.remoteServerRunning ? "SHA256:fake-fingerprint" : null,
+      hasPassword: this.remoteServerPassword !== "",
+      lastError: this.remoteServerLastError,
+    };
+  }
+
+  /** 실제 구현처럼 루트나 비밀번호가 비어 있으면 거부하고 사유를 `lastError`에 남긴다. */
+  async remoteServerStart() {
+    const fail = (m: string): never => {
+      this.remoteServerLastError = m;
+      throw new BackendError(m);
+    };
+    if (!this.loaded.config.remote_server.root.trim()) fail("공유할 루트 폴더가 비어 있어 서버를 켤 수 없습니다");
+    if (this.remoteServerPassword === "") fail("비밀번호가 설정되지 않아 서버를 켤 수 없습니다");
+    this.remoteServerRunning = true;
+    this.remoteServerLastError = null;
+    return this.remoteServerState();
+  }
+
+  async remoteServerStop() {
+    this.remoteServerRunning = false;
+    this.remoteServerLastError = null;
+    return this.remoteServerState();
+  }
+
+  async remoteServerStatus() {
+    return this.remoteServerState();
+  }
+
+  async setRemoteServerPassword(password: string) {
+    this.remoteServerPassword = password;
+    return this.remoteServerState();
   }
 
   /** 테스트용: 설정 폴더 열기를 누른 횟수. */
@@ -1380,7 +1425,7 @@ export class FakeBackend implements Backend {
   }
 
   /** 열린 터미널 세션: 세션 번호 → 연 위치. */
-  terminals = new Map<number, { cwd: string; cols: number; rows: number }>();
+  terminals = new Map<number, { cwd: string; cols: number; rows: number; remote?: string }>();
   /** `terminalWrite`로 쓴 입력 기록. */
   terminalWrites: { id: number; data: string }[] = [];
   private nextTerminal = 1;
@@ -1448,9 +1493,21 @@ export class FakeBackend implements Backend {
     return id;
   }
 
+  /** 가짜 원격 셸: 입력을 그대로 되돌려 준다(에코). 열려 있는 SFTP 연결(`sftp://<id>/..`)만 연다. */
+  async terminalOpenRemote(connectionId: string, cols: number, rows: number) {
+    if (!this.remoteOpen.has(connectionId)) throw new Error(`원격 연결 '${connectionId}'이(가) 열려 있지 않습니다`);
+    const server = (this.loaded.config.remote.servers ?? []).find((s) => FakeBackend.remoteId(s) === connectionId);
+    if (server?.protocol === "ftp") throw new Error("원격 셸은 SFTP 연결에서만 열 수 있습니다");
+    const id = this.nextTerminal++;
+    this.terminals.set(id, { cwd: "", cols, rows, remote: connectionId });
+    return id;
+  }
+
   async terminalWrite(id: number, data: string) {
-    if (!this.terminals.has(id)) throw new Error(`터미널 세션 ${id}번이 없습니다`);
+    const t = this.terminals.get(id);
+    if (!t) throw new Error(`터미널 세션 ${id}번이 없습니다`);
     this.terminalWrites.push({ id, data });
+    if (t.remote) this.emitTerminalOutput(id, data); // 원격 셸 흉내: 입력을 되돌려 준다
   }
 
   async terminalResize(id: number, cols: number, rows: number) {

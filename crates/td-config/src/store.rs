@@ -253,13 +253,13 @@ pub fn set_smb_servers(dir: &Path, servers: &[SmbServer]) -> Result<(), String> 
 
 /// 사용자 `config.toml`의 원격 서버 목록(`[[remote.servers]]`)을 `servers`로 통째로 바꾼다.
 /// 다른 키와 주석은 그대로 두고, 빈 목록이면 키를 지워 기본값(빈 목록)으로 돌린다.
-/// protocol이 sftp·ftp가 아니거나 host가 빈 항목이 있거나 파일에 문법 오류가 있으면 파일을 건드리지 않고 오류를 돌려준다.
+/// protocol이 sftp·ftp·twindeck이 아니거나 host가 빈 항목이 있거나 파일에 문법 오류가 있으면 파일을 건드리지 않고 오류를 돌려준다.
 /// 비밀번호는 이 목록에 없고 이 함수는 비밀번호를 쓰지 않는다.
 pub fn set_remote_servers(dir: &Path, servers: &[RemoteServer]) -> Result<(), String> {
     for (i, s) in servers.iter().enumerate() {
-        if s.protocol != "sftp" && s.protocol != "ftp" {
+        if !matches!(s.protocol.as_str(), "sftp" | "ftp" | "twindeck") {
             return Err(format!(
-                "remote.servers[{}]: protocol은 sftp 또는 ftp여야 합니다",
+                "remote.servers[{}]: protocol은 sftp, ftp, twindeck 중 하나여야 합니다",
                 i + 1
             ));
         }

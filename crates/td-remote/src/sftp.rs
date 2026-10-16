@@ -16,7 +16,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::runtime::Runtime;
 
 /// 런타임을 비동기 문맥 안에서 버려도 패닉하지 않게 백그라운드로 종료한다.
-struct Rt(Option<Runtime>);
+pub(crate) struct Rt(pub(crate) Option<Runtime>);
 
 impl std::ops::Deref for Rt {
     type Target = Runtime;
@@ -38,7 +38,7 @@ use crate::{
     RemoteWrite, Result,
 };
 
-const TIMEOUT: Duration = Duration::from_secs(15);
+pub(crate) const TIMEOUT: Duration = Duration::from_secs(15);
 
 #[derive(Debug, Clone)]
 pub struct SftpConfig {
@@ -48,7 +48,7 @@ pub struct SftpConfig {
     pub password: String,
 }
 
-struct Client;
+pub(crate) struct Client;
 
 impl client::Handler for Client {
     type Error = russh::Error;
@@ -79,7 +79,7 @@ fn map_sftp(path: &str, e: SftpError) -> RemoteError {
     }
 }
 
-fn map_ssh(e: russh::Error) -> RemoteError {
+pub(crate) fn map_ssh(e: russh::Error) -> RemoteError {
     match e {
         russh::Error::IO(_)
         | russh::Error::Disconnect
@@ -91,7 +91,7 @@ fn map_ssh(e: russh::Error) -> RemoteError {
 
 /// 비동기 작업을 호출 스레드에서 끝날 때까지 기다린다. 이미 tokio 런타임 안이면
 /// 중첩 `block_on` 패닉을 피하려고 새 스레드에서 실행한다.
-fn block<T: Send>(rt: &Runtime, fut: impl Future<Output = T> + Send) -> T {
+pub(crate) fn block<T: Send>(rt: &Runtime, fut: impl Future<Output = T> + Send) -> T {
     if tokio::runtime::Handle::try_current().is_ok() {
         std::thread::scope(|s| {
             s.spawn(|| rt.block_on(fut))

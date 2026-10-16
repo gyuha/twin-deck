@@ -26,6 +26,31 @@ pub fn apply_config(svc: &AppService, loaded: &td_config::Loaded) {
     svc.set_preview_limits(&loaded.config.preview);
 }
 
+/// 설정의 `remote_server.enabled`가 켜져 있고 비밀번호가 있으면 내장 서버를 켠다. 실패는 경고만 남기고 앱은 계속 뜬다.
+fn start_remote_server_if_enabled(app: &tauri::App, cfg: &td_config::RemoteServerConfig) {
+    use td_remote::SecretStore;
+    if !cfg.enabled {
+        return;
+    }
+    let has_password = td_remote::KeyringStore
+        .get(service::REMOTE_SERVER_SECRET_KEY)
+        .ok()
+        .flatten()
+        .is_some_and(|p| !p.is_empty());
+    if !has_password {
+        eprintln!("경고: 내장 서버가 켜져 있지만 비밀번호가 없어 시작하지 않습니다");
+        return;
+    }
+    let started =
+        commands::remote_server_host_key_path(&app.state::<ConfigState>()).and_then(|key| {
+            app.state::<AppService>()
+                .remote_server_start(cfg, &key, &td_remote::KeyringStore)
+        });
+    if let Err(e) = started {
+        eprintln!("경고: 내장 서버를 켜지 못했습니다: {e}");
+    }
+}
+
 /// 터미널에서 `td`로 불린 요청을 해석해 화면에 알리고 창을 앞으로 가져온다(이미 떠 있던 앱이 받는다).
 fn handle_second_instance(app: &tauri::AppHandle, argv: Vec<String>, cwd: String) {
     let request = OpenPathsDto::from_result(cli::launch_request(
@@ -152,6 +177,7 @@ fn main() {
             let current = app.state::<ConfigState>().current();
             apply_config(&app.state::<AppService>(), &current);
             global_hotkey::apply(app.handle(), &current.config.environment);
+            start_remote_server_if_enabled(app, &current.config.remote_server);
             if let Some(rx) = config_rx {
                 commands::forward_config_changes(app.handle().clone(), rx);
             }

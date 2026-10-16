@@ -1614,6 +1614,31 @@ fn remote_servers_write_rejects_invalid_entries_without_touching_the_file() {
 }
 
 #[test]
+fn remote_servers_accept_twindeck_with_default_port_2222_and_keep_other_protocols() {
+    let l = load("[[remote.servers]]\nprotocol = \"twindeck\"\nhost = \"h\"\n\n[[remote.servers]]\nprotocol = \"sftp\"\nhost = \"s\"\n");
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    let ports: Vec<_> = l
+        .config
+        .remote
+        .servers
+        .iter()
+        .map(|s| (s.protocol.as_str(), s.port))
+        .collect();
+    assert_eq!(ports, [("twindeck", 2222), ("sftp", 22)]);
+
+    let d = user_value_dir(None);
+    let servers = [
+        remote("집", "twindeck", "home.local", 2222, "me", ""),
+        remote("회사", "sftp", "files", 22, "kim", ""),
+    ];
+    td_config::set_remote_servers(d.path(), &servers).unwrap();
+    assert_eq!(
+        load_dir(d.path(), Platform::Linux).config.remote.servers,
+        servers
+    );
+}
+
+#[test]
 fn remote_server_password_is_never_written_to_or_kept_from_config() {
     // 서버 항목에는 비밀번호 필드가 없다: 저장한 config.toml에도, 읽은 설정(JSON)에도 비밀번호가 나오지 않는다.
     let d = user_value_dir(None);
@@ -1628,4 +1653,67 @@ fn remote_server_password_is_never_written_to_or_kept_from_config() {
     let json = format!("{:?}", l.config);
     assert!(!json.contains("s3cret"), "{json}");
     assert_eq!(l.config.remote.servers.len(), 1);
+}
+
+#[test]
+fn 원격_서버_기본값은_꺼짐_로컬_전용_읽기_전용이다() {
+    let c = load("").config.remote_server;
+    assert!(!c.enabled);
+    assert_eq!(c.bind, "127.0.0.1");
+    assert_eq!(c.port, 2222);
+    assert_eq!(c.root, "");
+    assert!(!c.allow_write);
+    assert!(!c.allow_shell);
+    assert_eq!(c.user, "twindeck");
+}
+
+#[test]
+fn 원격_서버_포트_범위와_빈_bind는_경고하고_기본값으로_돌아간다() {
+    for bad in ["port = 0", "port = 70000", "port = -1"] {
+        let l = load(&format!("[remote_server]\n{bad}\n"));
+        assert_eq!(l.config.remote_server.port, 2222, "{bad}");
+        assert!(
+            l.warnings
+                .iter()
+                .any(|w| w.message.contains("remote_server.port")),
+            "{bad}"
+        );
+    }
+    let l = load("[remote_server]\nbind = \"  \"\nuser = \"\"\n");
+    assert_eq!(l.config.remote_server.bind, "127.0.0.1");
+    assert_eq!(l.config.remote_server.user, "twindeck");
+    assert_eq!(l.warnings.len(), 2);
+    let ok = load("[remote_server]\nport = 65535\nbind = \"0.0.0.0\"\nenabled = true\n");
+    assert_eq!(ok.config.remote_server.port, 65535);
+    assert!(ok.warnings.is_empty());
+}
+
+#[test]
+fn 원격_서버_설정은_사용자_설정_저장과_다시_읽기가_된다() {
+    let dir = tempfile::tempdir().unwrap();
+    td_config::set_user_value(
+        dir.path(),
+        "remote_server.enabled",
+        td_config::ConfigValue::Bool(true),
+    )
+    .unwrap();
+    td_config::set_user_value(
+        dir.path(),
+        "remote_server.port",
+        td_config::ConfigValue::Int(2200),
+    )
+    .unwrap();
+    td_config::set_user_value(
+        dir.path(),
+        "remote_server.root",
+        td_config::ConfigValue::Str("/tmp/share".into()),
+    )
+    .unwrap();
+    let c = td_config::load_dir(dir.path(), td_config::Platform::current())
+        .config
+        .remote_server;
+    assert!(c.enabled);
+    assert_eq!(c.port, 2200);
+    assert_eq!(c.root, "/tmp/share");
+    assert_eq!(c.bind, "127.0.0.1");
 }

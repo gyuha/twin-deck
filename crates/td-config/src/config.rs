@@ -29,6 +29,8 @@ pub struct Config {
     pub smb: SmbConfig,
     /// 저장된 SFTP·FTP 서버 목록. 비밀번호는 여기 두지 않고 OS 키체인에 둔다(ADR-0019).
     pub remote: RemoteConfig,
+    /// 이 앱 안에서 도는 SSH/SFTP 서버(Twin Deck Remote). 비밀번호는 여기 두지 않고 OS 키체인에 둔다.
+    pub remote_server: RemoteServerConfig,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
@@ -228,13 +230,13 @@ pub struct SmbServer {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct RemoteConfig {
-    /// 병합 후 항목별로 검증해서 채운다(protocol이 sftp·ftp가 아니거나 host가 빈 항목은 경고와 함께 빠진다).
+    /// 병합 후 항목별로 검증해서 채운다(protocol이 sftp·ftp·twindeck이 아니거나 host가 빈 항목은 경고와 함께 빠진다).
     #[serde(default)]
     pub servers: Vec<RemoteServer>,
 }
 
 /// SFTP·FTP 서버 항목(`[[remote.servers]]`). `name`이 비면 읽을 때 `user@host`(user가 없으면 `host`)로 채우고,
-/// `port`가 0이거나 없으면 프로토콜 기본 포트(sftp 22, ftp 21)로 채운다. `user`가 비면 FTP는 `anonymous`로 연결한다.
+/// `port`가 0이거나 없으면 프로토콜 기본 포트(sftp 22, ftp 21, twindeck 2222)로 채운다. `twindeck`은 앱 내장 서버(Twin Deck Remote)로, 연결은 SFTP와 같다. `user`가 비면 FTP는 `anonymous`로 연결한다.
 /// `base_dir`은 접속 직후 이동할 폴더이고 비면 서버가 알려 주는 홈이다.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct RemoteServer {
@@ -244,4 +246,17 @@ pub struct RemoteServer {
     pub port: u16,
     pub user: String,
     pub base_dir: String,
+}
+
+/// 내장 서버(Twin Deck Remote) 설정. 기본은 꺼짐·로컬 전용·읽기 전용·셸 없음이다.
+/// `root`가 비어 있으면 서버를 켤 수 없다(홈 폴더로 대신하지 않는다).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct RemoteServerConfig {
+    pub enabled: bool,
+    pub bind: String,
+    pub port: u16,
+    pub root: String,
+    pub allow_write: bool,
+    pub allow_shell: bool,
+    pub user: String,
 }
