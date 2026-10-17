@@ -102,10 +102,31 @@ fn open(cfg: &FtpConfig) -> Result<FtpStream> {
     Ok(s)
 }
 
+/// MLSD 줄의 시각 사실(`modify=20261014103409.988`)에서 소수점 초를 뗀다. RFC 3659는 소수점 초를 허용하지만
+/// `suppaftp`의 파서는 `InvalidDate`로 거부하고, MLSD가 성공하면 LIST로 넘어가지 않으므로 목록이 통째로 비어 보인다.
+/// 사실 목록은 첫 공백 앞까지고 그 뒤는 이름이라 이름은 건드리지 않는다.
+fn without_fraction(line: &str) -> String {
+    let (facts, name) = line.split_once(' ').unwrap_or((line, ""));
+    let facts: Vec<&str> = facts
+        .split(';')
+        .map(|fact| match fact.split_once('=') {
+            Some((k, v))
+                if v.len() > 15
+                    && v.as_bytes()[14] == b'.'
+                    && v[..14].bytes().all(|b| b.is_ascii_digit()) =>
+            {
+                &fact[..k.len() + 1 + 14]
+            }
+            _ => fact,
+        })
+        .collect();
+    format!("{} {name}", facts.join(";"))
+}
+
 fn entry_of(line: &str) -> Option<RemoteEntry> {
     // MLSD 줄은 `type=...;` 사실 목록으로 시작한다. 그렇지 않으면 LIST(유닉스·DOS) 형식이다.
     let f = if line.to_ascii_lowercase().contains("type=") {
-        ListParser::parse_mlsd(line).ok()?
+        ListParser::parse_mlsd(&without_fraction(line)).ok()?
     } else {
         ListParser::parse_posix(line)
             .or_else(|_| ListParser::parse_dos(line))
@@ -286,6 +307,7 @@ impl<T: TlsStream + Send + 'static> RemoteWrite for FtpWriter<T> {
 #[cfg(test)]
 mod tests {
     use super::entry_of;
+    use crate::RemoteKind;
 
     #[test]
     fn 목록의_상위_경로_이름은_항목으로_받지_않는다() {
@@ -297,6 +319,19 @@ mod tests {
         // LIST(유닉스)
         assert!(entry_of("-rw-r--r-- 1 u g 1 Jan  1 00:00 ../escaped.txt").is_none());
         assert!(entry_of("drwxr-xr-x 2 u g 0 Jan  1 00:00 ..").is_none());
+    }
+
+    #[test]
+    fn mlsd_시각의_소수점_초와_대문자_사실_이름을_받는다() {
+        // 실제 서버(File Manager)가 보낸 줄: 키가 대문자로 시작하고, 시각에 소수점 초가 붙고, 폴더에는 size가 없다.
+        let dir = entry_of("Type=dir;Modify=20261014103409.988;Perm=el; device").unwrap();
+        assert_eq!((dir.name.as_str(), dir.kind), ("device", RemoteKind::Dir));
+        assert!(dir.modified.is_some());
+        let file = entry_of("Type=file;Size=12;Modify=20261014103409.5;Perm=r; a b.txt").unwrap();
+        assert_eq!(
+            (file.name.as_str(), file.kind, file.size),
+            ("a b.txt", RemoteKind::File, 12)
+        );
     }
 
     #[test]
