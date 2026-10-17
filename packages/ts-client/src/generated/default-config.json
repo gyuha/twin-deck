@@ -40,7 +40,11 @@
         "pane_highlight": true,
         "tab_style": "underline",
         "tab_close_button": false,
-        "tab_position": "top"
+        "tab_position": "top",
+        "tab_color_terminal": "auto",
+        "tab_color_smb": "auto",
+        "tab_color_remote": "auto",
+        "tab_color_twindeck": "auto"
       }
     },
     "display": {

@@ -3,6 +3,7 @@ import { joinPath, remoteUrl, splitRemote } from "@twin-deck/ts-client";
 import { formatSpace } from "../lib/format";
 import { useApp, useAppStore, useT } from "../state/context";
 import type { PaneId } from "../state/store";
+import { connectionOf, withIcon } from "../lib/connections";
 
 /**
  * 경로를 조각으로 나눈 이동 링크 (NAV-12).
@@ -15,6 +16,8 @@ export function Breadcrumb({ pane, path }: { pane: PaneId; path: string }) {
   const { api } = useAppStore();
   const space = useApp((s) => s.diskSpace[pane]);
   const sizeFormat = useApp((s) => s.loaded.config.display.size_format);
+  const config = useApp((s) => s.loaded.config);
+  const smbMounts = useApp((s) => s.smbMounts);
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(path);
   const input = useRef<HTMLInputElement>(null);
@@ -39,6 +42,8 @@ export function Breadcrumb({ pane, path }: { pane: PaneId; path: string }) {
   for (const part of rest.split(remote ? "/" : /[\\/]/).filter(Boolean)) {
     segments.push({ label: part, path: joinPath(segments[segments.length - 1].path, part) });
   }
+  // 저장된 연결 안이면 연결의 루트 조각(원격 `sftp://<id>/`, SMB 마운트 폴더) 앞에 그 연결의 이모지를 붙인다(이슈 #93).
+  const conn = connectionOf(path, config, smbMounts);
   const go = (target: string) => {
     api.activate(pane);
     void api.navigate(target);
@@ -91,7 +96,7 @@ export function Breadcrumb({ pane, path }: { pane: PaneId; path: string }) {
           <span key={seg.path} className="flex items-center">
             {i > 1 && <span aria-hidden>{seg.path.charAt(seg.path.length - seg.label.length - 1)}</span>}
             <button type="button" tabIndex={-1} onClick={() => go(seg.path)} className="hover:underline">
-              {isArchive ? seg.label.slice(0, -1) : seg.label}
+              {withIcon(seg.path === conn?.root ? conn.icon : "", isArchive ? seg.label.slice(0, -1) : seg.label)}
             </button>
             {isArchive && (
               <span role="img" aria-label={t("breadcrumb.archive_edge")} title={t("breadcrumb.archive_edge")} className="font-bold text-accent">

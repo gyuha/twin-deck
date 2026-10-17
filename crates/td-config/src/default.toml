@@ -45,6 +45,11 @@ pane_highlight = true
 tab_style = "underline"
 tab_close_button = false
 tab_position = "top" # 탭 막대 위치: top(파일 목록 위), bottom(파일 목록 아래)
+# 특수 탭의 색: auto(테마에서 계산), off(일반 탭과 같게), #rrggbb(직접 지정). 칸형은 탭 배경, 밑줄형은 밑줄과 이름 앞 점에 칠한다.
+tab_color_terminal = "auto" # 터미널 탭
+tab_color_smb = "auto" # SMB 공유 안의 탭
+tab_color_remote = "auto" # SFTP·FTP 탭
+tab_color_twindeck = "auto" # Twin Deck Remote 탭
 
 [display]
 relative_date = true
@@ -82,11 +87,11 @@ additional_extensions = []
 [view.table]
 columns = ["name", "size", "modified"]
 
-# 저장된 SMB 서버. 항목은 [[smb.servers]]에 name·host·share·user로 쓴다(user를 비우면 게스트). 비밀번호는 OS 키체인에 둔다.
+# 저장된 SMB 서버. 항목은 [[smb.servers]]에 name·host·share·user·icon으로 쓴다(user를 비우면 게스트, icon은 이름 앞에 붙는 이모지). 비밀번호는 OS 키체인에 둔다.
 [smb]
 servers = []
 
-# 저장된 SFTP·FTP 서버. 항목은 [[remote.servers]]에 name·protocol(sftp|ftp)·host·port·user·base_dir로 쓴다.
+# 저장된 SFTP·FTP 서버. 항목은 [[remote.servers]]에 name·protocol(sftp|ftp|twindeck)·host·port·user·base_dir·icon으로 쓴다(icon은 이름 앞에 붙는 이모지).
 # port를 비우면 프로토콜 기본값(sftp 22, ftp 21), base_dir을 비우면 접속 직후 서버의 홈 폴더다. 비밀번호는 OS 키체인에 둔다.
 [remote]
 servers = []

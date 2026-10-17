@@ -570,11 +570,34 @@ fn smb_target(config: &ConfigState, index: u32) -> ServiceResult<td_smb::SmbTarg
         .servers
         .get(index as usize)
         .ok_or_else(|| format!("SMB 서버 항목이 없습니다: {index}"))?;
-    Ok(td_smb::SmbTarget {
+    Ok(smb_target_of(s))
+}
+
+fn smb_target_of(s: &td_config::SmbServer) -> td_smb::SmbTarget {
+    td_smb::SmbTarget {
         host: s.host.clone(),
         share: s.share.clone(),
         user: Some(s.user.clone()).filter(|u| !u.is_empty()),
-    })
+    }
+}
+
+/// 저장된 SMB 서버 항목마다 지금 마운트된 위치(없으면 `None`)를 순서대로 돌려준다.
+fn smb_mount_points(
+    servers: &[td_config::SmbServer],
+    find: impl Fn(&td_smb::SmbTarget) -> Option<std::path::PathBuf>,
+) -> Vec<Option<String>> {
+    servers
+        .iter()
+        .map(|s| find(&smb_target_of(s)).map(|p| p.to_string_lossy().into_owned()))
+        .collect()
+}
+
+/// 저장된 SMB 서버 항목마다 지금 마운트된 위치를 돌려준다(항목 순서와 같고, 마운트돼 있지 않으면 `null`).
+/// 앱 밖(Finder 등)에서 마운트한 공유도 찾는다. UI는 이것으로 SMB 탭의 아이콘·색을 정한다(이슈 #92·#93).
+#[tauri::command]
+#[specta::specta]
+pub fn smb_mounts(config: State<'_, ConfigState>) -> Vec<Option<String>> {
+    smb_mount_points(&config.current().config.smb.servers, td_smb::find_mounted)
 }
 
 /// 설정의 `index`번째 SMB 서버에 연결(OS 마운트)한다. 이미 마운트돼 있으면 그 경로를 돌려준다.
@@ -1594,6 +1617,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             set_smb_servers,
             smb_connect,
             smb_forget_password,
+            smb_mounts,
             set_remote_servers,
             remote_connect,
             remote_disconnect,
@@ -2005,6 +2029,21 @@ mod smb_tests {
         assert_eq!(guest.user, None);
         assert_eq!(smb_target(&state, 1).unwrap().user.as_deref(), Some("kim"));
         assert!(smb_target(&state, 2).is_err());
+    }
+
+    #[test]
+    fn smb_마운트_위치는_항목_순서대로_찾고_없으면_none이다() {
+        let server = |share: &str| td_config::SmbServer {
+            name: share.into(),
+            host: "nas".into(),
+            share: share.into(),
+            user: String::new(),
+            icon: String::new(),
+        };
+        let found = smb_mount_points(&[server("a"), server("b")], |t| {
+            (t.share == "b").then(|| std::path::PathBuf::from("/Volumes/b"))
+        });
+        assert_eq!(found, vec![None, Some("/Volumes/b".to_string())]);
     }
 
     #[test]

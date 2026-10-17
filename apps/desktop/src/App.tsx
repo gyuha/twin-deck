@@ -14,13 +14,14 @@ import { installFileMenuForWindow } from "./appMenu";
 import { StoreContext, useApp, useAppStore, useT } from "./state/context";
 import { actionContext, activeTab, createAppStore, scopeStack } from "./state/store";
 import { ActionBar, useBarIds } from "./ui/ActionBar";
-import { useTextColor, useUiFont } from "./ui/fonts";
+import { textColorFor, useTabColors, useTextColor, useUiFont } from "./ui/fonts";
 import { ActionsPalette } from "./ui/ActionsPalette";
 import { Dialog } from "./ui/Dialog";
 import { DragLayer } from "./ui/DragLayer";
 import { Preview } from "./ui/Preview";
 import { fkeyBindings } from "./lib/fkeys";
 import { parseThemeList, resolveTheme, themeVars } from "./lib/themeColors";
+import type { WarpTheme } from "./lib/themes.generated";
 import { FindDialog } from "./ui/FindDialog";
 import { Help } from "./ui/Help";
 import { PaneSplit } from "./ui/PaneSplit";
@@ -51,15 +52,15 @@ export function detectPlatform(): Platform {
 /**
  * 설정 `behavior.theme`을 `<html>`에 반영한다: 테마의 색 토큰을 인라인 `--color-*`로 걸고, `data-theme`(dark/light)·`data-color-theme`(테마 이름)·
  * 클래스(dark/light, `color-scheme`용)를 정한다. system은 OS가 다크인지에 따라 Mocha/Latte이고 OS 설정이 바뀌면 따라간다.
- * 모든 테마가 같은 토큰 묶음을 덮어쓰므로 이전 테마의 값이 남지 않는다. 지금 적용된 테마가 다크인지 돌려준다(테마별 글자색, 이슈 #58).
+ * 모든 테마가 같은 토큰 묶음을 덮어쓰므로 이전 테마의 값이 남지 않는다. 지금 적용된 테마를 돌려준다(테마별 글자색 이슈 #58, 특수 탭 색 이슈 #92).
  */
-function useTheme(setting: string): boolean {
-  const [dark, setDark] = useState(false);
+function useTheme(setting: string): WarpTheme | null {
+  const [theme, setTheme] = useState<WarpTheme | null>(null);
   useEffect(() => {
     const media = typeof window.matchMedia === "function" ? window.matchMedia("(prefers-color-scheme: dark)") : null;
     const apply = () => {
       const t = resolveTheme(setting, !!media?.matches);
-      setDark(t.dark);
+      setTheme(t);
       const root = document.documentElement;
       for (const [name, value] of Object.entries(themeVars(t))) root.style.setProperty(name, value);
       root.dataset.theme = t.dark ? "dark" : "light";
@@ -71,7 +72,7 @@ function useTheme(setting: string): boolean {
     media.addEventListener("change", apply);
     return () => media.removeEventListener("change", apply);
   }, [setting]);
-  return dark;
+  return theme;
 }
 
 /**
@@ -200,9 +201,11 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
   const [themePreview, setThemePreview] = useState<string | null>(null);
   useEffect(() => setThemePreview(null), [loaded.config.behavior.theme]);
   const randomTheme = useRandomTheme(loaded.config.behavior);
-  const darkTheme = useTheme(themePreview ?? randomTheme ?? loaded.config.behavior.theme);
+  const theme = useTheme(themePreview ?? randomTheme ?? loaded.config.behavior.theme);
+  const darkTheme = theme?.dark ?? false;
   useUiFont(loaded.config.behavior.ui_font);
   useTextColor(loaded.config.behavior, darkTheme);
+  useTabColors(loaded.config.behavior.layout, theme, textColorFor(loaded.config.behavior, darkTheme));
 
   // 웹뷰 기본 메뉴(Reload, Inspect Element)는 막는다. 입력창의 잘라내기/붙여넣기 메뉴는 남긴다.
   useEffect(() => {

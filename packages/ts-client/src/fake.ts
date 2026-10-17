@@ -839,7 +839,7 @@ export class FakeBackend implements Backend {
 
   /** 실제 구현처럼 목록 전체를 바꾼다. host나 share가 빈 항목이 있으면 거부하고, 빈 name은 `host/share`로 채운다. */
   async setSmbServers(servers: SmbServer[]) {
-    const items = servers.map((v) => ({ name: v.name.trim(), host: v.host.trim(), share: v.share.trim(), user: v.user.trim() }));
+    const items = servers.map((v) => ({ name: v.name.trim(), host: v.host.trim(), share: v.share.trim(), user: v.user.trim(), icon: (v.icon ?? "").trim() }));
     const bad = items.findIndex((v) => !v.host || !v.share);
     if (bad >= 0) throw new BackendError(`smb.servers[${bad + 1}]: host와 share가 필요합니다`);
     this.setConfig((l) => {
@@ -883,6 +883,14 @@ export class FakeBackend implements Backend {
     this.smbPasswords.delete(FakeBackend.smbKey(this.smbServer(index)));
   }
 
+  /** 가짜 마운트 위치는 `/Volumes/<share>`다. 그 볼륨이 있으면 마운트된 것으로 본다. */
+  async smbMounts() {
+    return (this.loaded.config.smb.servers ?? []).map((s) => {
+      const mountPoint = `/Volumes/${s.share}`;
+      return this.volumes.some((v) => v.mountPoint === mountPoint) ? mountPoint : null;
+    });
+  }
+
   /** 실제 구현처럼 목록 전체를 바꾼다. protocol이 sftp·ftp가 아니거나 host가 빈 항목이 있으면 거부하고, 빈 name은 `user@host`(사용자가 없으면 `host`)로, 0인 포트는 기본 포트로 채운다. */
   async setRemoteServers(servers: RemoteServer[]) {
     const items = servers.map((v) => ({
@@ -892,6 +900,7 @@ export class FakeBackend implements Backend {
       port: v.port,
       user: v.user.trim(),
       base_dir: v.base_dir.trim(),
+      icon: (v.icon ?? "").trim(),
     }));
     const bad = items.findIndex((v) => !["sftp", "ftp", "twindeck"].includes(v.protocol) || !v.host);
     if (bad >= 0) throw new BackendError(`remote.servers[${bad + 1}]: protocol은 sftp, ftp, twindeck 중 하나여야 하고 host가 필요합니다`);

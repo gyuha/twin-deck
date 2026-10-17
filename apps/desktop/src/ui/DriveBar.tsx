@@ -4,6 +4,7 @@ import { activeTab } from "../state/store";
 import type { PaneId } from "../state/store";
 import { REMOTE_SECTION, SMB_SECTION } from "./Settings";
 import { isRemotePath } from "@twin-deck/ts-client";
+import { withIcon } from "../lib/connections";
 
 /**
  * 패널 위의 드라이브 바(Double Commander 방식). 한 줄이다: 마운트된 볼륨 버튼(현재 볼륨 강조, 누르면 그 루트로 이동)이 왼쪽에 있고,
@@ -18,6 +19,8 @@ export function DriveBar({ pane }: { pane: PaneId }) {
   const path = useApp((s) => activeTab(s, pane).path);
   const virtual = useApp((s) => !!activeTab(s, pane).virtual);
   const show = useApp((s) => s.loaded.config.behavior.layout.show_drive_bar);
+  const smbServers = useApp((s) => s.loaded.config.smb.servers);
+  const smbMounts = useApp((s) => s.smbMounts);
   if (!show || volumes.length === 0) return null;
   const current = virtual ? null : volumeOf(path, volumes);
   const side = pane === "left" ? t("common.left") : t("common.right");
@@ -26,6 +29,8 @@ export function DriveBar({ pane }: { pane: PaneId }) {
       <div role="toolbar" aria-label={t("drive.aria", { side })} className="flex flex-wrap items-center gap-1 px-2 py-1">
         {volumes.map((v) => {
           const on = current?.mountPoint === v.mountPoint;
+          // 저장된 SMB 항목이 마운트된 볼륨이면 그 항목의 이모지를 붙인다(이슈 #93).
+          const icon = smbServers?.[smbMounts.indexOf(v.mountPoint)]?.icon;
           return (
             <button
               key={v.mountPoint}
@@ -35,7 +40,7 @@ export function DriveBar({ pane }: { pane: PaneId }) {
               onClick={() => void api.selectVolume(pane, v.mountPoint)}
               className={"rounded border px-2 py-0.5 " + (on ? "border-accent bg-accent/15 text-ink" : "border-app-line text-ink-dull hover:bg-app-selected")}
             >
-              {v.name}
+              {withIcon(icon, v.name)}
             </button>
           );
         })}

@@ -245,6 +245,9 @@ pub fn set_smb_servers(dir: &Path, servers: &[SmbServer]) -> Result<(), String> 
         t.insert("host", toml_edit::value(s.host.as_str()));
         t.insert("share", toml_edit::value(s.share.as_str()));
         t.insert("user", toml_edit::value(s.user.as_str()));
+        if !s.icon.is_empty() {
+            t.insert("icon", toml_edit::value(s.icon.as_str()));
+        }
         list.push(t);
     }
     smb.insert("servers", toml_edit::Item::ArrayOfTables(list));
@@ -292,6 +295,9 @@ pub fn set_remote_servers(dir: &Path, servers: &[RemoteServer]) -> Result<(), St
         t.insert("port", toml_edit::value(i64::from(s.port)));
         t.insert("user", toml_edit::value(s.user.as_str()));
         t.insert("base_dir", toml_edit::value(s.base_dir.as_str()));
+        if !s.icon.is_empty() {
+            t.insert("icon", toml_edit::value(s.icon.as_str()));
+        }
         list.push(t);
     }
     remote.insert("servers", toml_edit::Item::ArrayOfTables(list));
