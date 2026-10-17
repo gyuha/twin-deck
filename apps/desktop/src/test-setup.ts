@@ -24,6 +24,13 @@ Element.prototype.setPointerCapture ??= () => {};
 Element.prototype.releasePointerCapture ??= () => {};
 Element.prototype.scrollIntoView ??= () => {};
 
+// jsdom에는 ResizeObserver가 없다. 이모지 선택 팝업(frimousse)이 쓴다. 크기 변화를 알려 주지 않는 최소 shim이며, 실제 레이아웃을 검증하는 것은 아니다.
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
+
 // Node의 `fetch().blob()`은 Node의 Blob을 돌려주는데 jsdom의 FileReader는 jsdom의 Blob만 받는다.
 // Node Blob이 오면 내용을 읽어 jsdom Blob으로 바꿔서 넘기는 최소한의 shim이다(실제 브라우저에는 이런 구분이 없다).
 const readAsText = FileReader.prototype.readAsText;

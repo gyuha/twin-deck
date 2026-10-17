@@ -53,6 +53,8 @@ crates.io에서 받아 쓰는 라이브러리이며 코드를 복사해 온 것�
 | three | 0.186.1 | MIT | 3D 모델 미리보기(렌더러와 STL·OBJ·PLY·FBX·glTF·3MF·USDZ·GCode 로더) |
 | occt-import-js | 0.0.23 | LGPL-2.1 | STEP·IGES 읽기. 안에 든 OpenCascade(Open CASCADE Technology) 컴파일 결과(`occt-import-js.wasm`)를 수정 없이 별도 wasm 파일로 불러온다. 라이선스 원문은 패키지의 `dist/license.occt.txt`·`dist/license.occt-import-js.txt`, 소스는 https://github.com/kovacsv/occt-import-js |
 | react-colorful | 5.8.1 | MIT | 설정 화면의 글자색 색상환 |
+| frimousse | 0.4.0 | MIT | 서버 아이콘의 이모지 선택 팝업(`IconField`) |
+| emojibase-data (`ko`·`en`의 `data.json`·`messages.json`) | 16.0.3 | MIT | 이모지 선택 팝업이 인터넷 없이 쓰는 이모지 데이터. 수정 없이 `apps/desktop/public/emojibase/`에 복사했고 라이선스 원문은 같은 폴더의 `LICENSE`다 |
 
 ### Draco 디코더 (번들 자산)
 

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { EmojiPicker } from "frimousse";
 import { HexColorPicker } from "react-colorful";
 import { Button, Input, Select, SelectOption } from "@spacedrive/primitives";
 import { defaultBindingsFor } from "@twin-deck/actions";
@@ -586,13 +588,62 @@ function lastGrapheme(value: string): string {
   return parts.length > 0 ? parts[parts.length - 1].segment : "";
 }
 
-/** 연결 항목의 이모지 한 칸(이슈 #93). 연결 메뉴·드라이브 바·경로 표시줄·탭 이름 앞에 붙는다. */
+/** 이모지 팝업의 크기(px). 아이콘 칸 아래에 둘 자리가 모자라면 위로 올려 그린다. */
+const EMOJI_POPUP = { w: 320, h: 300 };
+
+/**
+ * 연결 항목의 이모지 한 칸(이슈 #93). 연결 메뉴·드라이브 바·경로 표시줄·탭 이름 앞에 붙는다.
+ * 칸을 누르면 `frimousse` 이모지 선택기가 팝업으로 뜬다. 편집 창의 크기·스크롤을 바꾸지 않도록 `body`로 포털해 `fixed`로 그린다.
+ * 이모지 데이터는 앱에 들어 있다(`public/emojibase`, 인터넷 요청 없음). 목록에 없는 이모지는 칸에 직접 넣는다(포커스는 칸에 남는다).
+ */
 function IconField({ value, disabled, onChange, onDone }: { value: string; disabled: boolean; onChange: (v: string) => void; onDone: () => void }) {
   const t = useT();
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const wrap = useRef<HTMLDivElement>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const popup = useRef<HTMLDivElement>(null);
+  // 고른 뒤 포커스를 칸으로 돌릴 때 그 포커스가 팝업을 다시 열지 않게 한 번 건너뛴다.
+  const skipOpen = useRef(false);
+  const open = () => {
+    const r = input.current?.getBoundingClientRect();
+    if (!r) return;
+    const below = r.bottom + 4;
+    const top = below + EMOJI_POPUP.h > window.innerHeight ? Math.max(4, r.top - EMOJI_POPUP.h - 4) : below;
+    setPos({ top, left: Math.max(4, Math.min(r.left, window.innerWidth - EMOJI_POPUP.w - 4)) });
+  };
+  const close = () => {
+    setPos(null);
+    skipOpen.current = true;
+    input.current?.focus();
+  };
+  useEffect(() => {
+    if (!pos) return;
+    const away = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (!wrap.current?.contains(target) && !popup.current?.contains(target)) setPos(null);
+    };
+    document.addEventListener("mousedown", away);
+    return () => document.removeEventListener("mousedown", away);
+  }, [pos]);
+  const pick = (emoji: string) => {
+    onChange(emoji);
+    close();
+  };
   return (
-    <label className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+    <div
+      ref={wrap}
+      className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm"
+      onKeyDown={(e) => {
+        // 팝업이 열려 있으면 Esc는 팝업만 닫는다(편집 창까지 닫지 않는다). 팝업은 포털이지만 React 이벤트는 여기까지 올라온다.
+        if (pos && e.key === "Escape" && !e.nativeEvent.isComposing) {
+          e.stopPropagation();
+          close();
+        }
+      }}
+    >
       <span className="w-24 shrink-0">{t("settings.server.icon")}</span>
       <Input
+        ref={input}
         aria-label={t("settings.server.icon")}
         type="text"
         size="sm"
@@ -601,12 +652,68 @@ function IconField({ value, disabled, onChange, onDone }: { value: string; disab
         disabled={disabled}
         placeholder="🙂"
         onChange={(e) => onChange(lastGrapheme(e.target.value))}
+        onClick={open}
+        onFocus={() => {
+          if (skipOpen.current) skipOpen.current = false;
+          else open();
+        }}
         onKeyDown={(e) => {
           if (e.key === "Enter") onDone();
         }}
       />
       <span className="text-xs text-ink-faint">{t("settings.server.icon_hint")}</span>
-    </label>
+      {pos &&
+        !disabled &&
+        createPortal(
+          <div
+            ref={popup}
+            role="dialog"
+            aria-label={t("settings.server.icon_picker")}
+            style={{ position: "fixed", top: pos.top, left: pos.left, width: EMOJI_POPUP.w, height: EMOJI_POPUP.h }}
+            className="z-[60] flex flex-col overflow-hidden rounded border border-app-line bg-app-box text-sm shadow-lg"
+          >
+            <EmojiPicker.Root
+              locale={currentLanguage() === "en" ? "en" : "ko"}
+              emojibaseUrl="/emojibase"
+              columns={8}
+              onEmojiSelect={(e) => pick(e.emoji)}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <EmojiPicker.Search aria-label={t("settings.server.icon_search")} placeholder={t("settings.server.icon_search")} className="m-2 rounded border border-app-line bg-app-dark-box px-2 py-1 outline-none" />
+              <EmojiPicker.Viewport className="relative min-h-0 flex-1 overflow-y-auto">
+                <EmojiPicker.Loading className="absolute inset-0 flex items-center justify-center text-ink-faint">{t("settings.server.icon_loading")}</EmojiPicker.Loading>
+                <EmojiPicker.Empty className="absolute inset-0 flex items-center justify-center text-ink-faint">{t("settings.server.icon_empty")}</EmojiPicker.Empty>
+                <EmojiPicker.List
+                  className="select-none pb-1"
+                  components={{
+                    CategoryHeader: ({ category, ...props }) => (
+                      <div {...props} className="bg-app-box px-2 py-1 text-xs font-semibold text-ink-faint">
+                        {category.label}
+                      </div>
+                    ),
+                    Row: ({ children, ...props }) => (
+                      <div {...props} className="scroll-my-1 px-1">
+                        {children}
+                      </div>
+                    ),
+                    Emoji: ({ emoji, ...props }) => (
+                      <button {...props} className="flex size-9 items-center justify-center rounded text-xl data-[active]:bg-app-selected">
+                        {emoji.emoji}
+                      </button>
+                    ),
+                  }}
+                />
+              </EmojiPicker.Viewport>
+            </EmojiPicker.Root>
+            <div className="flex justify-end border-t border-app-line p-1.5">
+              <Button type="button" size="sm" variant="gray" onClick={() => pick("")}>
+                {t("settings.server.icon_clear")}
+              </Button>
+            </div>
+          </div>,
+          document.body,
+        )}
+    </div>
   );
 }
 
