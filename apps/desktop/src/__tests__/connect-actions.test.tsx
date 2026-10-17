@@ -42,8 +42,8 @@ describe("연결 액션 (이슈 #95)", () => {
     const { user } = await renderApp(b);
     await user.keyboard("{Tab}"); // 오른쪽 패널이 활성
     await runAction(user, "core.menu.connect");
-    expect((await options()).join("|")).toContain("SFTP · 회사");
-    await user.click(within(await menu()).getByRole("option", { name: /SFTP · 회사/ }));
+    expect((await options()).join("|")).toContain("SFTP 회사");
+    await user.click(within(await menu()).getByRole("option", { name: /SFTP 회사/ }));
     await waitFor(() => expect(tabTitles("right")).toHaveLength(2));
     expect(tabTitles("left")).toHaveLength(1); // 왼쪽은 그대로
     expect(await b.remoteConnections()).toEqual([0]);
@@ -62,7 +62,7 @@ describe("연결 액션 (이슈 #95)", () => {
     const { user } = await renderApp(b);
     await runAction(user, "core.menu.connect");
     await menu(); // 커서는 첫 항목(SFTP)에서 시작한다
-    const sftp = within(await menu()).getByRole("option", { name: /SFTP · 회사/ });
+    const sftp = within(await menu()).getByRole("option", { name: /SFTP 회사/ });
     await waitFor(() => expect(sftp).toHaveAttribute("aria-selected", "true"));
     await user.keyboard(SHIFT_ENTER);
     await waitFor(() => expect([...b.terminals.values()].map((x) => x.remote)).toEqual(["kim@nas:22"]));

@@ -202,8 +202,13 @@ export const recentLimit = (c: { behavior: { layout: { recent_limit: number } } 
 
 export type MenuKind = "volumes" | "favorites" | "recent" | "hierarchy" | "smb";
 
+/** 연결 메뉴 항목의 연결 종류(이름 앞 배지, 이슈 #95). */
+export type ConnectionProtocol = "smb" | "sftp" | "ftp" | "twindeck";
+
 export interface MenuItem {
   label: string;
+  /** 연결 메뉴: 이 항목의 연결 종류. 있으면 이름 앞에 종류 배지를 보인다. */
+  protocol?: ConnectionProtocol;
   /** 이동할 경로. 없으면 머리글/구분선이라 고를 수 없다. */
   path?: string;
   /** 즐겨찾기 항목의 변수 확장 전 경로(삭제할 때 설정 파일과 맞춘다). */
@@ -2981,13 +2986,21 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       set({ menu: null });
       return api.connectRemoteTerminal(m.pane ?? get().activePane, item.remote);
     },
-    /** 숫자키: n번째로 고를 수 있는 항목 (1~9, 0은 10번째). */
-    async menuSelectNth(n: number) {
+    /**
+     * 숫자키: n번째로 고를 수 있는 항목 (1~9, 0은 10번째). `terminal`이면(Shift+숫자, 이슈 #95) 그 항목이 SFTP 서버일 때만
+     * 연결한 뒤 그 서버의 SSH(원격 셸) 터미널 탭을 연다. SFTP가 아닌 항목이면 아무것도 하지 않고 메뉴를 그대로 둔다(Shift+Enter와 같다).
+     */
+    async menuSelectNth(n: number, terminal = false) {
       const m = get().menu;
       if (!m) return;
       const selectable = m.items.map((it, i) => (pickable(it) ? i : -1)).filter((i) => i >= 0);
       const idx = selectable[n === 0 ? 9 : n - 1];
-      if (idx !== undefined) await api.menuSelect(idx);
+      if (idx === undefined) return;
+      if (!terminal) return api.menuSelect(idx);
+      const item = m.items[idx];
+      if (!item.terminal || item.remote === undefined) return;
+      set({ menu: null });
+      return api.connectRemoteTerminal(m.pane ?? get().activePane, item.remote);
     },
     /**
      * 드라이브 바의 "연결" 메뉴: 저장된 SMB 서버 항목, 원격(SFTP·FTP) 서버 항목(연결 중이면 비활성), 그리고 각 설정 탭을 여는
@@ -2999,12 +3012,14 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       // 항목에 이모지가 있으면 이름 앞에 붙인다(이슈 #93).
       const items: MenuItem[] = (s.loaded.config.smb.servers ?? []).map((v, i) => {
         const name = withIcon(v.icon, v.name);
-        return s.smbConnecting.includes(i) ? { label: tr("store.smb.connecting", { name }), smb: i, disabled: true } : { label: name, smb: i };
+        return s.smbConnecting.includes(i) ? { label: tr("store.smb.connecting", { name }), smb: i, disabled: true, protocol: "smb" } : { label: name, smb: i, protocol: "smb" };
       });
       const remotes = s.loaded.config.remote.servers ?? [];
       remotes.forEach((v, i) => {
-        const label = withIcon(v.icon, `${v.protocol.toUpperCase()} · ${v.name}`);
-        items.push(s.remoteConnecting.includes(i) ? { label: tr("store.remote.connecting", { name: label }), remote: i, disabled: true } : { label, remote: i, terminal: v.protocol === "sftp" });
+        // 연결 종류는 이름 앞 배지(`ProtocolBadge`)가 보여 주므로 이름에는 붙이지 않는다.
+        const protocol: ConnectionProtocol = v.protocol === "ftp" ? "ftp" : v.protocol === "twindeck" ? "twindeck" : "sftp";
+        const label = withIcon(v.icon, v.name);
+        items.push(s.remoteConnecting.includes(i) ? { label: tr("store.remote.connecting", { name: label }), remote: i, disabled: true, protocol } : { label, remote: i, terminal: v.protocol === "sftp", protocol });
       });
       if (items.length > 0) items.push({ label: "", separator: true });
       items.push({ label: tr("store.smb.manage"), settings: smbSection });

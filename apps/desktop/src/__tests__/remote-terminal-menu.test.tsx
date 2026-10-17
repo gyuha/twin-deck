@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { renderApp, seedBackend } from "./helpers";
 
@@ -120,5 +120,55 @@ describe("연결 메뉴의 Shift+Enter 터미널 (이슈 #94)", () => {
     expect(option(/회사/)).toHaveTextContent("Shift+Enter: 터미널");
     expect(option(/백업/)).not.toHaveTextContent("Shift+Enter");
     expect(option(/NAS/)).not.toHaveTextContent("Shift+Enter");
+  });
+
+  // Shift+숫자(이슈 #95): 메뉴는 NAS(1)·회사 SFTP(2)·백업 FTP(3) 순이다. 실제 브라우저처럼 Shift를 누르면 e.key는 기호, e.code는 키 위치다.
+  const shiftDigit = (n: number) => fireEvent.keyDown(window, { key: "!@#$%^&*()"[n === 0 ? 9 : n - 1], code: `Digit${n}`, shiftKey: true });
+
+  it("Shift+숫자: n번째가 SFTP 서버면 연결해 SSH 터미널 탭을 열고 메뉴가 닫힌다", async () => {
+    const { backend } = setup();
+    const { user } = await renderApp(backend);
+    await open(user);
+    shiftDigit(2);
+    expect(screen.queryByRole("dialog", { name: "서버에 연결" })).toBeNull();
+    const d = await screen.findByRole("dialog", { name: "회사 비밀번호" });
+    await user.type(within(d).getByLabelText("비밀번호"), "pw{Enter}");
+    await waitFor(() => expect([...backend.terminals.values()].map((t) => t.remote)).toEqual(["kim@nas:22"]));
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toContain("터미널: kim@nas:22");
+  });
+
+  it("Shift+숫자: SFTP가 아닌 항목(SMB·FTP)이나 범위 밖 번호는 아무것도 하지 않고 메뉴가 남는다", async () => {
+    const { backend, smbConnect } = setup();
+    const { user } = await renderApp(backend);
+    await open(user);
+    for (const n of [1, 3, 9, 0]) shiftDigit(n);
+    expect(menu()).toBeInTheDocument();
+    expect(await backend.remoteConnections()).toEqual([]);
+    expect(smbConnect).not.toHaveBeenCalled();
+    expect(backend.terminals.size).toBe(0);
+    expect(screen.queryByRole("dialog", { name: /비밀번호/ })).toBeNull();
+  });
+
+  it("숫자만 누르면 지금처럼 연결만 하고, Shift로 숫자 자체를 치는 배열(key가 숫자)도 숫자 선택으로 남는다", async () => {
+    const { backend } = setup();
+    const { user } = await renderApp(backend);
+    await open(user);
+    await user.keyboard("2");
+    const d = await screen.findByRole("dialog", { name: "회사 비밀번호" });
+    await user.type(within(d).getByLabelText("비밀번호"), "pw{Enter}");
+    await waitFor(async () => expect(await backend.remoteConnections()).toEqual([0]));
+    expect(backend.terminals.size).toBe(0);
+    // AZERTY 같은 배열: Shift를 눌러야 숫자가 나온다 — key가 "2"이므로 터미널이 아니라 숫자 선택이다.
+    await open(user);
+    fireEvent.keyDown(window, { key: "2", code: "Digit2", shiftKey: true });
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "서버에 연결" })).toBeNull());
+    expect(backend.terminals.size).toBe(0);
+  });
+
+  it("연결 메뉴 아래 도움말이 SFTP의 Shift+숫자 터미널 연결을 알려 준다", async () => {
+    const { backend } = setup();
+    const { user } = await renderApp(backend);
+    await open(user);
+    expect(menu()).toHaveTextContent("SFTP는 Shift+숫자/Shift+Return: SSH 터미널");
   });
 });

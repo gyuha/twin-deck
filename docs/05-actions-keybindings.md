@@ -142,7 +142,7 @@ Marta에서는 수정자 없는 단일 키 바인딩이 Quick Select에 가로�
 | `core.menu.favorites` | Favorites 메뉴 (열린 뒤 글자·숫자 입력으로 이름·경로 필터, `Alt+숫자`로 n번째 선택, `Ctrl+=`로 현재 폴더 추가·이미 있으면 무시, `Ctrl+-`로 커서 항목을 즐겨찾기에서 삭제(폴더는 그대로)) | `Alt+2` | `Alt+2` | 자체 ID, 키 확인 |
 | `core.menu.recent` | Recent Locations (열린 뒤 글자·숫자 입력으로 경로 필터, `Alt+숫자`로 n번째 선택) | `Alt+3` | `Alt+3` | 자체 ID, 키 확인 |
 | `core.menu.hierarchy` | Hierarchy | `Alt+0` | `Alt+0` | 자체 ID, 키 확인 |
-| `core.menu.connect` | 서버에 연결 메뉴 (이슈 #95): 드라이브 바의 "연결" 버튼과 같다. 활성 패널에서 저장된 SMB·SFTP·FTP 서버 목록 메뉴를 연다. 메뉴 안에서 `Enter`는 연결(그 패널에 서버 루트를 보는 새 탭), SFTP 항목의 `Shift+Enter`(`core.menu.select_terminal`)는 SSH(원격 셸) 터미널 탭이다. 항목 끝의 "SFTP·FTP 관리…"는 설정을 그 탭에서 연다. 액션 패널에서 "sftp"·"ssh"로 찾을 수 있고 macOS 메뉴바 File 메뉴에도 "서버에 연결…"로 있다 | `Alt+4` | `Alt+4` | pane, 자체 ID, 키 확인 |
+| `core.menu.connect` | 서버에 연결 메뉴 (이슈 #95): 드라이브 바의 "연결" 버튼과 같다. 활성 패널에서 저장된 SMB·SFTP·FTP 서버 목록 메뉴를 연다. 메뉴 안에서 `Enter`·숫자키는 연결(그 패널에 서버 루트를 보는 새 탭), SFTP 항목의 `Shift+Enter`(`core.menu.select_terminal`)와 `Shift+숫자`(n번째 항목이 SFTP일 때, 키 위치로 번호를 읽으며 SFTP가 아닌 항목·범위 밖은 아무 일도 없다)는 연결한 뒤 SSH(원격 셸) 터미널 탭이다. 항목 끝의 "SFTP·FTP 관리…"는 설정을 그 탭에서 연다. 액션 패널에서 "sftp"·"ssh"로 찾을 수 있고 macOS 메뉴바 File 메뉴에도 "서버에 연결…"로 있다 | `Alt+4` | `Alt+4` | pane, 자체 ID, 키 확인 |
 | `core.menu.select_terminal` | 메뉴: 터미널로 열기 — 드라이브 바 "서버에 연결" 메뉴에서 커서가 SFTP 항목이면 연결해 그 서버의 원격 셸 터미널 탭만 메뉴를 연 현재 패널의 탭 줄에 연다(패널은 옮기지 않는다. `Enter`는 패널을 서버로 옮기는 연결). SFTP 항목 오른쪽에 "Shift+Enter: 터미널" 배지가 보이고, FTP·SMB·관리 항목에서는 아무것도 하지 않는다. 구현됨(이슈 #94) | `Shift+Enter` | `Shift+Enter` | panel, 자체 ID, 키 확인 |
 | `core.favorites.add` / `core.favorites.edit` | Favorites 추가/편집 | 없음 | 없음 | 자체 |
 | `core.recent.clear` | Recent 비우기 (최근 위치 메뉴 안) | `Ctrl+Backspace` | `Ctrl+Backspace` | 자체 |

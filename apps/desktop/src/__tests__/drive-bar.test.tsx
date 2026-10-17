@@ -236,7 +236,7 @@ describe("드라이브 바", () => {
     it("연결 메뉴에 저장된 항목과 구분선, SMB 서버 관리…가 보인다", async () => {
       const { user } = await renderApp(withServers(NAS, GUEST));
       await openConnect(user);
-      expect(options()).toEqual(["1NAS", "2공용", "3SMB 서버 관리…", "4SFTP·FTP 관리…"]);
+      expect(options()).toEqual(["1SMB NAS", "2SMB 공용", "3SMB 서버 관리…", "4SFTP·FTP 관리…"]);
       expect(within(menu()).getByRole("separator")).toBeInTheDocument();
     });
 
@@ -446,7 +446,7 @@ describe("드라이브 바", () => {
         };
         const { user } = await renderApp(backend);
         await openConnect(user);
-        await pick(user, "SFTP · 회사");
+        await pick(user, "SFTP 회사");
         const d = await screen.findByRole("dialog", { name: "SFTP 서버 신원 확인" });
         expect(within(d).getByText("nas:22")).toBeVisible();
         expect(within(d).getByText("ssh-ed25519")).toBeVisible();
@@ -480,7 +480,7 @@ describe("드라이브 바", () => {
           expect(approvals).toEqual([undefined, challenge.publicKey]);
           await user.click(within(bar("왼쪽")).getByRole("button", { name: "연결 끊기" }));
           await openConnect(user);
-          await pick(user, "SFTP · 회사");
+          await pick(user, "SFTP 회사");
           await waitFor(async () => expect(await backend.remoteConnections()).toEqual([0]));
           expect(screen.queryByRole("dialog", { name: "SFTP 서버 신원 확인" })).toBeNull();
         } else {
@@ -496,7 +496,7 @@ describe("드라이브 바", () => {
       backend.remoteConnect = async () => { calls++; throw new HostKeyError({ ...challenge, previousFingerprint: "SHA256:old" }); };
       const { user } = await renderApp(backend);
       await openConnect(user);
-      await pick(user, "SFTP · 회사");
+      await pick(user, "SFTP 회사");
       expect(await screen.findByText(/SFTP 서버 키가 변경되어 인증을 차단/)).toHaveTextContent(/SHA256:old.*SHA256:test-fingerprint/);
       expect(screen.getByText(/서버 사칭 위험/)).toBeVisible();
       expect(calls).toBe(1);
@@ -506,14 +506,14 @@ describe("드라이브 바", () => {
     it("연결 메뉴에 저장된 원격 항목이 프로토콜과 함께 보이고 SFTP·FTP 관리…가 있다", async () => {
       const { user } = await renderApp(withRemotes(SFTP, FTP));
       await openConnect(user);
-      expect(options()).toEqual(["1SFTP · 회사Shift+Enter: 터미널", "2FTP · 공개", "3SMB 서버 관리…", "4SFTP·FTP 관리…"]);
+      expect(options()).toEqual(["1SFTP 회사Shift+Enter: 터미널", "2FTP 공개", "3SMB 서버 관리…", "4SFTP·FTP 관리…"]);
     });
 
     it("SFTP 항목을 고르면 비밀번호를 묻고 맞으면 그 패널이 원격 루트로 이동한다(기억하면 저장된다)", async () => {
       const backend = withRemotes(SFTP);
       const { user } = await renderApp(backend);
       await openConnect(user, "오른쪽");
-      await pick(user, "SFTP · 회사");
+      await pick(user, "SFTP 회사");
       let d = await passwordDialog();
       await user.type(within(d).getByLabelText("비밀번호"), "bad{Enter}");
       d = await passwordDialog();
@@ -536,11 +536,11 @@ describe("드라이브 바", () => {
       backend.remotePasswords.set("kim@nas:22/sftp", "secret");
       const { user } = await renderApp(backend);
       await openConnect(user, "오른쪽");
-      await pick(user, "SFTP · 회사");
+      await pick(user, "SFTP 회사");
       await waitFor(() => expect(rightCrumbs()).toEqual(["sftp://kim@nas:22/"]));
       expect(screen.queryByRole("dialog", { name: "회사 비밀번호" })).toBeNull();
       await openConnect(user, "오른쪽");
-      await pick(user, "FTP · 공개");
+      await pick(user, "FTP 공개");
       await waitFor(() => expect(rightCrumbs()).toEqual(["ftp://ftp.example.com:21/", "pub"]));
     });
 
@@ -548,7 +548,7 @@ describe("드라이브 바", () => {
       const backend = withRemotes(SFTP);
       const { user } = await renderApp(backend);
       await openConnect(user);
-      await pick(user, "SFTP · 회사");
+      await pick(user, "SFTP 회사");
       await passwordDialog();
       await user.keyboard("{Escape}");
       await waitFor(() => expect(screen.queryByRole("dialog", { name: "회사 비밀번호" })).toBeNull());
@@ -579,9 +579,9 @@ describe("드라이브 바", () => {
       };
       const { user } = await renderApp(backend);
       await openConnect(user);
-      await pick(user, "FTP · 공개");
+      await pick(user, "FTP 공개");
       await openConnect(user);
-      const busy = within(menu()).getByRole("option", { name: /FTP · 공개 — 연결 중…/ });
+      const busy = within(menu()).getByRole("option", { name: /FTP 공개 — 연결 중…/ });
       expect(busy).toHaveAttribute("aria-disabled", "true");
       await user.click(busy);
       release();
@@ -600,7 +600,7 @@ describe("드라이브 바", () => {
       };
       const { user } = await renderApp(backend);
       await openConnect(user);
-      await pick(user, "SFTP · 회사");
+      await pick(user, "SFTP 회사");
       await backend.setRemoteServers([{ ...SFTP, host: "other" }]);
       release();
       expect(await screen.findByText(/원격 서버 목록이 바뀌어 연결을 멈췄습니다/)).toBeInTheDocument();
@@ -619,7 +619,7 @@ describe("드라이브 바", () => {
       backend.remotePasswords.set("kim@nas:22/sftp", "pw");
       const { user } = await renderApp(backend);
       await openConnect(user, "오른쪽");
-      await pick(user, "SFTP · 회사");
+      await pick(user, "SFTP 회사");
       await waitFor(() => expect(rightCrumbs()).toEqual(["sftp://kim@nas:22/"]));
       expect(await backend.remoteConnections()).toEqual([0]);
       await user.click(within(bar("오른쪽")).getByRole("button", { name: "연결 끊기" }));

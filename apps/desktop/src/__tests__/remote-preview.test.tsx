@@ -22,7 +22,7 @@ async function connected() {
   backend.remotePasswords.set("kim@nas:22/sftp", "pw");
   const app = await renderApp(backend);
   await app.user.click(within(screen.getByRole("toolbar", { name: "드라이브 (오른쪽 패널)" })).getByRole("button", { name: "연결" }));
-  await app.user.click(within(screen.getByRole("dialog", { name: "서버에 연결" })).getByRole("option", { name: /SFTP · 회사/ }));
+  await app.user.click(within(screen.getByRole("dialog", { name: "서버에 연결" })).getByRole("option", { name: /SFTP 회사/ }));
   await waitFor(() => expect(within(screen.getByRole("listbox", { name: "오른쪽 파일 목록" })).getAllByRole("option")).toHaveLength(6));
   return app;
 }

@@ -48,7 +48,7 @@ describe.skipIf(!binary)("가짜 SFTP 서버와 UI·IPC·신뢰 저장소 통합
     const bar = () => screen.getByRole("toolbar", { name: "드라이브 (왼쪽 패널)" });
     const connect = async () => {
       await user.click(within(bar()).getByRole("button", { name: "연결" }));
-      await user.click(within(screen.getByRole("dialog", { name: "서버에 연결" })).getByRole("option", { name: /SFTP · 로컬 시험/ }));
+      await user.click(within(screen.getByRole("dialog", { name: "서버에 연결" })).getByRole("option", { name: /SFTP 로컬 시험/ }));
     };
     const password = async () => {
       const d = await screen.findByRole("dialog", { name: "로컬 시험 비밀번호" });

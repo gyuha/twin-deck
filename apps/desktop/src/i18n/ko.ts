@@ -726,6 +726,7 @@ export const ko = {
   "popup.hint_recent": " · Ctrl+Backspace 비우기",
   "popup.hint_favorites": " · Ctrl+= 현재 폴더 추가 · Ctrl+- 선택 항목 삭제",
   "popup.hint_menu": "↑↓ 이동 · 숫자/Return 선택 · Esc 닫기{extra}",
+  "popup.hint_connect": " · SFTP는 Shift+숫자/Shift+Return: SSH 터미널",
   "popup.hint_volumes": " · U 언마운트 · E 추출",
   "palette.search_aria": "액션 검색",
   "palette.placeholder": "액션 이름 또는 ID",

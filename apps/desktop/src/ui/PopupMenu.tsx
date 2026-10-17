@@ -1,5 +1,6 @@
 import { useApp, useAppStore, useT } from "../state/context";
 import { pickable } from "../state/store";
+import { ProtocolBadge } from "./ProtocolBadge";
 
 /** Volumes/Favorites/Recent/Hierarchy/SMB 연결 팝업. 항목은 클릭해도 고른다. 키 조작은 `panel` 스코프가 처리한다. */
 export function PopupMenu() {
@@ -32,6 +33,7 @@ export function PopupMenu() {
                 return (
                   <div key={i} role="option" aria-selected={false} aria-disabled="true" className="border-l-4 border-transparent px-2 py-0.5 text-ink-faint">
                     <span className="mr-2 inline-block w-3" />
+                    {it.protocol && <ProtocolBadge protocol={it.protocol} />}{it.protocol && " "}
                     {it.label}
                   </div>
                 );
@@ -55,6 +57,7 @@ export function PopupMenu() {
                   className={i === menu.cursor ? "border-l-4 border-accent bg-app-selected px-2 py-0.5" : "border-l-4 border-transparent px-2 py-0.5"}
                 >
                   <span className="mr-2 inline-block w-3 text-ink-faint">{hint}</span>
+                  {it.protocol && <ProtocolBadge protocol={it.protocol} />}{it.protocol && " "}
                   {it.label}
                   {it.terminal && <span className="float-right ml-2 text-xs text-ink-faint">{t("popup.terminal_badge")}</span>}
                 </div>
@@ -63,7 +66,7 @@ export function PopupMenu() {
           </div>
         )}
         <p className="mt-2 text-xs text-ink-faint">
-          {menu.kind === "recent" || menu.kind === "favorites" ? t("popup.hint_list", { extra: menu.kind === "recent" ? t("popup.hint_recent") : t("popup.hint_favorites") }) : t("popup.hint_menu", { extra: menu.kind === "volumes" ? t("popup.hint_volumes") : "" })}
+          {menu.kind === "recent" || menu.kind === "favorites" ? t("popup.hint_list", { extra: menu.kind === "recent" ? t("popup.hint_recent") : t("popup.hint_favorites") }) : t("popup.hint_menu", { extra: menu.kind === "volumes" ? t("popup.hint_volumes") : menu.kind === "smb" ? t("popup.hint_connect") : "" })}
         </p>
       </div>
     </div>

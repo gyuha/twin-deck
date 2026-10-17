@@ -728,6 +728,7 @@ export const en: Record<Key, string> = {
   "popup.hint_recent": " · Ctrl+Backspace clear",
   "popup.hint_favorites": " · Ctrl+= add current folder · Ctrl+- delete selected",
   "popup.hint_menu": "↑↓ move · number/Return select · Esc close{extra}",
+  "popup.hint_connect": " · SFTP: Shift+number/Shift+Return for an SSH terminal",
   "popup.hint_volumes": " · U unmount · E eject",
   "palette.search_aria": "Search actions",
   "palette.placeholder": "Action name or ID",

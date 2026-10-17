@@ -80,6 +80,16 @@ export function useKeyboard({ app, keymap, registry }: Options) {
         }
         if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key.length === 1 || e.key === "Backspace")) return;
       }
+      // 서버 연결 메뉴: Shift+숫자는 n번째 SFTP 서버에 연결해 SSH 터미널로 연다(이슈 #95). 키 위치(e.code)로 번호를 읽고, 숫자를 Shift로 치는 배열에서
+      // 숫자 자체가 e.key로 오는 경우(AZERTY 등)는 기존 숫자 선택으로 두려고 e.key가 숫자가 아닐 때만 쓴다.
+      if (top === "panel" && s.menu?.kind === "smb" && plain && e.shiftKey && !/^[0-9]$/.test(e.key)) {
+        const digit = /^Digit([0-9])$/.exec(e.code);
+        if (digit) {
+          e.preventDefault();
+          void api.menuSelectNth(Number(digit[1]), true);
+          return;
+        }
+      }
       // 팝업 메뉴: 숫자키로 항목을 고른다.
       if (top === "panel" && plain && /^[0-9]$/.test(e.key)) {
         e.preventDefault();
