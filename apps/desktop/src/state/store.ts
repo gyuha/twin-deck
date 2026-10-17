@@ -1951,7 +1951,9 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     /**
      * 탭 `index`를 반대쪽 패널(`to`)의 `toIndex` 자리로 보낸다. 원래 패널에 탭이 둘 이상이면 이동(탭 상태를 그대로 가져간다),
      * 하나뿐이면 복사한다(원본은 그대로 두고 같은 경로의 새 탭을 만든다 — 원래 패널이 탭 0개가 되지 않게). 보낸 탭이 그 패널의 활성 탭이 되고 그 패널이 활성 패널이 된다.
-     * 가상 탭(검색 결과 등)·범위 밖·같은 패널이면 아무것도 바꾸지 않는다.
+     * 터미널 탭(이슈 #96)은 pty 세션이 하나뿐이라 복사하지 않고 늘 이동한다(같은 탭 id·세션 번호, 세션은 닫지 않는다).
+     * 마지막 탭인 터미널을 보내면 원래 패널에는 그 터미널이 시작한 폴더를 보는 파일 탭을 채운다(터미널 탭을 닫을 때와 같다).
+     * 터미널이 아닌 가상 탭(검색 결과 등)·범위 밖·같은 패널이면 아무것도 바꾸지 않는다.
      */
     async transferTab(from: PaneId, index: number, to: PaneId, toIndex: number) {
       if (from === to) return;
@@ -1959,20 +1961,29 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const src = s.panes[from];
       const dst = s.panes[to];
       const tab = src.tabs[index];
-      if (!tab || tab.virtual) return;
+      const terminal = tab?.virtual?.kind === "terminal";
+      if (!tab || (tab.virtual && !terminal)) return;
       const at = Math.min(Math.max(toIndex, 0), dst.tabs.length);
-      const copying = src.tabs.length <= 1;
+      const copying = !terminal && src.tabs.length <= 1;
       const incoming = copying ? newTab(tab.path) : tab;
       const dstTabs = [...dst.tabs.slice(0, at), incoming, ...dst.tabs.slice(at)];
       let srcPane = src;
+      // 마지막 탭이던 터미널을 보내면 원래 패널이 비지 않게 그 터미널이 시작한 폴더를 보는 파일 탭을 채운다.
+      let fill: TabState | null = null;
       if (!copying) {
         const tabs = src.tabs.filter((_, i) => i !== index);
-        const kept = src.tabs[src.active];
-        const active = index === src.active ? Math.min(index, tabs.length - 1) : tabs.indexOf(kept);
-        srcPane = { tabs, active };
+        if (tabs.length === 0 && tab.virtual?.kind === "terminal") {
+          fill = newTab(tab.virtual.base);
+          srcPane = { tabs: [fill], active: 0 };
+        } else {
+          const kept = src.tabs[src.active];
+          const active = index === src.active ? Math.min(index, tabs.length - 1) : tabs.indexOf(kept);
+          srcPane = { tabs, active };
+        }
       }
       set((st) => ({ panes: { ...st.panes, [from]: srcPane, [to]: { tabs: dstTabs, active: at } }, activePane: to }));
       if (copying) await reload(to, incoming.id);
+      if (fill) await reload(from, fill.id);
       await syncWatches();
     },
     cycleTab(delta: 1 | -1) {

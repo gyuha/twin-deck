@@ -181,7 +181,7 @@ To find folders that take a lot of space, press `Alt+T` on a folder. Subfolders 
 ### Tabs and panes
 
 - **Tabs**: each pane can have several tabs. `Mod+T` opens a new tab and `Mod+W` closes it; a middle click on a tab also closes it. To jump to a tab by number, press `Cmd+1`~`Cmd+9` on macOS or `Ctrl+Shift+1`~`Ctrl+Shift+9` on Windows/Linux (`9` is the last tab, and a number beyond the tab count does nothing). These keys are also handled by the app in a terminal tab.
-- **Dragging tabs**: drag a tab to reorder within a pane, or drop it on the opposite pane's tab bar to send it there. If the original pane has only one tab, it is copied instead of moved.
+- **Dragging tabs**: drag a tab to reorder within a pane, or drop it on the opposite pane's tab bar to send it there. If the original pane has only one tab, it is copied instead of moved. Terminal tabs can also be dragged to the opposite pane: a terminal is always moved, never copied, and its shell and screen (scrollback) carry over unchanged. If the terminal was the last tab in its pane, that pane gets a tab on the folder the terminal started in. Other special tabs such as search results are not sent between panes.
 - **Swap panes**: `Mod+U` swaps the tabs, folders, cursors, and selections of the left and right panes.
 - **Pane width**: drag the middle border to adjust it.
 - **Quick access**: `Alt+2` is the favorites menu and `Alt+3` the recent locations menu; both can be filtered by typing. In the favorites menu, add the current folder with `Ctrl+=`. Assign frequently used folders to `Ctrl+0`~`9` in the **Folder shortcuts** tab of Settings.

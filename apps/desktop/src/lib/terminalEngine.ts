@@ -2,7 +2,10 @@
 import { installImeBridge } from "./imeBridge";
 
 export interface TerminalEngine {
-  /** 화면을 `el` 안에 그리고 `el` 크기에 맞춘다. */
+  /**
+   * 화면을 `el` 안에 그리고 `el` 크기에 맞춘다. 이미 열린 엔진에 다른 `el`로 다시 부르면 화면(스크롤 내용 포함)을 그대로 두고
+   * 새 `el`로 옮겨 붙인다 — 터미널 탭을 다른 패널로 옮길 때 쓴다(이슈 #96).
+   */
   open(el: HTMLElement): void;
   /** pty가 낸 바이트(또는 글)를 화면에 쓴다. */
   write(data: Uint8Array | string): void;
@@ -46,6 +49,8 @@ export async function createTerminalEngine(fontFamily = ""): Promise<TerminalEng
   term.loadAddon(fit);
   let observer: ResizeObserver | null = null;
   let removeIme: (() => void) | null = null;
+  /** 지금 화면이 붙어 있는 자리. 처음 `open`하기 전에는 null. */
+  let host: HTMLElement | null = null;
   let sendData: (data: string) => void = () => {};
   let disposed = false;
   let fontRequest = 0;
@@ -59,10 +64,22 @@ export async function createTerminalEngine(fontFamily = ""): Promise<TerminalEng
   });
   return {
     open(el) {
+      if (host === el) return;
+      const reattach = host !== null;
+      // 옛 자리에 걸어 둔 한글 입력 브리지와 크기 관찰자는 풀고 새 자리에 다시 건다.
+      removeIme?.();
+      observer?.disconnect();
+      host = el;
       // 한글 조합은 xterm이 아니라 직접 받는다(WebKit에서 모음이 빠지는 문제). 확정된 글은 일반 입력과 같은 길로 보낸다.
       removeIme = installImeBridge(el, (text) => sendData(text));
-      term.open(el);
+      if (reattach) {
+        // xterm은 한 번만 열 수 있다. 이미 그려진 화면(element)을 새 자리로 옮겨 붙인다.
+        if (term.element) el.appendChild(term.element);
+      } else {
+        term.open(el);
+      }
       fit.fit();
+      if (reattach && term.rows > 0) term.refresh(0, term.rows - 1);
       if (typeof ResizeObserver !== "undefined") {
         observer = new ResizeObserver(() => fit.fit());
         observer.observe(el);

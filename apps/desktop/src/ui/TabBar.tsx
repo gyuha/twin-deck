@@ -89,7 +89,9 @@ export function TabBar({ pane }: { pane: PaneId }) {
       if (m.buttons === 0) return cancel(); // mouseup을 놓친 채 버튼이 이미 떼어져 있다
       if (!dragging && Math.hypot(m.clientX - x, m.clientY - y) < DRAG_THRESHOLD) return;
       dragging = true;
-      if (!tabs[from]?.virtual && within(otherBar, m.clientX, m.clientY)) { // 가상 탭은 패널 간에 옮기지 않는다
+      // 가상 탭(검색 결과 등)은 패널 간에 옮기지 않는다. 터미널 탭은 옮긴다(이슈 #96).
+      const movable = !tabs[from]?.virtual || tabs[from]?.virtual?.kind === "terminal";
+      if (movable && within(otherBar, m.clientX, m.clientY)) {
         // 반대쪽 패널의 탭 줄 위: 놓으면 그쪽으로 보낸다. 자기 패널 안의 탭은 비키지 않는다.
         crossIndex = insertAt(m.clientX);
         to = from;
