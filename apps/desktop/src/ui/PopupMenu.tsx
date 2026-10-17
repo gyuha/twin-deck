@@ -56,6 +56,7 @@ export function PopupMenu() {
                 >
                   <span className="mr-2 inline-block w-3 text-ink-faint">{hint}</span>
                   {it.label}
+                  {it.terminal && <span className="float-right ml-2 text-xs text-ink-faint">{t("popup.terminal_badge")}</span>}
                 </div>
               );
             })}

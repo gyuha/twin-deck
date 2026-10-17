@@ -57,7 +57,7 @@ describe("연결 이모지 표시 (이슈 #93)", () => {
     const { user } = await renderApp(setup());
     await user.click(within(screen.getByRole("toolbar", { name: "드라이브 (왼쪽 패널)" })).getByRole("button", { name: "연결" }));
     const menu = screen.getByRole("dialog", { name: "서버에 연결" });
-    expect(within(menu).getAllByRole("option").map((o) => o.textContent?.trim())).toEqual(["1🗄️ USB 공유", "2🏢 SFTP · 회사", "3SMB 서버 관리…", "4SFTP·FTP 관리…"]);
+    expect(within(menu).getAllByRole("option").map((o) => o.textContent?.trim())).toEqual(["1🗄️ USB 공유", "2🏢 SFTP · 회사Shift+Enter: 터미널", "3SMB 서버 관리…", "4SFTP·FTP 관리…"]);
   });
 
   it("마운트된 SMB 공유의 볼륨 버튼, 그 안 폴더 탭 이름, 경로 표시줄의 마운트 조각 앞에 이모지가 붙는다", async () => {

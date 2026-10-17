@@ -131,6 +131,7 @@ export function menuHandlers({ api }: AppStore): Partial<ActionHandlers> {
     "core.menu.up": () => api.menuMove(-1),
     "core.menu.down": () => api.menuMove(1),
     "core.menu.select": () => api.menuSelect(),
+    "core.menu.select_terminal": () => api.menuSelectTerminal(),
     "core.menu.close": () => api.menuClose(),
     "core.menu.right": () => api.ctxRight(),
     "core.menu.left": () => api.ctxLeft(),
