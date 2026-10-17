@@ -122,6 +122,7 @@ Marta에서는 수정자 없는 단일 키 바인딩이 Quick Select에 가로�
 | 액션 ID | 이름 | macOS 키 | Windows/Linux 키 | 출처 |
 |---|---|---|---|---|
 | `core.open` | 열기 | `Return` | `Return` | ID 확인 |
+| `core.open.launch` | 앱 실행 (.app 열기, 이슈 #90): 커서가 로컬 `.app` 폴더면 안으로 들어가지 않고 OS 기본 열기(macOS `open`)로 앱을 실행한다. `Enter`·우클릭 "열기"(`core.open`)는 그대로 `.app` 안으로 들어간다. `.app`이 아닌 항목(원격·압축 안 포함)에서는 `core.open`과 똑같이 동작한다 | `Shift+Enter` | `Shift+Enter` | pane, 자체 ID, 키 확인 |
 | `core.open.directory` | 폴더 열기 (인수 `src`) | 없음 | 없음 | ID 확인, 인수 확인 |
 | `core.open.as_archive` | 아카이브로 열기 (Open As, ARC-04) | 없음 | 없음 | 자체 ID |
 | `core.go.up` | 상위 폴더 | `Backspace` | `Backspace`, `Alt+Up` | ID 확인 |

@@ -1459,6 +1459,21 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       await api.navigate(target, parentPath(tab.path) === target ? baseName(tab.path) : undefined, "forward");
     },
 
+    /**
+     * 앱 실행(`core.open.launch`, 이슈 #90): 커서가 로컬 `.app` 폴더면 안으로 들어가지 않고 OS 기본 열기로 앱을 실행한다.
+     * `.app`이 아닌 항목(원격·압축 안 포함)은 `open()`과 똑같이 한다. `.app` 폴더에서 `Enter`는 기존대로 안으로 들어간다.
+     */
+    async openLaunch() {
+      const tab = activeTab(get());
+      const c = tab.cursor >= 0 ? cursorEntry(tab) : undefined;
+      if (!c || tab.virtual || isRemotePath(c.path) || isArchivePath(c.path) || !isFolderEntry(c) || !/\.app[/\\]*$/i.test(c.name)) return api.open();
+      try {
+        await backend.openPath(c.path);
+      } catch (e) {
+        fail(e);
+      }
+    },
+
     /** 열기: 폴더는 들어가고, 아카이브 파일은 폴더처럼 연다 (ARC-01). */
     async open() {
       const tab = activeTab(get());

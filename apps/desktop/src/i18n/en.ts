@@ -69,6 +69,7 @@ export const en: Record<Key, string> = {
   "action.core.select.group": "Select by Pattern",
   "action.core.deselect.group": "Deselect by Pattern",
   "action.core.open": "Open",
+  "action.core.open.launch": "Launch app (open .app)",
   "action.core.compress": "Compress",
   "action.core.extract": "Extract (to New Folder Alongside)",
   "action.core.extract.to_inactive": "Extract (to Opposite Pane)",

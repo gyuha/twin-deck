@@ -124,6 +124,7 @@ You can see every shortcut as a list by pressing `F1` (or the **Shortcuts** butt
 - **When names collide**: choose overwrite, skip, or copy with a new name. Turn on "apply the same choice to the remaining items" so it does not ask again.
 - **Rename**: `F2` renames one right in the list. The name before the extension starts selected; `Enter` saves, `Esc` cancels, and `↑`/`↓` save and move on to the item above/below. With two or more selected, `F2` (or `Mod+Shift+R`) opens a window to rename them all at once.
 - **Archives**: zip-family archives open like folders, and compressing and extracting run in the background like copying.
+- **Opening and launching `.app`** (macOS): an `.app` is also a folder, so `Return` (or right-click **Open**) goes inside the app (`Contents`) so you can see what is in it. To launch the app, put the cursor on the `.app` and press `Shift+Return` (**Launch app (open .app)** in the Actions Panel). On anything that is not an `.app`, `Shift+Return` does the same as `Return`. An `.app` on a remote (SFTP/FTP) server or inside an archive is not launched.
 - **Drag and drop**: drag files to another pane or folder to copy, and hold `Ctrl` while dropping to move. A copy (`+`) or move (`−`) badge appears next to the cursor while dragging.
 
   ![Copy by dragging](docs/screenshots/drag-copy.png)
@@ -220,6 +221,7 @@ To find folders that take a lot of space, press `Alt+T` on a folder. Subfolders 
 | Switch pane | `Tab` |
 | Move | `↑` `↓` `PageUp` `PageDown` `Home` `End` |
 | Open / parent folder | `Return` / `Backspace` |
+| Launch an app (`.app`) | `Shift+Return` |
 | Toggle selection / select all / clear selection | `Space` or `Insert` / `Mod+A` / `Esc` |
 | Preview | `→` or `Mod+Y` |
 | Copy / move | `F5` / `F6` |

@@ -67,6 +67,7 @@ export const ko = {
   "action.core.select.group": "패턴으로 선택",
   "action.core.deselect.group": "패턴으로 선택 해제",
   "action.core.open": "열기",
+  "action.core.open.launch": "앱 실행 (.app 열기)",
   "action.core.compress": "압축",
   "action.core.extract": "추출 (옆의 새 폴더로)",
   "action.core.extract.to_inactive": "추출 (반대편 패널로)",
