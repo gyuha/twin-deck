@@ -506,7 +506,7 @@ describe("드라이브 바", () => {
     it("연결 메뉴에 저장된 원격 항목이 프로토콜과 함께 보이고 SFTP·FTP 관리…가 있다", async () => {
       const { user } = await renderApp(withRemotes(SFTP, FTP));
       await openConnect(user);
-      expect(options()).toEqual(["1SFTP · 회사", "2FTP · 공개", "3SMB 서버 관리…", "4SFTP·FTP 관리…"]);
+      expect(options()).toEqual(["1SFTP · 회사Shift+Enter: 터미널", "2FTP · 공개", "3SMB 서버 관리…", "4SFTP·FTP 관리…"]);
     });
 
     it("SFTP 항목을 고르면 비밀번호를 묻고 맞으면 그 패널이 원격 루트로 이동한다(기억하면 저장된다)", async () => {

@@ -37,7 +37,7 @@ twin-deck은 키보드 중심으로 조작하는 듀얼 패널 파일 탐색기�
 - 파일 작업(복사, 이동, 이름 변경, 새 폴더/파일, 휴지통, 영구 삭제, 복제, 심볼릭 링크)과 작업 큐
 - 탐색 보조 기능(Volumes, Favorites, Recent Locations, Hierarchy, Go To Path, Quick Select)
 - SMB 연결 관리(저장된 서버를 OS에 마운트, [ADR-0018](adr/0018-smb-via-os-mount.md))
-- SFTP·FTP 연결 관리(저장한 서버에 접속하면 패널이 원격 폴더로 들어가고 복사·이동·삭제는 로컬과 같다. 앱 안의 원격 클라이언트, [ADR-0019](adr/0019-remote-fs-in-process.md))
+- SFTP·FTP 연결 관리(저장한 서버에 접속하면 그 패널에 원격 폴더를 보는 새 탭이 열리고 복사·이동·삭제는 로컬과 같다. 앱 안의 원격 클라이언트, [ADR-0019](adr/0019-remote-fs-in-process.md))
 - 컬럼 설정, 정렬, 숨김 파일
 - 아카이브를 폴더처럼 열기, Look Up, Flatten, Disk Usage
 - 내장 터미널, CLI 실행 인자

@@ -911,6 +911,21 @@ function RemoteServersControl({
           >
             {t("settings.remote.connect")}
           </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="gray"
+            disabled={!canConnect || current?.protocol !== "sftp"}
+            onClick={() =>
+              void (async () => {
+                if (dirty && !(await save())) return;
+                api.closeSettings();
+                await api.connectRemoteTerminal(settingsPane, selected);
+              })()
+            }
+          >
+            {t("settings.remote.connect_terminal")}
+          </Button>
           <Button type="button" size="sm" variant="accent" disabled={disabled || !dirty} onClick={() => void save()}>
             {t("settings.remote.save")}
           </Button>

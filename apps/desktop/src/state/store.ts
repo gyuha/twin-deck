@@ -215,6 +215,8 @@ export interface MenuItem {
   settings?: number;
   /** 보이지만 고를 수 없다(연결 중인 SMB 항목). */
   disabled?: boolean;
+  /** 연결 메뉴: Shift+Enter로 터미널로 열 수 있는 항목(SFTP). */
+  terminal?: boolean;
 }
 
 /** 팝업 메뉴에서 고를 수 있는 항목인지(머리글·구분선·비활성 항목이 아님). */
@@ -1481,11 +1483,11 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     },
 
     /**
-     * 활성 패널의 폴더에서 시작하는 새 터미널 탭을 반대편 패널의 탭 줄에 만들고 활성으로 한다(`core.terminal.focus`).
+     * 활성 패널의 폴더에서 시작하는 새 터미널 탭을 반대편 패널의 탭 줄에 만들고 활성으로 한다(`core.terminal.focus`; `targetPane`을 주면 그 패널의 탭 줄에).
      * 누를 때마다 새 탭이다. 활성 탭이 터미널이면 그 터미널을 연 폴더에서 같은 패널에 새 탭을 만든다.
      * 검색 결과 같은 가상 탭과 압축 안에서는 열지 않는다.
      */
-    async terminalFocus(folder?: string) {
+    async terminalFocus(folder?: string, targetPane?: PaneId) {
       const s = get();
       const here = activeTab(s);
       const fromTerminal = here.virtual?.kind === "terminal";
@@ -1496,7 +1498,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       // 원격 폴더(sftp://)면 로컬 셸 대신 그 서버의 셸을 연다. FTP에는 셸이 없다.
       const remote = splitRemote(cwd);
       if (remote?.scheme === "ftp") return fail(tr("terminal.notice.ftp"));
-      const pane = fromTerminal ? s.activePane : other(s.activePane);
+      const pane = targetPane ?? (fromTerminal ? s.activePane : other(s.activePane));
       try {
         // 처음 크기는 임시다. 터미널 화면이 그려지면 패널 크기에 맞춰 바로 바꾼다.
         const id = remote ? await backend.terminalOpenRemote(remote.id, 80, 24) : await backend.terminalOpen(cwd, 80, 24);
@@ -2868,6 +2870,15 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (item.remote !== undefined) return api.connectRemote(m.pane ?? get().activePane, item.remote);
       if (item.path) await api.navigate(item.path);
     },
+    /** Shift+Enter: 커서 항목이 SFTP 서버면 연결한 뒤 그 서버의 터미널 탭을 연다. 다른 항목은 아무것도 하지 않고 메뉴를 그대로 둔다(이슈 #94). */
+    async menuSelectTerminal() {
+      if (get().ctxMenu) return;
+      const m = get().menu;
+      const item = m?.items[m.cursor];
+      if (!m || !item || !pickable(item) || !item.terminal || item.remote === undefined) return;
+      set({ menu: null });
+      return api.connectRemoteTerminal(m.pane ?? get().activePane, item.remote);
+    },
     /** 숫자키: n번째로 고를 수 있는 항목 (1~9, 0은 10번째). */
     async menuSelectNth(n: number) {
       const m = get().menu;
@@ -2889,7 +2900,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const remotes = s.loaded.config.remote.servers ?? [];
       remotes.forEach((v, i) => {
         const label = `${v.protocol.toUpperCase()} · ${v.name}`;
-        items.push(s.remoteConnecting.includes(i) ? { label: tr("store.remote.connecting", { name: label }), remote: i, disabled: true } : { label, remote: i });
+        items.push(s.remoteConnecting.includes(i) ? { label: tr("store.remote.connecting", { name: label }), remote: i, disabled: true } : { label, remote: i, terminal: v.protocol === "sftp" });
       });
       if (items.length > 0) items.push({ label: "", separator: true });
       items.push({ label: tr("store.smb.manage"), settings: smbSection });
@@ -2944,11 +2955,13 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       }
     },
     /**
-     * 저장된 원격(SFTP·FTP) 서버 항목에 연결하고 그 패널을 원격 루트로 옮긴다. 이미 연결돼 있으면 바로 옮긴다.
+     * 저장된 원격(SFTP·FTP) 서버 항목에 연결하고 그 패널에 원격 루트를 보는 새 탭을 연다(현재 탭은 그대로 둔다). 이미 연결돼 있으면 바로 연다.
+     * 그 패널에 원격 루트를 이미 보는 탭이 있으면 새로 만들지 않고 그 탭으로 간다(`openFolderTab`).
      * 먼저 저장된 비밀번호(키체인)로 시도하고, 인증이 필요하거나 틀리면 비밀번호를 물어 다시 시도한다(취소하면 그만둔다).
      * 그 밖의 실패는 오류로 알린다. 연결 중에도 UI는 막지 않고, 같은 항목은 끝날 때까지 다시 연결하지 않는다.
+     * `terminal`이면 패널은 옮기지 않고 그 서버의 원격 셸 터미널 탭만 `pane`의 탭 줄에 연다(이슈 #94).
      */
-    async connectRemote(pane: PaneId, index: number) {
+    async connectRemote(pane: PaneId, index: number, terminal = false) {
       const server = get().loaded.config.remote.servers?.[index];
       if (!server || get().remoteConnecting.includes(index)) return;
       set((s) => ({ notice: null, remoteConnecting: [...s.remoteConnecting, index] }));
@@ -2995,12 +3008,21 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
             continue;
           }
           api.activate(pane);
-          await api.navigate(root, undefined, "push", pane);
+          if (terminal) await api.terminalFocus(root, pane);
+          else await api.openFolderTab(pane, root);
           return;
         }
       } finally {
         set((s) => ({ remoteConnecting: s.remoteConnecting.filter((i) => i !== index) }));
       }
+    },
+    /**
+     * 저장된 SFTP 서버 항목에 연결해 그 서버의 원격 셸 터미널 탭만 연다(이슈 #94). 패널은 서버 폴더로 옮기지 않는다.
+     * 연결이 실패하거나 취소되면 터미널도 열지 않는다. 터미널 탭은 `pane`의 탭 줄에 연다.
+     */
+    async connectRemoteTerminal(pane: PaneId, index: number) {
+      if (get().loaded.config.remote.servers?.[index]?.protocol !== "sftp") return;
+      await api.connectRemote(pane, index, true);
     },
     /**
      * 패널이 놓인 원격 연결을 끊는다. 그 연결 안에 있는 모든 탭(양쪽 패널, 배경 탭 포함)을 먼저 홈(없으면 `/`)으로 옮기고 연결을 닫는다.
