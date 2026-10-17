@@ -210,6 +210,7 @@ export const RUST_MESSAGES: readonly (readonly [ko: string, en: string])[] = [
   ["원격과 아카이브 사이는 바로 복사할 수 없습니다", "Cannot copy directly between a remote server and an archive"],
   ["원격 심볼릭 링크는 지원하지 않습니다", "Remote symbolic links are not supported"],
   ["원격에는 심볼릭 링크를 만들 수 없습니다", "Cannot create symbolic links on a remote server"],
+  ["원격 연결이 끊어졌습니다", "The remote connection was lost"],
   ["원격 연결이 열려 있지 않습니다", "The remote connection is not open"],
   ["서버에 연결할 수 없습니다", "Cannot connect to the server"],
   ["이 운영체제에서는 비밀번호를 저장할 수 없습니다", "Passwords cannot be saved on this operating system"],
@@ -301,6 +302,12 @@ interface Entry {
   names: string[];
   en: string;
 }
+
+/**
+ * 원격 연결이 끊겨서 목록을 못 읽는다고 알아보는 Rust 문구(이슈 #98): 끊긴 세션(`td-archive`의 `REMOTE_DISCONNECTED`)·세션 없음·서버에 닿지 않음(`RemoteError::Unreachable`).
+ * 모두 위 `RUST_MESSAGES` 대응표에도 있어야 한다. UI는 이 문구로 "다시 연결"을 보인다(`lib/remoteErrors.ts`).
+ */
+export const RUST_REMOTE_DISCONNECTED: readonly string[] = ["원격 연결이 끊어졌습니다", "원격 연결이 열려 있지 않습니다", "서버에 연결할 수 없습니다"];
 
 const compiled: Entry[] = [...RUST_MESSAGES]
   .sort((a, b) => b[0].length - a[0].length)

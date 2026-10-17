@@ -8,6 +8,8 @@ export interface ActionContext {
   hasCursorItem: boolean;
   /** 활성 탭이 내장 터미널 탭인지(패널의 마지막 탭이어도 닫을 수 있다). */
   terminalTab?: boolean;
+  /** 활성 탭이 연결이 끊겨 목록을 못 읽는 원격 탭인지(다시 연결할 수 있다, 이슈 #98). */
+  remoteDisconnected?: boolean;
   /** 커서가 목록 맨 위의 `..` 상위 폴더 행에 있는지(열기만 가능하다). */
   onParentRow?: boolean;
   selectedCount: number;
@@ -72,6 +74,7 @@ export const DEFAULT_ACTION_META = [
   { id: "core.select.group", title: "패턴으로 선택", category: "Selection", scopes: ["pane"] },
   { id: "core.deselect.group", title: "패턴으로 선택 해제", category: "Selection", scopes: ["pane"] },
   { id: "core.open", title: "열기", category: "Navigation", scopes: ["pane"], isApplicable: (c) => c.hasCursorItem || !!c.onParentRow },
+  { id: "core.remote.reconnect", title: "원격 다시 연결", category: "Navigation", scopes: ["pane"], isApplicable: (c) => !!c.remoteDisconnected },
   { id: "core.open.launch", title: "앱 실행 (.app 열기)", category: "Navigation", scopes: ["pane"], isApplicable: (c) => c.hasCursorItem },
   { id: "core.compress", title: "압축", category: "File", scopes: ["pane"], isApplicable: hasTarget },
   { id: "core.extract", title: "추출 (옆의 새 폴더로)", category: "File", scopes: ["pane"], isApplicable: hasTarget },

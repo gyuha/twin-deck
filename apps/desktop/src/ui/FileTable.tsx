@@ -1,7 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Button } from "@spacedrive/primitives";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Rect, Virtualizer } from "@tanstack/react-virtual";
 import type { EntryDto } from "@twin-deck/ts-client";
+import { splitRemote } from "@twin-deck/ts-client";
 import { parseColumns, withColumnWidth, MAX_COLUMN_WIDTH, MIN_COLUMN_WIDTH } from "../lib/columns";
 import type { ColumnSpec } from "../lib/columns";
 import { COLUMN_TITLES, cellText } from "../lib/format";
@@ -10,8 +12,10 @@ import { SORT_KEYS, splitExtension } from "../lib/sort";
 import { FileIcon } from "./FileIcon";
 import type { SortKey } from "../lib/sort";
 import { useApp, useAppStore, useT } from "../state/context";
-import { activeTab, effectiveSort, groupingActive, isFolderEntry, parentRowVisible } from "../state/store";
+import { activeTab, effectiveSort, groupingActive, isFolderEntry, parentRowVisible, remoteIndexOf } from "../state/store";
 import { dateGroup } from "../lib/dateGroups";
+import { isRemoteDisconnected } from "../lib/remoteErrors";
+import { rustText } from "../i18n";
 import type { DateGroup } from "../lib/dateGroups";
 import type { PaneId } from "../state/store";
 
@@ -132,6 +136,9 @@ export function FileTable({ pane }: { pane: PaneId }) {
   const tab = useApp((s) => activeTab(s, pane));
   const isActive = useApp((s) => s.activePane === pane);
   const config = useApp((s) => s.loaded.config);
+  // 원격 탭이 연결이 끊겨 목록을 못 읽으면 패널을 흐리게 하고 다시 연결 버튼을 보인다(이슈 #98).
+  const disconnected = !tab.virtual && splitRemote(tab.path) !== null && isRemoteDisconnected(tab.error);
+  const reconnecting = useApp((s) => disconnected && s.remoteConnecting.includes(remoteIndexOf(s, tab.path)));
   const rename = useApp((s) => (s.rename?.pane === pane && s.rename.tabId === activeTab(s, pane).id ? s.rename : null));
   const dirSizes = useApp((s) => s.dirSizes);
   const rightClickSelect = config.behavior.table.right_click_select;
@@ -370,7 +377,17 @@ export function FileTable({ pane }: { pane: PaneId }) {
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col text-sm">
+    <div className="relative flex min-h-0 flex-1 flex-col text-sm">
+      {disconnected && (
+        <div data-remote-disconnected role="alert" className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-app-dark-box/80 p-4 text-center">
+          <div className="font-semibold">{t("table.remote_lost_title")}</div>
+          <div className="text-xs text-ink-faint">{splitRemote(tab.path)?.id}</div>
+          <div className="max-w-full break-words text-xs text-status-error">{rustText(tab.error ?? "")}</div>
+          <Button type="button" size="sm" variant="accent" disabled={reconnecting} onClick={() => void api.reconnectRemote(pane)}>
+            {reconnecting ? t("table.remote_reconnecting") : t("table.remote_reconnect")}
+          </Button>
+        </div>
+      )}
       <div
         role="row"
         aria-label={t("table.header_aria")}
@@ -412,7 +429,7 @@ export function FileTable({ pane }: { pane: PaneId }) {
           );
         })}
       </div>
-      {tab.error && (
+      {tab.error && !disconnected && (
         <div role="alert" className="bg-status-error/15 px-2 py-1 text-status-error">
           {tab.error}
         </div>
@@ -427,7 +444,8 @@ export function FileTable({ pane }: { pane: PaneId }) {
         aria-multiselectable="true"
         aria-activedescendant={tab.entries.length || parentRow ? rowId(tab.cursor) : undefined}
         aria-rowcount={tab.entries.length}
-        className="min-h-0 flex-1 overflow-auto"
+        data-dimmed={disconnected ? "true" : undefined}
+        className={disconnected ? "min-h-0 flex-1 overflow-auto opacity-30" : "min-h-0 flex-1 overflow-auto"}
       >
         {parentRow && renderParentRow()}
         <div style={{ height: virtualizer.getTotalSize(), position: "relative", width: "100%" }}>

@@ -13,6 +13,7 @@ export function navigationHandlers({ api }: AppStore): Partial<ActionHandlers> {
   return {
     "core.open": () => api.open(),
     "core.open.launch": () => api.openLaunch(),
+    "core.remote.reconnect": () => api.reconnectRemote(),
     "core.open.as_archive": () => api.openAsArchive(),
     "core.find.open": () => api.openFind(),
     "core.find.close": () => api.closeFind(),

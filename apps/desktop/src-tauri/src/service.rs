@@ -787,7 +787,8 @@ fn primary_lan_ip(v6: bool) -> Option<std::net::IpAddr> {
 }
 
 /// 원격 서버 항목으로 세션을 열어 레지스트리에 넣고, 패널이 이동할 루트 경로(`sftp://<id>/..`)를 돌려준다(ADR-0019).
-/// 이미 열려 있으면 다시 접속하지 않고 같은 연결을 쓴다. 블로킹이라 호출하는 쪽이 UI 스레드를 피해야 한다.
+/// 이미 열려 있고 **살아 있으면** 다시 접속하지 않고 같은 연결을 쓴다. 끊긴 세션(이슈 #98)은 레지스트리에서 버리고 새로 접속한다 —
+/// 그렇지 않으면 죽은 세션이 남아 앱을 다시 시작할 때까지 계속 실패한다. 블로킹이라 호출하는 쪽이 UI 스레드를 피해야 한다.
 pub fn connect_remote<S: td_remote::SecretStore>(
     registry: &td_archive::RemoteRegistry,
     target: &td_remote::RemoteTarget,
@@ -802,11 +803,23 @@ pub fn connect_remote<S: td_remote::SecretStore>(
         td_remote::Protocol::Ftp => td_vfs::RemoteProto::Ftp,
     };
     if let Some(session) = registry.get(&id) {
-        let root = match target.base_dir.trim() {
-            "" => session.home()?,
-            dir => dir.to_string(),
-        };
-        return Ok(td_vfs::remote_url(proto, &id, &root));
+        // 시작 폴더가 있어도 `home()`으로 살아 있는지 확인한다(죽은 세션의 경로를 "연결됨"으로 돌려주지 않게).
+        let home = session
+            .is_alive()
+            .then(|| session.home())
+            .and_then(Result::ok);
+        match home {
+            Some(home) => {
+                let root = match target.base_dir.trim() {
+                    "" => home,
+                    dir => dir.to_string(),
+                };
+                return Ok(td_vfs::remote_url(proto, &id, &root));
+            }
+            None => {
+                registry.remove(&id);
+            }
+        }
     }
     let (session, root) = td_remote::open_session(target, password, remember, secrets, opener)?;
     registry.insert(&id, session);
@@ -4589,6 +4602,123 @@ mod tests {
                     assert_eq!(a, b);
                     assert_eq!(calls.get(), 1);
                 });
+            }
+
+            /// 시험용 세션: `alive`와 `home_ok`만 정하고 나머지는 연결 불가 오류다(끊긴 세션 흉내).
+            struct Stale {
+                alive: bool,
+                home_ok: bool,
+            }
+            impl RemoteSession for Stale {
+                fn is_alive(&self) -> bool {
+                    self.alive
+                }
+                fn home(&self) -> td_remote::Result<String> {
+                    if self.home_ok {
+                        Ok("/".into())
+                    } else {
+                        Err(RemoteError::Unreachable)
+                    }
+                }
+                fn list(&self, _: &str) -> td_remote::Result<Vec<td_remote::RemoteEntry>> {
+                    Err(RemoteError::Unreachable)
+                }
+                fn stat(&self, _: &str) -> td_remote::Result<td_remote::RemoteEntry> {
+                    Err(RemoteError::Unreachable)
+                }
+                fn mkdir_all(&self, _: &str) -> td_remote::Result<()> {
+                    Err(RemoteError::Unreachable)
+                }
+                fn create_empty(&self, _: &str) -> td_remote::Result<()> {
+                    Err(RemoteError::Unreachable)
+                }
+                fn rename(&self, _: &str, _: &str) -> td_remote::Result<()> {
+                    Err(RemoteError::Unreachable)
+                }
+                fn remove_file(&self, _: &str) -> td_remote::Result<()> {
+                    Err(RemoteError::Unreachable)
+                }
+                fn remove_dir_all(&self, _: &str) -> td_remote::Result<()> {
+                    Err(RemoteError::Unreachable)
+                }
+                fn read(&self, _: &str) -> td_remote::Result<Box<dyn std::io::Read + Send>> {
+                    Err(RemoteError::Unreachable)
+                }
+                fn write(&self, _: &str) -> td_remote::Result<Box<dyn td_remote::RemoteWrite>> {
+                    Err(RemoteError::Unreachable)
+                }
+            }
+
+            /// 레지스트리에 `stale`을 넣어 둔 채 다시 연결하면: 서버에 새로 접속(opener 1회)하고 새 세션으로 읽힌다.
+            fn reconnects_over(stale: Stale, base: &str) {
+                each(|p| {
+                    let (_t, svc, _ch, _root) = setup();
+                    let (t, dir, _srv) = start(p, base);
+                    let connect_session = verified_opener(_srv.as_ref());
+                    std::fs::create_dir_all(dir.join(base.trim_start_matches('/'))).unwrap();
+                    std::fs::write(
+                        dir.join(base.trim_start_matches('/')).join("hello.txt"),
+                        b"hi",
+                    )
+                    .unwrap();
+                    let calls = Cell::new(0);
+                    let opener = |t: &RemoteTarget, u: &str, pw: &str| {
+                        calls.set(calls.get() + 1);
+                        connect_session(t, u, pw)
+                    };
+                    let reg = svc.remote_registry();
+                    reg.insert(
+                        &t.id(),
+                        Arc::new(Stale { ..stale }) as Arc<dyn RemoteSession>,
+                    );
+                    let url =
+                        connect_remote(&reg, &t, Some("p".into()), false, &Mem::default(), &opener)
+                            .unwrap();
+                    assert_eq!(calls.get(), 1, "죽은 세션을 재사용했다");
+                    if !base.is_empty() {
+                        assert!(url.ends_with(base), "{url}");
+                    }
+                    let names: Vec<_> = svc
+                        .list_dir(&url, false)
+                        .unwrap()
+                        .into_iter()
+                        .map(|e| e.name)
+                        .collect();
+                    assert_eq!(names, ["hello.txt"], "새 세션으로 읽히지 않았다");
+                });
+            }
+
+            #[test]
+            fn 끊긴_세션은_재연결하면_새_세션으로_바꿔_끼운다() {
+                reconnects_over(
+                    Stale {
+                        alive: false,
+                        home_ok: true,
+                    },
+                    "",
+                );
+            }
+
+            #[test]
+            fn 살아_있다고_하지만_home이_실패하는_세션도_재연결로_바꿔_끼운다() {
+                reconnects_over(
+                    Stale {
+                        alive: true,
+                        home_ok: false,
+                    },
+                    "",
+                );
+            }
+
+            #[test]
+            fn 시작_폴더가_있어도_끊긴_세션은_재연결로_바꿔_끼운다() {
+                reconnects_over(
+                    Stale {
+                        alive: false,
+                        home_ok: true,
+                    },
+                    "/sub",
+                );
             }
 
             #[test]

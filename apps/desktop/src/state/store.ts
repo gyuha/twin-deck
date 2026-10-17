@@ -63,6 +63,7 @@ import { formatDateTime, formatOctal, formatPermissions, formatSize } from "../l
 import { DEFAULT_SORT, SORT_KEYS, sortEntries, sortFromColumns } from "../lib/sort";
 import { dateGroup } from "../lib/dateGroups";
 import { withIcon } from "../lib/connections";
+import { isRemoteDisconnected } from "../lib/remoteErrors";
 import type { SortKey, SortState } from "../lib/sort";
 
 export type PaneId = "left" | "right";
@@ -489,11 +490,19 @@ function isArchiveEntry(e: EntryDto | undefined, extraExts: string[]): boolean {
 /** `..` 상위 폴더 행을 보이는가: 옵션이 켜져 있고, 가상 탭이 아니며, 상위 폴더가 있을 때. 이 행은 커서 위치 `-1`이고 `entries`에는 들지 않는다. */
 export const parentRowVisible = (tab: TabState, enabled: boolean): boolean => enabled && !tab.virtual && parentPath(tab.path) !== null;
 
+/** 원격 경로의 연결 id로 설정의 서버 항목 순번을 찾는다. 원격 경로가 아니거나 설정에서 지워졌으면 -1. */
+export function remoteIndexOf(s: AppState, path: string): number {
+  const loc = splitRemote(path);
+  if (!loc) return -1;
+  return (s.loaded.config.remote.servers ?? []).findIndex((v) => remoteServerId(v) === loc.id && (v.protocol === "ftp" ? "ftp" : "sftp") === loc.scheme);
+}
+
 export function actionContext(s: AppState): ActionContext {
   const tab = activeTab(s);
   return {
     hasCursorItem: !!cursorEntry(tab),
     terminalTab: tab.virtual?.kind === "terminal",
+    remoteDisconnected: !tab.virtual && isRemotePath(tab.path) && isRemoteDisconnected(tab.error),
     onParentRow: tab.cursor < 0 && parentRowVisible(tab, s.loaded.config.behavior.table.show_parent_row),
     selectedCount: tab.selection.size,
     tabCount: s.panes[s.activePane].tabs.length,
@@ -630,6 +639,68 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       for (const p of stale) delete next[p];
       return { dirSizes: next };
     });
+  }
+
+  /**
+   * 설정의 `index`번째 원격 서버에 연결하고 그 루트 경로(`sftp://<id>/..`)를 돌려준다. 취소하거나 실패하면 알리고 `null`을 돌려준다.
+   * 먼저 저장된 비밀번호(키체인)로 시도하고, 인증이 필요하거나 틀리면 비밀번호를 물어 다시 시도한다(취소하면 그만둔다).
+   * 연결 중에도 UI는 막지 않고, 같은 항목은 끝날 때까지 다시 연결하지 않는다(`remoteConnecting`).
+   * 이미 연결돼 있고 살아 있으면 그대로 루트를 돌려주고, 끊긴 세션은 Rust가 버리고 새로 접속한다(이슈 #98).
+   * `connectRemote`(패널을 옮긴다)와 `reconnectRemote`(끊긴 탭을 되살린다)가 같이 쓴다.
+   */
+  async function openRemoteConnection(index: number): Promise<string | null> {
+    const server = get().loaded.config.remote.servers?.[index];
+    if (!server || get().remoteConnecting.includes(index)) return null;
+    set((s) => ({ notice: null, remoteConnecting: [...s.remoteConnecting, index] }));
+    // 알리고 멈춘다(연결하지 못했다는 뜻으로 `null`).
+    const stop = (e: unknown): null => {
+      fail(e);
+      return null;
+    };
+    // 백엔드는 항목을 순번으로 찾는다. 기다리는 사이 목록이 바뀌어 이 순번이 다른 서버가 되면 비밀번호를 엉뚱한 서버로 보내지 않도록 멈춘다.
+    const changed = () => {
+      const now = get().loaded.config.remote.servers?.[index];
+      return !now || now.protocol !== server.protocol || remoteServerId(now) !== remoteServerId(server);
+    };
+    try {
+      let password: string | null = null;
+      let remember = false;
+      let approvedHostKey: string | undefined;
+      for (;;) {
+        if (changed()) return stop(tr("store.remote.changed"));
+        try {
+          return await backend.remoteConnect(index, password, remember, approvedHostKey);
+        } catch (e) {
+          if (e instanceof HostKeyError) {
+            const k = e.key;
+            if (k.previousFingerprint) return stop(tr("store.remote.hostkey_changed", { host: k.host, port: k.port, algorithm: k.algorithm, previous: k.previousFingerprint, fingerprint: k.fingerprint }));
+            if (get().dialog || changed()) return stop(tr("store.remote.hostkey_unfinished"));
+            const answer = await ask<boolean>({
+              kind: "hostKey", title: tr("sftp.trust.title"), host: k.host, port: k.port,
+              algorithm: k.algorithm, fingerprint: k.fingerprint, confirmed: false,
+            });
+            if (answer !== true || changed()) return null;
+            approvedHostKey = k.publicKey;
+            continue;
+          }
+          // 다른 창이 떠 있으면 그 창의 응답을 가로채지 않도록 묻지 않고 오류로 알린다.
+          if (!(e instanceof RemoteConnectError) || e.kind !== "auth" || get().dialog) return stop(e);
+          if (changed()) return stop(tr("store.remote.changed"));
+          const answer: { value: string; remember: boolean } | null = await ask<{ value: string; remember: boolean }>({
+            kind: "password",
+            title: tr("store.remote.password_title", { name: server.name }),
+            value: "",
+            remember,
+            error: password === null ? null : tr("store.remote.password_wrong"),
+          });
+          if (answer === null) return null;
+          password = answer.value;
+          remember = answer.remember;
+        }
+      }
+    } finally {
+      set((s) => ({ remoteConnecting: s.remoteConnecting.filter((i) => i !== index) }));
+    }
   }
 
   /**
@@ -2983,58 +3054,28 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
      * `terminal`이면 패널은 옮기지 않고 그 서버의 원격 셸 터미널 탭만 `pane`의 탭 줄에 연다(이슈 #94).
      */
     async connectRemote(pane: PaneId, index: number, terminal = false) {
-      const server = get().loaded.config.remote.servers?.[index];
-      if (!server || get().remoteConnecting.includes(index)) return;
-      set((s) => ({ notice: null, remoteConnecting: [...s.remoteConnecting, index] }));
-      // 백엔드는 항목을 순번으로 찾는다. 기다리는 사이 목록이 바뀌어 이 순번이 다른 서버가 되면 비밀번호를 엉뚱한 서버로 보내지 않도록 멈춘다.
-      const changed = () => {
-        const now = get().loaded.config.remote.servers?.[index];
-        return !now || now.protocol !== server.protocol || remoteServerId(now) !== remoteServerId(server);
-      };
-      try {
-        let password: string | null = null;
-        let remember = false;
-        let approvedHostKey: string | undefined;
-        for (;;) {
-          if (changed()) return fail(tr("store.remote.changed"));
-          let root: string;
-          try {
-            root = await backend.remoteConnect(index, password, remember, approvedHostKey);
-          } catch (e) {
-            if (e instanceof HostKeyError) {
-              const k = e.key;
-              if (k.previousFingerprint) return fail(tr("store.remote.hostkey_changed", { host: k.host, port: k.port, algorithm: k.algorithm, previous: k.previousFingerprint, fingerprint: k.fingerprint }));
-              if (get().dialog || changed()) return fail(tr("store.remote.hostkey_unfinished"));
-              const answer = await ask<boolean>({
-                kind: "hostKey", title: tr("sftp.trust.title"), host: k.host, port: k.port,
-                algorithm: k.algorithm, fingerprint: k.fingerprint, confirmed: false,
-              });
-              if (answer !== true || changed()) return;
-              approvedHostKey = k.publicKey;
-              continue;
-            }
-            // 다른 창이 떠 있으면 그 창의 응답을 가로채지 않도록 묻지 않고 오류로 알린다.
-            if (!(e instanceof RemoteConnectError) || e.kind !== "auth" || get().dialog) return fail(e);
-            if (changed()) return fail(tr("store.remote.changed"));
-            const answer: { value: string; remember: boolean } | null = await ask<{ value: string; remember: boolean }>({
-              kind: "password",
-              title: tr("store.remote.password_title", { name: server.name }),
-              value: "",
-              remember,
-              error: password === null ? null : tr("store.remote.password_wrong"),
-            });
-            if (answer === null) return;
-            password = answer.value;
-            remember = answer.remember;
-            continue;
-          }
-          api.activate(pane);
-          if (terminal) await api.terminalFocus(root, pane);
-          else await api.openFolderTab(pane, root);
-          return;
+      const root = await openRemoteConnection(index);
+      if (root === null) return;
+      api.activate(pane);
+      if (terminal) await api.terminalFocus(root, pane);
+      else await api.openFolderTab(pane, root);
+    },
+    /**
+     * 끊긴 원격 탭을 다시 연결한다(이슈 #98). 탭의 연결 id로 설정의 서버 항목을 찾아 `connectRemote`와 같은 흐름(저장된 비밀번호 →
+     * 비밀번호 창·호스트 키 확인)으로 접속하고, 성공하면 그 연결을 보는 모든 탭(양쪽 패널·배경 탭)을 다시 읽는다.
+     * 설정에서 지워진 서버면 알리기만 한다. 끊긴 탭이 아니어도 원격 탭이면 같은 일을 한다.
+     */
+    async reconnectRemote(pane: PaneId = get().activePane) {
+      const s = get();
+      const loc = splitRemote(activeTab(s, pane).path);
+      if (!loc) return;
+      const index = remoteIndexOf(s, activeTab(s, pane).path);
+      if (index < 0) return fail(tr("store.remote.reconnect_missing"));
+      if ((await openRemoteConnection(index)) === null) return;
+      for (const p of ["left", "right"] as const) {
+        for (const t of get().panes[p].tabs) {
+          if (!t.virtual && splitRemote(t.path)?.id === loc.id) await reload(p, t.id);
         }
-      } finally {
-        set((s) => ({ remoteConnecting: s.remoteConnecting.filter((i) => i !== index) }));
       }
     },
     /**

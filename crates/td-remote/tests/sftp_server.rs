@@ -315,3 +315,22 @@ fn 저장된_비밀번호도_미승인키_검증을_우회하지_않는다() {
     ));
     assert_eq!(attempts(&s), 0);
 }
+
+#[test]
+fn 서버가_내려가면_재연결이_필요해서_is_alive가_거짓이_된다() {
+    let s = Fixture::start();
+    let session = SftpSession::connect(s.cfg(USER, PASS)).unwrap();
+    assert!(session.is_alive());
+    assert!(session.home().is_ok());
+    drop(s);
+    // 연결 작업이 끝났다는 것을 알아채는 데 잠깐 걸린다.
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while session.is_alive() && std::time::Instant::now() < deadline {
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    assert!(
+        !session.is_alive(),
+        "서버를 내렸는데 5초 안에 끊김을 알지 못했다"
+    );
+    assert!(session.home().is_err());
+}

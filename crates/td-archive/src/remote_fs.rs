@@ -10,6 +10,9 @@ use td_vfs::{
     remote_url, Entry, EntryKind, Info, ListOptions, RemoteLoc, Result, VfsError, VfsPath,
 };
 
+/// 끊긴 세션으로 작업할 때의 오류 문구. UI가 같은 문구로 끊김을 알아보고 "다시 연결"을 보이므로 바꾸면 UI도 맞춰야 한다.
+pub const REMOTE_DISCONNECTED: &str = "원격 연결이 끊어졌습니다";
+
 /// 열린 원격 세션들(연결 id → 세션). 복제본끼리 공유한다.
 #[derive(Clone, Default)]
 pub struct RemoteRegistry {
@@ -45,8 +48,14 @@ impl RemoteRegistry {
     }
 
     fn session(&self, path: &VfsPath, loc: &RemoteLoc) -> Result<Arc<dyn RemoteSession>> {
-        self.get(&loc.id)
-            .ok_or_else(|| other(path, "원격 연결이 열려 있지 않습니다"))
+        let session = self
+            .get(&loc.id)
+            .ok_or_else(|| other(path, "원격 연결이 열려 있지 않습니다"))?;
+        if session.is_alive() {
+            Ok(session)
+        } else {
+            Err(other(path, REMOTE_DISCONNECTED))
+        }
     }
 }
 

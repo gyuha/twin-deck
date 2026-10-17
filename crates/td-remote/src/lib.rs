@@ -45,6 +45,10 @@ pub trait RemoteWrite: Write + Send {
 
 /// 열린 원격 세션. 스레드 사이에서 공유할 수 있다.
 pub trait RemoteSession: Send + Sync {
+    /// 연결이 아직 살아 있는가. 끊긴 것을 알면 거짓이다(다시 접속해야 한다). 스스로 다시 연결하는 세션(FTP)은 늘 참이다.
+    fn is_alive(&self) -> bool {
+        true
+    }
     /// 로그인 직후의 기본 폴더(홈).
     fn home(&self) -> Result<String>;
     fn list(&self, dir: &str) -> Result<Vec<RemoteEntry>>;

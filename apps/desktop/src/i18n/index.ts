@@ -34,7 +34,7 @@ export function actionShortTitle(id: string, fallback: string): string {
   return key in ko ? t(key as Key) : actionTitle(id, fallback);
 }
 
-export { RUST_INTERNAL, RUST_MESSAGES } from "./rust";
+export { RUST_INTERNAL, RUST_MESSAGES, RUST_REMOTE_DISCONNECTED } from "./rust";
 import { translateRust as translateRustRaw } from "./rust";
 
 /** Rust가 만든 문구를 지금 언어로. 한국어면 그대로다. */

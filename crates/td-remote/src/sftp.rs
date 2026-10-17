@@ -180,8 +180,8 @@ impl client::Handler for Client {
 pub struct SftpSession {
     rt: Arc<Rt>,
     sftp: Arc<RawSftp>,
-    // 연결을 살려 두려고 들고 있는다.
-    _handle: client::Handle<Client>,
+    // 연결을 살려 두려고 들고 있고, 끊겼는지(`is_alive`) 물어보는 데도 쓴다.
+    handle: client::Handle<Client>,
 }
 
 fn map_sftp(path: &str, e: SftpError) -> RemoteError {
@@ -259,7 +259,7 @@ impl SftpSession {
         Ok(Self {
             rt,
             sftp: Arc::new(sftp),
-            _handle: handle,
+            handle,
         })
     }
 
@@ -285,6 +285,10 @@ fn modified_of(m: &russh_sftp::protocol::FileAttributes) -> Option<SystemTime> {
 }
 
 impl RemoteSession for SftpSession {
+    fn is_alive(&self) -> bool {
+        !self.handle.is_closed()
+    }
+
     fn home(&self) -> Result<String> {
         self.run("/", self.sftp.canonicalize("."))
     }

@@ -212,6 +212,7 @@ export class FakeBackend implements Backend {
   }
 
   async listDir(path: string, showHidden: boolean): Promise<EntryDto[]> {
+    this.assertRemoteAlive(path);
     // 폴더를 가리키는 링크는 대상 폴더의 내용을 링크 경로 아래 항목으로 보여 준다(실제 파일시스템처럼).
     const node = this.need(path);
     const real = node.link && this.nodes.get(node.link)?.kind === "dir" ? node.link : path;
@@ -304,6 +305,7 @@ export class FakeBackend implements Backend {
   }
 
   async fileInfo(path: string): Promise<FileInfoDto> {
+    this.assertRemoteAlive(path);
     const n = this.need(path);
     const prefix = path === "/" ? "/" : `${path}/`;
     const children = [...this.nodes.keys()].filter(
@@ -940,6 +942,20 @@ export class FakeBackend implements Backend {
    * 사용자가 없는 SFTP는 auth 오류, 사용자가 없는 FTP는 익명. 이미 연결돼 있으면 그대로 루트를 돌려준다.
    * 루트는 `base_dir`(없으면 `/`)이고, 성공하면 그 폴더가 가짜 트리에 생긴다(`seed`로 미리 넣은 파일이 보인다).
    */
+  /** 끊긴 연결 id들(테스트용 `simulateRemoteDrop`). 그 연결의 목록·정보 조회가 "원격 연결이 끊어졌습니다"로 실패한다. */
+  private remoteDropped = new Set<string>();
+
+  /** 테스트용: 연결 `id`(예: `me@h:22`)가 끊긴 것처럼 만든다. 같은 서버에 `remoteConnect`로 다시 성공하면 풀린다(Rust의 죽은 세션 교체와 같다). */
+  simulateRemoteDrop(id: string) {
+    this.remoteOpen.delete(id);
+    this.remoteDropped.add(id);
+  }
+
+  private assertRemoteAlive(path: string) {
+    const loc = splitRemote(path);
+    if (loc && this.remoteDropped.has(loc.id)) throw new BackendError("원격 연결이 끊어졌습니다");
+  }
+
   async remoteConnect(index: number, password: string | null, remember: boolean, _approvedHostKey?: string) {
     const s = this.remoteServer(index);
     const id = FakeBackend.remoteId(s);
@@ -954,6 +970,7 @@ export class FakeBackend implements Backend {
       if (s.host === "offline") throw new RemoteConnectError("unreachable", "서버에 연결할 수 없습니다");
       if (pw === "bad") throw authError;
       this.remoteOpen.add(id);
+      this.remoteDropped.delete(id);
       if (remember && password && s.user) this.remotePasswords.set(key, password);
     }
     this.ensureDir(root);
