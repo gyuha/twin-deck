@@ -331,6 +331,13 @@ async smbForgetPassword(index: number) : Promise<Result<null, string>> {
 }
 },
 /**
+ * 저장된 SMB 서버 항목마다 지금 마운트된 위치를 돌려준다(항목 순서와 같고, 마운트돼 있지 않으면 `null`).
+ * 앱 밖(Finder 등)에서 마운트한 공유도 찾는다. UI는 이것으로 SMB 탭의 아이콘·색을 정한다(이슈 #92·#93).
+ */
+async smbMounts() : Promise<(string | null)[]> {
+    return await TAURI_INVOKE("smb_mounts");
+},
+/**
  * 저장된 원격(SFTP·FTP) 서버 목록(`[[remote.servers]]`) 전체를 바꾸고, 새로 병합된 설정을 바로 돌려준다.
  * 목록은 설정(`Loaded`)의 `remote.servers`로 읽는다. protocol이 sftp·ftp가 아니거나 host가 빈 항목이 있으면 쓰지 않고 거부한다.
  * 비밀번호는 목록에 없다(OS 키체인).
@@ -908,7 +915,11 @@ tab_close_button: boolean;
 /**
  * 탭 막대 위치: "top"(파일 목록 위) | "bottom"(파일 목록 아래, 이슈 #67). 패널마다 탭 막대가 하나씩이라 두 패널 모두 따른다.
  */
-tab_position: string }
+tab_position: string; 
+/**
+ * 특수 탭의 색(이슈 #92): "auto"(테마에서 계산) | "off" | "#rrggbb". 칸형은 배경, 밑줄형은 밑줄과 이름 앞 점에 쓴다.
+ */
+tab_color_terminal: string; tab_color_smb: string; tab_color_remote: string; tab_color_twindeck: string }
 export type BehaviorTable = { icon_size: number; 
 /**
  * 목록 행의 아이콘을 운영체제가 쓰는 파일 아이콘으로 보인다(macOS·Windows). 얻지 못하면 기본 아이콘이다.
@@ -1269,7 +1280,11 @@ export type RemoteFailureDto = { kind: RemoteErrorKindDto; message: string }
  * `port`가 0이거나 없으면 프로토콜 기본 포트(sftp 22, ftp 21, twindeck 2222)로 채운다. `twindeck`은 앱 내장 서버(Twin Deck Remote)로, 연결은 SFTP와 같다. `user`가 비면 FTP는 `anonymous`로 연결한다.
  * `base_dir`은 접속 직후 이동할 폴더이고 비면 서버가 알려 주는 홈이다.
  */
-export type RemoteServer = { name: string; protocol: string; host: string; port: number; user: string; base_dir: string }
+export type RemoteServer = { name: string; protocol: string; host: string; port: number; user: string; base_dir: string; 
+/**
+ * 연결 메뉴·경로 표시줄·탭 이름 앞에 붙이는 이모지(이슈 #93). 비면 붙이지 않는다.
+ */
+icon?: string }
 /**
  * 내장 서버(Twin Deck Remote) 설정. 기본은 꺼짐·로컬 전용·읽기 전용·셸 없음이다.
  * `root`가 비어 있으면 서버를 켤 수 없다(홈 폴더로 대신하지 않는다).
@@ -1330,7 +1345,11 @@ export type SmbFailureDto = { kind: SmbErrorKindDto; message: string }
 /**
  * SMB 서버 항목(`[[smb.servers]]`). `name`이 비면 읽을 때 `host/share`로 채운다. `user`가 비면 게스트로 연결한다.
  */
-export type SmbServer = { name: string; host: string; share: string; user: string }
+export type SmbServer = { name: string; host: string; share: string; user: string; 
+/**
+ * 연결 메뉴·드라이브 바·경로 표시줄·탭 이름 앞에 붙이는 이모지(이슈 #93). 비면 붙이지 않는다.
+ */
+icon?: string }
 /**
  * 창 하나의 복원 상태: 두 패널의 탭들, 활성 패널, 숨김 표시, Actions Panel 검색어.
  */

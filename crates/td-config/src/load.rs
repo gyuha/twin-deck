@@ -208,6 +208,46 @@ fn validate_text_color(merged: &mut Table, warnings: &mut Vec<Warning>) {
     }
 }
 
+/// 특수 탭 색 키(`behavior.layout.tab_color_*`)는 `auto`·`off`·`#rgb`/`#rrggbb` 중 하나여야 한다(이슈 #92).
+/// 아니면 경고하고 기본값(`auto`)으로 되돌린다.
+fn validate_tab_colors(merged: &mut Table, warnings: &mut Vec<Warning>) {
+    let Some(layout) = merged
+        .get_mut("behavior")
+        .and_then(Value::as_table_mut)
+        .and_then(|b| b.get_mut("layout"))
+        .and_then(Value::as_table_mut)
+    else {
+        return;
+    };
+    for key in [
+        "tab_color_terminal",
+        "tab_color_smb",
+        "tab_color_remote",
+        "tab_color_twindeck",
+    ] {
+        let ok = match layout.get(key) {
+            None => continue,
+            Some(Value::String(v)) => {
+                matches!(v.as_str(), "auto" | "off")
+                    || v.strip_prefix('#').is_some_and(|h| {
+                        matches!(h.len(), 3 | 6) && h.chars().all(|c| c.is_ascii_hexdigit())
+                    })
+            }
+            Some(_) => false,
+        };
+        if ok {
+            continue;
+        }
+        warnings.push(Warning::new(
+            "config.toml",
+            format!(
+                "behavior.layout.{key}: auto, off, #rrggbb 중 하나여야 합니다 (기본값을 씁니다)"
+            ),
+        ));
+        layout.insert(key.to_string(), Value::String("auto".into()));
+    }
+}
+
 /// `remote_server`의 포트 범위(1~65535)와 bind·user가 비지 않았는지 본다. 어긋나면 경고와 함께 기본값으로 되돌린다.
 fn validate_remote_server(merged: &mut Table, defaults: &Table, warnings: &mut Vec<Warning>) {
     let Some(t) = merged
@@ -358,6 +398,7 @@ fn parse_smb_servers(value: Option<Value>, warnings: &mut Vec<Warning>) -> Vec<S
             host,
             share,
             user: text("user"),
+            icon: text("icon"),
         });
     }
     out
@@ -428,6 +469,7 @@ fn parse_remote_servers(value: Option<Value>, warnings: &mut Vec<Warning>) -> Ve
             port,
             user,
             base_dir: text("base_dir"),
+            icon: text("icon"),
         });
     }
     out
@@ -451,6 +493,7 @@ pub fn load_from_strs(
     }
     validate_enums(&mut merged, &defaults, &mut warnings);
     validate_text_color(&mut merged, &mut warnings);
+    validate_tab_colors(&mut merged, &mut warnings);
     validate_remote_server(&mut merged, &defaults, &mut warnings);
     let favorites = parse_favorites(merged.remove("favorites"), &mut warnings);
     let smb_servers = parse_smb_servers(

@@ -1,6 +1,7 @@
 /** Warp 테마(themes.generated.ts)의 색 몇 개에서 앱의 의미 토큰(`--color-*`) 전체를 계산한다. 화면과 무관한 순수 함수. */
 import { THEMES } from "./themes.generated";
 import type { WarpTheme } from "./themes.generated";
+import type { TabKind } from "./connections";
 
 /** `system`일 때 OS 밝기에 따라 쓰는 기본 테마, `light`/`dark`가 가리키는 테마. */
 export const DEFAULT_LIGHT = "catppuccin-latte";
@@ -118,4 +119,125 @@ export function resolveTheme(setting: string, osDark: boolean): WarpTheme {
 /** `behavior.random_themes`(쉼표로 이은 문자열)에서 실제로 있는 테마 이름만 순서대로, 중복 없이 뽑는다. */
 export function parseThemeList(value: string): string[] {
   return [...new Set(value.split(",").map((s) => s.trim()).filter((s) => THEME_BY_ID.has(s)))];
+}
+
+// ---- 특수 탭 색(이슈 #92): OKLCH에서 강조색의 hue를 돌려 종류마다 다른 색을 만든다 ----
+
+type Oklch = { l: number; c: number; h: number };
+
+const toLinear = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+const fromLinear = (v: number) => (v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055);
+
+function oklab(color: string): [number, number, number] {
+  const [r, g, b] = rgb(color).map((v) => toLinear(v / 255));
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return [
+    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+  ];
+}
+
+export function toOklch(color: string): Oklch {
+  const [l, a, b] = oklab(color);
+  return { l, c: Math.hypot(a, b), h: ((Math.atan2(b, a) * 180) / Math.PI + 360) % 360 };
+}
+
+/** OKLCH → sRGB(0~255). 색역 밖이면 null. */
+function oklchRgb({ l, c, h }: Oklch): Rgb | null {
+  const a = c * Math.cos((h * Math.PI) / 180);
+  const b = c * Math.sin((h * Math.PI) / 180);
+  const l3 = (l + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m3 = (l - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s3 = (l - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  const out = [
+    4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3,
+    -1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3,
+    -0.0041960863 * l3 - 0.7034186147 * m3 + 1.707614701 * s3,
+  ];
+  if (!out.every((v) => v >= -1e-4 && v <= 1 + 1e-4)) return null;
+  return out.map((v) => fromLinear(Math.max(0, Math.min(1, v))) * 255) as Rgb;
+}
+
+/** OKLCH → `#rrggbb`. 색역을 벗어나면 채도를 줄여 맞춘다. */
+export function fromOklch(o: Oklch): string {
+  for (let c = o.c; c > 0; c -= 0.005) {
+    const v = oklchRgb({ ...o, c });
+    if (v) return hex(v);
+  }
+  return hex(oklchRgb({ ...o, c: 0 })!);
+}
+
+/** OKLab 거리(ΔE). 0.02쯤이면 겨우 구분되고 0.1이면 뚜렷하다. */
+export function deltaE(x: string, y: string): number {
+  const [a, b] = [oklab(x), oklab(y)];
+  return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+}
+
+/** 종류마다 강조색에서 돌리는 hue. 강조색 자체(0°)는 피해서 선택·커서 강조와 겹치지 않게 한다. */
+const HUE_OFFSET: Record<TabKind, number> = { terminal: 45, smb: 135, remote: 225, twindeck: 315 };
+
+/**
+ * 밝기를 0.01 간격으로 훑어 `ok`를 만족하는 색 중 밝기가 `target`에 가장 가까운 것.
+ * 없으면 `must`를 만족하는 것 중 `score`가 가장 큰 것, 그것도 없으면 전체에서 `score`가 가장 큰 것.
+ */
+function pickLightness(base: Oklch, target: number, must: (c: string) => boolean, ok: (c: string) => boolean, score: (c: string) => number): string {
+  const all = Array.from({ length: 101 }, (_, i) => ({ c: fromOklch({ ...base, l: i / 100 }), d: Math.abs(i / 100 - target) }));
+  const pass = all.filter((x) => must(x.c) && ok(x.c));
+  if (pass.length > 0) return pass.reduce((p, q) => (q.d < p.d ? q : p)).c;
+  const best = (xs: typeof all) => xs.reduce((p, q) => (score(q.c) > score(p.c) ? q : p)).c;
+  const musts = all.filter((x) => must(x.c));
+  return best(musts.length > 0 ? musts : all);
+}
+
+export interface TabColor {
+  /** 칸형 탭의 배경. */
+  fill: string;
+  /** `fill` 위의 글자색. */
+  ink: string;
+  /** 밑줄형의 밑줄과 이름 앞 점(앱 배경 위에 그린다). */
+  mark: string;
+}
+
+/** 배경 `fill` 위의 글자색: 앱 글자색이 대비 4.5 이상이면 그대로, 아니면 흰색·검정 중 대비가 큰 쪽. */
+const inkFor = (fill: string, ink: string) => (contrast(fill, ink) >= 4.5 ? ink : inkOn(fill));
+
+/**
+ * 테마의 배경 `bg`·글자 `ink`·강조색 `accent`에서 종류별 탭 색을 계산한다.
+ * hue는 강조색에서 종류마다 돌리고 채도는 강조색의 채도를 범위(배경 0.06~0.14, 밑줄·점 0.1~0.18)로 제한해 쓴다.
+ * 칸형 배경은 글자와 대비 4.5 이상이면서 앱 배경과 ΔE 0.06 이상 떨어진 밝기 중 선택 탭 배경(`--color-app-selected`)의 밝기에
+ * 가장 가까운 것이다(ΔE를 채울 수 없는 테마는 대비 4.5를 지키는 것 중 배경과 가장 먼 것).
+ * 밑줄·점은 앱 배경과 대비 3 이상인 밝기 중 강조색의 밝기(0.6~0.8로 제한)에 가장 가까운 것이다.
+ */
+export function autoTabColor(kind: TabKind, bg: string, ink: string, accent: string): TabColor {
+  const a = toOklch(accent);
+  const h = (a.h + HUE_OFFSET[kind]) % 360;
+  const clamp = (lo: number, hi: number) => Math.min(hi, Math.max(lo, a.c));
+  const fill = pickLightness(
+    { l: a.l, c: clamp(0.06, 0.14), h },
+    toOklch(mix(bg, ink, 0.16)).l,
+    (c) => contrast(c, ink) >= 4.5,
+    (c) => deltaE(c, bg) >= 0.06,
+    (c) => deltaE(c, bg),
+  );
+  // 강조색이 거의 흰색·검정인 테마는 그 밝기에서 채도를 낼 수 없어 종류끼리 구분되지 않으므로 목표 밝기를 0.6~0.8로 제한한다.
+  const mark = pickLightness({ l: a.l, c: clamp(0.1, 0.18), h }, Math.min(0.8, Math.max(0.6, a.l)), () => true, (c) => contrast(c, bg) >= 3, (c) => contrast(c, bg));
+  return { fill, ink: inkFor(fill, ink), mark };
+}
+
+const HEX = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+const fullHex = (c: string) => (c.length === 4 ? "#" + [...c.slice(1)].map((x) => x + x).join("") : c).toLowerCase();
+
+/**
+ * `behavior.layout.tab_color_<종류>` 값(`auto` | `off` | `#rrggbb`)을 색으로 푼다. `off`(또는 알 수 없는 값)면 null이다.
+ * 직접 지정한 색은 칸형 배경·밑줄·점에 그대로 쓰고, 글자만 읽히는 색으로 고른다. `ink`는 지금 쓰는 앱 글자색이다(글자색 설정 반영).
+ */
+export function tabColor(kind: TabKind, setting: string, theme: { background: string; accent: string }, ink: string): TabColor | null {
+  const text = fullHex(ink);
+  if (setting === "auto") return autoTabColor(kind, theme.background, text, theme.accent);
+  if (!HEX.test(setting)) return null;
+  const c = fullHex(setting);
+  return { fill: c, ink: inkFor(c, text), mark: c };
 }

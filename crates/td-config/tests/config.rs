@@ -1152,6 +1152,82 @@ fn tab_position_defaults_top_and_validates() {
 }
 
 #[test]
+fn tab_colors_default_auto_and_validate() {
+    let none = load("");
+    assert!(none.warnings.is_empty(), "{:?}", none.warnings);
+    let layout = &none.config.behavior.layout;
+    for v in [
+        &layout.tab_color_terminal,
+        &layout.tab_color_smb,
+        &layout.tab_color_remote,
+        &layout.tab_color_twindeck,
+    ] {
+        assert_eq!(v, "auto");
+    }
+
+    let l = load(
+        "[behavior.layout]\ntab_color_terminal = \"off\"\ntab_color_smb = \"#1a2B3c\"\ntab_color_remote = \"#abc\"\n",
+    );
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert_eq!(l.config.behavior.layout.tab_color_terminal, "off");
+    assert_eq!(l.config.behavior.layout.tab_color_smb, "#1a2B3c");
+    assert_eq!(l.config.behavior.layout.tab_color_remote, "#abc");
+
+    let l = load("[behavior.layout]\ntab_color_twindeck = \"red\"\ntab_color_smb = 3\n");
+    for key in ["tab_color_twindeck", "tab_color_smb"] {
+        assert!(
+            l.warnings.iter().any(|w| w.message.contains(key)),
+            "{key}: {:?}",
+            l.warnings
+        );
+    }
+    assert_eq!(l.config.behavior.layout.tab_color_twindeck, "auto");
+    assert_eq!(l.config.behavior.layout.tab_color_smb, "auto");
+}
+
+#[test]
+fn server_icons_are_read_and_saved() {
+    let l = load(
+        r#"
+[[smb.servers]]
+host = "nas.local"
+share = "media"
+icon = " 🗄️ "
+
+[[remote.servers]]
+protocol = "sftp"
+host = "example.com"
+icon = "🏠"
+
+[[remote.servers]]
+protocol = "ftp"
+host = "ftp.example.com"
+"#,
+    );
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert_eq!(l.config.smb.servers[0].icon, "🗄️");
+    assert_eq!(l.config.remote.servers[0].icon, "🏠");
+    assert_eq!(l.config.remote.servers[1].icon, "");
+
+    let d = tempfile::tempdir().unwrap();
+    let mut s = smb("n", "h", "s", "");
+    s.icon = "📁".into();
+    td_config::set_smb_servers(d.path(), &[s, smb("m", "h", "t", "")]).unwrap();
+    let mut r = remote("r", "sftp", "h", 22, "", "");
+    r.icon = "🚀".into();
+    td_config::set_remote_servers(d.path(), &[r, remote("q", "ftp", "h", 21, "", "")]).unwrap();
+    let text = std::fs::read_to_string(d.path().join("config.toml")).unwrap();
+    // 빈 아이콘은 키를 쓰지 않는다.
+    assert_eq!(text.matches("icon = ").count(), 2, "{text}");
+    let l = load_dir(d.path(), Platform::Linux);
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert_eq!(l.config.smb.servers[0].icon, "📁");
+    assert_eq!(l.config.smb.servers[1].icon, "");
+    assert_eq!(l.config.remote.servers[0].icon, "🚀");
+    assert_eq!(l.config.remote.servers[1].icon, "");
+}
+
+#[test]
 fn tab_close_button_defaults_off_and_round_trips() {
     use td_config::{set_user_value, ConfigValue};
     let none = load("");
@@ -1320,6 +1396,7 @@ fn smb(name: &str, host: &str, share: &str, user: &str) -> td_config::SmbServer 
         host: host.into(),
         share: share.into(),
         user: user.into(),
+        icon: String::new(),
     }
 }
 
@@ -1480,6 +1557,7 @@ fn remote(
         port,
         user: user.into(),
         base_dir: base_dir.into(),
+        icon: String::new(),
     }
 }
 

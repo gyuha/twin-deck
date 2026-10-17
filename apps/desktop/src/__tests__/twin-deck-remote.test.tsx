@@ -7,8 +7,8 @@ const button = (name: string) => screen.getByRole("button", { name });
 const field = (name: string) => screen.getByRole("textbox", { name });
 const servers = async (backend: ReturnType<typeof seedBackend>) => (await backend.getConfig()).config.remote.servers;
 
-const TD = { name: "집", protocol: "twindeck", host: "home.local", port: 2222, user: "me", base_dir: "" };
-const SFTP = { name: "회사", protocol: "sftp", host: "files.example.com", port: 22, user: "kim", base_dir: "/srv" };
+const TD = { name: "집", protocol: "twindeck", host: "home.local", port: 2222, user: "me", base_dir: "", icon: "" };
+const SFTP = { name: "회사", protocol: "sftp", host: "files.example.com", port: 22, user: "kim", base_dir: "/srv", icon: "" };
 
 async function openTab(tab: string, backend = seedBackend()) {
   const app = await renderApp(backend);
@@ -194,7 +194,7 @@ describe("Twin Deck Remote 탭", () => {
       await user.type(field("호스트"), "new.local");
       await user.click(button("저장"));
       await waitFor(async () => expect((await servers(backend))?.length).toBe(3));
-      expect(await servers(backend)).toEqual([SFTP, TD, { name: "new.local", protocol: "twindeck", host: "new.local", port: 2222, user: "", base_dir: "" }]);
+      expect(await servers(backend)).toEqual([SFTP, TD, { name: "new.local", protocol: "twindeck", host: "new.local", port: 2222, user: "", base_dir: "", icon: "" }]);
       // 삭제도 SFTP 항목은 건드리지 않는다.
       await user.click(within(screen.getByRole("listbox", { name: "접속 주소" })).getByRole("option", { name: /집/ }));
       await user.click(button("삭제"));

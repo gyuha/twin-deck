@@ -62,6 +62,7 @@ import { isInside, volumeOf } from "../lib/volumes";
 import { formatDateTime, formatOctal, formatPermissions, formatSize } from "../lib/format";
 import { DEFAULT_SORT, SORT_KEYS, sortEntries, sortFromColumns } from "../lib/sort";
 import { dateGroup } from "../lib/dateGroups";
+import { withIcon } from "../lib/connections";
 import type { SortKey, SortState } from "../lib/sort";
 
 export type PaneId = "left" | "right";
@@ -377,6 +378,8 @@ export interface AppState {
   /** 설정 화면이 열려 있는지, 어느 섹션인지, 마지막 저장 오류. */
   /** 마운트된 볼륨 목록(드라이브 바). */
   volumes: VolumeDto[];
+  /** 저장된 SMB 서버 항목마다 지금 마운트된 위치(항목 순서, 마운트돼 있지 않으면 null). SMB 탭의 아이콘·색에 쓴다(이슈 #92·#93). */
+  smbMounts: (string | null)[];
   /** 패널별 현재 볼륨의 용량. 알 수 없으면 null. */
   diskSpace: Record<PaneId, DiskSpaceDto | null>;
   settingsOpen: boolean;
@@ -580,6 +583,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     queue: [],
     queueOpen: false,
     volumes: [],
+    smbMounts: [],
     diskSpace: { left: null, right: null },
     settingsOpen: false,
     settingsPane: "left",
@@ -2883,12 +2887,14 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     openSmbMenu(pane: PaneId, smbSection: number, remoteSection?: number) {
       api.activate(pane);
       const s = get();
-      const items: MenuItem[] = (s.loaded.config.smb.servers ?? []).map((v, i) =>
-        s.smbConnecting.includes(i) ? { label: tr("store.smb.connecting", { name: v.name }), smb: i, disabled: true } : { label: v.name, smb: i },
-      );
+      // 항목에 이모지가 있으면 이름 앞에 붙인다(이슈 #93).
+      const items: MenuItem[] = (s.loaded.config.smb.servers ?? []).map((v, i) => {
+        const name = withIcon(v.icon, v.name);
+        return s.smbConnecting.includes(i) ? { label: tr("store.smb.connecting", { name }), smb: i, disabled: true } : { label: name, smb: i };
+      });
       const remotes = s.loaded.config.remote.servers ?? [];
       remotes.forEach((v, i) => {
-        const label = `${v.protocol.toUpperCase()} · ${v.name}`;
+        const label = withIcon(v.icon, `${v.protocol.toUpperCase()} · ${v.name}`);
         items.push(s.remoteConnecting.includes(i) ? { label: tr("store.remote.connecting", { name: label }), remote: i, disabled: true } : { label, remote: i });
       });
       if (items.length > 0) items.push({ label: "", separator: true });
@@ -3035,6 +3041,11 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     async refreshVolumes() {
       try {
         set({ volumes: await backend.listVolumes() });
+      } catch {
+        /* 이전 목록 유지 */
+      }
+      try {
+        set({ smbMounts: await backend.smbMounts() });
       } catch {
         /* 이전 목록 유지 */
       }
@@ -3518,6 +3529,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     async setSmbServers(servers: SmbServer[]) {
       try {
         set({ loaded: await backend.setSmbServers(servers), settingsError: null });
+        void api.refreshVolumes(); // 항목 순서가 바뀌었을 수 있어 마운트 위치를 다시 맞춘다
         return true;
       } catch (e) {
         set({ settingsError: String(e instanceof Error ? e.message : e) });

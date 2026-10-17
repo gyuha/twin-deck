@@ -115,6 +115,11 @@ pub struct BehaviorLayout {
     pub tab_close_button: bool,
     /// 탭 막대 위치: "top"(파일 목록 위) | "bottom"(파일 목록 아래, 이슈 #67). 패널마다 탭 막대가 하나씩이라 두 패널 모두 따른다.
     pub tab_position: String,
+    /// 특수 탭의 색(이슈 #92): "auto"(테마에서 계산) | "off" | "#rrggbb". 칸형은 배경, 밑줄형은 밑줄과 이름 앞 점에 쓴다.
+    pub tab_color_terminal: String,
+    pub tab_color_smb: String,
+    pub tab_color_remote: String,
+    pub tab_color_twindeck: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
@@ -228,6 +233,9 @@ pub struct SmbServer {
     pub host: String,
     pub share: String,
     pub user: String,
+    /// 연결 메뉴·드라이브 바·경로 표시줄·탭 이름 앞에 붙이는 이모지(이슈 #93). 비면 붙이지 않는다.
+    #[serde(default)]
+    pub icon: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
@@ -248,6 +256,9 @@ pub struct RemoteServer {
     pub port: u16,
     pub user: String,
     pub base_dir: String,
+    /// 연결 메뉴·경로 표시줄·탭 이름 앞에 붙이는 이모지(이슈 #93). 비면 붙이지 않는다.
+    #[serde(default)]
+    pub icon: String,
 }
 
 /// 내장 서버(Twin Deck Remote) 설정. 기본은 꺼짐·로컬 전용·읽기 전용·셸 없음이다.

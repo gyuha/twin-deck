@@ -8,6 +8,7 @@ import type { RemoteServer, RemoteServerStatus, SmbServer } from "@twin-deck/ts-
 import { APP_ACTIONS, APP_LAUNCH_ACTION, APP_OPEN_FOLDER_ACTION } from "../lib/fkeys";
 import { THEMES } from "../lib/themes.generated";
 import { parseThemeList } from "../lib/themeColors";
+import { withIcon } from "../lib/connections";
 import { actionTitle, currentLanguage, LOCALES, t as translate, type Key } from "../i18n";
 import { useApp, useAppStore, useT } from "../state/context";
 import { Combobox } from "./Combobox";
@@ -23,6 +24,8 @@ type Control =
   | { type: "int" }
   | { type: "text" }
   | { type: "color" }
+  /** 특수 탭 색: 자동·끔·직접 지정(`#rrggbb`) 선택 상자와, 직접 지정이면 색 한 칸. */
+  | { type: "tab-color" }
   | { type: "select"; options: readonly string[]; labels?: Record<string, string> }
   /** 검색 입력이 있는 선택 상자(항목이 많을 때). */
   | { type: "combo"; options: readonly ComboOption[] }
@@ -165,6 +168,10 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
       { key: "behavior.layout.pane_highlight", get title() { return translate("settings.item.behavior.layout.pane_highlight.title"); }, get desc() { return translate("settings.item.behavior.layout.pane_highlight.desc"); }, control: { type: "switch" } },
       { key: "behavior.layout.tab_style", get title() { return translate("settings.item.behavior.layout.tab_style.title"); }, get desc() { return translate("settings.item.behavior.layout.tab_style.desc"); }, control: { type: "select", options: TAB_STYLES } },
       { key: "behavior.layout.tab_position", get title() { return translate("settings.item.behavior.layout.tab_position.title"); }, get desc() { return translate("settings.item.behavior.layout.tab_position.desc"); }, control: { type: "select", options: TAB_POSITIONS } },
+      { key: "behavior.layout.tab_color_terminal", get title() { return translate("settings.item.behavior.layout.tab_color_terminal.title"); }, get desc() { return translate("settings.item.behavior.layout.tab_color.desc"); }, control: { type: "tab-color" } },
+      { key: "behavior.layout.tab_color_smb", get title() { return translate("settings.item.behavior.layout.tab_color_smb.title"); }, get desc() { return translate("settings.item.behavior.layout.tab_color.desc"); }, control: { type: "tab-color" } },
+      { key: "behavior.layout.tab_color_remote", get title() { return translate("settings.item.behavior.layout.tab_color_remote.title"); }, get desc() { return translate("settings.item.behavior.layout.tab_color.desc"); }, control: { type: "tab-color" } },
+      { key: "behavior.layout.tab_color_twindeck", get title() { return translate("settings.item.behavior.layout.tab_color_twindeck.title"); }, get desc() { return translate("settings.item.behavior.layout.tab_color.desc"); }, control: { type: "tab-color" } },
       { key: "behavior.layout.tab_close_button", get title() { return translate("settings.item.behavior.layout.tab_close_button.title"); }, get desc() { return translate("settings.item.behavior.layout.tab_close_button.desc"); }, control: { type: "switch" } },
       { key: "behavior.layout.show_action_bar", get title() { return translate("settings.item.behavior.layout.show_action_bar.title"); }, get desc() { return translate("settings.item.behavior.layout.show_action_bar.desc"); }, control: { type: "switch" } },
       { key: "behavior.layout.action_bar_by_modifier", get title() { return translate("settings.item.behavior.layout.action_bar_by_modifier.title"); }, get desc() { return translate("settings.item.behavior.layout.action_bar_by_modifier.desc"); }, control: { type: "switch" } },
@@ -296,6 +303,34 @@ function EditableControl({ item, value, disabled, onCommit }: { item: Item; valu
   );
   // 글자 입력은 줄에서 남는 폭을 모두 쓴다(입력 컴포넌트가 내용 폭으로 줄어들지 않게 감싼다). 숫자 입력은 고정 폭이다.
   return item.control.type === "text" ? <div className="min-w-0 flex-1">{input}</div> : input;
+}
+
+const TAB_COLOR_MODES = ["auto", "off", "custom"] as const;
+
+/**
+ * 특수 탭 색(이슈 #92): 자동·끔·직접 지정. 직접 지정으로 바꾸면 지금 보이는 자동 색에서 시작하고 색 한 칸을 함께 보인다.
+ * 색 칸을 지우면 자동으로 돌아간다.
+ */
+function TabColorControl({ item, value, disabled, onCommit }: { item: Item; value: string; disabled: boolean; onCommit: (v: string) => void }) {
+  const t = useT();
+  const mode = value === "auto" || value === "off" ? value : "custom";
+  const start = () => {
+    const kind = item.key.slice(item.key.lastIndexOf("_") + 1);
+    const auto = getComputedStyle(document.documentElement).getPropertyValue(`--tab-${kind}-fill`).trim();
+    return /^#[0-9a-fA-F]{6}$/.test(auto) ? auto : "#808080";
+  };
+  return (
+    <div className="flex items-center gap-2">
+      <Select value={mode} disabled={disabled} onChange={(m) => m !== mode && onCommit(m === "custom" ? start() : m)}>
+        {TAB_COLOR_MODES.map((m) => (
+          <SelectOption key={m} value={m}>
+            {t(`settings.tab_color.${m}`)}
+          </SelectOption>
+        ))}
+      </Select>
+      {mode === "custom" && <ColorControl item={item} value={value} disabled={disabled} onCommit={(v) => onCommit(v || "auto")} />}
+    </div>
+  );
 }
 
 /**
@@ -545,6 +580,36 @@ function ServerModal({ title, onClose, children }: { title: string; onClose: () 
   );
 }
 
+/** 입력에서 마지막 글자(자소 묶음) 하나만 남긴다. 이모지 선택기로 새로 고르면 이전 아이콘을 바꾼다. */
+function lastGrapheme(value: string): string {
+  const parts = [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(value.trim())];
+  return parts.length > 0 ? parts[parts.length - 1].segment : "";
+}
+
+/** 연결 항목의 이모지 한 칸(이슈 #93). 연결 메뉴·드라이브 바·경로 표시줄·탭 이름 앞에 붙는다. */
+function IconField({ value, disabled, onChange, onDone }: { value: string; disabled: boolean; onChange: (v: string) => void; onDone: () => void }) {
+  const t = useT();
+  return (
+    <label className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+      <span className="w-24 shrink-0">{t("settings.server.icon")}</span>
+      <Input
+        aria-label={t("settings.server.icon")}
+        type="text"
+        size="sm"
+        className="w-16"
+        value={value}
+        disabled={disabled}
+        placeholder="🙂"
+        onChange={(e) => onChange(lastGrapheme(e.target.value))}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") onDone();
+        }}
+      />
+      <span className="text-xs text-ink-faint">{t("settings.server.icon_hint")}</span>
+    </label>
+  );
+}
+
 const EMPTY_SMB: SmbServer = { name: "", host: "", share: "", user: "" };
 const SMB_FIELDS = ["name", "host", "share", "user"] as const;
 
@@ -569,7 +634,7 @@ function SmbServersControl({ label, disabled }: { label: string; disabled: boole
   }, [savedKey]);
   const dirty = JSON.stringify(draft) !== savedKey;
   const current = draft[selected] as SmbServer | undefined;
-  const edit = (field: (typeof SMB_FIELDS)[number], value: string) => {
+  const edit = (field: (typeof SMB_FIELDS)[number] | "icon", value: string) => {
     setDraft(draft.map((s, i) => (i === selected ? { ...s, [field]: value } : s)));
     setInvalid(null);
     setNotice(null);
@@ -610,7 +675,7 @@ function SmbServersControl({ label, disabled }: { label: string; disabled: boole
             }}
             className={"cursor-default px-2 py-1.5 text-sm " + (i === selected ? "bg-app-selected" : "hover:bg-app-hover")}
           >
-            <div className="truncate">{s.name || `${s.host}/${s.share}`}</div>
+            <div className="truncate">{withIcon(s.icon, s.name || `${s.host}/${s.share}`)}</div>
             <div className="truncate text-xs text-ink-faint">
               {s.host}/{s.share}
               {s.user ? ` · ${s.user}` : ""}
@@ -718,6 +783,7 @@ function SmbServersControl({ label, disabled }: { label: string; disabled: boole
                 />
               </label>
             ))}
+            <IconField value={current.icon ?? ""} disabled={disabled} onChange={(v) => edit("icon", v)} onDone={() => setEditing(false)} />
             <div className="flex justify-end">
               <Button
                 type="button"
@@ -827,7 +893,7 @@ function RemoteServersControl({
             }}
             className={"cursor-default px-2 py-1.5 text-sm " + (i === selected ? "bg-app-selected" : "hover:bg-app-hover")}
           >
-            <div className="truncate">{s.name || (s.user ? `${s.user}@${s.host}` : s.host)}</div>
+            <div className="truncate">{withIcon(s.icon, s.name || (s.user ? `${s.user}@${s.host}` : s.host))}</div>
             <div className="truncate text-xs text-ink-faint">
               {s.protocol.toUpperCase()} · {s.host}
               {s.port ? `:${s.port}` : ""}
@@ -964,6 +1030,7 @@ function RemoteServersControl({
                 />
               </label>
             ))}
+            <IconField value={current.icon ?? ""} disabled={disabled} onChange={(v) => patch({ icon: v })} onDone={() => setEditing(false)} />
             <label className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
               <span className="w-24 shrink-0">{t("settings.remote.port")}</span>
               <Input
@@ -1381,6 +1448,9 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
                     )}
                     {item.control.type === "color" && (
                       <ColorControl item={item} value={String(value ?? "")} disabled={!!broken} onCommit={(v) => void api.setConfigValue(item.key, { kind: "str", value: v })} />
+                    )}
+                    {item.control.type === "tab-color" && (
+                      <TabColorControl item={item} value={String(value ?? "auto")} disabled={!!broken} onCommit={(v) => void api.setConfigValue(item.key, { kind: "str", value: v })} />
                     )}
                     {(item.control.type === "int" || item.control.type === "text") && (
                       <EditableControl

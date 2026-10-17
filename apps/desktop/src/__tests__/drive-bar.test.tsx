@@ -211,9 +211,9 @@ describe("드라이브 바", () => {
   });
 
   describe("SMB 연결 메뉴 (이슈 #77)", () => {
-    const NAS = { name: "NAS", host: "nas.local", share: "media", user: "kim" };
-    const GUEST = { name: "공용", host: "nas.local", share: "public", user: "" };
-    const OFFLINE = { name: "꺼진 서버", host: "offline", share: "data", user: "" };
+    const NAS = { name: "NAS", host: "nas.local", share: "media", user: "kim", icon: "" };
+    const GUEST = { name: "공용", host: "nas.local", share: "public", user: "", icon: "" };
+    const OFFLINE = { name: "꺼진 서버", host: "offline", share: "data", user: "", icon: "" };
     const withServers = (...servers: (typeof NAS)[]) => {
       const backend = setup();
       backend.setConfig((l) => (l.config.smb = { servers }));
@@ -362,7 +362,7 @@ describe("드라이브 바", () => {
 
     // 백엔드는 항목을 순번으로 찾는다. 연결 중에 목록이 바뀌면 같은 순번이 다른 서버라서 비밀번호를 엉뚱한 서버로 보낼 수 있다.
     it("연결 중에 서버 목록이 바뀌면 비밀번호를 묻지 않고 멈춘다", async () => {
-      const OTHER = { name: "다른 서버", host: "other.local", share: "media", user: "kim" };
+      const OTHER = { name: "다른 서버", host: "other.local", share: "media", user: "kim", icon: "" };
       const backend = withServers(NAS, OTHER);
       let release!: () => void;
       const gate = new Promise<void>((r) => (release = r));
@@ -406,9 +406,9 @@ describe("드라이브 바", () => {
   });
 
   describe("원격 연결 메뉴 (이슈 #76)", () => {
-    const SFTP = { name: "회사", protocol: "sftp", host: "nas", port: 22, user: "kim", base_dir: "" };
-    const FTP = { name: "공개", protocol: "ftp", host: "ftp.example.com", port: 21, user: "", base_dir: "/pub" };
-    const OFFLINE = { name: "꺼진 서버", protocol: "sftp", host: "offline", port: 22, user: "kim", base_dir: "" };
+    const SFTP = { name: "회사", protocol: "sftp", host: "nas", port: 22, user: "kim", base_dir: "", icon: "" };
+    const FTP = { name: "공개", protocol: "ftp", host: "ftp.example.com", port: 21, user: "", base_dir: "/pub", icon: "" };
+    const OFFLINE = { name: "꺼진 서버", protocol: "sftp", host: "offline", port: 22, user: "kim", base_dir: "", icon: "" };
     const withRemotes = (...servers: (typeof SFTP)[]) => {
       const backend = setup();
       backend.setConfig((l) => (l.config.remote = { servers }));

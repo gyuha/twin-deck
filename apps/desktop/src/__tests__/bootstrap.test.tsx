@@ -36,6 +36,7 @@ describe("앱 부팅 (Tauri IPC 모킹)", () => {
         if (cmd === "list_dir") return [entry("docs", "dir"), entry("a.txt", "file")];
         if (cmd === "queue_jobs") return [];
         if (cmd === "list_volumes") return []; // 드라이브 바가 시작할 때 볼륨 목록을 읽는다
+        if (cmd === "smb_mounts") return []; // 함께 SMB 마운트 위치도 읽는다(탭 아이콘·색)
         if (cmd === "load_state") return { snapshot: null, warning: null };
         if (cmd === "get_config") return defaultLoaded();
         if (cmd === "user_dirs")

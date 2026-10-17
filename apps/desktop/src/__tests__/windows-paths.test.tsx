@@ -8,7 +8,11 @@ import type { AppStore } from "../state/store";
 
 function renderCrumb(path: string) {
   const api = { activate: vi.fn(), navigate: vi.fn().mockResolvedValue(undefined) };
-  const store = createStore(() => ({ diskSpace: { left: null, right: null }, loaded: { config: { display: { size_format: "auto" } } } }));
+  const store = createStore(() => ({
+    diskSpace: { left: null, right: null },
+    smbMounts: [],
+    loaded: { config: { display: { size_format: "auto" }, smb: { servers: [] }, remote: { servers: [] } } },
+  }));
   render(
     <StoreContext.Provider value={{ api, store } as unknown as AppStore}>
       <Breadcrumb pane="left" path={path} />

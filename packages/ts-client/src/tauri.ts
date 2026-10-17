@@ -277,6 +277,9 @@ export class TauriBackend implements Backend {
   async smbForgetPassword(index: number) {
     unwrap(await commands.smbForgetPassword(index));
   }
+  async smbMounts() {
+    return commands.smbMounts();
+  }
   async setRemoteServers(servers: RemoteServer[]) {
     return unwrap(await commands.setRemoteServers(servers));
   }

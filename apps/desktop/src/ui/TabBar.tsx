@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { baseName } from "@twin-deck/ts-client";
 import { useApp, useAppStore, useT } from "../state/context";
 import type { PaneId } from "../state/store";
+import { tabConnection, withIcon } from "../lib/connections";
 
 /** 이 거리(px)보다 적게 움직이면 끌기가 아니라 클릭이다. */
 const DRAG_THRESHOLD = 4;
@@ -14,6 +15,9 @@ export function TabBar({ pane }: { pane: PaneId }) {
   const bottom = useApp((s) => s.loaded.config.behavior.layout.tab_position === "bottom"); // 막대가 목록 아래면 경계선·활성 탭 강조선을 위쪽(목록 쪽)에 둔다(이슈 #67)
   const { api } = useAppStore();
   const closeable = useApp((s) => s.loaded.config.behavior.layout.tab_close_button);
+  const layout = useApp((s) => s.loaded.config.behavior.layout);
+  const config = useApp((s) => s.loaded.config);
+  const smbMounts = useApp((s) => s.smbMounts);
   const [hover, setHover] = useState<number | null>(null); // 호버한 탭(닫기 버튼이 켜졌을 때 ✕를 보일 탭)
   const dropTarget = useApp((s) => s.tabDropTarget === pane);
   // 끌기 중: 끌린 탭(from)은 커서를 따라 dx만큼 움직이고, 지나는 탭들은 shift만큼 비켜 놓일 자리(to)를 보여 준다.
@@ -137,8 +141,24 @@ export function TabBar({ pane }: { pane: PaneId }) {
           : `flex gap-1 ${bottom ? "border-t" : "border-b"} border-app-line px-1 text-sm`
       }>
       {tabs.map((t, i) => {
-        const name = t.virtual ? t.virtual.title : baseName(t.path) || t.path;
+        // 네트워크 연결·터미널 탭은 연결의 이모지를 이름 앞에 붙이고(이슈 #93), 종류별 색(`--tab-<종류>-*`, 이슈 #92)을 칠한다.
+        const conn = tabConnection(t, config, smbMounts);
+        const name = withIcon(conn?.icon, t.virtual ? t.virtual.title : baseName(t.path) || t.path);
+        const kind = conn && layout[`tab_color_${conn.kind}`] !== "off" ? conn.kind : null;
         const pad = closeable ? "px-6" : "px-2";
+        // 칸형: 활성 여부와 관계없이 그 색을 배경으로 칠하고, 활성 탭은 굵은 글씨와 글자색 안쪽 선(목록 쪽)으로 구분한다.
+        // 밑줄형: 활성 탭의 밑줄을 그 색으로 칠한다(이름 앞 점은 아래에서 붙인다).
+        const colorStyle: React.CSSProperties | undefined = !kind
+          ? undefined
+          : segments
+            ? {
+                backgroundColor: `var(--tab-${kind}-fill)`,
+                color: `var(--tab-${kind}-ink)`,
+                boxShadow: i === active ? `inset 0 ${bottom ? 2 : -2}px 0 var(--tab-${kind}-ink)` : undefined,
+              }
+            : i === active
+              ? { borderColor: `var(--tab-${kind}-mark)` }
+              : undefined;
         const tabButton = (
           <button
             key={closeable ? undefined : t.id}
@@ -162,7 +182,8 @@ export function TabBar({ pane }: { pane: PaneId }) {
             onClick={() => {
               if (!justDragged.current) api.activate(pane, i);
             }}
-            style={closeable ? undefined : dragStyle(i)}
+            data-tab-kind={kind ?? undefined}
+            style={closeable ? colorStyle : { ...colorStyle, ...dragStyle(i) }}
             className={
               // 탭은 키보드 대상이 아니라(tabIndex -1) 클릭으로만 포커스를 받는다. 기본 포커스 링이 미리보기 같은 키보드 조작 중에 테두리로 보이지 않게 끈다.
               // 닫기 버튼이 켜지면 ✕ 자리를 위해 좌우 패딩을 같게 넓힌다(px-6). 호버로 글자가 움직이지 않고 칸형에서도 글자가 가운데에 남는다.
@@ -176,6 +197,7 @@ export function TabBar({ pane }: { pane: PaneId }) {
                   : `${pad} py-1 text-ink-faint`)
             }
           >
+            {kind && !segments && <span data-tab-dot className="mr-1.5 inline-block size-1.5 rounded-full align-middle" style={{ backgroundColor: `var(--tab-${kind}-mark)` }} />}
             {name}
           </button>
         );

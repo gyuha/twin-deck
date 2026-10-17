@@ -14,7 +14,7 @@ describe("SMB 연결 계약 (FakeBackend)", () => {
   it("목록을 저장하면 설정에 반영되고 빈 name은 host/share가 된다", async () => {
     const b = new FakeBackend();
     const loaded = await b.setSmbServers([server("nas", "공유", "kim")]);
-    expect(loaded.config.smb.servers).toEqual([{ name: "nas/공유", host: "nas", share: "공유", user: "kim" }]);
+    expect(loaded.config.smb.servers).toEqual([{ name: "nas/공유", host: "nas", share: "공유", user: "kim", icon: "" }]);
     expect((await b.getConfig()).config.smb.servers).toHaveLength(1);
   });
 

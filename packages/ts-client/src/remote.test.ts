@@ -48,8 +48,8 @@ describe("원격 연결 계약 (FakeBackend)", () => {
     const b = new FakeBackend();
     const loaded = await b.setRemoteServers([server("sftp", "nas", "kim"), server("ftp", "ftp.x.com")]);
     expect(loaded.config.remote.servers).toEqual([
-      { name: "kim@nas", protocol: "sftp", host: "nas", port: 22, user: "kim", base_dir: "" },
-      { name: "ftp.x.com", protocol: "ftp", host: "ftp.x.com", port: 21, user: "", base_dir: "" },
+      { name: "kim@nas", protocol: "sftp", host: "nas", port: 22, user: "kim", base_dir: "", icon: "" },
+      { name: "ftp.x.com", protocol: "ftp", host: "ftp.x.com", port: 21, user: "", base_dir: "", icon: "" },
     ]);
     expect((await b.getConfig()).config.remote.servers).toHaveLength(2);
   });

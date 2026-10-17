@@ -179,6 +179,8 @@ export interface Backend {
   smbConnect(index: number, password: string | null, remember: boolean): Promise<string>;
   /** 설정의 `index`번째 SMB 서버에 저장된 비밀번호를 키체인에서 지운다. 저장된 값이 없어도 성공이다. */
   smbForgetPassword(index: number): Promise<void>;
+  /** 저장된 SMB 서버 항목마다 지금 마운트된 위치(항목 순서, 마운트돼 있지 않으면 null). 앱 밖에서 마운트한 공유도 찾는다. */
+  smbMounts(): Promise<(string | null)[]>;
   /** 저장된 원격(SFTP·FTP) 서버 목록 전체를 바꾸고 새로 병합된 설정을 돌려준다. 목록은 `Loaded`의 `config.remote.servers`로 읽는다. protocol이 sftp·ftp가 아니거나 host가 빈 항목이 있으면 거부된다. 비밀번호는 목록에 없다(키체인). */
   setRemoteServers(servers: RemoteServer[]): Promise<Loaded>;
   /**
