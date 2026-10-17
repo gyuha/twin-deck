@@ -960,7 +960,11 @@ group_by_modified: boolean;
 /**
  * 확장자 컬럼이 보일 때도 파일 이름에 확장자를 그대로 두고 확장자 칸은 비운다(이슈 #86). 확장자 컬럼이 꺼져 있으면 영향이 없다.
  */
-keep_extension: boolean }
+keep_extension: boolean; 
+/**
+ * 파일 이름 글자의 밝기를 수정일에 따라 4단계로 나눈다(이슈 #91). 7일 이내는 앱 글자색, 1년 이상·날짜 없음은 흐린 글자색이다.
+ */
+freshness: boolean }
 /**
  * 사용자 키바인딩 한 줄. `action`이 None이면 기본 바인딩 해제(`"F5" = "none"`).
  */

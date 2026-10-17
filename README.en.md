@@ -210,6 +210,7 @@ To find folders that take a lot of space, press `Alt+T` on a folder. Subfolders 
 
 - **Fonts and text color**: set the screen font and preview font separately, and change the app's default text color.
 - **List appearance**: choose icon size, zebra rows, folder name decoration, tab style, active pane border highlight, and more. Turn on **Use system icons** (off by default) to show the real file icons Finder or File Explorer use in the list (macOS and Windows; the default icon stays when one can't be obtained).
+- **Shade names by date modified**: turn it on in the **List and selection** tab (off by default) and file names fade in 4 levels by date modified. Within 7 days keeps the normal text color, within 30 days and within a year fall in between, and anything older uses the dim text color, so recent files stand out in any sort order. Themes whose text already has low contrast with the background (such as Solarized) can't be split into levels, so it has no effect there and the setting says why.
 - **F-keys**: assign a built-in action or an external program to each of `F1`~`F12` (including modifier combinations) and choose whether it shows in the bar at the bottom.
 - **Changing keys**: edit shortcuts in `keybindings.toml` in the settings folder.
 

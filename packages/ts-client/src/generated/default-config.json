@@ -23,7 +23,8 @@
         "cursor_fill": false,
         "show_parent_row": false,
         "group_by_modified": false,
-        "keep_extension": false
+        "keep_extension": false,
+        "freshness": false
       },
       "quick_select": {
         "match_only_prefix": false,

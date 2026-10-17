@@ -14,7 +14,7 @@ import { installFileMenuForWindow } from "./appMenu";
 import { StoreContext, useApp, useAppStore, useT } from "./state/context";
 import { actionContext, activeTab, createAppStore, scopeStack } from "./state/store";
 import { ActionBar, useBarIds } from "./ui/ActionBar";
-import { textColorFor, useTabColors, useTextColor, useUiFont } from "./ui/fonts";
+import { textColorFor, useFreshness, useTabColors, useTextColor, useUiFont } from "./ui/fonts";
 import { ActionsPalette } from "./ui/ActionsPalette";
 import { Dialog } from "./ui/Dialog";
 import { DragLayer } from "./ui/DragLayer";
@@ -206,6 +206,7 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
   useUiFont(loaded.config.behavior.ui_font);
   useTextColor(loaded.config.behavior, darkTheme);
   useTabColors(loaded.config.behavior.layout, theme, textColorFor(loaded.config.behavior, darkTheme));
+  const freshnessReady = useFreshness(loaded.config.behavior.table.freshness, theme, textColorFor(loaded.config.behavior, darkTheme));
 
   // 웹뷰 기본 메뉴(Reload, Inspect Element)는 막는다. 입력창의 잘라내기/붙여넣기 메뉴는 남긴다.
   useEffect(() => {
@@ -282,7 +283,7 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
 
   return (
     <StoreContext.Provider value={app}>
-      <UiContext.Provider value={{ registry, keymap, platform }}>
+      <UiContext.Provider value={{ registry, keymap, platform, freshnessReady }}>
       <BarWarnings base={warnings} />
       <main className="flex h-screen flex-col">
         <PaneSplit onThemePreview={setThemePreview} />

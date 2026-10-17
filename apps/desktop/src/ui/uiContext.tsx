@@ -8,6 +8,8 @@ export interface UiContextValue {
   registry: ActionRegistry<ActionContext>;
   keymap: Keymap;
   platform: Platform;
+  /** 지금 테마·글자색으로 파일 신선도 단계를 나눌 수 있는지(이슈 #91). 설정 화면이 쓸 수 없는 이유를 보일 때 쓴다. */
+  freshnessReady: boolean;
 }
 
 export const UiContext = createContext<UiContextValue | null>(null);

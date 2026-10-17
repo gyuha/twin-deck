@@ -13,7 +13,7 @@ import { FileIcon } from "./FileIcon";
 import type { SortKey } from "../lib/sort";
 import { useApp, useAppStore, useT } from "../state/context";
 import { activeTab, effectiveSort, groupingActive, isFolderEntry, parentRowVisible, remoteIndexOf } from "../state/store";
-import { dateGroup } from "../lib/dateGroups";
+import { dateGroup, freshnessLevel } from "../lib/dateGroups";
 import { isRemoteDisconnected } from "../lib/remoteErrors";
 import { rustText } from "../i18n";
 import type { DateGroup } from "../lib/dateGroups";
@@ -161,6 +161,8 @@ export function FileTable({ pane }: { pane: PaneId }) {
   // 수정일 구간 그룹핑(이슈 #62): 구간이 바뀌는 곳에 제목 행을 끼운다. 제목 행은 항목이 아니라 커서·선택 번호는 그대로 `tab.entries`의 번호다.
   const grouping = groupingActive(tab, config.behavior.table.group_by_modified);
   const language = config.behavior.language;
+  // 파일 신선도(이슈 #91): 이름 글자색을 수정일 단계의 `--fresh-N`으로 둔다. 테마가 단계를 나눌 수 없으면 변수가 없어 원래 색을 물려받는다.
+  const freshNow = config.behavior.table.freshness ? Date.now() : null;
   const layout = useMemo(() => {
     if (!grouping) return null;
     const now = Date.now();
@@ -288,6 +290,8 @@ export function FileTable({ pane }: { pane: PaneId }) {
     const fill = cursor && isActive && cursorFill;
     const stripe = zebra ? (i % 2 === 1 ? "odd" : "even") : undefined;
     const [pre, post] = isFolderEntry(e) ? [decoPre, decoPost] : ["", ""];
+    // 선택한 행(강조색 글자)·꽉 채운 커서 행(강조색 위 글자)·이름 바꾸는 중에는 원래 색을 둔다.
+    const fresh = freshNow !== null && !selected && !fill && rename?.path !== e.path ? freshnessLevel(e.modifiedMs, freshNow) : null;
     return (
       <div
         key={e.path}
@@ -354,7 +358,7 @@ export function FileTable({ pane }: { pane: PaneId }) {
         {/* 폴더를 가리키는 링크는 폴더 아이콘에 링크 표시를 얹는다(이슈 #47). 파일 링크·끊어진 링크는 파일 아이콘에 링크 표시. */}
         <FileIcon name={e.name} kind={e.kind === "symlink" && e.linkIsDir ? "dir" : e.kind} link={e.kind === "symlink"} size={iconSize} path={e.path} systemIcons={systemIcons} />
         {columns.map((c, k) => (
-          <span key={`${c.name}-${k}`} className={(c.name === "name" ? "truncate " : "self-stretch truncate text-right leading-6 tabular-nums ") + columnEdge(c.name, k, k === columns.length - 1)}>
+          <span key={`${c.name}-${k}`} data-fresh={c.name === "name" && fresh !== null ? fresh : undefined} style={c.name === "name" && fresh !== null ? { color: `var(--fresh-${fresh})` } : undefined} className={(c.name === "name" ? "truncate " : "self-stretch truncate text-right leading-6 tabular-nums ") + columnEdge(c.name, k, k === columns.length - 1)}>
             {c.name === "name" && rename?.path === e.path ? (
               <RenameInput path={e.path} folder={isFolderEntry(e)} />
             ) : c.name === "name" && tab.quick ? (

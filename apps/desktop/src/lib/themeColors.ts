@@ -241,3 +241,30 @@ export function tabColor(kind: TabKind, setting: string, theme: { background: st
   const c = fullHex(setting);
   return { fill: c, ink: inkFor(c, text), mark: c };
 }
+
+// ---- 파일 신선도(이슈 #91): 수정일에 따라 이름 글자의 밝기를 4단계로 나눈다 ----
+
+/** 신선도 단계 수. 0이 가장 오래된(흐린) 단계, 3이 7일 이내(앱 글자색 그대로)다. */
+export const FRESHNESS_LEVELS = 4;
+
+/** 이웃 단계 사이의 최소 OKLab 거리. 이보다 좁으면 단계를 구분할 수 없다고 보고 표시하지 않는다. */
+export const FRESHNESS_MIN_STEP = 0.02;
+
+/** OKLab에서 `a`와 `b`를 비율 `t`로 섞는다(눈에 보이는 차이가 고르게 바뀐다). */
+function mixOklab(a: string, b: string, t: number): string {
+  const [x, y] = [oklab(a), oklab(b)];
+  const [l, p, q] = x.map((v, i) => v * (1 - t) + y[i] * t);
+  return fromOklch({ l, c: Math.hypot(p, q), h: ((Math.atan2(q, p) * 180) / Math.PI + 360) % 360 });
+}
+
+/**
+ * 신선도 단계별 글자색(0 = 가장 오래됨 … 3 = 7일 이내). 가장 신선한 단계는 앱 글자색(`text`, 비면 테마 글자색)이고,
+ * 가장 오래된 단계는 흐린 글자색(테마는 `--color-ink-dull`, 직접 지정한 글자색은 앱과 같이 배경 30% 섞음)이다. 단, 배경과 대비 4.5는 지킨다.
+ * 사이 단계는 OKLab에서 고르게 섞는다. 이웃 단계 거리가 `FRESHNESS_MIN_STEP`보다 좁으면(글자색이 이미 배경과 대비가 낮은 테마) null.
+ */
+export function freshnessShades(theme: WarpTheme, text: string): string[] | null {
+  const ink = text ? fullHex(text) : theme.foreground;
+  const dull = dim(ink, theme.background, text ? 0.3 : 0.28, 4.5);
+  if (deltaE(ink, dull) / (FRESHNESS_LEVELS - 1) < FRESHNESS_MIN_STEP) return null;
+  return Array.from({ length: FRESHNESS_LEVELS }, (_, i) => (i === 0 ? dull : i === FRESHNESS_LEVELS - 1 ? ink : mixOklab(dull, ink, i / (FRESHNESS_LEVELS - 1))));
+}

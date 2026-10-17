@@ -1,9 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import type { CSSProperties } from "react";
 import { useApp } from "../state/context";
 import { TAB_KINDS } from "../lib/connections";
 import type { TabKind } from "../lib/connections";
-import { tabColor } from "../lib/themeColors";
+import { freshnessShades, tabColor } from "../lib/themeColors";
 import type { WarpTheme } from "../lib/themes.generated";
 
 /** 설정 `behavior.ui_font`를 앱 전체(`<body>`)에 반영한다. 비우면 기본 글꼴로 돌아간다. */
@@ -70,6 +70,21 @@ export function useTabColors(layout: TabColorSettings, theme: WarpTheme | null, 
     });
     return () => names.forEach((n) => style.removeProperty(n));
   }, [key, theme, ink]);
+}
+
+/**
+ * 파일 신선도(이슈 #91): 켜져 있고 지금 테마·글자색(`ink`, 비면 테마 글자색)으로 단계를 나눌 수 있으면 `<html>`에 `--fresh-0`~`--fresh-3`을 건다.
+ * 단계를 나눌 수 있는지 돌려준다(설정 화면이 켰지만 쓸 수 없는 이유를 보인다). 테마를 아직 모르면 true로 본다.
+ */
+export function useFreshness(on: boolean, theme: WarpTheme | null, ink: string): boolean {
+  const shades = useMemo(() => (theme ? freshnessShades(theme, ink) : null), [theme, ink]);
+  useEffect(() => {
+    if (!on || !shades) return;
+    const { style } = document.documentElement;
+    shades.forEach((c, i) => style.setProperty(`--fresh-${i}`, c));
+    return () => shades.forEach((_, i) => style.removeProperty(`--fresh-${i}`));
+  }, [on, shades]);
+  return !theme || shades !== null;
 }
 
 /**

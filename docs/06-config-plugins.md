@@ -101,6 +101,7 @@ column_lines = "none"             # 컬럼 사이 세로선: "none" | "solid" | 
 cursor_fill = false               # 활성 패널의 커서 행을 강조색으로 꽉 채운다
 show_parent_row = false          # 파일 목록 맨 위에 상위 폴더 `..` 행을 보인다(작업 대상에는 들지 않는다)
 group_by_modified = false         # 켜면 목록을 수정일 구간(오늘·어제·이전 7일·이전 30일·월·연도)으로 나눠 구간 제목을 보인다(단일 컬럼 목록 보기에만 적용)
+freshness = false                 # 켜면 파일 이름 글자의 밝기를 수정일로 4단계(7일 이내·30일 이내·1년 이내·그 이상)로 나눈다(이슈 #91)
 
 [behavior.quick_select]
 match_only_prefix = false

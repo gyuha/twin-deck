@@ -194,6 +194,7 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
       { key: "behavior.table.cursor_fill", get title() { return translate("settings.item.behavior.table.cursor_fill.title"); }, get desc() { return translate("settings.item.behavior.table.cursor_fill.desc"); }, control: { type: "switch" } },
       { key: "behavior.table.show_parent_row", get title() { return translate("settings.item.behavior.table.show_parent_row.title"); }, get desc() { return translate("settings.item.behavior.table.show_parent_row.desc"); }, control: { type: "switch" } },
       { key: "behavior.table.group_by_modified", get title() { return translate("settings.item.behavior.table.group_by_modified.title"); }, get desc() { return translate("settings.item.behavior.table.group_by_modified.desc"); }, control: { type: "switch" } },
+      { key: "behavior.table.freshness", get title() { return translate("settings.item.behavior.table.freshness.title"); }, get desc() { return translate("settings.item.behavior.table.freshness.desc"); }, control: { type: "switch" } },
       { key: "behavior.table.circular_selection", get title() { return translate("settings.item.behavior.table.circular_selection.title"); }, get desc() { return translate("settings.item.behavior.table.circular_selection.desc"); }, control: { type: "switch" } },
       { key: "behavior.table.right_click_select", get title() { return translate("settings.item.behavior.table.right_click_select.title"); }, get desc() { return translate("settings.item.behavior.table.right_click_select.desc"); }, control: { type: "switch" } },
       { key: "behavior.quick_select.match_only_prefix", get title() { return translate("settings.item.behavior.quick_select.match_only_prefix.title"); }, get desc() { return translate("settings.item.behavior.quick_select.match_only_prefix.desc"); }, control: { type: "switch" } },
@@ -1353,7 +1354,7 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
   const config = useApp((s) => s.loaded.config);
   // F키 탭은 고정 F1~F12 뒤에 설정 파일의 조합키 항목이 이어진다.
   // 내장 기본 바인딩의 조합키(Shift+F8, Mod+F12 등)도 설정 파일에 없어도 같이 보인다.
-  const { platform } = useUi();
+  const { platform, freshnessReady } = useUi();
   const comboKeys = [
     ...new Set([
       ...Object.keys(config.fkeys).filter((k) => k.includes("+")),
@@ -1475,6 +1476,12 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
                       {item.title}
                       {item.desc && <InfoTip text={item.desc} />}
                     </div>
+                    {/* 파일 신선도를 켰지만 지금 테마·글자색으로는 단계를 나눌 수 없을 때(이슈 #91) */}
+                    {item.key === "behavior.table.freshness" && value === true && !freshnessReady && (
+                      <p role="alert" className="mt-0.5 text-xs font-semibold text-status-warning">
+                        {t("settings.freshness.unavailable")}
+                      </p>
+                    )}
                   </div>
                   <div className={item.control.type === "fkey" ? "contents" : "flex items-center gap-3 " + (stacked ? "w-full min-w-0" : wide ? "min-w-0 flex-1 justify-end" : "shrink-0")}>
                     {!broken && !combo && (

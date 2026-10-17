@@ -42,3 +42,15 @@ export function dateGroup(modifiedMs: number | null, now: number): DateGroup {
   return { id: `y:${year}`, rank: 1000 + (nowYear - year), title: String(year) };
 }
 
+
+/**
+ * 파일 신선도 단계(이슈 #91): 3 = 7일 이내(오늘 포함, 앞날 시각도) · 2 = 30일 이내 · 1 = 1년(365일) 이내 · 0 = 그 이상 또는 날짜 없음.
+ * 경계는 구간 묶음과 같은 로컬 자정이라 "이전 7일"·"이전 30일" 제목과 단계가 맞는다.
+ */
+export function freshnessLevel(modifiedMs: number | null, now: number): 0 | 1 | 2 | 3 {
+  if (modifiedMs === null) return 0;
+  if (modifiedMs >= startOfDay(now, 7)) return 3;
+  if (modifiedMs >= startOfDay(now, 30)) return 2;
+  if (modifiedMs >= startOfDay(now, 365)) return 1;
+  return 0;
+}
