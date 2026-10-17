@@ -10,6 +10,8 @@ export interface ActionContext {
   terminalTab?: boolean;
   /** 활성 탭이 연결이 끊겨 목록을 못 읽는 원격 탭인지(다시 연결할 수 있다, 이슈 #98). */
   remoteDisconnected?: boolean;
+  /** 활성 탭이 원격(SFTP·FTP) 폴더를 보는 탭인지(연결을 끊을 수 있다, 이슈 #95). */
+  onRemote?: boolean;
   /** 커서가 목록 맨 위의 `..` 상위 폴더 행에 있는지(열기만 가능하다). */
   onParentRow?: boolean;
   selectedCount: number;
@@ -74,6 +76,8 @@ export const DEFAULT_ACTION_META = [
   { id: "core.select.group", title: "패턴으로 선택", category: "Selection", scopes: ["pane"] },
   { id: "core.deselect.group", title: "패턴으로 선택 해제", category: "Selection", scopes: ["pane"] },
   { id: "core.open", title: "열기", category: "Navigation", scopes: ["pane"], isApplicable: (c) => c.hasCursorItem || !!c.onParentRow },
+  { id: "core.menu.connect", title: "서버에 연결 메뉴", category: "Navigation", scopes: ["pane"] },
+  { id: "core.remote.disconnect", title: "원격 연결 끊기", category: "Navigation", scopes: ["pane"], isApplicable: (c) => !!c.onRemote },
   { id: "core.remote.reconnect", title: "원격 다시 연결", category: "Navigation", scopes: ["pane"], isApplicable: (c) => !!c.remoteDisconnected },
   { id: "core.open.launch", title: "앱 실행 (.app 열기)", category: "Navigation", scopes: ["pane"], isApplicable: (c) => c.hasCursorItem },
   { id: "core.compress", title: "압축", category: "File", scopes: ["pane"], isApplicable: hasTarget },
@@ -172,6 +176,8 @@ export const DEFAULT_ACTION_META = [
   { id: "core.window.new", title: "새 창", category: "View", scopes: ["pane"] },
   { id: "core.state.reset", title: "상태 초기화 후 종료", category: "View", scopes: ["pane"] },
   { id: "core.settings.open", title: "설정 화면 열기", category: "View", scopes: ["global", "terminal"] },
+  { id: "core.settings.remote", title: "SFTP·FTP 서버 설정 열기", category: "View", scopes: ["global", "terminal"] },
+  { id: "core.settings.twindeck_remote", title: "Twin Deck Remote 설정 열기", category: "View", scopes: ["global", "terminal"] },
   { id: "core.settings.close", title: "설정 화면 닫기", category: "View", scopes: ["settings"] },
   { id: "core.queue.open", title: "작업 큐 열기/닫기", category: "View", scopes: ["global"] },
   { id: "core.terminal.focus", title: "새 터미널 탭", category: "View", scopes: ["pane", "terminal"] },
@@ -307,6 +313,7 @@ export const DEFAULT_BINDINGS: Binding[] = [
   b("pane", "core.menu.favorites", "Alt+2"),
   b("pane", "core.menu.recent", "Alt+3"),
   b("pane", "core.menu.hierarchy", "Alt+0"),
+  b("pane", "core.menu.connect", "Alt+4"),
   b("pane", "core.go.path", "Mod+G"),
   ...Array.from({ length: 10 }, (_, n) => ba("pane", "core.go.shortcut", { n: String(n) }, `Ctrl+${n}`)),
   b("panel", "core.menu.up", "Up"),

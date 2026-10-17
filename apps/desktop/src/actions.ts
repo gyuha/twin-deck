@@ -1,5 +1,6 @@
 import type { ActionHandlers } from "@twin-deck/actions";
 import { scrollPreview } from "./ui/previewScroll";
+import { REMOTE_SECTION, SMB_SECTION, TWIN_DECK_REMOTE_SECTION } from "./ui/Settings";
 import type { AppStore } from "./state/store";
 import { PAGE_SIZE } from "./state/store";
 
@@ -109,6 +110,8 @@ export function fileOpHandlers({ api }: AppStore): Partial<ActionHandlers> {
 export function queueHandlers({ api }: AppStore): Partial<ActionHandlers> {
   return {
     "core.settings.open": () => api.openSettings(),
+    "core.settings.remote": () => api.openSettings(REMOTE_SECTION),
+    "core.settings.twindeck_remote": () => api.openSettings(TWIN_DECK_REMOTE_SECTION),
     "core.settings.close": () => api.closeSettings(),
     "core.queue.open": () => api.toggleQueue(),
     "core.terminal.focus": () => api.terminalFocus(),
@@ -124,9 +127,12 @@ export function queueHandlers({ api }: AppStore): Partial<ActionHandlers> {
 }
 
 /** 탐색 보조 메뉴(Volumes/Favorites/Recent/Hierarchy)와 Go To Path의 실행 핸들러. */
-export function menuHandlers({ api }: AppStore): Partial<ActionHandlers> {
+export function menuHandlers({ api, store }: AppStore): Partial<ActionHandlers> {
   return {
     "core.menu.volumes": () => api.openMenu("volumes"),
+    // 드라이브 바의 "연결" 버튼과 같다: 활성 패널에서 연결 메뉴를 연다(이슈 #95). 탭 순번은 설정 화면이 정하므로 여기서 넘긴다.
+    "core.menu.connect": () => api.openSmbMenu(store.getState().activePane, SMB_SECTION, REMOTE_SECTION),
+    "core.remote.disconnect": () => api.disconnectRemote(store.getState().activePane),
     "core.menu.favorites": () => api.openMenu("favorites"),
     "core.menu.recent": () => api.openMenu("recent"),
     "core.menu.hierarchy": () => api.openMenu("hierarchy"),

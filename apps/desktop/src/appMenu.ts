@@ -91,6 +91,8 @@ export const FILE_MENU: ({ key: Key; actionId: string } | null)[] = [
   null,
   { key: "menu.file.info", actionId: "core.file.info" },
   null,
+  { key: "menu.file.connect", actionId: "core.menu.connect" },
+  null,
 ];
 
 /** View 메뉴에 넣는 켜고 끄는 항목. `flag`는 `LayoutFlags`의 키다. */

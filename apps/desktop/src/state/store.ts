@@ -503,6 +503,7 @@ export function actionContext(s: AppState): ActionContext {
     hasCursorItem: !!cursorEntry(tab),
     terminalTab: tab.virtual?.kind === "terminal",
     remoteDisconnected: !tab.virtual && isRemotePath(tab.path) && isRemoteDisconnected(tab.error),
+    onRemote: !tab.virtual && isRemotePath(tab.path),
     onParentRow: tab.cursor < 0 && parentRowVisible(tab, s.loaded.config.behavior.table.show_parent_row),
     selectedCount: tab.selection.size,
     tabCount: s.panes[s.activePane].tabs.length,

@@ -342,7 +342,9 @@ describe("키 설정", () => {
     await act(async () => {});
     await user.keyboard("{Control>}{Shift>}p{/Shift}{/Control}");
     await user.keyboard("settings");
-    expect(await screen.findByRole("option", { name: /설정/ })).toBeInTheDocument();
+    // "설정"이 든 액션이 여럿이다(설정 화면 열기, SFTP·FTP 서버 설정 열기, Twin Deck Remote 설정 열기). 그중 설정 화면 열기가 있어야 한다.
+    const options = await screen.findAllByRole("option", { name: /설정/ });
+    expect(options.some((o) => o.textContent?.includes("설정 화면 열기"))).toBe(true);
   });
 });
 

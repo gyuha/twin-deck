@@ -124,6 +124,9 @@ Marta에서는 수정자 없는 단일 키 바인딩이 Quick Select에 가로�
 | `core.open` | 열기 | `Return` | `Return` | ID 확인 |
 | `core.open.launch` | 앱 실행 (.app 열기, 이슈 #90): 커서가 로컬 `.app` 폴더면 안으로 들어가지 않고 OS 기본 열기(macOS `open`)로 앱을 실행한다. `Enter`·우클릭 "열기"(`core.open`)는 그대로 `.app` 안으로 들어간다. `.app`이 아닌 항목(원격·압축 안 포함)에서는 `core.open`과 똑같이 동작한다 | `Shift+Enter` | `Shift+Enter` | pane, 자체 ID, 키 확인 |
 | `core.remote.reconnect` | 원격 다시 연결 (이슈 #98): 활성 탭이 연결이 끊겨 목록을 못 읽는 원격(SFTP·FTP) 탭일 때만 실행된다. 패널의 "다시 연결" 버튼과 같은 일을 한다 — 설정의 서버 항목으로 다시 접속(저장된 비밀번호, 없거나 틀리면 비밀번호 창·호스트 키 확인)하고, 성공하면 그 연결을 보는 모든 탭(양쪽 패널·배경 탭)을 다시 읽는다. 설정에서 지워진 서버면 알림만 보인다 | 없음 | 없음 | pane, 자체 ID |
+| `core.remote.disconnect` | 원격 연결 끊기 (이슈 #95): 활성 탭이 원격(SFTP·FTP) 폴더를 볼 때만 실행된다. 드라이브 바의 "끊기" 버튼과 같다 — 그 연결을 보는 모든 탭(양쪽 패널·배경 탭)을 홈으로 옮기고 연결을 닫는다. 원격 위치가 아니거나 설정에서 지워진 서버면 아무 일도 하지 않는다 | 없음 | 없음 | pane, 자체 ID |
+| `core.settings.remote` | SFTP·FTP 서버 설정 열기 (이슈 #95): 설정 화면을 **SFTP·FTP 서버** 탭에서 연다(서버 추가·편집·연결·터미널 연결 버튼이 있는 탭). 설정 화면 자체는 `Mod+,`(`core.settings.open`)로 연다 | 없음 | 없음 | global·terminal, 자체 ID |
+| `core.settings.twindeck_remote` | Twin Deck Remote 설정 열기 (이슈 #95): 설정 화면을 **Twin Deck Remote** 탭에서 연다(이 앱을 SSH/SFTP 서버로 켜는 탭) | 없음 | 없음 | global·terminal, 자체 ID |
 | `core.open.directory` | 폴더 열기 (인수 `src`) | 없음 | 없음 | ID 확인, 인수 확인 |
 | `core.open.as_archive` | 아카이브로 열기 (Open As, ARC-04) | 없음 | 없음 | 자체 ID |
 | `core.go.up` | 상위 폴더 | `Backspace` | `Backspace`, `Alt+Up` | ID 확인 |
@@ -139,6 +142,7 @@ Marta에서는 수정자 없는 단일 키 바인딩이 Quick Select에 가로�
 | `core.menu.favorites` | Favorites 메뉴 (열린 뒤 글자·숫자 입력으로 이름·경로 필터, `Alt+숫자`로 n번째 선택, `Ctrl+=`로 현재 폴더 추가·이미 있으면 무시, `Ctrl+-`로 커서 항목을 즐겨찾기에서 삭제(폴더는 그대로)) | `Alt+2` | `Alt+2` | 자체 ID, 키 확인 |
 | `core.menu.recent` | Recent Locations (열린 뒤 글자·숫자 입력으로 경로 필터, `Alt+숫자`로 n번째 선택) | `Alt+3` | `Alt+3` | 자체 ID, 키 확인 |
 | `core.menu.hierarchy` | Hierarchy | `Alt+0` | `Alt+0` | 자체 ID, 키 확인 |
+| `core.menu.connect` | 서버에 연결 메뉴 (이슈 #95): 드라이브 바의 "연결" 버튼과 같다. 활성 패널에서 저장된 SMB·SFTP·FTP 서버 목록 메뉴를 연다. 메뉴 안에서 `Enter`는 연결(그 패널에 서버 루트를 보는 새 탭), SFTP 항목의 `Shift+Enter`(`core.menu.select_terminal`)는 SSH(원격 셸) 터미널 탭이다. 항목 끝의 "SFTP·FTP 관리…"는 설정을 그 탭에서 연다. 액션 패널에서 "sftp"·"ssh"로 찾을 수 있고 macOS 메뉴바 File 메뉴에도 "서버에 연결…"로 있다 | `Alt+4` | `Alt+4` | pane, 자체 ID, 키 확인 |
 | `core.menu.select_terminal` | 메뉴: 터미널로 열기 — 드라이브 바 "서버에 연결" 메뉴에서 커서가 SFTP 항목이면 연결해 그 서버의 원격 셸 터미널 탭만 메뉴를 연 현재 패널의 탭 줄에 연다(패널은 옮기지 않는다. `Enter`는 패널을 서버로 옮기는 연결). SFTP 항목 오른쪽에 "Shift+Enter: 터미널" 배지가 보이고, FTP·SMB·관리 항목에서는 아무것도 하지 않는다. 구현됨(이슈 #94) | `Shift+Enter` | `Shift+Enter` | panel, 자체 ID, 키 확인 |
 | `core.favorites.add` / `core.favorites.edit` | Favorites 추가/편집 | 없음 | 없음 | 자체 |
 | `core.recent.clear` | Recent 비우기 (최근 위치 메뉴 안) | `Ctrl+Backspace` | `Ctrl+Backspace` | 자체 |
