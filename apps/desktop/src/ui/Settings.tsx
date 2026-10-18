@@ -1334,11 +1334,12 @@ function TwinDeckServerControl({ label, disabled }: { label: string; disabled: b
               if (e.key === "Enter" && password) setPw(password);
             }}
           />
-          <Button type="button" size="sm" variant="gray" disabled={disabled || busy || !password} onClick={() => setPw(password)}>
-            {t("settings.twindeck.password_save")}
+          {/* 줄 제목이 이미 "비밀번호"라 보이는 글자는 짧게 두고, 화면 읽기 프로그램용 이름(aria-label)은 전체 문구를 유지한다. */}
+          <Button type="button" size="sm" variant="gray" className="whitespace-nowrap" aria-label={t("settings.twindeck.password_save")} disabled={disabled || busy || !password} onClick={() => setPw(password)}>
+            {t("settings.twindeck.password_save_short")}
           </Button>
-          <Button type="button" size="sm" variant="gray" disabled={disabled || busy || !hasPassword} onClick={() => setPw("")}>
-            {t("settings.twindeck.password_delete")}
+          <Button type="button" size="sm" variant="gray" className="whitespace-nowrap" aria-label={t("settings.twindeck.password_delete")} disabled={disabled || busy || !hasPassword} onClick={() => setPw("")}>
+            {t("settings.twindeck.password_delete_short")}
           </Button>
         </div>
       </div>

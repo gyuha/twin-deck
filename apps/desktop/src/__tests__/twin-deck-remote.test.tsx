@@ -120,6 +120,18 @@ describe("Twin Deck Remote 탭", () => {
       expect(screen.queryByDisplayValue("hunter2-secret")).toBeNull();
     });
 
+    it("비밀번호 줄의 버튼은 보이는 글자가 짧고(설정·삭제) 화면 읽기 이름은 전체 문구를 유지한다", async () => {
+      await openTwinDeck();
+      const set = button("비밀번호 설정");
+      const del = button("비밀번호 삭제");
+      expect(set).toHaveTextContent(/^설정$/);
+      expect(del).toHaveTextContent(/^삭제$/);
+      expect(set).toHaveAttribute("aria-label", "비밀번호 설정");
+      expect(del).toHaveAttribute("aria-label", "비밀번호 삭제");
+      expect(set.className).toContain("whitespace-nowrap"); // 좁은 줄에서 글자가 줄바꿈되지 않는다
+      expect(del.className).toContain("whitespace-nowrap");
+    });
+
     it("비밀번호 삭제는 빈 문자열을 보낸다", async () => {
       const backend = seedBackend();
       backend.remoteServerPassword = "pw";

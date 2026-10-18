@@ -611,6 +611,8 @@ export const ko = {
   "settings.twindeck.password_input": "새 비밀번호",
   "settings.twindeck.password_save": "비밀번호 설정",
   "settings.twindeck.password_delete": "비밀번호 삭제",
+  "settings.twindeck.password_save_short": "설정",
+  "settings.twindeck.password_delete_short": "삭제",
   "settings.twindeck.edit_title": "Twin Deck Remote 접속 주소 편집",
   "preview.kind.text": "텍스트",
   "preview.kind.image": "이미지",

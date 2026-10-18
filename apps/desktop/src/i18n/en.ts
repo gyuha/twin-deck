@@ -613,6 +613,8 @@ export const en: Record<Key, string> = {
   "settings.twindeck.password_input": "New password",
   "settings.twindeck.password_save": "Set password",
   "settings.twindeck.password_delete": "Delete password",
+  "settings.twindeck.password_save_short": "Set",
+  "settings.twindeck.password_delete_short": "Delete",
   "settings.twindeck.edit_title": "Edit Twin Deck Remote address",
   "preview.kind.text": "Text",
   "preview.kind.image": "Image",
