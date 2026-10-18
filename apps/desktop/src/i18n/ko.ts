@@ -268,6 +268,7 @@ export const ko = {
   "store.compress.progress": "압축",
   "terminal.tab": "터미널",
   "terminal.aria": "터미널",
+  "terminal.lost_title": "원격 연결이 끊어졌습니다",
   "terminal.starting": "터미널을 시작하는 중…",
   "terminal.failed": "터미널을 그리지 못했습니다: {error}",
   "terminal.notice.virtual": "검색 결과 같은 가상 탭에서는 터미널을 열 수 없습니다",

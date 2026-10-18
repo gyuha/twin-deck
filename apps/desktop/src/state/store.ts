@@ -52,6 +52,7 @@ import type {
 import type { ActionContext } from "@twin-deck/actions";
 import type { Scope } from "@twin-deck/keybinds";
 import { appendQuick, backspaceQuick } from "../lib/hangulInput";
+import { rebindTerminal } from "../lib/terminalSessions";
 import { quickMatch } from "../lib/names";
 import { parseColumns } from "../lib/columns";
 import { neighborTile, OTHER } from "../lib/treemap";
@@ -113,6 +114,8 @@ export interface VirtualTab {
   recheck: string[];
   /** Disk Usage: 항목이 사라져 합계·크기가 옛 값이다. 작업이 모두 끝나면 같은 폴더를 다시 스캔한다. */
   stale?: boolean;
+  /** 터미널: 원격 셸의 연결이 끊겼다(종료 코드 없이 채널이 닫혔다). 탭과 화면은 남기고 다시 연결할 수 있게 한다(이슈 #98). */
+  disconnected?: boolean;
 }
 
 /** 파일 찾기 다이얼로그(기본 탭)의 입력값. */
@@ -507,7 +510,7 @@ export function actionContext(s: AppState): ActionContext {
   return {
     hasCursorItem: !!cursorEntry(tab),
     terminalTab: tab.virtual?.kind === "terminal",
-    remoteDisconnected: !tab.virtual && isRemotePath(tab.path) && isRemoteDisconnected(tab.error),
+    remoteDisconnected: (!tab.virtual && isRemotePath(tab.path) && isRemoteDisconnected(tab.error)) || (tab.virtual?.kind === "terminal" && !!tab.virtual.disconnected),
     onRemote: !tab.virtual && isRemotePath(tab.path),
     onParentRow: tab.cursor < 0 && parentRowVisible(tab, s.loaded.config.behavior.table.show_parent_row),
     selectedCount: tab.selection.size,
@@ -968,7 +971,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
   // 내장 터미널의 셸이 끝나면(exit, Ctrl+D) 패널이 파일 목록으로 돌아온다(이슈 #46).
   // 실행 중인 앱에 `td` 명령이 경로를 넘기면 같은 규칙으로 연다(이슈 #45).
   subscribe(() => backend.onOpenPaths((request) => void api.openPaths(request)));
-  subscribe(() => backend.onTerminalEvent((e) => e.type === "exit" && void api.terminalExited(e.id)));
+  subscribe(() => backend.onTerminalEvent((e) => e.type === "exit" && void api.terminalExited(e.id, e.code)));
   subscribe(() => backend.onDirChanged((path) => {
     for (const pane of ["left", "right"] as const) {
       for (const t of get().panes[pane].tabs) if (t.path === path) void reload(pane, t.id);
@@ -1660,11 +1663,45 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         fail(e);
       }
     },
-    /** 셸이 끝났다: 그 세션의 터미널 탭을 없앤다. 패널의 마지막 탭이면 시작한 폴더를 보는 파일 탭으로 바꾼다. */
-    async terminalExited(id: number) {
+    /**
+     * 셸이 끝났다: 그 세션의 터미널 탭을 없앤다. 패널의 마지막 탭이면 시작한 폴더를 보는 파일 탭으로 바꾼다.
+     * 원격 셸이 종료 코드 없이(`code === null`) 닫혔으면 연결이 끊긴 것이므로 탭과 화면을 남기고 끊김으로 표시한다(이슈 #98).
+     */
+    async terminalExited(id: number, code: number | null = 0) {
       for (const pane of ["left", "right"] as const) {
         const index = get().panes[pane].tabs.findIndex((t) => t.virtual?.kind === "terminal" && t.virtual.jobId === id);
-        if (index >= 0) return removeTerminalTab(pane, index);
+        if (index < 0) continue;
+        const tab = get().panes[pane].tabs[index];
+        if (code === null && splitRemote(tab.virtual!.base)) {
+          void backend.terminalClose(id).catch(() => {});
+          return set((s) => ({ panes: { ...s.panes, [pane]: { ...s.panes[pane], tabs: s.panes[pane].tabs.map((t) => (t.id === tab.id ? { ...t, virtual: { ...t.virtual!, disconnected: true } } : t)) } } }));
+        }
+        return removeTerminalTab(pane, index);
+      }
+    },
+    /**
+     * 끊긴 원격 터미널 탭을 다시 연결한다(이슈 #98). 서버에 다시 접속(`openRemoteConnection`: 저장된 비밀번호 → 비밀번호 창·호스트 키 확인)한 뒤
+     * 새 셸을 열어 같은 탭에 이어 붙인다. 이전 화면은 그대로 두고 그 아래로 이어서 출력된다(엔진을 새 세션 번호로 옮긴다).
+     */
+    async reconnectTerminal(pane: PaneId = get().activePane, tabId?: number) {
+      const s = get();
+      const tab = tabId === undefined ? activeTab(s, pane) : s.panes[pane].tabs.find((t) => t.id === tabId);
+      if (tab?.virtual?.kind !== "terminal") return;
+      const remote = splitRemote(tab.virtual.base);
+      if (!remote) return;
+      const index = remoteIndexOf(s, tab.virtual.base);
+      if (index < 0) return fail(tr("store.remote.reconnect_missing"));
+      if ((await openRemoteConnection(index)) === null) return;
+      const oldId = tab.virtual.jobId;
+      try {
+        const id = await backend.terminalOpenRemote(remote.id, 80, 24);
+        const now = get();
+        const cur = now.panes[pane].tabs.find((t) => t.id === tab.id);
+        if (!cur?.virtual || cur.virtual.jobId !== oldId) return void backend.terminalClose(id).catch(() => {});
+        rebindTerminal(backend, oldId, id);
+        set({ panes: { ...now.panes, [pane]: { ...now.panes[pane], tabs: now.panes[pane].tabs.map((t) => (t.id === tab.id ? { ...t, virtual: { ...t.virtual!, jobId: id, disconnected: false } } : t)) } } });
+      } catch (e) {
+        fail(e);
       }
     },
 
@@ -3093,6 +3130,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
      * 설정에서 지워진 서버면 알리기만 한다. 끊긴 탭이 아니어도 원격 탭이면 같은 일을 한다.
      */
     async reconnectRemote(pane: PaneId = get().activePane) {
+      if (activeTab(get(), pane).virtual?.kind === "terminal") return api.reconnectTerminal(pane);
       const s = get();
       const loc = splitRemote(activeTab(s, pane).path);
       if (!loc) return;

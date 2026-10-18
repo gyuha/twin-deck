@@ -27,9 +27,9 @@ export function Pane({ pane, onThemePreview }: { pane: PaneId; onThemePreview?: 
   const dropHere = useApp((s) => !!s.drag?.target && !s.drag.target.row && s.drag.target.pane === pane);
   // 이 패널의 터미널 탭들(세션 번호). 활성 탭이 터미널이면 파일 목록 대신 그 터미널이 보이고, 나머지는 숨긴 채 계속 그려 둔다.
   const terminalKey = useApp((s) =>
-    s.panes[pane].tabs.flatMap((t) => (t.virtual?.kind === "terminal" ? [`${t.id}:${t.virtual.jobId}`] : [])).join(","),
+    s.panes[pane].tabs.flatMap((t) => (t.virtual?.kind === "terminal" ? [`${t.id}:${t.virtual.jobId}:${t.virtual.disconnected ? 1 : 0}`] : [])).join(","),
   );
-  const terminals = terminalKey ? terminalKey.split(",").map((x) => ({ tab: Number(x.split(":")[0]), session: Number(x.split(":")[1]) })) : [];
+  const terminals = terminalKey ? terminalKey.split(",").map((x) => ({ tab: Number(x.split(":")[0]), session: Number(x.split(":")[1]), lost: x.split(":")[2] === "1" })) : [];
   const activeTerminalTab = useApp((s) => (activeTab(s, pane).virtual?.kind === "terminal" ? activeTab(s, pane).id : null));
   const hasSettings = useApp((s) => s.settingsOpen && s.settingsPane === pane); // 설정이 이 패널 자리에 떠 있다
   // 탭 막대 위치(이슈 #67): "bottom"이면 파일 목록 뒤(패널 하단)에 그린다. 위치는 CSS order가 아니라 렌더 순서로 정한다.
@@ -72,7 +72,7 @@ export function Pane({ pane, onThemePreview }: { pane: PaneId; onThemePreview?: 
       )}
       {/* 설정이 이 패널 자리에 떠 있어도 터미널은 지우지 않고 숨겨 둔다(지우면 열려 있는 터미널 화면이 사라진다). */}
       {terminals.map((term) => (
-        <TerminalView key={term.session} id={term.session} shown={!hasSettings && activeTerminalTab === term.tab} focused={isActive} />
+        <TerminalView key={term.session} pane={pane} tabId={term.tab} id={term.session} lost={term.lost} shown={!hasSettings && activeTerminalTab === term.tab} focused={isActive} />
       ))}
       {!hasSettings && activeTerminalTab === null && (
         <>

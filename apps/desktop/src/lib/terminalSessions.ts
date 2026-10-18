@@ -23,6 +23,8 @@ export interface TerminalHandle {
 }
 
 interface Session {
+  /** 지금 이어진 pty 세션 번호. 원격 셸을 다시 연결하면 같은 화면이 새 번호로 옮겨 온다(`rebindTerminal`). */
+  id: number;
   engine: TerminalEngine | null;
   state: TerminalState;
   /** 엔진이 준비되기 전에 온 출력. */
@@ -49,9 +51,9 @@ function notify(s: Session, patch: Partial<TerminalState>) {
 }
 
 function open(backend: Backend, id: number, font: string): Session {
-  const s: Session = { engine: null, state: { ready: false, error: null }, pending: [], host: null, refs: 0, disposed: false, off: () => {}, watchers: new Set() };
+  const s: Session = { id, engine: null, state: { ready: false, error: null }, pending: [], host: null, refs: 0, disposed: false, off: () => {}, watchers: new Set() };
   s.off = backend.onTerminalEvent((e) => {
-    if (e.type !== "output" || e.id !== id) return;
+    if (e.type !== "output" || e.id !== s.id) return;
     if (s.engine) s.engine.write(e.data);
     else s.pending.push(e.data);
   });
@@ -59,11 +61,11 @@ function open(backend: Backend, id: number, font: string): Session {
     (eng) => {
       if (s.disposed) return eng.dispose();
       s.engine = eng;
-      eng.onData((data) => void backend.terminalWrite(id, data).catch(() => {}));
-      eng.onResize(({ cols, rows }) => void backend.terminalResize(id, cols, rows).catch(() => {}));
+      eng.onData((data) => void backend.terminalWrite(s.id, data).catch(() => {}));
+      eng.onResize(({ cols, rows }) => void backend.terminalResize(s.id, cols, rows).catch(() => {}));
       for (const chunk of s.pending) eng.write(chunk);
       s.pending = [];
-      if (s.host) place(backend, id, s, s.host);
+      if (s.host) place(backend, s, s.host);
       notify(s, { ready: true });
     },
     (e) => !s.disposed && notify(s, { error: String(e instanceof Error ? e.message : e) }),
@@ -72,20 +74,34 @@ function open(backend: Backend, id: number, font: string): Session {
 }
 
 /** 엔진을 `host`에 붙이고(처음이면 열고, 다른 자리에서 왔으면 옮기고) 맞춘 크기를 셸에 알린다. */
-function place(backend: Backend, id: number, s: Session, host: HTMLElement) {
+function place(backend: Backend, s: Session, host: HTMLElement) {
   const eng = s.engine;
   if (!eng) return;
   eng.open(host);
   // 열자마자 맞춘 크기를 셸에 알린다(처음 크기 80x24는 임시였다).
-  void backend.terminalResize(id, eng.cols, eng.rows).catch(() => {});
+  void backend.terminalResize(s.id, eng.cols, eng.rows).catch(() => {});
 }
 
-function dispose(backend: Backend, id: number, s: Session) {
+function dispose(backend: Backend, s: Session) {
   s.disposed = true;
   s.off();
   s.engine?.dispose();
   s.engine = null;
-  sessionsOf(backend).delete(id);
+  sessionsOf(backend).delete(s.id);
+}
+
+/**
+ * 끊긴 원격 셸을 다시 연결해 새 세션 `to`가 열렸을 때, 옛 세션 `from`의 화면(엔진)을 새 번호로 옮긴다(이슈 #98).
+ * 이전 화면이 남고 그 아래로 새 셸의 출력이 이어진다. 옛 세션이 없으면(화면이 아직 열리지 않았다) 아무것도 하지 않는다.
+ */
+export function rebindTerminal(backend: Backend, from: number, to: number) {
+  const sessions = sessionsOf(backend);
+  const s = sessions.get(from);
+  if (!s) return;
+  sessions.delete(from);
+  s.id = to;
+  sessions.set(to, s);
+  if (s.engine) void backend.terminalResize(to, s.engine.cols, s.engine.rows).catch(() => {});
 }
 
 /**
@@ -103,7 +119,7 @@ export function acquireTerminal(backend: Backend, id: number, font: string, watc
   return {
     attach(host) {
       s.host = host;
-      place(backend, id, s, host);
+      place(backend, s, host);
     },
     engine: () => s.engine,
     release() {
@@ -113,7 +129,7 @@ export function acquireTerminal(backend: Backend, id: number, font: string, watc
       s.refs--;
       // 같은 커밋에서 다른 패널의 뷰가 바로 이어 받는 경우(탭 이동)를 위해 한 틱 기다렸다가, 아무도 쓰지 않을 때만 해제한다.
       setTimeout(() => {
-        if (s.refs === 0 && !s.disposed) dispose(backend, id, s);
+        if (s.refs === 0 && !s.disposed) dispose(backend, s);
       }, 0);
     },
   };

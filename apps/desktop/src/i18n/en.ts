@@ -270,6 +270,7 @@ export const en: Record<Key, string> = {
   "store.compress.progress": "Compressing",
   "terminal.tab": "Terminal",
   "terminal.aria": "Terminal",
+  "terminal.lost_title": "The remote connection was lost",
   "terminal.starting": "Starting terminal…",
   "terminal.failed": "Could not draw the terminal: {error}",
   "terminal.notice.virtual": "A terminal cannot be opened in a virtual tab such as search results",
