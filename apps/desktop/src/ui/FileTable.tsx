@@ -158,6 +158,9 @@ export function FileTable({ pane }: { pane: PaneId }) {
   // 확장자 컬럼이 보이면 파일 이름에서는 확장자를 뺀다(그 컬럼이 보여 준다). `확장자 유지`(이슈 #86)가 켜져 있으면 이름에 확장자를 두고 확장자 칸은 비운다.
   const keepExt = config.behavior.table.keep_extension;
   const hasExtColumn = columns.some((c) => c.name === "extension") && !keepExt;
+  // `확장자 유지`가 켜져 있고 확장자 컬럼이 이름 컬럼 바로 뒤에 있으면, 본문에서는 확장자 칸을 이름 칸에 합친다(이슈 #99): 이름 칸이 두 칸 폭을 쓰고 둘 사이에 컬럼 선이 없다. 헤더는 그대로다.
+  const nameAt = columns.findIndex((c) => c.name === "name");
+  const mergedExtAt = keepExt && nameAt >= 0 && columns[nameAt + 1]?.name === "extension" ? nameAt + 1 : -1;
   // 수정일 구간 그룹핑(이슈 #62): 구간이 바뀌는 곳에 제목 행을 끼운다. 제목 행은 항목이 아니라 커서·선택 번호는 그대로 `tab.entries`의 번호다.
   const grouping = groupingActive(tab, config.behavior.table.group_by_modified);
   const language = config.behavior.language;
@@ -353,8 +356,8 @@ export function FileTable({ pane }: { pane: PaneId }) {
         )}
         {/* 폴더를 가리키는 링크는 폴더 아이콘에 링크 표시를 얹는다(이슈 #47). 파일 링크·끊어진 링크는 파일 아이콘에 링크 표시. */}
         <FileIcon name={e.name} kind={e.kind === "symlink" && e.linkIsDir ? "dir" : e.kind} link={e.kind === "symlink"} size={iconSize} path={e.path} systemIcons={systemIcons} />
-        {columns.map((c, k) => (
-          <span key={`${c.name}-${k}`} className={(c.name === "name" ? "truncate " : "self-stretch truncate text-right leading-6 tabular-nums ") + columnEdge(c.name, k, k === columns.length - 1)}>
+        {columns.map((c, k) => k === mergedExtAt ? null : (
+          <span key={`${c.name}-${k}`} style={k === mergedExtAt - 1 ? { gridColumn: "span 2" } : undefined} className={(c.name === "name" ? "truncate " : "self-stretch truncate text-right leading-6 tabular-nums ") + columnEdge(c.name, k, k === columns.length - 1)}>
             {c.name === "name" && rename?.path === e.path ? (
               <RenameInput path={e.path} folder={isFolderEntry(e)} />
             ) : c.name === "name" && tab.quick ? (

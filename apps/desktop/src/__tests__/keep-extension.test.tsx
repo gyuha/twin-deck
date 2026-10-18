@@ -27,18 +27,37 @@ function seed(keep: boolean, column: boolean, change: (l: Loaded) => void = () =
 }
 const leftPane = () => within(screen.getByRole("region", { name: "왼쪽 패널" }));
 const extHeader = () => within(leftPane().getByRole("row", { name: "컬럼 머리글" })).getByRole("columnheader", { name: /확장자/ });
-/** 이름 칸 바로 다음 칸(확장자 칸)의 글자. */
+/** 이름 칸 바로 다음 칸의 글자. */
 const extCell = (name: string) => within(list("left")).getByText(name).nextElementSibling;
 const open = (user: Awaited<ReturnType<typeof renderApp>>["user"]) => user.keyboard("{Control>},{/Control}");
 
 describe("확장자 유지 옵션 (이슈 #86)", () => {
-  it("컬럼 켬 + 유지 켬: 이름에 확장자가 남고 확장자 칸은 비며 헤더로 정렬된다", async () => {
+  it("컬럼 켬 + 유지 켬: 이름에 확장자가 남고 본문에서는 확장자 칸이 이름 칸에 합쳐지며 헤더로 정렬된다", async () => {
     const { user } = await renderApp(seed(true, true));
     expect(entryNames("left")).toEqual(["docs", "src", "a.txt", "b.md", "c.zip", "d.txt"]);
-    for (const name of ["a.txt", "b.md", "c.zip", "d.txt"]) expect(extCell(name)).toBeEmptyDOMElement();
+    // 합쳐졌으므로 이름 칸 다음 칸은 확장자 칸이 아니라 크기 칸이다.
+    for (const name of ["a.txt", "b.md", "c.zip", "d.txt"]) expect(extCell(name)).toHaveTextContent(/\d/);
     await user.click(extHeader());
     await waitFor(() => expect(entryNames("left")).toEqual(["docs", "src", "b.md", "a.txt", "d.txt", "c.zip"]));
     expect(extHeader()).toHaveAttribute("aria-sort", "ascending");
+  });
+
+  it("컬럼 켬 + 유지 켬: 본문 행은 이름 칸이 확장자 칸까지 두 칸 폭을 쓰고 둘 사이에 컬럼 선이 없다 (이슈 #99)", async () => {
+    await renderApp(seed(true, true, (l) => void (l.config.behavior.table.column_lines = "solid")));
+    const row = within(list("left")).getByText("a.txt").parentElement as HTMLElement;
+    expect(row.children).toHaveLength((row.querySelector("[data-mark]") ? 1 : 0) + 1 + 3); // (표시 칸) + 아이콘 + 이름·크기·수정일: 확장자 칸이 따로 없다
+    const name = within(list("left")).getByText("a.txt");
+    expect(name.style.gridColumn).toContain("span 2");
+    expect(name.className).not.toMatch(/border-l/);
+    expect(name.nextElementSibling?.className).toMatch(/border-l/); // 확장자 칸 뒤의 선은 그대로
+    // 헤더는 그대로 확장자 칸을 둔다.
+    expect(extHeader()).toBeInTheDocument();
+  });
+
+  it("확장자 컬럼이 이름 컬럼 바로 뒤가 아니면 합치지 않는다", async () => {
+    await renderApp(seed(true, true, (l) => void (l.config.view.table.columns = ["name", "size", "extension", "modified"])));
+    const name = within(list("left")).getByText("a.txt");
+    expect(name.style.gridColumn).toBe("");
   });
 
   it("유지 끔(기본): 이름에서 확장자가 빠지고 확장자 칸에 보인다", async () => {
