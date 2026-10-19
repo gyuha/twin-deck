@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { baseName } from "@twin-deck/ts-client";
 import { useApp, useAppStore, useT } from "../state/context";
 import type { PaneId } from "../state/store";
@@ -23,6 +23,13 @@ export function TabBar({ pane }: { pane: PaneId }) {
   // 끌기 중: 끌린 탭(from)은 커서를 따라 dx만큼 움직이고, 지나는 탭들은 shift만큼 비켜 놓일 자리(to)를 보여 준다.
   const [drag, setDrag] = useState<{ from: number; to: number; dx: number; shift: number } | null>(null);
   const justDragged = useRef(false);
+  const listRef = useRef<HTMLDivElement>(null);
+  // 탭이 많아 탭 줄이 가로로 스크롤될 때, 활성 탭이 줄 밖에 있으면 보이는 곳으로 스크롤한다(이슈 #104). 이미 보이면 아무것도 하지 않는다.
+  // 탭 모양·위치·닫기 버튼이 바뀌면 탭 폭이 달라져 이전 스크롤 위치가 맞지 않으므로 그때도 다시 맞춘다
+  // (시작할 때 기본 모양으로 그린 뒤 설정이 로드되어 모양이 바뀌는 경우 포함).
+  useEffect(() => {
+    listRef.current?.querySelectorAll('[role="tab"]')[active]?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  }, [active, tabs.length, segments, bottom, closeable]);
   const tabIndexAt = (el: EventTarget | null) => {
     const tab = el instanceof Element ? el.closest('[role="tab"]') : null;
     const list = tab?.closest('[role="tablist"]');
@@ -132,15 +139,15 @@ export function TabBar({ pane }: { pane: PaneId }) {
     return { transform: between ? `translateX(${dir * drag.shift}px)` : undefined, transition: "transform 120ms" };
   };
   return (
-    <div role="tablist" aria-label={tr("tabs.aria")} data-pane={pane} data-drop-target={dropTarget ? "true" : undefined}
+    <div ref={listRef} role="tablist" aria-label={tr("tabs.aria")} data-pane={pane} data-drop-target={dropTarget ? "true" : undefined}
       // 탭 줄의 빈 곳(탭 버튼이 아닌 곳)을 더블클릭하면 이 패널에 새 탭을 만든다.
       onDoubleClick={(e) => {
         if (e.target === e.currentTarget) void api.newTabIn(pane);
       }}
       className={
         segments
-          ? `flex ${bottom ? "border-t" : "border-b"} border-app-line text-sm`
-          : `flex gap-1 ${bottom ? "border-t" : "border-b"} border-app-line px-1 text-sm`
+          ? `td-thin-scroll flex overflow-x-auto overflow-y-hidden ${bottom ? "border-t" : "border-b"} border-app-line text-sm`
+          : `td-thin-scroll flex gap-1 overflow-x-auto overflow-y-hidden ${bottom ? "border-t" : "border-b"} border-app-line px-1 text-sm`
       }>
       {tabs.map((t, i) => {
         // 네트워크 연결·터미널 탭은 연결의 이모지를 이름 앞에 붙이고(이슈 #93), 종류별 색(`--tab-<종류>-*`, 이슈 #92)을 칠한다.
@@ -192,11 +199,12 @@ export function TabBar({ pane }: { pane: PaneId }) {
               "outline-none " +
               (segments
                 ? // 칸형(Marta식): 폭을 균등 분할하고 활성 탭은 배경으로 구분한다. 좁아지면 이름을 말줄임으로 줄인다.
-                  (closeable ? "min-w-0 flex-1 truncate px-6 py-1 text-center " : "min-w-0 flex-1 truncate border-r border-app-line px-2 py-1 text-center last:border-r-0 ") +
+                  (closeable ? "min-w-0 flex-1 truncate px-6 py-1 text-center " : "min-w-24 flex-1 truncate border-r border-app-line px-2 py-1 text-center last:border-r-0 ") +
                   (i === active ? "bg-app-selected font-semibold" : "text-ink-faint")
-                : i === active
-                  ? `${bottom ? "border-t-2" : "border-b-2"} border-accent ${pad} py-1 font-semibold`
-                  : `${pad} py-1 text-ink-faint`)
+                : "shrink-0 whitespace-nowrap " +
+                  (i === active
+                    ? `${bottom ? "border-t-2" : "border-b-2"} border-accent ${pad} py-1 font-semibold`
+                    : `${pad} py-1 text-ink-faint`))
             }
           >
             {kind && !segments && <span data-tab-dot className="mr-1.5 inline-block size-1.5 rounded-full align-middle" style={{ backgroundColor: `var(--tab-${kind}-mark)` }} />}
@@ -210,7 +218,7 @@ export function TabBar({ pane }: { pane: PaneId }) {
             style={dragStyle(i)}
             onMouseEnter={() => setHover(i)}
             onMouseLeave={() => setHover((h) => (h === i ? null : h))}
-            className={"relative flex " + (segments ? "min-w-0 flex-1 border-r border-app-line last:border-r-0" : "")}
+            className={"relative flex " + (segments ? "min-w-24 flex-1 border-r border-app-line last:border-r-0" : "shrink-0")}
           >
             {tabButton}
             {hover === i && tabs.length > 1 && !drag && (

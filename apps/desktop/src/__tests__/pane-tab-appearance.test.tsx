@@ -62,7 +62,7 @@ describe("탭 모양 (behavior.layout.tab_style)", () => {
     expect(t).toHaveLength(3);
     for (const tab of t) {
       expect(tab.className).toContain("flex-1");
-      expect(tab.className).toContain("min-w-0");
+      expect(tab.className).toContain("min-w-24"); // 탭이 많아지면 이보다 줄지 않고 탭 줄이 가로로 스크롤된다(이슈 #104)
       expect(tab.className).toContain("truncate");
       expect(tab.className).toContain("py-1"); // 글자 높이만큼만 나오지 않게 세로 여백을 준다
     }
@@ -103,8 +103,10 @@ describe("기본값에서는 지금 모양 그대로", () => {
     await renderApp(withLayout({}), undefined, undefined, { snapshot: snapshotWithTabs(2) });
     expect(pane("left").className).toBe("flex min-h-0 min-w-0 flex-1 flex-col border-2 border-accent");
     expect(pane("right").className).toBe("flex min-h-0 min-w-0 flex-1 flex-col border-2 border-transparent");
-    expect(tablist("left").className).toBe("flex gap-1 border-b border-app-line px-1 text-sm");
-    expect(tabs("left")[0].className).toBe("outline-none border-b-2 border-accent px-2 py-1 font-semibold");
-    expect(tabs("left")[1].className).toBe("outline-none px-2 py-1 text-ink-faint");
+    // 이슈 #104: 탭이 많을 때 가로로 스크롤되도록 넘침 처리(`overflow-x-auto`·얇은 스크롤바)와 줄어들지 않는 탭(`shrink-0`)이 더해졌다.
+    // 탭이 적을 때 눈에 보이는 모양(높이·간격·색)은 같다. 나머지 클래스는 그대로다.
+    expect(tablist("left").className).toBe("td-thin-scroll flex gap-1 overflow-x-auto overflow-y-hidden border-b border-app-line px-1 text-sm");
+    expect(tabs("left")[0].className).toBe("outline-none shrink-0 whitespace-nowrap border-b-2 border-accent px-2 py-1 font-semibold");
+    expect(tabs("left")[1].className).toBe("outline-none shrink-0 whitespace-nowrap px-2 py-1 text-ink-faint");
   });
 });
