@@ -142,11 +142,11 @@ function StatusBar() {
         </button>
       )}
       {notice && (
-        <span role="alert" className="ml-4 text-status-error">
+        <button type="button" role="alert" tabIndex={-1} title={t("status.notice_open")} onClick={() => void api.showNotice()} className="ml-4 min-w-0 flex-1 truncate text-left text-status-error">
           {notice}
-        </span>
+        </button>
       )}
-      <span className="ml-auto flex gap-1">
+      <span className="ml-auto flex shrink-0 gap-1 pl-2">
         {entryButton(t("settings.aria"), t("settings.aria"), "core.settings.open", () => api.openSettings())}
         {entryButton(t("menu.help_shortcuts"), t("status.shortcuts"), "core.help", () => api.openHelp())}
         {viewToggle(t("status.hidden_aria"), t("status.hidden"), showHidden, () => api.toggleHidden(), "core.view.hidden")}

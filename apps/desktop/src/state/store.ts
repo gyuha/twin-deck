@@ -194,7 +194,7 @@ export type DialogState =
   /** 선택지 중 하나를 고르는 창(확인이면 고른 번호, 취소면 null). */
   | { kind: "choice"; title: string; lines: string[]; choices: string[]; selected: number }
   | { kind: "conflict"; title: string; existing: string; selected: number; remaining: number; all: boolean }
-  | { kind: "info"; title: string; lines: string[] }
+  | { kind: "info"; title: string; lines: string[]; copyText?: string }
   /** SMB 비밀번호 입력(가림). 확인이면 `{ value, remember }`, 취소면 null. `error`는 앞서 넣은 비밀번호가 틀렸다는 안내다. */
   | { kind: "password"; title: string; value: string; remember: boolean; error: string | null }
   /** 실행 중인 전송(복사/이동) 작업의 진행 창. */
@@ -2726,6 +2726,24 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         ...(info.linkTarget ? [tr("store.info.link", { value: info.linkTarget })] : []),
       ];
       await ask<boolean>({ kind: "info", title: tr("store.info.title", { name: info.name }), lines });
+    },
+    /** 상태 표시줄의 오류 메시지 전체를 팝업으로 보여 준다(팝업에서 복사할 수 있다). 메시지가 없으면 아무것도 하지 않는다. */
+    async showNotice() {
+      const text = get().notice;
+      if (!text) return;
+      await ask<boolean>({ kind: "info", title: tr("status.notice_title"), lines: [], copyText: text });
+    },
+    /** 팝업에 보이는 메시지(`copyText`)를 클립보드로 복사한다. 복사했으면 true. */
+    async dialogCopyText(): Promise<boolean> {
+      const d = get().dialog;
+      if (d?.kind !== "info" || d.copyText === undefined) return false;
+      try {
+        await backend.copyText(d.copyText);
+        return true;
+      } catch (e) {
+        fail(e);
+        return false;
+      }
     },
     /** 미리보기 중인 텍스트의 원문(보이는 부분)을 클립보드로 복사한다. 아직 읽는 중이거나 텍스트가 아니면 아무것도 하지 않는다. */
     async previewCopyText() {

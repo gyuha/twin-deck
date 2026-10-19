@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { rustText, t as translate } from "../i18n";
 import { useApp, useAppStore, useT } from "../state/context";
 import { CONFLICT_CHOICES, isActiveJob } from "../state/store";
@@ -22,6 +22,14 @@ export function Dialog() {
   const { api } = useAppStore();
   const input = useRef<HTMLInputElement>(null);
   const root = useRef<HTMLDivElement>(null);
+  const [copied, setCopied] = useState(false); // 복사 버튼이 잠깐 체크 표시를 보이는 동안
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(copiedTimer.current), []);
+  const flashCopied = () => {
+    setCopied(true);
+    clearTimeout(copiedTimer.current);
+    copiedTimer.current = setTimeout(() => setCopied(false), 1500);
+  };
   const kind = dialog?.kind;
   const jobId = dialog?.kind === "progress" ? dialog.jobId : null;
   const job = useApp((s) => (jobId === null ? undefined : s.queue.find((j) => j.id === jobId)));
@@ -203,6 +211,30 @@ export function Dialog() {
           </>
           );
         })()}
+        {dialog.kind === "info" && dialog.copyText !== undefined && (
+          <div className="mb-1 flex min-h-0 items-start gap-2">
+            <pre className="td-thin-scroll min-h-0 flex-1 select-text overflow-auto whitespace-pre-wrap break-all font-mono text-xs">{dialog.copyText}</pre>
+            <button
+              type="button"
+              aria-label={t("status.notice_copy")}
+              title={t("status.notice_copy")}
+              data-copied={copied ? "true" : undefined}
+              onClick={() => void api.dialogCopyText().then((ok) => ok && flashCopied())}
+              className="flex size-6 shrink-0 items-center justify-center rounded text-ink-dull hover:bg-app-selected hover:text-ink"
+            >
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                {copied ? (
+                  <path d="M3 8.5l3.2 3.2L13 4.8" />
+                ) : (
+                  <>
+                    <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" />
+                    <path d="M10.5 5.5v-2a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 2.5 3.5V9A1.5 1.5 0 0 0 4 10.5h1.5" />
+                  </>
+                )}
+              </svg>
+            </button>
+          </div>
+        )}
         {(dialog.kind === "confirm" || dialog.kind === "info") && (
           <ul className="mb-1 min-h-0 list-inside list-disc overflow-y-auto">
             {dialog.lines.map((l) => (
