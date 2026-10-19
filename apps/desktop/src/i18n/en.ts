@@ -688,6 +688,7 @@ export const en: Record<Key, string> = {
   "queue.title": "Job Queue",
   "queue.empty": "No jobs",
   "queue.list_aria": "Job list",
+  "queue.job_progress_aria": "Job progress",
   "queue.hint": "↑↓/Space move · P pause/resume · A/D abort · Esc close",
   "virtual.running": "In progress… (Esc to cancel)",
   "virtual.cancelled": "Cancelled",

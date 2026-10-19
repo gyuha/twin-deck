@@ -1,4 +1,4 @@
-import { useApp, useT } from "../state/context";
+import { useApp, useAppStore, useT } from "../state/context";
 import { rustText, t as translate } from "../i18n";
 import { isActiveJob } from "../state/store";
 import type { JobDto } from "@twin-deck/ts-client";
@@ -10,6 +10,7 @@ const statusLabel = (s: JobDto["status"]) => translate(`queue.status.${s}` as co
 export function QueueIndicator() {
   const t = useT();
   const queue = useApp((s) => s.queue); // 참조가 안정적인 값만 선택한다(파생은 아래에서)
+  const { api } = useAppStore();
   const active = queue.filter(isActiveJob);
   if (active.length === 0) return null;
   const done = active.reduce((n, j) => n + j.completed, 0);
@@ -18,9 +19,11 @@ export function QueueIndicator() {
     <div
       role="status"
       aria-label={t("queue.progress_aria")}
-      className="fixed right-2 top-2 rounded bg-accent px-2 py-0.5 text-xs text-accent-ink"
+      className="fixed right-2 top-2 rounded bg-accent text-xs text-accent-ink"
     >
-      {t("queue.indicator", { count: active.length })} · {done}/{total} <span className="opacity-80">(=)</span>
+      <button type="button" onClick={() => api.toggleQueue()} className="rounded px-2 py-0.5">
+        {t("queue.indicator", { count: active.length })} · {done}/{total} <span className="opacity-80">(=)</span>
+      </button>
     </div>
   );
 }
@@ -50,6 +53,16 @@ export function QueuePopup() {
               >
                 <div>
                   {kindLabel(j.kind)} {j.completed}/{j.total} — {statusLabel(j.status)}
+                </div>
+                <div
+                  role="progressbar"
+                  aria-label={t("queue.job_progress_aria")}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={j.total > 0 ? Math.round((j.completed / j.total) * 100) : 0}
+                  className="my-1 h-1 rounded bg-app-line"
+                >
+                  <div className="h-full rounded bg-accent" style={{ width: `${j.total > 0 ? (j.completed / j.total) * 100 : 0}%` }} />
                 </div>
                 {j.current && isActiveJob(j) && <div className="truncate text-xs text-ink-dull">{j.current}</div>}
                 {j.errors.map((e) => (
