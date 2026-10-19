@@ -686,6 +686,7 @@ export const ko = {
   "queue.title": "작업 큐",
   "queue.empty": "작업 없음",
   "queue.list_aria": "작업 목록",
+  "queue.job_progress_aria": "작업 진행률",
   "queue.hint": "↑↓/Space 이동 · P 일시정지/재개 · A/D 중단 · Esc 닫기",
   "virtual.running": "진행 중… (Esc로 취소)",
   "virtual.cancelled": "취소됨",

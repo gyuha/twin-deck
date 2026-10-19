@@ -129,3 +129,23 @@ describe("실패 요약", () => {
     expect(within(row).getByRole("alert")).toHaveTextContent("찾을 수 없음");
   });
 });
+
+describe("이슈 #100 작업 뱃지", () => {
+  it("배지 클릭으로 작업 큐 목록을 연다", async () => {
+    const { user } = await manualCopyAll();
+    expect(popup()).toBeNull();
+    await user.click(within(indicator()!).getByRole("button"));
+    expect(await screen.findByRole("dialog", { name: "작업 큐" })).toBeInTheDocument();
+    expect(jobRows()[0]).toHaveTextContent("복사 0/5 — 대기");
+  });
+
+  it("진행률 막대가 완료/전체 비율을 보여 준다", async () => {
+    const { user, backend } = await manualCopyAll();
+    await user.keyboard("=");
+    await advance(backend);
+    await waitFor(() => expect(jobRows()[0]).toHaveTextContent("복사 1/5"));
+    const bar = within(jobRows()[0]).getByRole("progressbar");
+    expect(bar).toHaveAttribute("aria-valuenow", "20");
+    expect(bar).toHaveAttribute("aria-valuemax", "100");
+  });
+});
