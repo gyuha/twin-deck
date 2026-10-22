@@ -246,7 +246,11 @@ impl ConfigState {
             );
         };
         let resolved = td_config::resolve_config_dir(&local);
-        match td_config::ConfigStore::start(&resolved.dir, td_config::Platform::current()) {
+        match td_config::ConfigStore::start_with_local(
+            &resolved.dir,
+            &local,
+            td_config::Platform::current(),
+        ) {
             Ok((store, rx)) => (
                 Self {
                     local_dir: Some(local),
@@ -310,6 +314,27 @@ impl ConfigState {
         Ok(self.current())
     }
 
+    /// 즐겨찾기를 추가한다. PC 종속 정보라 설정 폴더(동기화 폴더일 수 있다)가 아니라 로컬 폴더의 `favorites.toml`에 쓴다(이슈 #106).
+    pub fn add_favorite(&self, name: &str, path: &str) -> ServiceResult<Loaded> {
+        self.update_favorites(|dir, local| td_config::append_favorite_in(dir, local, name, path))
+    }
+
+    /// 즐겨찾기에서 경로(변수 확장 전 원문)가 같은 항목을 지운다. 로컬 `favorites.toml`을 고친다.
+    pub fn remove_favorite(&self, path: &str) -> ServiceResult<Loaded> {
+        self.update_favorites(|dir, local| td_config::remove_favorite_in(dir, local, path))
+    }
+
+    fn update_favorites(
+        &self,
+        f: impl FnOnce(&std::path::Path, &std::path::Path) -> Result<(), String>,
+    ) -> ServiceResult<Loaded> {
+        let local = self
+            .local_dir
+            .clone()
+            .ok_or("설정 디렉터리를 사용할 수 없습니다")?;
+        self.update(|dir| f(dir, &local))
+    }
+
     /// 지금 설정 파일을 읽고 쓰는 폴더.
     pub fn config_dir(&self) -> ServiceResult<std::path::PathBuf> {
         self.store
@@ -356,8 +381,9 @@ impl ConfigState {
             .ok_or("설정 디렉터리를 사용할 수 없습니다")?;
         let current = self.config_dir().unwrap_or_else(|_| local.clone());
         let dir = td_config::change_config_location(local, &current, target, conflict)?;
-        let (store, rx) = td_config::ConfigStore::start(&dir, td_config::Platform::current())
-            .map_err(|e| format!("새 설정 폴더를 열지 못했습니다: {e}"))?;
+        let (store, rx) =
+            td_config::ConfigStore::start_with_local(&dir, local, td_config::Platform::current())
+                .map_err(|e| format!("새 설정 폴더를 열지 못했습니다: {e}"))?;
         *self.store.lock().unwrap() = Some(store);
         *self.location_warning.lock().unwrap() = None;
         Ok((self.current(), rx))
@@ -460,14 +486,14 @@ pub fn user_dirs(app: tauri::AppHandle) -> UserDirsDto {
     }
 }
 
-/// 즐겨찾기에서 경로(변수 확장 전 원문)가 같은 항목을 `config.toml`에서 지우고 새 설정을 바로 돌려준다. 폴더 자체는 지우지 않는다.
+/// 즐겨찾기에서 경로(변수 확장 전 원문)가 같은 항목을 로컬 `favorites.toml`에서 지우고 새 설정을 바로 돌려준다. 폴더 자체는 지우지 않는다.
 #[tauri::command]
 #[specta::specta]
 pub fn remove_favorite(config: State<'_, ConfigState>, path: String) -> ServiceResult<Loaded> {
-    config.update(|dir| td_config::remove_favorite(dir, &path))
+    config.remove_favorite(&path)
 }
 
-/// 현재 폴더 등을 즐겨찾기로 `config.toml`에 덧붙이고, 새로 병합된 설정을 바로 돌려준다(변경 이벤트를 기다리지 않는다).
+/// 현재 폴더 등을 즐겨찾기로 로컬 `favorites.toml`에 덧붙이고, 새로 병합된 설정을 바로 돌려준다(변경 이벤트를 기다리지 않는다).
 #[tauri::command]
 #[specta::specta]
 pub fn add_favorite(
@@ -475,7 +501,7 @@ pub fn add_favorite(
     name: String,
     path: String,
 ) -> ServiceResult<Loaded> {
-    config.update(|dir| td_config::append_favorite(dir, &name, &path))
+    config.add_favorite(&name, &path)
 }
 
 /// 설정 화면: 사용자 `config.toml`의 키 하나를 쓰고, 새로 병합된 설정을 바로 돌려준다(변경 이벤트를 기다리지 않는다).
@@ -1908,6 +1934,42 @@ mod config_location_tests {
         assert!(fs::read_to_string(cloud.path().join("config.toml.bak"))
             .unwrap()
             .contains("light"));
+    }
+
+    /// 설정 저장 경로(동기화 폴더)를 지정해도 즐겨찾기는 로컬 `favorites.toml`에만 쓰이고 동기화 폴더의 설정은 바뀌지 않는다(이슈 #106).
+    #[test]
+    fn favorites_local_stay_out_of_the_synced_config_dir() {
+        let local = tempfile::tempdir().unwrap();
+        let cloud = tempfile::tempdir().unwrap();
+        fs::write(
+            local.path().join("config.toml"),
+            "[behavior]\ntheme = \"dark\"\n",
+        )
+        .unwrap();
+        let (state, _rx) = ConfigState::open(Some(local.path().to_path_buf()));
+        state
+            .switch_location(Some(cloud.path()), LocationConflict::UseExisting)
+            .unwrap();
+        let synced = fs::read_to_string(cloud.path().join("config.toml")).unwrap();
+
+        let loaded = state.add_favorite("집", "/home/a").unwrap();
+        assert_eq!(loaded.config.favorites.len(), 1);
+        assert_eq!(
+            fs::read_to_string(cloud.path().join("config.toml")).unwrap(),
+            synced
+        );
+        assert!(!cloud.path().join("favorites.toml").exists());
+        assert!(fs::read_to_string(local.path().join("favorites.toml"))
+            .unwrap()
+            .contains("/home/a"));
+
+        // 기본 위치로 되돌려도 즐겨찾기는 그대로다.
+        let (back, _rx2) = state
+            .switch_location(None, LocationConflict::Overwrite)
+            .unwrap();
+        assert_eq!(back.config.favorites.len(), 1);
+        let after = state.remove_favorite("/home/a").unwrap();
+        assert!(after.config.favorites.is_empty());
     }
 
     #[test]

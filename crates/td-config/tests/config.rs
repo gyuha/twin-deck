@@ -408,10 +408,16 @@ fn favorite_append_refuses_and_keeps_file_when_unsafe() {
     assert!(append_favorite(dir.path(), "x", "/x").is_err());
     assert_eq!(fs::read_to_string(&file).unwrap(), inline, "파일은 그대로");
 
-    // 문법 오류가 있는 파일도 건드리지 않는다
-    fs::write(&file, "[broken\n").unwrap();
+    // 즐겨찾기는 `favorites.toml`에 쓴다(이슈 #106). 문법 오류가 있는 그 파일도 건드리지 않는다
+    let fav = dir.path().join("favorites.toml");
+    fs::write(&fav, "[broken\n").unwrap();
     assert!(append_favorite(dir.path(), "x", "/x").is_err());
-    assert_eq!(fs::read_to_string(&file).unwrap(), "[broken\n");
+    assert_eq!(fs::read_to_string(&fav).unwrap(), "[broken\n");
+    assert_eq!(
+        fs::read_to_string(&file).unwrap(),
+        inline,
+        "config.toml은 그대로"
+    );
 }
 
 #[test]
@@ -888,11 +894,15 @@ fn remove_favorite_drops_matching_entry_and_keeps_the_rest() {
         "# 내 설정\n[[favorites]]\nname = \"A\"\npath = \"/a\"\n\n[[favorites]]\nname = \"B\"\npath = \"${user.downloads}\"\n",
     )
     .unwrap();
+    // 즐겨찾기는 `favorites.toml`에서 지운다(이슈 #106). 옛 `config.toml`의 항목은 먼저 그 파일로 옮겨 오고 `config.toml`은 그대로다.
     remove_favorite(dir.path(), "${user.downloads}").unwrap();
-    let text = std::fs::read_to_string(dir.path().join("config.toml")).unwrap();
+    let text = std::fs::read_to_string(dir.path().join("favorites.toml")).unwrap();
+    assert!(text.contains("path = \"/a\""), "{text}");
     assert!(
-        text.contains("# 내 설정") && text.contains("path = \"/a\""),
-        "{text}"
+        std::fs::read_to_string(dir.path().join("config.toml"))
+            .unwrap()
+            .contains("downloads"),
+        "config.toml은 건드리지 않는다"
     );
     assert!(!text.contains("downloads"), "{text}");
     // 없는 경로나 파일이 없는 경우는 오류가 아니다.
@@ -900,12 +910,12 @@ fn remove_favorite_drops_matching_entry_and_keeps_the_rest() {
     remove_favorite(tempfile::tempdir().unwrap().path(), "/a").unwrap();
     // 인라인 배열과 그룹 안 항목도 지운다.
     std::fs::write(
-        dir.path().join("config.toml"),
+        dir.path().join("favorites.toml"),
         "favorites = [{ kind = \"group\", name = \"G\", items = [{ name = \"X\", path = \"/x\" }, { name = \"Y\", path = \"/y\" }] }]\n",
     )
     .unwrap();
     remove_favorite(dir.path(), "/x").unwrap();
-    let text = std::fs::read_to_string(dir.path().join("config.toml")).unwrap();
+    let text = std::fs::read_to_string(dir.path().join("favorites.toml")).unwrap();
     assert!(!text.contains("/x") && text.contains("/y"), "{text}");
 }
 

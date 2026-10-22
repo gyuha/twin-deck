@@ -11,13 +11,16 @@ use specta::Type;
 use td_watch::DirWatcher;
 
 use crate::config::{RemoteServer, SmbServer};
-use crate::load::{load_dir, Loaded, Platform};
+use crate::favorites::FAVORITES_FILE;
+use crate::load::{load_dir_with_local, Loaded, Platform};
 
 /// 설정 디렉터리를 감시하며 최신 유효 설정을 보관한다.
 /// TOML 문법 오류가 나면 이전 유효 설정을 유지하고 경고만 갱신한다.
 pub struct ConfigStore {
     current: Arc<Mutex<Loaded>>,
     dir: PathBuf,
+    /// 즐겨찾기 파일(`favorites.toml`)이 있는 로컬 폴더. 설정 저장 경로를 지정하지 않았으면 `dir`과 같다.
+    local: PathBuf,
     platform: Platform,
     _watcher: DirWatcher,
 }
@@ -25,12 +28,17 @@ pub struct ConfigStore {
 /// 파일 이벤트가 늦거나 유실돼도 설정이 반영되도록, 이 주기로 파일 상태를 직접 비교한다.
 const POLL: Duration = Duration::from_secs(1);
 
-type Signature = [Option<String>; 2];
+type Signature = [Option<String>; 3];
 
-/// `config.toml`, `keybindings.toml`의 내용. 없거나 읽지 못하면 None.
-/// 수정 시각과 크기로는 같은 길이로 두 번 고친 편집(`16` → `18`)을 타임스탬프 해상도가 거친 파일 시스템에서 놓칠 수 있어 내용을 비교한다(두 파일 합쳐 몇 KB).
-fn signature(dir: &Path) -> Signature {
-    ["config.toml", "keybindings.toml"].map(|name| fs::read_to_string(dir.join(name)).ok())
+/// `config.toml`, `keybindings.toml`과 로컬 `favorites.toml`의 내용. 없거나 읽지 못하면 None.
+/// 수정 시각과 크기로는 같은 길이로 두 번 고친 편집(`16` → `18`)을 타임스탬프 해상도가 거친 파일 시스템에서 놓칠 수 있어 내용을 비교한다(파일 합쳐 몇 KB).
+fn signature(dir: &Path, local: &Path) -> Signature {
+    let read = |d: &Path, name: &str| fs::read_to_string(d.join(name)).ok();
+    [
+        read(dir, "config.toml"),
+        read(dir, "keybindings.toml"),
+        read(local, FAVORITES_FILE),
+    ]
 }
 
 /// 문법 오류로 읽기에 실패한 파일이 있는지 (그 파일의 내용은 이전 값을 유지해야 한다).
@@ -43,18 +51,35 @@ fn has_syntax_error(l: &Loaded) -> bool {
 impl ConfigStore {
     /// 시작하며 한 번 읽고, 이후 변경이 있을 때마다 새 `Loaded`를 수신기로 보낸다.
     pub fn start(dir: &Path, platform: Platform) -> std::io::Result<(Self, Receiver<Loaded>)> {
+        Self::start_with_local(dir, dir, platform)
+    }
+
+    /// `start`와 같고, 즐겨찾기 파일(`favorites.toml`)은 설정 폴더 `dir`이 아니라 로컬 폴더 `local`에 둔다(이슈 #106).
+    /// 설정 저장 경로(동기화 폴더)를 지정하면 두 폴더가 다르다. 옛 `config.toml`의 즐겨찾기는 시작할 때 한 번 `local`로 복사한다.
+    pub fn start_with_local(
+        dir: &Path,
+        local: &Path,
+        platform: Platform,
+    ) -> std::io::Result<(Self, Receiver<Loaded>)> {
         fs::create_dir_all(dir)?;
+        // 옮기지 못해도(권한 등) 설정을 여는 데는 지장이 없다. 이때는 `config.toml`의 즐겨찾기가 계속 읽힌다.
+        let _ = crate::favorites::migrate(dir, local);
         // 기준 서명은 처음 읽기 전에 구한다. 그 사이에 파일이 바뀌어도 다음 확인에서 서명이 달라 다시 읽는다.
-        let initial = signature(dir);
-        let current = Arc::new(Mutex::new(load_dir(dir, platform)));
+        let initial = signature(dir, local);
+        let current = Arc::new(Mutex::new(load_dir_with_local(dir, local, platform)));
         let (mut watcher, changes) =
             DirWatcher::new().map_err(|e| std::io::Error::other(e.to_string()))?;
         watcher
             .watch(dir)
             .map_err(|e| std::io::Error::other(e.to_string()))?;
+        if local != dir && fs::create_dir_all(local).is_ok() {
+            watcher
+                .watch(local)
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
+        }
 
         let (tx, rx) = mpsc::channel();
-        let (cur, d) = (Arc::clone(&current), dir.to_path_buf());
+        let (cur, d, l) = (Arc::clone(&current), dir.to_path_buf(), local.to_path_buf());
         thread::spawn(move || {
             let mut last = initial;
             loop {
@@ -65,12 +90,12 @@ impl ConfigStore {
                 }
                 // 이벤트가 와도 설정 파일이 그대로면 알리지 않는다. 이 폴더에는 커서·선택이 바뀔 때마다 저장하는
                 // state.json도 있어서, 알리면 화면이 설정을 다시 받아 메뉴바 등을 매번 다시 만든다.
-                let now = signature(&d);
+                let now = signature(&d, &l);
                 if now == last {
                     continue;
                 }
                 last = now;
-                let mut fresh = load_dir(&d, platform);
+                let mut fresh = load_dir_with_local(&d, &l, platform);
                 let mut guard = cur.lock().unwrap();
                 if has_syntax_error(&fresh) {
                     // 이전 유효 설정을 유지하고 경고만 새로 반영한다.
@@ -88,6 +113,7 @@ impl ConfigStore {
             Self {
                 current,
                 dir: dir.to_path_buf(),
+                local: local.to_path_buf(),
                 platform,
                 _watcher: watcher,
             },
@@ -106,7 +132,7 @@ impl ConfigStore {
     /// 파일을 지금 다시 읽어 최신 설정으로 바꾸고 돌려준다. 설정 화면이 쓴 직후 변경 이벤트를 기다리지 않고 반영할 때 쓴다.
     /// 문법 오류가 있으면 감시 스레드와 같이 이전 유효 설정을 유지하고 경고만 새로 반영한다.
     pub fn refresh(&self) -> Loaded {
-        let mut fresh = load_dir(&self.dir, self.platform);
+        let mut fresh = load_dir_with_local(&self.dir, &self.local, self.platform);
         let mut guard = self.current.lock().unwrap();
         if has_syntax_error(&fresh) {
             fresh.config = guard.config.clone();
@@ -139,10 +165,25 @@ fn read_user_doc(dir: &Path) -> Result<toml_edit::DocumentMut, String> {
 }
 
 fn write_user_doc(dir: &Path, doc: &toml_edit::DocumentMut) -> Result<(), String> {
+    write_doc(dir, "config.toml", doc)
+}
+
+/// 로컬 `favorites.toml`을 편집 가능한 문서로 읽는다. 없으면 빈 문서. 문법 오류면 파일을 건드리지 않도록 오류.
+fn read_favorites_doc(dir: &Path) -> Result<toml_edit::DocumentMut, String> {
+    let text = match fs::read_to_string(dir.join(FAVORITES_FILE)) {
+        Ok(s) => s,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(e) => return Err(format!("favorites.toml을 읽지 못했습니다: {e}")),
+    };
+    text.parse::<toml_edit::DocumentMut>()
+        .map_err(|_| "favorites.toml에 문법 오류가 있어 즐겨찾기를 바꾸지 않았습니다".to_string())
+}
+
+fn write_doc(dir: &Path, file: &str, doc: &toml_edit::DocumentMut) -> Result<(), String> {
     fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-    let tmp = dir.join("config.toml.tmp");
+    let tmp = dir.join(format!("{file}.tmp"));
     fs::write(&tmp, doc.to_string()).map_err(|e| e.to_string())?;
-    fs::rename(&tmp, dir.join("config.toml")).map_err(|e| e.to_string())
+    fs::rename(&tmp, dir.join(file)).map_err(|e| e.to_string())
 }
 
 /// 사용자 `config.toml`의 점으로 이은 키(`behavior.table.icon_size`) 하나를 쓴다.
@@ -304,9 +345,15 @@ pub fn set_remote_servers(dir: &Path, servers: &[RemoteServer]) -> Result<(), St
     write_user_doc(dir, &doc)
 }
 
-/// `config.toml`의 즐겨찾기에서 경로가 `path`(변수 확장 전의 원문)인 항목 하나를 지운다. 그룹 안의 항목도 찾는다.
-/// 폴더 자체는 건드리지 않는다. 없는 경로는 오류가 아니다. 문법 오류가 있는 파일은 건드리지 않는다.
+/// `remove_favorite_in`을 설정 폴더와 로컬 폴더가 같은 곳으로 부른다.
 pub fn remove_favorite(dir: &Path, path: &str) -> Result<(), String> {
+    remove_favorite_in(dir, dir, path)
+}
+
+/// 로컬 `favorites.toml`의 즐겨찾기에서 경로가 `path`(변수 확장 전의 원문)인 항목 하나를 지운다. 그룹 안의 항목도 찾는다.
+/// 옛 `config.toml`에만 즐겨찾기가 있으면 먼저 `favorites.toml`로 옮긴다(`config.toml`은 건드리지 않는다).
+/// 폴더 자체는 건드리지 않는다. 없는 경로는 오류가 아니다. 문법 오류가 있는 파일은 건드리지 않는다.
+pub fn remove_favorite_in(config_dir: &Path, local: &Path, path: &str) -> Result<(), String> {
     use toml_edit::{Item, Value};
     fn has(t: &dyn toml_edit::TableLike, path: &str) -> bool {
         t.get("path").and_then(Item::as_str) == Some(path)
@@ -346,25 +393,39 @@ pub fn remove_favorite(dir: &Path, path: &str) -> Result<(), String> {
             _ => false,
         }
     }
-    let mut doc = read_user_doc(dir)?;
+    crate::favorites::migrate(config_dir, local)?;
+    let mut doc = read_favorites_doc(local)?;
     let removed = doc.get_mut("favorites").is_some_and(|f| remove_in(f, path));
     if !removed {
         return Ok(());
     }
-    write_user_doc(dir, &doc)
+    write_doc(local, FAVORITES_FILE, &doc)
 }
 
-/// `config.toml` 끝에 `[[favorites]]` 항목을 덧붙인다. 기존 내용과 주석은 그대로 두고,
-/// 결과가 올바른 TOML이 아니면(예: 이미 `favorites = [...]`로 정의됨) 파일을 건드리지 않고 오류를 돌려준다.
+/// `append_favorite_in`을 설정 폴더와 로컬 폴더가 같은 곳으로 부른다.
 pub fn append_favorite(dir: &Path, name: &str, path: &str) -> Result<(), String> {
-    let file = dir.join("config.toml");
+    append_favorite_in(dir, dir, name, path)
+}
+
+/// 로컬 `favorites.toml` 끝에 `[[favorites]]` 항목을 덧붙인다. 기존 내용과 주석은 그대로 두고,
+/// 옛 `config.toml`에만 즐겨찾기가 있으면 먼저 `favorites.toml`로 옮긴 뒤 덧붙인다(`config.toml`은 건드리지 않는다).
+/// 결과가 올바른 TOML이 아니면(예: 이미 `favorites = [...]`로 정의됨) 파일을 건드리지 않고 오류를 돌려준다.
+pub fn append_favorite_in(
+    config_dir: &Path,
+    local: &Path,
+    name: &str,
+    path: &str,
+) -> Result<(), String> {
+    crate::favorites::migrate(config_dir, local)?;
+    let dir = local;
+    let file = dir.join(FAVORITES_FILE);
     let existing = match fs::read_to_string(&file) {
         Ok(s) => s,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
-        Err(e) => return Err(format!("config.toml을 읽지 못했습니다: {e}")),
+        Err(e) => return Err(format!("favorites.toml을 읽지 못했습니다: {e}")),
     };
     if existing.parse::<toml::Table>().is_err() {
-        return Err("config.toml에 문법 오류가 있어 즐겨찾기를 추가하지 않았습니다".into());
+        return Err("favorites.toml에 문법 오류가 있어 즐겨찾기를 추가하지 않았습니다".into());
     }
     let quote = |s: &str| toml::Value::String(s.to_string()).to_string();
     let sep = if existing.is_empty() || existing.ends_with('\n') {
@@ -381,7 +442,7 @@ pub fn append_favorite(dir: &Path, name: &str, path: &str) -> Result<(), String>
         return Err("favorites가 이미 다른 형식으로 정의되어 있어 추가하지 못했습니다".into());
     }
     fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-    let tmp = dir.join("config.toml.tmp");
+    let tmp = dir.join(format!("{FAVORITES_FILE}.tmp"));
     fs::write(&tmp, updated).map_err(|e| e.to_string())?;
     fs::rename(&tmp, &file).map_err(|e| e.to_string())
 }

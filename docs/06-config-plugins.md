@@ -18,7 +18,8 @@ OS별 설정 디렉터리는 Tauri의 경로 API 또는 `directories` 크레이�
 
 | 파일/폴더 | 내용 |
 |---|---|
-| `config.toml` | 동작, 표시, 환경, 즐겨찾기, Gadgets, 액션 바, 파일시스템 옵션 |
+| `config.toml` | 동작, 표시, 환경, Gadgets, 액션 바, 파일시스템 옵션 |
+| `favorites.toml` | 즐겨찾기(4.1). 경로가 PC마다 달라 설정 저장 경로를 지정해도 늘 이 로컬 폴더에 둔다(동기화하지 않는다) |
 | `keybindings.toml` | 키바인딩 |
 | `location.toml` | 설정 저장 경로(2.1). 지정하면 `config.toml`·`keybindings.toml`은 그 폴더에 둔다 |
 | `themes/*.toml` | 사용자 테마 |
@@ -32,7 +33,7 @@ OS별 설정 디렉터리는 Tauri의 경로 API 또는 `directories` 크레이�
 구현됨(2026-10-15, 이슈 #71). 설정 화면 환경 섹션의 "설정 저장 경로"에서 `config.toml`·`keybindings.toml`을 둘 폴더를 고를 수 있다. iCloud Drive나 Google Drive for desktop이 동기화하는 폴더를 고르면, 서버 없이 여러 기기가 같은 설정을 쓴다. 앱은 클라우드 API를 부르지 않고 그 폴더의 파일을 읽고 쓰기만 하며, 전송은 각 클라우드 클라이언트가 맡는다.
 
 - 고른 경로는 위 설정 디렉터리의 `location.toml`(`dir = "…"`)에 적는다. 그 경로 안의 `config.toml`에 적으면 경로를 알아야 경로를 읽을 수 있는 문제가 생긴다. 파일이 없거나 `dir`이 비면 기본 위치를 쓴다.
-- 경로를 따라가는 파일은 `config.toml`과 `keybindings.toml`뿐이다. `state.json`(탭·창·커서)은 늘 기본 위치에 남는다. 커서만 움직여도 저장되는 파일이라, 클라우드 폴더에 두면 기기마다 충돌 사본이 생긴다.
+- 경로를 따라가는 파일은 `config.toml`과 `keybindings.toml`뿐이다. `state.json`(탭·창·커서·최근 위치)과 `favorites.toml`(즐겨찾기)은 늘 기본 위치에 남는다. 즐겨찾기와 최근 위치는 PC마다 다른 경로라 다른 기기로 번지지 않게 한다(이슈 #106). 커서만 움직여도 저장되는 파일이라, 클라우드 폴더에 두면 기기마다 충돌 사본이 생긴다.
 - 새 폴더에 설정 파일이 없으면 지금 파일을 복사한다. 이미 있으면(다른 기기에서 먼저 지정한 경우) "그 폴더의 설정 사용"과 "지금 설정으로 덮어쓰기" 중에서 고른다. 덮어쓰면 그 폴더에 있던 파일은 `config.toml.bak`·`keybindings.toml.bak`으로 남는다. "기본 위치로"를 누르면 같은 규칙으로 기본 위치로 돌아가고 `location.toml`을 지운다.
 - 바꾸면 앱을 다시 시작하지 않아도 새 폴더의 설정이 바로 적용되고, 그 폴더를 감시한다. Tauri가 뜨기 전에 읽는 `environment.single_instance`도 지정한 폴더를 따른다.
 - 시작할 때 지정한 폴더가 없으면(지워졌거나 클라우드 드라이브가 아직 붙지 않음) 기본 위치의 설정을 쓰고 경고를 보인다. 이때 설정 화면에서 바꾼 값은 기본 위치에 저장된다.
@@ -166,6 +167,8 @@ Marta의 `layout.showActionBar`, `table.circularSelection` 등 옵션 이름은 
 ### 4.1 즐겨찾기
 
 Marta는 즐겨찾기를 `이름 "경로"` 목록으로 쓰고, 구분선은 `이름 null`, 중첩 그룹을 지원한다. TOML은 `null`이 없으므로 항목 종류를 명시한다.
+
+즐겨찾기는 `config.toml`이 아니라 로컬 설정 폴더의 `favorites.toml`에 둔다(이슈 #106). 설정 저장 경로(2.1)로 `config.toml`을 iCloud·Google Drive 폴더에 두어도 `favorites.toml`은 이 PC에만 남고 동기화·설정 내보내기에 들어가지 않는다. 형식은 아래 `[[favorites]]`와 같다. 예전에 `config.toml`에 쓴 즐겨찾기는 `favorites.toml`이 없을 때 앱을 시작하면 한 번 복사하고(`config.toml`은 그대로 둔다), 그 뒤 `config.toml`의 `[[favorites]]`는 무시한다. 직접 고치려면 `favorites.toml`을 고친다(고치면 바로 반영된다).
 
 ```toml
 [[favorites]]

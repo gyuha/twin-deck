@@ -290,17 +290,18 @@ fn validate_remote_server(merged: &mut Table, defaults: &Table, warnings: &mut V
     }
 }
 
-fn parse_favorites(value: Option<Value>, warnings: &mut Vec<Warning>) -> Vec<FavoriteDto> {
+fn parse_favorites(
+    value: Option<Value>,
+    file: &str,
+    warnings: &mut Vec<Warning>,
+) -> Vec<FavoriteDto> {
     let Some(Value::Array(items)) = value else {
         return Vec::new();
     };
     let mut out = Vec::new();
     for (i, item) in items.iter().enumerate() {
         let bad = |warnings: &mut Vec<Warning>, why: &str| {
-            warnings.push(Warning::new(
-                "config.toml",
-                format!("favorites[{}]: {why}", i + 1),
-            ));
+            warnings.push(Warning::new(file, format!("favorites[{}]: {why}", i + 1)));
         };
         let Some(t) = item.as_table() else {
             bad(warnings, "테이블이어야 합니다");
@@ -475,10 +476,21 @@ fn parse_remote_servers(value: Option<Value>, warnings: &mut Vec<Warning>) -> Ve
     out
 }
 
-/// 문자열로 주어진 사용자 설정을 읽는다. `None`은 파일이 없다는 뜻이다.
+/// 문자열로 주어진 사용자 설정을 읽는다. `None`은 파일이 없다는 뜻이다. 즐겨찾기는 `config.toml`의 `[[favorites]]`에서 읽는다.
 pub fn load_from_strs(
     config: Option<&str>,
     keybindings: Option<&str>,
+    platform: Platform,
+) -> Loaded {
+    load_from_parts(config, keybindings, None, platform)
+}
+
+/// `load_from_strs`에 로컬 `favorites.toml`의 내용(`favorites`)을 더한다. 주어지면 즐겨찾기는 그 파일에서만 읽고
+/// `config.toml`의 `[[favorites]]`는 무시한다(동기화되는 설정에 PC 종속 경로가 섞이지 않게 한다, 이슈 #106).
+pub fn load_from_parts(
+    config: Option<&str>,
+    keybindings: Option<&str>,
+    favorites: Option<&str>,
     platform: Platform,
 ) -> Loaded {
     let mut warnings = Vec::new();
@@ -495,7 +507,17 @@ pub fn load_from_strs(
     validate_text_color(&mut merged, &mut warnings);
     validate_tab_colors(&mut merged, &mut warnings);
     validate_remote_server(&mut merged, &defaults, &mut warnings);
-    let favorites = parse_favorites(merged.remove("favorites"), &mut warnings);
+    let config_favorites = merged.remove("favorites");
+    let favorites = match favorites {
+        None => parse_favorites(config_favorites, "config.toml", &mut warnings),
+        Some(src) => match src.parse::<Table>() {
+            Ok(mut t) => parse_favorites(t.remove("favorites"), "favorites.toml", &mut warnings),
+            Err(e) => {
+                warnings.push(syntax_warning("favorites.toml", src, &e));
+                Vec::new()
+            }
+        },
+    };
     let smb_servers = parse_smb_servers(
         merged
             .get_mut("smb")
@@ -551,12 +573,19 @@ pub fn load_from_strs(
     }
 }
 
-/// 설정 디렉터리(`config.toml`, `keybindings.toml`)를 읽는다. 없는 파일은 기본값으로 취급한다.
+/// 설정 디렉터리(`config.toml`, `keybindings.toml`)를 읽는다. 없는 파일은 기본값으로 취급한다. 즐겨찾기 파일도 같은 폴더에서 찾는다.
 pub fn load_dir(dir: &Path, platform: Platform) -> Loaded {
-    let read = |name: &str| fs::read_to_string(dir.join(name)).ok();
-    load_from_strs(
-        read("config.toml").as_deref(),
-        read("keybindings.toml").as_deref(),
+    load_dir_with_local(dir, dir, platform)
+}
+
+/// 설정은 `dir`에서, 즐겨찾기(`favorites.toml`)는 로컬 폴더 `local`에서 읽는다(이슈 #106).
+/// `local`에 즐겨찾기 파일이 없으면 아직 옮기지 않은 것이므로 `config.toml`의 `[[favorites]]`를 쓴다.
+pub fn load_dir_with_local(dir: &Path, local: &Path, platform: Platform) -> Loaded {
+    let read = |d: &Path, name: &str| fs::read_to_string(d.join(name)).ok();
+    load_from_parts(
+        read(dir, "config.toml").as_deref(),
+        read(dir, "keybindings.toml").as_deref(),
+        read(local, crate::favorites::FAVORITES_FILE).as_deref(),
         platform,
     )
 }

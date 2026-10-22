@@ -3,6 +3,7 @@
 
 mod columns;
 mod config;
+mod favorites;
 mod keybindings;
 mod load;
 mod location;
@@ -18,15 +19,18 @@ pub use config::{
     RemoteConfig, RemoteServer, RemoteServerConfig, SelectionConfig, SmbConfig, SmbServer,
     TableView, ViewConfig, ZipConfig,
 };
+pub use favorites::FAVORITES_FILE;
 pub use keybindings::BindingSpec;
-pub use load::{load_dir, load_from_strs, Loaded, Platform, Warning};
+pub use load::{
+    load_dir, load_dir_with_local, load_from_parts, load_from_strs, Loaded, Platform, Warning,
+};
 pub use location::{
     change_config_location, has_config_files, read_config_location, resolve_config_dir,
     LocationConflict, ResolvedDir, CONFIG_FILES, LOCATION_FILE,
 };
 pub use store::{
-    append_favorite, remove_favorite, reset_user_value, set_remote_servers, set_smb_servers,
-    set_user_value, ConfigStore, ConfigValue,
+    append_favorite, append_favorite_in, remove_favorite, remove_favorite_in, reset_user_value,
+    set_remote_servers, set_smb_servers, set_user_value, ConfigStore, ConfigValue,
 };
 pub use themes::THEME_IDS;
 pub use transfer::{export_config_zip, import_config_zip};

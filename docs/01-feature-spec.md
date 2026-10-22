@@ -35,7 +35,7 @@ Marta의 중심 모델은 "활성 패널이 source, 비활성 패널이 target"�
 | NAV-05 | ~~다중 컬럼 모드에서 좌우 이동~~ (제거됨: 다열 보기를 없앴다, 이슈 #74) | `/docs/navigation/` | - | |
 | NAV-06 | 순환 선택, 우클릭 선택, Quick Select 접두 일치/아무 문자 활성화 옵션 | `/docs/navigation/` | P1 | 설정 키로 제공 |
 | NAV-07 | Volumes 메뉴, 언마운트/추출 | `/docs/navigation/volumes/` | P1 | OS별 볼륨 감지 |
-| NAV-08 | Favorites (추가/편집, 숫자키 선택, 구분선, 중첩 그룹) | `/docs/navigation/favorites/` | P1 | 설정 파일과 UI 편집 |
+| NAV-08 | Favorites (추가/편집, 숫자키 선택, 구분선, 중첩 그룹) | `/docs/navigation/favorites/` | P1 | 설정 파일(`favorites.toml`, 로컬 전용)과 UI 편집 |
 | NAV-09 | Recent Locations (탭별, 탭 닫으면 삭제, 비우기 액션) | `/docs/navigation/recent/` | P1 | |
 | NAV-10 | Hierarchy (루트까지의 상위 목록) | `/docs/navigation/hierarchy/` | P1 | 브레드크럼과 동일 정보 |
 | NAV-11 | Go To Path (Tab 완성, 아카이브 안에서는 `/`가 아카이브 루트) | `/docs/actions/` | P1 | |
