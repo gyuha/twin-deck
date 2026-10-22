@@ -21,7 +21,7 @@ export function TabBar({ pane }: { pane: PaneId }) {
   const [hover, setHover] = useState<number | null>(null); // 호버한 탭(닫기 버튼이 켜졌을 때 ✕를 보일 탭)
   const dropTarget = useApp((s) => s.tabDropTarget === pane);
   // 끌기 중: 끌린 탭(from)은 커서를 따라 dx만큼 움직이고, 지나는 탭들은 shift만큼 비켜 놓일 자리(to)를 보여 준다.
-  const [drag, setDrag] = useState<{ from: number; to: number; dx: number; shift: number } | null>(null);
+  const [drag, setDrag] = useState<{ from: number; to: number; dx: number; shift: number; ghost: { left: number; top: number; width: number; height: number } | null } | null>(null);
   const justDragged = useRef(false);
   const listRef = useRef<HTMLDivElement>(null);
   // 탭이 많아 탭 줄이 가로로 스크롤될 때, 활성 탭이 줄 밖에 있으면 보이는 곳으로 스크롤한다(이슈 #104). 이미 보이면 아무것도 하지 않는다.
@@ -111,7 +111,9 @@ export function TabBar({ pane }: { pane: PaneId }) {
         const at = nearOwn ? targetAt(m) : from;
         if (at >= 0 && at < tabs.length) to = at;
       }
-      setDrag({ from, to, dx: m.clientX - x, shift });
+      // 끌린 탭은 탭 줄(스크롤 영역) 안에서 잘리고 밖으로 나가면 스크롤 폭을 늘리므로(이슈 #105), 레이아웃이 있으면 눈에 보이는 모양은 화면에 고정된 복제(ghost)가 맡는다.
+      const ghost = laidOut ? { left: rects[from].left + (m.clientX - x), top: rects[from].top + (m.clientY - y), width: rects[from].width, height: rects[from].height } : null;
+      setDrag({ from, to, dx: m.clientX - x, shift, ghost });
     }
     function up() {
       stopListening();
@@ -133,7 +135,16 @@ export function TabBar({ pane }: { pane: PaneId }) {
   /** 끌기 중 이 탭의 모양: 끌린 탭은 커서를 따르고, 사이의 탭은 한 칸 비킨다. */
   const dragStyle = (i: number): React.CSSProperties | undefined => {
     if (!drag) return undefined;
-    if (i === drag.from) return { transform: `translateX(${drag.dx}px)`, zIndex: 10, position: "relative", boxShadow: "0 2px 8px rgba(0,0,0,.35)", cursor: "grabbing" };
+    if (i === drag.from) {
+      if (drag.ghost) {
+        // 자리는 그대로 두되 보이지 않게 하고(ghost가 대신 보인다), 옮긴 거리는 탭 줄 안으로 가둬 스크롤 폭이 늘지 않게 한다.
+        const bar = listRef.current?.getBoundingClientRect();
+        const home = drag.ghost.left - drag.dx; // 누른 시점의 탭 왼쪽
+        const dx = bar && bar.width > 0 ? Math.min(Math.max(drag.dx, bar.left - home), bar.right - drag.ghost.width - home) : drag.dx;
+        return { transform: `translateX(${dx}px)`, visibility: "hidden" };
+      }
+      return { transform: `translateX(${drag.dx}px)`, zIndex: 10, position: "relative", boxShadow: "0 2px 8px rgba(0,0,0,.35)", cursor: "grabbing" };
+    }
     const between = drag.from < drag.to ? i > drag.from && i <= drag.to : i >= drag.to && i < drag.from;
     const dir = drag.from < drag.to ? -1 : 1;
     return { transform: between ? `translateX(${dir * drag.shift}px)` : undefined, transition: "transform 120ms" };
@@ -244,6 +255,16 @@ export function TabBar({ pane }: { pane: PaneId }) {
           </div>
         );
       })}
+      {drag?.ghost && (
+        <div
+          aria-hidden
+          data-tab-ghost
+          style={{ position: "fixed", ...drag.ghost, zIndex: 50 }}
+          className="pointer-events-none flex items-center justify-center truncate whitespace-nowrap border border-app-line bg-app-selected px-2 text-sm font-semibold shadow-md"
+        >
+          {withIcon(tabConnection(tabs[drag.from], config, smbMounts)?.icon, tabs[drag.from].virtual ? tabs[drag.from].virtual!.title : baseName(tabs[drag.from].path) || tabs[drag.from].path)}
+        </div>
+      )}
     </div>
   );
 }

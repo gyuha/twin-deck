@@ -1,5 +1,6 @@
 // 터미널 화면 엔진. xterm.js로 그리고, 테스트에서는 이 모듈을 가짜로 바꾼다.
 import { installImeBridge } from "./imeBridge";
+import { findUrls } from "./terminalLinks";
 
 export interface TerminalEngine {
   /**
@@ -39,8 +40,11 @@ async function loadFont(font: string): Promise<void> {
   }
 }
 
-/** xterm.js를 처음 쓸 때 불러 엔진을 만든다. `fontFamily`는 터미널 글꼴 설정이며 패널 크기에 맞춰 칸 수를 조절한다. */
-export async function createTerminalEngine(fontFamily = ""): Promise<TerminalEngine> {
+/**
+ * xterm.js를 처음 쓸 때 불러 엔진을 만든다. `fontFamily`는 터미널 글꼴 설정이며 패널 크기에 맞춰 칸 수를 조절한다.
+ * 화면에 보이는 주소(`http`·`https`)를 Ctrl(macOS는 Cmd)+클릭하면 `openLink`를 부른다(이슈 #107).
+ */
+export async function createTerminalEngine(fontFamily = "", openLink: (url: string) => void = () => {}): Promise<TerminalEngine> {
   const initialFont = terminalFontFamily(fontFamily);
   const [{ Terminal }, { FitAddon }] = await Promise.all([import("@xterm/xterm"), import("@xterm/addon-fit"), import("@xterm/xterm/css/xterm.css")]);
   await loadFont(initialFont);
@@ -61,6 +65,30 @@ export async function createTerminalEngine(fontFamily = ""): Promise<TerminalEng
     e.preventDefault();
     sendData("\x15");
     return false;
+  });
+  // 한 줄(줄 바꿈으로 이어진 줄은 따로 본다)에서 주소를 찾는다. 글자 위치를 칸 번호로 바꿀 때 넓은 글자(한글)가 두 칸을 차지하는 것을 반영한다.
+  term.registerLinkProvider({
+    provideLinks(y, callback) {
+      const line = term.buffer.active.getLine(y - 1);
+      if (!line) return callback(undefined);
+      let text = "";
+      const cellOf: number[] = [];
+      for (let x = 0; x < line.length; x++) {
+        const cell = line.getCell(x);
+        if (!cell || cell.getWidth() === 0) continue;
+        const chars = cell.getChars() || " ";
+        for (let i = 0; i < chars.length; i++) cellOf.push(x);
+        text += chars;
+      }
+      const links = findUrls(text).map(({ start, end, url }) => ({
+        text: url,
+        range: { start: { x: cellOf[start] + 1, y }, end: { x: cellOf[end - 1] + 1, y } },
+        activate: (e: MouseEvent) => {
+          if (e.ctrlKey || e.metaKey) openLink(url);
+        },
+      }));
+      callback(links.length ? links : undefined);
+    },
   });
   return {
     open(el) {

@@ -57,7 +57,7 @@ function open(backend: Backend, id: number, font: string): Session {
     if (s.engine) s.engine.write(e.data);
     else s.pending.push(e.data);
   });
-  createTerminalEngine(font).then(
+  createTerminalEngine(font, (url) => void backend.openExternalUrl(url).catch(() => {})).then(
     (eng) => {
       if (s.disposed) return eng.dispose();
       s.engine = eng;

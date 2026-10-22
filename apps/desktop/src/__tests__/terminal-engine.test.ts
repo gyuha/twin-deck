@@ -14,6 +14,7 @@ vi.mock("@xterm/xterm", () => ({
     dispose = vi.fn();
     constructor(public options: { fontFamily: string }) { mocks.terminals.push(this); }
     loadAddon() {}
+    registerLinkProvider() {}
     attachCustomKeyEventHandler(handler: (e: KeyboardEvent) => boolean) { mocks.keyHandlers.push(handler); }
     onData() {}
   },

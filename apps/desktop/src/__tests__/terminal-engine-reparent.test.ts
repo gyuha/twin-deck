@@ -20,6 +20,7 @@ vi.mock("@xterm/xterm", () => ({
       mocks.terminals.push(this);
     }
     loadAddon() {}
+    registerLinkProvider() {}
     attachCustomKeyEventHandler() {}
     onData() {}
     open(el: HTMLElement) {
