@@ -72,6 +72,7 @@ pub fn connect_session_verified(
             port: target.port,
             user: user.into(),
             password: password.into(),
+            keepalive: Some(crate::KEEPALIVE_INTERVAL),
             host_key,
         })?)),
         Protocol::Ftp => Ok(Arc::new(FtpSession::connect(FtpConfig {

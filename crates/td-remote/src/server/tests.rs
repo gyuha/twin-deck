@@ -111,6 +111,7 @@ mod sftp_tests {
             port: s.local_addr.port(),
             user: "me".into(),
             password: "secret".into(),
+            keepalive: Some(crate::KEEPALIVE_INTERVAL),
             host_key: trust(dir.path()),
         })
         .unwrap();
@@ -126,6 +127,7 @@ mod sftp_tests {
             port: s.local_addr.port(),
             user: "me".into(),
             password: "nope".into(),
+            keepalive: Some(crate::KEEPALIVE_INTERVAL),
             host_key: trust(dir.path()),
         });
         assert!(matches!(r, Err(RemoteError::Auth)));
@@ -240,6 +242,7 @@ mod shell_tests {
                 port: s.local_addr.port(),
                 user: "me".into(),
                 password: "secret".into(),
+                keepalive: Some(crate::KEEPALIVE_INTERVAL),
                 host_key: trust(dir),
             },
             cols,

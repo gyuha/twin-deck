@@ -40,6 +40,11 @@ impl Drop for FakeSftp {
 
 impl FakeSftp {
     pub fn start() -> Self {
+        Self::start_with_inactivity(None)
+    }
+
+    /// 무활동 제한(`inactivity`)을 둔 서버. 그동안 아무 패킷도 받지 못하면 서버가 연결을 끊는다(keepalive 시험용).
+    pub fn start_with_inactivity(inactivity: Option<std::time::Duration>) -> Self {
         let root = tempfile::tempdir().unwrap();
         let rt = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
@@ -58,6 +63,7 @@ impl FakeSftp {
             auth_rejection_time: std::time::Duration::from_millis(0),
             auth_rejection_time_initial: Some(std::time::Duration::from_millis(0)),
             keys: vec![key],
+            inactivity_timeout: inactivity,
             ..Default::default()
         };
         rt.spawn(async move {
@@ -85,6 +91,7 @@ impl FakeSftp {
             port: self.port,
             user: user.into(),
             password: pass.into(),
+            keepalive: Some(crate::KEEPALIVE_INTERVAL),
             host_key: crate::HostKeyPolicy {
                 directory: Some(self.trust.path().into()),
                 approved_key: Some(self.public_key.clone()),

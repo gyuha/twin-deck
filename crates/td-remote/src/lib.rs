@@ -20,7 +20,7 @@ pub use connect::{
 pub use error::{RemoteError, Result};
 pub use ftp::{FtpConfig, FtpSession};
 pub use secret::{secret_key, KeyringStore, SecretStore, SECRET_SERVICE};
-pub use sftp::{HostKeyChallenge, HostKeyPolicy, SftpConfig, SftpSession};
+pub use sftp::{HostKeyChallenge, HostKeyPolicy, SftpConfig, SftpSession, KEEPALIVE_INTERVAL};
 pub use shell::{ShellEvent, ShellSession};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1204,6 +1204,7 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
                         port: t.port,
                         user: user.into(),
                         password: pw.into(),
+                        keepalive: Some(td_remote::KEEPALIVE_INTERVAL),
                         host_key: shell_host_key.clone(),
                     },
                 );
@@ -4934,6 +4935,7 @@ mod tests {
                 port,
                 user: "me".into(),
                 password: String::new(),
+                keepalive: Some(td_remote::KEEPALIVE_INTERVAL),
                 host_key: policy.clone(),
             });
             match probe.err() {
@@ -4954,6 +4956,7 @@ mod tests {
                 port,
                 user: "me".into(),
                 password: password.into(),
+                keepalive: Some(td_remote::KEEPALIVE_INTERVAL),
                 host_key: td_remote::HostKeyPolicy {
                     directory: Some(dir.to_path_buf()),
                     approved_key: None,
@@ -4967,6 +4970,7 @@ mod tests {
                 port,
                 user: "me".into(),
                 password: password.into(),
+                keepalive: Some(td_remote::KEEPALIVE_INTERVAL),
                 host_key: trusting(port, dir),
             })
         }

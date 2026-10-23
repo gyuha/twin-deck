@@ -36,6 +36,7 @@ fn 닫힌_포트는_연결_불가_오류다() {
         port,
         user: USER.into(),
         password: PASS.into(),
+        keepalive: Some(td_remote::KEEPALIVE_INTERVAL),
         host_key: Default::default(),
     };
     assert_eq!(
@@ -333,4 +334,114 @@ fn 서버가_내려가면_재연결이_필요해서_is_alive가_거짓이_된다
         "서버를 내렸는데 5초 안에 끊김을 알지 못했다"
     );
     assert!(session.home().is_err());
+}
+
+/// `deadline` 안에 연결이 끊겼다고 알아채면 참.
+fn dies_within(session: &SftpSession, deadline: std::time::Duration) -> bool {
+    let end = std::time::Instant::now() + deadline;
+    while session.is_alive() && std::time::Instant::now() < end {
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    !session.is_alive()
+}
+
+// 이슈 #108: 무활동 제한이 2초인 서버에 4초 동안 아무것도 하지 않아도 keepalive가 연결을 살려 둔다.
+#[test]
+fn keepalive가_있으면_무활동_제한이_있는_서버에서도_연결이_유지된다() {
+    let s = Fixture::start_with_inactivity(Some(std::time::Duration::from_secs(2)));
+    let mut cfg = s.cfg(USER, PASS);
+    cfg.keepalive = Some(std::time::Duration::from_millis(500));
+    let session = SftpSession::connect(cfg).unwrap();
+    std::thread::sleep(std::time::Duration::from_secs(4));
+    assert!(
+        session.is_alive(),
+        "keepalive를 보냈는데 서버가 연결을 끊었다"
+    );
+    assert!(session.list("/").is_ok());
+}
+
+// 위 시험의 대조: 같은 서버에 keepalive 없이 두면 서버가 끊는다(위 시험이 서버가 원래 안 끊어서 통과한 게 아님을 보인다).
+#[test]
+fn keepalive가_없으면_무활동_제한이_있는_서버가_연결을_끊는다() {
+    let s = Fixture::start_with_inactivity(Some(std::time::Duration::from_secs(2)));
+    let mut cfg = s.cfg(USER, PASS);
+    cfg.keepalive = None;
+    let session = SftpSession::connect(cfg).unwrap();
+    assert!(
+        dies_within(&session, std::time::Duration::from_secs(6)),
+        "keepalive가 없는데 무활동 제한이 지나도 연결이 살아 있다"
+    );
+    assert!(session.list("/").is_err());
+}
+
+/// 클라이언트와 서버 사이의 TCP 중계. `freeze`하면 소켓은 열어 둔 채 오가는 바이트를 버린다(NAT가 조용히 연결을 잊은 상태).
+struct Blackhole {
+    port: u16,
+    frozen: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl Blackhole {
+    fn start(server_port: u16) -> Self {
+        use std::sync::atomic::Ordering;
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let frozen = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let flag = frozen.clone();
+        std::thread::spawn(move || {
+            let Ok((client, _)) = listener.accept() else {
+                return;
+            };
+            let server = std::net::TcpStream::connect(("127.0.0.1", server_port)).unwrap();
+            let pipe =
+                |mut from: std::net::TcpStream,
+                 mut to: std::net::TcpStream,
+                 flag: std::sync::Arc<std::sync::atomic::AtomicBool>| {
+                    std::thread::spawn(move || {
+                        let mut buf = [0u8; 16384];
+                        loop {
+                            match from.read(&mut buf) {
+                                Ok(0) | Err(_) => break,
+                                Ok(n) if !flag.load(Ordering::SeqCst) => {
+                                    if to.write_all(&buf[..n]).is_err() {
+                                        break;
+                                    }
+                                }
+                                Ok(_) => {} // 얼어 있으면 버린다
+                            }
+                        }
+                        // 소켓은 닫지 않는다: 끊김을 알리는 FIN도 가지 않아야 조용한 끊김이다.
+                        std::mem::forget(to);
+                    });
+                };
+            pipe(
+                client.try_clone().unwrap(),
+                server.try_clone().unwrap(),
+                flag.clone(),
+            );
+            pipe(server, client, flag);
+        });
+        Self { port, frozen }
+    }
+
+    fn freeze(&self) {
+        self.frozen.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+// 이슈 #108: 중간에서 패킷이 사라지면(FIN 없이 조용히 끊김) keepalive 응답이 없어 몇 초 안에 끊김을 알아챈다.
+// 그래야 "다시 연결" 버튼과 자동 재연결이 동작한다.
+#[test]
+fn blackhole_조용히_끊긴_연결을_keepalive로_감지해_is_alive가_거짓이_된다() {
+    let s = Fixture::start();
+    let proxy = Blackhole::start(s.port);
+    let mut cfg = s.cfg(USER, PASS);
+    cfg.port = proxy.port;
+    cfg.keepalive = Some(std::time::Duration::from_millis(300));
+    let session = SftpSession::connect(cfg).unwrap();
+    assert!(session.list("/").is_ok());
+    proxy.freeze();
+    assert!(
+        dies_within(&session, std::time::Duration::from_secs(5)),
+        "패킷이 사라졌는데 5초 안에 끊김을 알지 못했다"
+    );
 }

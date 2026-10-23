@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use russh::{client, ChannelMsg, ChannelWriteHalf};
 
-use crate::sftp::{block, client_for, map_ssh, Client, Rt, TIMEOUT};
+use crate::sftp::{block, client_config, client_for, map_ssh, Client, Rt, TIMEOUT};
 use crate::{RemoteError, Result, SftpConfig};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,7 +35,7 @@ impl ShellSession {
                 .map_err(|e| RemoteError::Other(e.to_string()))?,
         )));
         let (handle, channel) = block(&rt, async {
-            let config = Arc::new(client::Config::default());
+            let config = Arc::new(client_config(cfg.keepalive));
             let (handler, failure) = client_for(&cfg);
             let mut handle = tokio::time::timeout(
                 TIMEOUT,

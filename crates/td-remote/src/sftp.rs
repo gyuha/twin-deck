@@ -40,12 +40,29 @@ use crate::{
 
 pub(crate) const TIMEOUT: Duration = Duration::from_secs(15);
 
+/// keepalive 간격(이슈 #108). 아무 작업이 없어도 이 간격으로 서버에 신호를 보내, 서버의 무활동 제한(Twin Deck Remote는 600초)이나
+/// NAT·방화벽이 조용한 연결을 끊지 않게 한다.
+pub const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(30);
+/// keepalive에 이만큼 연속으로 답이 없으면 연결이 죽은 것으로 보고 닫는다. 그래야 `is_alive`가 거짓이 되어 다시 연결할 수 있다.
+const KEEPALIVE_MAX: usize = 3;
+
+/// SFTP 세션과 원격 셸이 같이 쓰는 SSH 클라이언트 설정. `keepalive`가 `None`이면 keepalive를 보내지 않는다.
+pub(crate) fn client_config(keepalive: Option<Duration>) -> client::Config {
+    client::Config {
+        keepalive_interval: keepalive,
+        keepalive_max: KEEPALIVE_MAX,
+        ..Default::default()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct SftpConfig {
     pub host: String,
     pub port: u16,
     pub user: String,
     pub password: String,
+    /// keepalive 간격. 보통 `Some(KEEPALIVE_INTERVAL)`이고, `None`이면 보내지 않는다(시험용).
+    pub keepalive: Option<Duration>,
     pub host_key: HostKeyPolicy,
 }
 
@@ -230,7 +247,7 @@ impl SftpSession {
                 .map_err(|e| RemoteError::Other(e.to_string()))?,
         )));
         let (handle, sftp) = block(&rt, async {
-            let config = Arc::new(client::Config::default());
+            let config = Arc::new(client_config(cfg.keepalive));
             let (handler, failure) = client_for(&cfg);
             let mut handle = tokio::time::timeout(
                 TIMEOUT,
@@ -452,5 +469,16 @@ mod trust_tests {
             saved == a.public_key().to_openssh().unwrap()
                 || saved == b.public_key().to_openssh().unwrap()
         );
+    }
+
+    #[test]
+    fn client_config는_기본_30초마다_keepalive를_보내고_3번_답이_없으면_닫는다() {
+        let c = client_config(Some(KEEPALIVE_INTERVAL));
+        assert_eq!(
+            c.keepalive_interval,
+            Some(std::time::Duration::from_secs(30))
+        );
+        assert_eq!(c.keepalive_max, 3);
+        assert_eq!(client_config(None).keepalive_interval, None);
     }
 }
