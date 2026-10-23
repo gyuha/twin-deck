@@ -17,7 +17,7 @@ const files = {
 
 async function connected() {
   const backend = seedBackend();
-  backend.setConfig((l) => (l.config.remote = { servers: [SFTP] }));
+  backend.setConfig((l) => (l.config.remote = { auto_reconnect: true, servers: [SFTP] }));
   backend.seed(files);
   backend.remotePasswords.set("kim@nas:22/sftp", "pw");
   const app = await renderApp(backend);

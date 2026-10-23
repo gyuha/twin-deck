@@ -553,7 +553,7 @@ describe("SFTP·FTP 서버 탭 (이슈 #76)", () => {
 
   it("저장된 항목을 고쳐 저장하고, 삭제 후 저장하면 목록에서 빠진다", async () => {
     const backend = seedBackend();
-    backend.setConfig((l) => (l.config.remote = { servers: [SFTP, { name: "백업", protocol: "ftp", host: "backup", port: 21, user: "", base_dir: "", icon: "" }] }));
+    backend.setConfig((l) => (l.config.remote = { auto_reconnect: true, servers: [SFTP, { name: "백업", protocol: "ftp", host: "backup", port: 21, user: "", base_dir: "", icon: "" }] }));
     const { user } = await openRemote(backend);
     const listbox = screen.getByRole("listbox", { name: "저장된 원격 서버" });
     expect(within(listbox).getAllByRole("option").map((o) => o.textContent)).toEqual(["회사SFTP · files.example.com:2222", "백업FTP · backup:21"]);
@@ -590,7 +590,7 @@ describe("SFTP·FTP 서버 탭 (이슈 #76)", () => {
 
   it("저장된 비밀번호 지우기는 키체인에서 그 항목의 비밀번호를 지운다", async () => {
     const backend = seedBackend();
-    backend.setConfig((l) => (l.config.remote = { servers: [SFTP] }));
+    backend.setConfig((l) => (l.config.remote = { auto_reconnect: true, servers: [SFTP] }));
     backend.remotePasswords.set("kim@files.example.com:2222/sftp", "secret");
     const { user } = await openRemote(backend);
     await user.click(button("편집"));
@@ -634,7 +634,7 @@ describe("서버 항목 복제 (이슈 #76)", () => {
   it("SFTP·FTP: 복제하면 프로토콜·포트까지 같은 항목이 생기고 저장된다", async () => {
     const backend = seedBackend();
     const srv = { name: "회사", protocol: "sftp", host: "files.example.com", port: 2222, user: "kim", base_dir: "/srv", icon: "" };
-    backend.setConfig((l) => (l.config.remote = { servers: [srv] }));
+    backend.setConfig((l) => (l.config.remote = { auto_reconnect: true, servers: [srv] }));
     const { user } = await openTab("SFTP·FTP 서버", backend);
     await user.click(button("복제"));
     await user.click(button("저장"));
@@ -661,7 +661,7 @@ describe("설정 화면에서 바로 연결 (이슈 #76)", () => {
 
   it("SFTP: 연결을 누르면 설정을 닫고 비밀번호를 묻고, 맞으면 설정이 덮었던 패널이 서버 폴더로 이동한다", async () => {
     const backend = seedBackend();
-    backend.setConfig((l) => (l.config.remote = { servers: [SFTP] }));
+    backend.setConfig((l) => (l.config.remote = { auto_reconnect: true, servers: [SFTP] }));
     backend.seed({ "sftp://kim@nas:22/docs/a.txt": "a" });
     const { user } = await openTab("SFTP·FTP 서버", backend);
     await user.click(button("연결"));
@@ -676,7 +676,7 @@ describe("설정 화면에서 바로 연결 (이슈 #76)", () => {
 
   it("저장하지 않은 변경이 있으면 연결을 누를 때 먼저 저장하고 그 설정으로 연결한다", async () => {
     const backend = seedBackend();
-    backend.setConfig((l) => (l.config.remote = { servers: [SFTP] }));
+    backend.setConfig((l) => (l.config.remote = { auto_reconnect: true, servers: [SFTP] }));
     backend.seed({ "sftp://kim@nas:22/docs/a.txt": "a" });
     const { user } = await openTab("SFTP·FTP 서버", backend);
     expect(button("연결")).toBeEnabled();
@@ -694,7 +694,7 @@ describe("설정 화면에서 바로 연결 (이슈 #76)", () => {
 
   it("저장이 거부되는 입력이면 연결하지 않고 오류를 보인다", async () => {
     const backend = seedBackend();
-    backend.setConfig((l) => (l.config.remote = { servers: [SFTP] }));
+    backend.setConfig((l) => (l.config.remote = { auto_reconnect: true, servers: [SFTP] }));
     const { user } = await openTab("SFTP·FTP 서버", backend);
     await user.click(button("편집"));
     await user.clear(within(screen.getByRole("tabpanel")).getByRole("textbox", { name: "호스트" }));

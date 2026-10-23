@@ -13,7 +13,7 @@ const setup = () => {
   const b = new FakeBackend().seed({ "/home/a/a.txt": "a", "/home/b/b.txt": "b" });
   b.setConfig((l) => {
     l.config.smb = { servers: [NAS] };
-    l.config.remote = { servers: [SFTP, FTP, TD] };
+    l.config.remote = { auto_reconnect: true, servers: [SFTP, FTP, TD] };
   });
   return b;
 };

@@ -563,6 +563,8 @@ export const en: Record<Key, string> = {
   "settings.section.remote.title": "SFTP / FTP Servers",
   "settings.section.remote.desc": "Save the SFTP and FTP servers you connect to often. Pick one from the Connect menu in the drive bar and the pane enters its folders; copy, move and delete work like on local files. Passwords are stored in the OS keychain, not in the settings file",
   "settings.remote.list": "Saved remote servers",
+  "settings.item.remote.auto_reconnect.title": "Reconnect automatically when disconnected",
+  "settings.item.remote.auto_reconnect.desc": "When you open a remote folder whose connection dropped, reconnect once without asking. Only with a saved password and an already trusted host key; otherwise the Reconnect button appears. Remote terminals are not reconnected automatically",
   "settings.remote.empty": "No saved servers. Press Add to create one",
   "settings.remote.name": "Display name",
   "settings.remote.name_placeholder": "Empty: user@host",

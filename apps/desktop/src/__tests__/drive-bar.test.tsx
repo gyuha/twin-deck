@@ -411,7 +411,7 @@ describe("드라이브 바", () => {
     const OFFLINE = { name: "꺼진 서버", protocol: "sftp", host: "offline", port: 22, user: "kim", base_dir: "", icon: "" };
     const withRemotes = (...servers: (typeof SFTP)[]) => {
       const backend = setup();
-      backend.setConfig((l) => (l.config.remote = { servers }));
+      backend.setConfig((l) => (l.config.remote = { auto_reconnect: true, servers }));
       backend.seed({ "sftp://kim@nas:22/docs/a.txt": "a", "sftp://kim@nas:22/b.txt": "b", "ftp://ftp.example.com:21/pub/p.txt": "p" });
       return backend;
     };

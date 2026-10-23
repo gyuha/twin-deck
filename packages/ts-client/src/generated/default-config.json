@@ -153,7 +153,8 @@
       "servers": []
     },
     "remote": {
-      "servers": []
+      "servers": [],
+      "auto_reconnect": true
     },
     "remote_server": {
       "enabled": false,

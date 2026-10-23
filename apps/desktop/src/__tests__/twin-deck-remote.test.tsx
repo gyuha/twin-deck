@@ -165,7 +165,7 @@ describe("Twin Deck Remote 탭", () => {
 
     it("수정하고 삭제할 수 있다", async () => {
       const backend = seedBackend();
-      backend.setConfig((l) => (l.config.remote = { servers: [TD, { ...TD, name: "사무실", host: "office.local" }] }));
+      backend.setConfig((l) => (l.config.remote = { auto_reconnect: true, servers: [TD, { ...TD, name: "사무실", host: "office.local" }] }));
       const { user } = await openTwinDeck(backend);
       expect(within(list()).getAllByRole("option").map((o) => o.textContent)).toEqual(["집TWINDECK · home.local:2222", "사무실TWINDECK · office.local:2222"]);
       await user.click(within(list()).getByRole("option", { name: /사무실/ }));
@@ -191,7 +191,7 @@ describe("Twin Deck Remote 탭", () => {
   describe("SFTP·FTP 탭과 서로 덮어쓰지 않는다", () => {
     it("Twin Deck Remote 탭에는 twindeck 항목만, SFTP·FTP 탭에는 그 밖의 항목만 보인다", async () => {
       const backend = seedBackend();
-      backend.setConfig((l) => (l.config.remote = { servers: [SFTP, TD] }));
+      backend.setConfig((l) => (l.config.remote = { auto_reconnect: true, servers: [SFTP, TD] }));
       const { user } = await openTwinDeck(backend);
       expect(within(screen.getByRole("listbox", { name: "접속 주소" })).getAllByRole("option").map((o) => o.textContent)).toEqual(["집TWINDECK · home.local:2222"]);
       await user.click(screen.getByRole("tab", { name: "SFTP·FTP 서버" }));
@@ -200,7 +200,7 @@ describe("Twin Deck Remote 탭", () => {
 
     it("Twin Deck Remote 탭에서 저장해도 SFTP 항목이 그대로 남고 순서도 유지된다", async () => {
       const backend = seedBackend();
-      backend.setConfig((l) => (l.config.remote = { servers: [SFTP, TD] }));
+      backend.setConfig((l) => (l.config.remote = { auto_reconnect: true, servers: [SFTP, TD] }));
       const { user } = await openTwinDeck(backend);
       await user.click(button("추가"));
       await user.type(field("호스트"), "new.local");
@@ -217,7 +217,7 @@ describe("Twin Deck Remote 탭", () => {
 
     it("SFTP·FTP 탭에서 저장·삭제해도 twindeck 항목이 남는다", async () => {
       const backend = seedBackend();
-      backend.setConfig((l) => (l.config.remote = { servers: [TD, SFTP] }));
+      backend.setConfig((l) => (l.config.remote = { auto_reconnect: true, servers: [TD, SFTP] }));
       const { user } = await openTab("SFTP·FTP 서버", backend);
       await user.click(within(screen.getByRole("listbox", { name: "저장된 원격 서버" })).getByRole("option", { name: /회사/ }));
       await user.click(button("편집"));

@@ -45,7 +45,7 @@ const setup = () => {
   const b = seedBackend();
   b.setConfig((l) => {
     l.config.smb = { servers: [USB] };
-    l.config.remote = { servers: [SFTP] };
+    l.config.remote = { auto_reconnect: true, servers: [SFTP] };
   });
   return b;
 };

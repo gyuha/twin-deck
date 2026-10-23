@@ -8,7 +8,7 @@ const ROOT = "sftp://kim@nas:22";
 
 async function connected() {
   const backend = seedBackend();
-  backend.setConfig((l) => (l.config.remote = { servers: [SFTP] }));
+  backend.setConfig((l) => (l.config.remote = { auto_reconnect: true, servers: [SFTP] }));
   backend.seed({ [`${ROOT}/report.txt`]: "원격 내용", [`${ROOT}/photos/p1.jpg`]: "p1", [`${ROOT}/old.log`]: "old" });
   backend.remotePasswords.set("kim@nas:22/sftp", "pw");
   const app = await renderApp(backend);

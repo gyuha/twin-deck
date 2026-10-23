@@ -135,6 +135,9 @@ global_hotkey_enabled = true      # 전역 화면 열기 단축키 사용 여부
 global_hotkey = "Mod+Alt+O"       # 앱이 뒤에 있을 때 창을 불러오는 전역 단축키(Mod는 macOS ⌘, 그 밖은 Ctrl). 비우면 끈다
 terminal = "default"              # 내장 터미널의 셸(Windows): default(cmd) | cmd | powershell | gitbash(Git for Windows). 다른 OS는 $SHELL(로그인 셸)
 
+[remote]
+auto_reconnect = true             # 끊긴 원격 파일 탭을 쓰려 할 때 묻지 않고 한 번 다시 접속한다(저장된 비밀번호와 이미 신뢰한 호스트 키가 있을 때만, 이슈 #108). 안 되면 "다시 연결" 버튼. 원격 터미널은 제외
+
 [core.confirm]
 delete = true                     # 영구 삭제 확인
 trash = false                     # 휴지통 이동 확인

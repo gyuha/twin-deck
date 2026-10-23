@@ -32,7 +32,7 @@ describe("설정의 터미널 연결 버튼 (이슈 #94)", () => {
 
   it("SFTP 서버를 고르면 버튼이 켜지고, 누르면 연결한 뒤 그 서버의 원격 셸 터미널 탭이 열린다", async () => {
     const backend = seedBackend();
-    backend.setConfig((l) => (l.config.remote = { servers: [SFTP] }));
+    backend.setConfig((l) => (l.config.remote = { auto_reconnect: true, servers: [SFTP] }));
     backend.seed({ "sftp://kim@nas:22/docs/a.txt": "a" });
     const { user } = await openTab(backend);
     expect(button("터미널 연결")).toBeEnabled();
@@ -52,7 +52,7 @@ describe("설정의 터미널 연결 버튼 (이슈 #94)", () => {
 
   it("FTP 서버를 고르면 버튼이 꺼져 있다", async () => {
     const backend = seedBackend();
-    backend.setConfig((l) => (l.config.remote = { servers: [FTP] }));
+    backend.setConfig((l) => (l.config.remote = { auto_reconnect: true, servers: [FTP] }));
     await openTab(backend);
     expect(button("터미널 연결")).toBeDisabled();
     expect(button("연결")).toBeEnabled();
@@ -60,7 +60,7 @@ describe("설정의 터미널 연결 버튼 (이슈 #94)", () => {
 
   it("비밀번호 창을 취소하면 터미널을 열지 않는다", async () => {
     const backend = seedBackend();
-    backend.setConfig((l) => (l.config.remote = { servers: [SFTP] }));
+    backend.setConfig((l) => (l.config.remote = { auto_reconnect: true, servers: [SFTP] }));
     const { user } = await openTab(backend);
     await user.click(button("터미널 연결"));
     await screen.findByRole("dialog", { name: "회사 비밀번호" });

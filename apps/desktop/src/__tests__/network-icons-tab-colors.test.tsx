@@ -8,7 +8,7 @@ import { renderApp, seedBackend } from "./helpers";
 const USB = { name: "USB 공유", host: "nas.local", share: "USB", user: "", icon: "🗄️" };
 const SFTP = { name: "회사", protocol: "sftp", host: "files.example.com", port: 22, user: "kim", base_dir: "", icon: "🏢" };
 const TD = { name: "집", protocol: "twindeck", host: "home.local", port: 2222, user: "me", base_dir: "", icon: "" };
-const servers = { smb: { servers: [USB] }, remote: { servers: [SFTP, TD] } };
+const servers = { smb: { servers: [USB] }, remote: { auto_reconnect: true, servers: [SFTP, TD] } };
 
 describe("연결과 탭 종류 판정 (이슈 #92·#93)", () => {
   it("원격 경로는 연결 id가 같은 서버 항목이고, twindeck 항목이면 Twin Deck Remote다", () => {
@@ -36,7 +36,7 @@ const setup = (layout: Record<string, string> = {}) => {
   const b = seedBackend().seed({ "/Volumes/USB/docs/x.txt": "x" });
   b.setConfig((l) => {
     l.config.smb = { servers: [USB] };
-    l.config.remote = { servers: [SFTP] };
+    l.config.remote = { auto_reconnect: true, servers: [SFTP] };
     Object.assign(l.config.behavior.layout, layout);
   });
   return b;

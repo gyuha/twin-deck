@@ -21,7 +21,7 @@ type User = Awaited<ReturnType<typeof renderApp>>["user"];
 /** SFTP·FTP 서버가 저장돼 있고 SFTP 비밀번호가 키체인에 있는 백엔드(연결 때 비밀번호를 묻지 않는다). */
 const saved = () => {
   const b = new FakeBackend().seed({ "/home/a/a.txt": "a", "/home/b/b.txt": "b", "sftp://kim@nas:22/r.txt": "r" });
-  b.setConfig((l) => (l.config.remote = { servers: [SFTP, FTP] }));
+  b.setConfig((l) => (l.config.remote = { auto_reconnect: true, servers: [SFTP, FTP] }));
   b.remotePasswords.set("kim@nas:22/sftp", "pw");
   return b;
 };

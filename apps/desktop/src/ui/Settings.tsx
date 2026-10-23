@@ -138,7 +138,10 @@ const FOLDER_STYLES =["none", "brackets", "parens", "slash"] as const;
 const remoteSection: { title: string; desc?: string; items: Item[] } = {
   get title() { return translate("settings.section.remote.title"); },
   get desc() { return translate("settings.section.remote.desc"); },
-  items: [{ key: "remote.servers", get title() { return translate("settings.remote.list"); }, control: { type: "remote-servers" } }],
+  items: [
+    { key: "remote.auto_reconnect", get title() { return translate("settings.item.remote.auto_reconnect.title"); }, get desc() { return translate("settings.item.remote.auto_reconnect.desc"); }, control: { type: "switch" } },
+    { key: "remote.servers", get title() { return translate("settings.remote.list"); }, control: { type: "remote-servers" } },
+  ],
 };
 
 const twinDeckRemoteSection: { title: string; desc?: string; items: Item[] } = {

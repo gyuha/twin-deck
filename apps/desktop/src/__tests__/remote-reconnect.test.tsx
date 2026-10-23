@@ -18,6 +18,10 @@ async function connected(remember: boolean) {
     [`sftp://${ID}/docs/d.txt`]: "d",
   });
   await b.setRemoteServers([SERVER]);
+  // 이 파일은 수동 "다시 연결"을 시험한다. 자동 재연결(이슈 #108)은 remote-auto-reconnect.test.tsx에서 시험한다.
+  b.setConfig((l) => {
+    l.config.remote.auto_reconnect = false;
+  });
   const root = await b.remoteConnect(0, "pw", remember);
   return { b, root };
 }

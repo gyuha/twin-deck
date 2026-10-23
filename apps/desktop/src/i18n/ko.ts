@@ -561,6 +561,8 @@ export const ko = {
   "settings.section.remote.title": "SFTP·FTP 서버",
   "settings.section.remote.desc": "자주 접속하는 SFTP·FTP 서버를 저장합니다. 드라이브 바의 연결 메뉴에서 고르면 패널이 그 서버의 폴더로 들어가고, 복사·이동·삭제는 로컬과 같게 합니다. 비밀번호는 설정 파일이 아니라 OS 키체인에 저장됩니다",
   "settings.remote.list": "저장된 원격 서버",
+  "settings.item.remote.auto_reconnect.title": "끊기면 자동으로 다시 연결",
+  "settings.item.remote.auto_reconnect.desc": "연결이 끊긴 원격 폴더를 열면 창을 띄우지 않고 한 번 다시 접속합니다. 저장된 비밀번호와 이미 신뢰한 호스트 키가 있을 때만 하고, 안 되면 \"다시 연결\" 버튼이 뜹니다. 원격 터미널은 자동으로 다시 연결하지 않습니다",
   "settings.remote.empty": "저장된 서버가 없습니다. 추가를 눌러 만듭니다",
   "settings.remote.name": "표시 이름",
   "settings.remote.name_placeholder": "비우면 사용자@호스트",

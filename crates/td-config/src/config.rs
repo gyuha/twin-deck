@@ -243,6 +243,8 @@ pub struct RemoteConfig {
     /// 병합 후 항목별로 검증해서 채운다(protocol이 sftp·ftp·twindeck이 아니거나 host가 빈 항목은 경고와 함께 빠진다).
     #[serde(default)]
     pub servers: Vec<RemoteServer>,
+    /// 끊긴 원격 파일 탭을 쓰려 할 때 묻지 않고 한 번 다시 접속한다(이슈 #108). 저장된 비밀번호와 이미 신뢰한 호스트 키가 있을 때만 한다.
+    pub auto_reconnect: bool,
 }
 
 /// SFTP·FTP 서버 항목(`[[remote.servers]]`). `name`이 비면 읽을 때 `user@host`(user가 없으면 `host`)로 채우고,

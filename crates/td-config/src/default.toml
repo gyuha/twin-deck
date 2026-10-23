@@ -93,8 +93,11 @@ servers = []
 
 # 저장된 SFTP·FTP 서버. 항목은 [[remote.servers]]에 name·protocol(sftp|ftp|twindeck)·host·port·user·base_dir·icon으로 쓴다(icon은 이름 앞에 붙는 이모지).
 # port를 비우면 프로토콜 기본값(sftp 22, ftp 21), base_dir을 비우면 접속 직후 서버의 홈 폴더다. 비밀번호는 OS 키체인에 둔다.
+# auto_reconnect를 켜 두면 연결이 끊긴 원격 파일 탭을 쓰려 할 때 창을 띄우지 않고 한 번 다시 접속한다(저장된 비밀번호와 이미 신뢰한 호스트 키가 있을 때만).
+# 실패하거나 비밀번호·호스트 키 확인이 필요하면 "다시 연결" 버튼이 뜬다. 원격 터미널 탭은 자동으로 다시 연결하지 않는다.
 [remote]
 servers = []
+auto_reconnect = true
 
 # 이 앱 안에서 도는 SSH/SFTP 서버(Twin Deck Remote). 꺼 둔 채로 시작하고, 수신 주소(bind) 기본은 0.0.0.0이라 켜면 같은 네트워크의 다른 컴퓨터도 접속할 수 있다(이 컴퓨터에서만 받으려면 127.0.0.1).
 # root는 접속한 사람이 볼 수 있는 폴더의 맨 위이고, 비어 있으면 서버를 켤 수 없다. allow_write를 켜지 않으면 읽기만 되고,

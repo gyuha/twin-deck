@@ -26,7 +26,7 @@ describe("연결 메뉴의 Shift+Enter 터미널 (이슈 #94)", () => {
     const backend = seedBackend();
     backend.setConfig((l) => {
       l.config.smb = { servers: [NAS] };
-      l.config.remote = { servers: [SFTP, FTP] };
+      l.config.remote = { auto_reconnect: true, servers: [SFTP, FTP] };
     });
     backend.seed({ "sftp://kim@nas:22/docs/a.txt": "a" });
     const smbConnect = vi.spyOn(backend, "smbConnect");

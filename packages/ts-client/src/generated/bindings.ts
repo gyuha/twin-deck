@@ -1264,7 +1264,11 @@ export type RemoteConfig = {
 /**
  * 병합 후 항목별로 검증해서 채운다(protocol이 sftp·ftp·twindeck이 아니거나 host가 빈 항목은 경고와 함께 빠진다).
  */
-servers?: RemoteServer[] }
+servers?: RemoteServer[]; 
+/**
+ * 끊긴 원격 파일 탭을 쓰려 할 때 묻지 않고 한 번 다시 접속한다(이슈 #108). 저장된 비밀번호와 이미 신뢰한 호스트 키가 있을 때만 한다.
+ */
+auto_reconnect: boolean }
 /**
  * `remote_connect`의 결과: 패널이 이동할 원격 루트 경로(`sftp://<id>/..`), 또는 종류가 구분된 실패.
  * 설정 디렉터리 없음·없는 항목 번호 같은 그 밖의 문제는 명령 오류(문자열)로 온다.

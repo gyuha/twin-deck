@@ -671,14 +671,15 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
    * 연결 중에도 UI는 막지 않고, 같은 항목은 끝날 때까지 다시 연결하지 않는다(`remoteConnecting`).
    * 이미 연결돼 있고 살아 있으면 그대로 루트를 돌려주고, 끊긴 세션은 Rust가 버리고 새로 접속한다(이슈 #98).
    * `connectRemote`(패널을 옮긴다)와 `reconnectRemote`(끊긴 탭을 되살린다)가 같이 쓴다.
+   * `silent`(자동 재연결, 이슈 #108)이면 저장된 비밀번호와 이미 신뢰한 호스트 키로만 시도한다: 창을 띄우거나 알리지 않고, 묻는 것이 필요하면 `null`이다.
    */
-  async function openRemoteConnection(index: number): Promise<string | null> {
+  async function openRemoteConnection(index: number, silent = false): Promise<string | null> {
     const server = get().loaded.config.remote.servers?.[index];
     if (!server || get().remoteConnecting.includes(index)) return null;
-    set((s) => ({ notice: null, remoteConnecting: [...s.remoteConnecting, index] }));
+    set((s) => ({ notice: silent ? s.notice : null, remoteConnecting: [...s.remoteConnecting, index] }));
     // 알리고 멈춘다(연결하지 못했다는 뜻으로 `null`).
     const stop = (e: unknown): null => {
-      fail(e);
+      if (!silent) fail(e);
       return null;
     };
     // 백엔드는 항목을 순번으로 찾는다. 기다리는 사이 목록이 바뀌어 이 순번이 다른 서버가 되면 비밀번호를 엉뚱한 서버로 보내지 않도록 멈춘다.
@@ -693,8 +694,11 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       for (;;) {
         if (changed()) return stop(tr("store.remote.changed"));
         try {
-          return await backend.remoteConnect(index, password, remember, approvedHostKey);
+          const root = await backend.remoteConnect(index, password, remember, approvedHostKey);
+          autoReconnectSpent.delete(remoteServerId(server));
+          return root;
         } catch (e) {
+          if (silent) return null;
           if (e instanceof HostKeyError) {
             const k = e.key;
             if (k.previousFingerprint) return stop(tr("store.remote.hostkey_changed", { host: k.host, port: k.port, algorithm: k.algorithm, previous: k.previousFingerprint, fingerprint: k.fingerprint }));
@@ -725,6 +729,34 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     } finally {
       set((s) => ({ remoteConnecting: s.remoteConnecting.filter((i) => i !== index) }));
     }
+  }
+
+  /** 자동 재연결(이슈 #108): 연결 id별로 진행 중인 시도, 그리고 이번 끊김에 이미 시도했다가 실패한 id. 다시 연결에 성공하면 풀린다. */
+  const autoReconnects = new Map<string, Promise<boolean>>();
+  const autoReconnectSpent = new Set<string>();
+  /**
+   * 끊긴 연결 `id`에 묻지 않고 한 번 다시 접속한다. 성공하면 그 연결을 보는 모든 탭을 다시 읽고 참을 돌려준다.
+   * 설정이 꺼져 있거나, 이번 끊김에 이미 시도했거나, 저장된 비밀번호·신뢰한 호스트 키로 안 되면 거짓이다(탭에는 "다시 연결" 버튼이 남는다).
+   */
+  function autoReconnect(id: string): Promise<boolean> {
+    if (!cfg().remote.auto_reconnect || autoReconnectSpent.has(id)) return Promise.resolve(false);
+    const running = autoReconnects.get(id);
+    if (running) return running;
+    const attempt = (async () => {
+      const index = (cfg().remote.servers ?? []).findIndex((v) => remoteServerId(v) === id);
+      if (index < 0 || (await openRemoteConnection(index, true)) === null) {
+        autoReconnectSpent.add(id);
+        return false;
+      }
+      for (const p of ["left", "right"] as const) {
+        for (const t of get().panes[p].tabs) {
+          if (!t.virtual && splitRemote(t.path)?.id === id) await reload(p, t.id);
+        }
+      }
+      return true;
+    })().finally(() => autoReconnects.delete(id));
+    autoReconnects.set(id, attempt);
+    return attempt;
   }
 
   /**
@@ -760,7 +792,15 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (!keepDirSizes) forgetDirSizesIn(tab.path);
     } catch (e) {
       if (reloadSeq.get(key) !== seq) return;
-      patchTab(pane, tabId, { entries: [], cursor: 0, selection: new Set(), error: String(e instanceof Error ? e.message : e) });
+      const message = String(e instanceof Error ? e.message : e);
+      // 끊긴 원격 탭이면 먼저 묻지 않고 한 번 다시 접속해 본다. 성공하면 그 연결의 탭을 모두 다시 읽었으므로 여기서는 끝낸다.
+      const id = isRemoteDisconnected(message) ? splitRemote(tab.path)?.id : undefined;
+      if (id && (await autoReconnect(id))) {
+        if (reloadSeq.get(key) === seq) await reload(pane, tabId, focusName, keepDirSizes);
+        return;
+      }
+      if (reloadSeq.get(key) !== seq) return;
+      patchTab(pane, tabId, { entries: [], cursor: 0, selection: new Set(), error: message });
     }
   }
 

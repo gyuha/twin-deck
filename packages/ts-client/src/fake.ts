@@ -908,6 +908,7 @@ export class FakeBackend implements Backend {
     if (bad >= 0) throw new BackendError(`remote.servers[${bad + 1}]: protocol은 sftp, ftp, twindeck 중 하나여야 하고 host가 필요합니다`);
     this.setConfig((l) => {
       l.config.remote = {
+        ...l.config.remote,
         servers: items.map((v) => ({
           ...v,
           port: v.port || (v.protocol === "sftp" ? 22 : v.protocol === "twindeck" ? 2222 : 21),

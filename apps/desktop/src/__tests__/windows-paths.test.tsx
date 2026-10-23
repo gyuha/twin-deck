@@ -11,7 +11,7 @@ function renderCrumb(path: string) {
   const store = createStore(() => ({
     diskSpace: { left: null, right: null },
     smbMounts: [],
-    loaded: { config: { display: { size_format: "auto" }, smb: { servers: [] }, remote: { servers: [] } } },
+    loaded: { config: { display: { size_format: "auto" }, smb: { servers: [] }, remote: { auto_reconnect: true, servers: [] } } },
   }));
   render(
     <StoreContext.Provider value={{ api, store } as unknown as AppStore}>
