@@ -213,8 +213,28 @@ impl russh::server::Handler for Handler {
     }
 }
 
+/// 서버 SSH 설정(이슈 #108). 서버도 `KEEPALIVE_INTERVAL`마다 클라이언트에 keepalive를 보내 NAT·방화벽이 쉬는 연결을 버리지 않게 하고,
+/// 3번 연속 답이 없으면 죽은 연결로 보고 정리한다. 그래서 쉬고 있다는 이유만으로 끊는 무활동 제한(russh 기본 600초)은 없앤다 —
+/// keepalive를 보내지 않는 클라이언트(옛 버전 Twin Deck, 일반 `sftp`·`ssh`)도 살아 있는 동안은 끊기지 않는다.
+fn ssh_config(key: russh::keys::PrivateKey, keepalive: Duration) -> russh::server::Config {
+    russh::server::Config {
+        auth_rejection_time: Duration::from_millis(300),
+        auth_rejection_time_initial: Some(Duration::from_millis(0)),
+        keys: vec![key],
+        inactivity_timeout: None,
+        keepalive_interval: Some(keepalive),
+        keepalive_max: 3,
+        ..Default::default()
+    }
+}
+
 /// 서버를 켠다. 바인딩에 실패하면(포트 사용 중 등) 오류.
 pub fn start(cfg: ServerConfig) -> Result<ServerHandle> {
+    start_with_keepalive(cfg, crate::KEEPALIVE_INTERVAL)
+}
+
+/// `keepalive` 간격으로 서버를 켠다(시험은 짧게 쓴다).
+fn start_with_keepalive(cfg: ServerConfig, keepalive: Duration) -> Result<ServerHandle> {
     let other = |e: &dyn std::fmt::Display| RemoteError::Other(e.to_string());
     let jail = jail::Jail::new(&cfg.root).map_err(|e| other(&e))?;
     let key = host_key::load_or_create(&cfg.host_key_path)?;
@@ -227,12 +247,7 @@ pub fn start(cfg: ServerConfig) -> Result<ServerHandle> {
         .enable_all()
         .build()
         .map_err(|e| other(&e))?;
-    let config = russh::server::Config {
-        auth_rejection_time: Duration::from_millis(300),
-        auth_rejection_time_initial: Some(Duration::from_millis(0)),
-        keys: vec![key],
-        ..Default::default()
-    };
+    let config = ssh_config(key, keepalive);
     let mut server = Server {
         cfg: Arc::new(cfg),
         jail,

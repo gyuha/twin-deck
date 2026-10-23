@@ -47,6 +47,17 @@ fn login(addr: std::net::SocketAddr, user: &str, pass: &str) -> bool {
     })
 }
 
+// 이슈 #108: 서버는 무활동 제한 없이 30초마다 keepalive를 보내고, 3번 답이 없으면 죽은 연결로 정리한다.
+#[test]
+fn server_keepalive_config_has_no_inactivity_limit() {
+    let key =
+        russh::keys::PrivateKey::random(&mut rand::rng(), russh::keys::Algorithm::Ed25519).unwrap();
+    let c = ssh_config(key, crate::KEEPALIVE_INTERVAL);
+    assert_eq!(c.inactivity_timeout, None);
+    assert_eq!(c.keepalive_interval, Some(Duration::from_secs(30)));
+    assert_eq!(c.keepalive_max, 3);
+}
+
 #[test]
 fn server_host_key_survives_restart() {
     let dir = tempfile::tempdir().unwrap();
@@ -116,6 +127,30 @@ mod sftp_tests {
         })
         .unwrap();
         (dir, s, sess)
+    }
+
+    // 이슈 #108: 서버가 보내는 keepalive에 클라이언트가 답하므로, keepalive를 보내지 않는 클라이언트(옛 버전)도 쉬는 동안 끊기지 않는다.
+    // 클라이언트가 답하지 못하면 서버가 3번(0.9초) 뒤 죽은 연결로 정리해 이 시험이 실패한다.
+    #[test]
+    fn server_keepalive_keeps_a_client_without_keepalive_connected() {
+        let dir = tempfile::tempdir().unwrap();
+        let share = dir.path().join("share");
+        std::fs::create_dir_all(&share).unwrap();
+        let mut c = cfg(dir.path());
+        c.root = share;
+        let s = start_with_keepalive(c, std::time::Duration::from_millis(300)).unwrap();
+        let sess = SftpSession::connect(SftpConfig {
+            host: "127.0.0.1".into(),
+            port: s.local_addr.port(),
+            user: "me".into(),
+            password: "secret".into(),
+            keepalive: None,
+            host_key: trust(dir.path()),
+        })
+        .unwrap();
+        std::thread::sleep(std::time::Duration::from_secs(2));
+        assert!(sess.is_alive());
+        assert!(sess.list("/").is_ok());
     }
 
     #[test]
