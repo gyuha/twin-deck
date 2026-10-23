@@ -81,6 +81,7 @@ export const FILE_MENU: ({ key: Key; actionId: string } | null)[] = [
   null,
   { key: "menu.file.copy", actionId: "core.copy" },
   { key: "menu.file.move", actionId: "core.move" },
+  { key: "sync.title", actionId: "core.directory_sync" },
   { key: "menu.file.rename", actionId: "core.rename" },
   { key: "menu.file.rename_multi", actionId: "core.rename.multi" },
   { key: "menu.file.compress", actionId: "core.compress" },

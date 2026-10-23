@@ -2,6 +2,7 @@
 
 mod error;
 mod ops;
+pub mod sync;
 mod trasher;
 
 pub use error::{OpsError, Result};

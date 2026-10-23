@@ -16,6 +16,7 @@ export function navigationHandlers({ api }: AppStore): Partial<ActionHandlers> {
     "core.open.launch": () => api.openLaunch(),
     "core.remote.reconnect": () => api.reconnectRemote(),
     "core.open.as_archive": () => api.openAsArchive(),
+    "core.directory_sync": () => api.openDirectorySync(),
     "core.find.open": () => api.openFind(),
     "core.find.close": () => api.closeFind(),
     "core.lookup.global": () => api.lookup("global"),

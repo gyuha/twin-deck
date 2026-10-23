@@ -5,6 +5,28 @@
 
 
 export const commands = {
+/**
+ * 양쪽 폴더를 비교한다. 큰 파일 비교는 명령 실행 스레드에서 수행한다.
+ */
+async compareDirectories(requestId: string, left: string, right: string, options: SyncOptionsDto) : Promise<Result<SyncComparisonDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("compare_directories", { requestId, left, right, options }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cancelDirectoryComparison(requestId: string) : Promise<void> {
+    await TAURI_INVOKE("cancel_directory_comparison", { requestId });
+},
+async syncDirectories(comparisonId: number, choices: SyncChoiceDto[]) : Promise<Result<number, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("sync_directories", { comparisonId, choices }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async getConfig() : Promise<Loaded> {
     return await TAURI_INVOKE("get_config");
 },
@@ -1375,6 +1397,12 @@ previewRect?: PreviewRect | null;
  */
 recent?: string[]; left: PaneSnap; right: PaneSnap }
 export type SortSnap = { key: string; dir: string }
+export type SyncChoiceDto = { relativePath: string; direction: SyncDirectionDto }
+export type SyncComparisonDto = { id: number; rows: SyncRowDto[] }
+export type SyncDirectionDto = "leftToRight" | "rightToLeft" | "skip"
+export type SyncOptionsDto = { recursive: boolean; byContent: boolean; ignoreDate: boolean; asymmetric: boolean; pattern: string; selectedNames: string[] | null }
+export type SyncRowDto = { relativePath: string; left: EntryDto | null; right: EntryDto | null; status: SyncStatusDto; direction: SyncDirectionDto; reason: string | null }
+export type SyncStatusDto = "equal" | "leftOnly" | "rightOnly" | "leftNewer" | "rightNewer" | "different" | "conflict"
 export type TabSnap = { path: string; 
 /**
  * 커서가 있던 항목의 이름(복원 시 이름으로 찾는다).

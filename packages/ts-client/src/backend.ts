@@ -1,3 +1,4 @@
+import type { SyncOptionsDto, SyncComparisonDto, SyncChoiceDto } from "./generated/bindings";
 import type { CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigLocationDto, ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, EpubInfoDto, ExpectedFileDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, NormalizeResultDto, LoadedState, LocationConflict, PreviewDto, RemoteErrorKindDto, RemoteServer, RemoteServerStatus, SmbErrorKindDto, SmbServer, QueueItemDto, OfficePreviewDto, SearchStartDto, SearchSummaryDto, Snapshot, UpdateInfoDto, UserDirsDto, VolumeDto, WriteTextResultDto } from "./generated/bindings";
 
 /** Look Up / Flatten / Disk Usage가 스트리밍으로 보내는 이벤트. 작업마다 마지막은 `done`이다. */
@@ -62,6 +63,10 @@ export interface FileDropEvent {
 }
 
 export interface Backend {
+  compareDirectories(requestId: string, left: string, right: string, options: SyncOptionsDto): Promise<SyncComparisonDto>;
+  cancelDirectoryComparison(requestId: string): Promise<void>;
+  syncDirectories(comparisonId: number, choices: SyncChoiceDto[]): Promise<number>;
+
   /** 폴더 먼저, 이름순으로 정렬된 목록. */
   listDir(path: string, showHidden: boolean): Promise<EntryDto[]>;
   mkdir(path: string): Promise<void>;

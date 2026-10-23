@@ -19,6 +19,7 @@ pub enum JobKind {
 
 #[derive(Debug, Clone)]
 pub struct Item {
+    pub sync: Option<td_ops::sync::SyncCopy>,
     pub src: VfsPath,
     /// 복사/이동의 대상 폴더. 휴지통/삭제에서는 무시한다.
     pub dest_dir: Option<VfsPath>,
@@ -32,6 +33,7 @@ pub struct Item {
 impl Item {
     pub fn new(src: VfsPath, dest_dir: Option<VfsPath>, policy: ConflictPolicy) -> Self {
         Self {
+            sync: None,
             src,
             dest_dir,
             policy,

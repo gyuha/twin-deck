@@ -1,3 +1,4 @@
+import type { SyncOptionsDto, SyncComparisonDto, SyncChoiceDto } from "./generated/bindings";
 import { getVersion } from "@tauri-apps/api/app";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -41,6 +42,10 @@ export function toFileDropEvent(payload: TauriDragDrop, scale: number): FileDrop
 }
 
 export class TauriBackend implements Backend {
+  async compareDirectories(requestId: string, left: string, right: string, options: SyncOptionsDto) { return unwrap(await commands.compareDirectories(requestId, left, right, options)); }
+  async cancelDirectoryComparison(requestId: string) { await commands.cancelDirectoryComparison(requestId); }
+  async syncDirectories(comparisonId: number, choices: SyncChoiceDto[]) { return unwrap(await commands.syncDirectories(comparisonId, choices)); }
+
   async listDir(path: string, showHidden: boolean) {
     return unwrap(await commands.listDir(path, showHidden));
   }

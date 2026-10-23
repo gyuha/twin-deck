@@ -22,6 +22,7 @@ import { Preview } from "./ui/Preview";
 import { fkeyBindings } from "./lib/fkeys";
 import { parseThemeList, resolveTheme, themeVars } from "./lib/themeColors";
 import type { WarpTheme } from "./lib/themes.generated";
+import { DirectorySync } from "./ui/DirectorySync";
 import { FindDialog } from "./ui/FindDialog";
 import { Help } from "./ui/Help";
 import { PaneSplit } from "./ui/PaneSplit";
@@ -297,6 +298,7 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
         <QueuePopup />
         <Help />
         <FindDialog />
+        <DirectorySync />
         <Dialog />
       </main>
       </UiContext.Provider>

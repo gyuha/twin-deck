@@ -86,6 +86,7 @@ Marta에서는 수정자 없는 단일 키 바인딩이 Quick Select에 가로�
 | 액션 ID | 이름 | macOS 키 | Windows/Linux 키 | 스코프 | 출처 |
 |---|---|---|---|---|---|
 | `core.copy` | 복사 (비활성 패널로) | `F5` | `F5` | pane | ID 추정, 키 확인 |
+| `core.directory_sync` | 디렉터리 동기화 (이슈 #109): 양쪽 현재 폴더 비교 후 항목별 복사 방향·제외를 지정하고 확인 후 작업 큐에서 복사. 자동 삭제 없음 | 없음 | 없음 | pane | 자체 ID |
 | `core.move` | 이동 | `F6` | `F6` | pane | ID 추정, 키 확인 |
 | `core.rename` | 이름 변경: 목록 안에서 커서 행의 이름을 바로 고친다 (2개 이상 선택하면 다중 이름 바꾸기) | `Shift+F6`, `F2` | `Shift+F6`, `F2` | pane | ID 추정, 키 확인 |
 | `core.rename.confirm` | 이름 변경: 저장 | `Return` | `Return` | rename | 자체 ID |

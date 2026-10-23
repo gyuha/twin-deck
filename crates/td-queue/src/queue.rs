@@ -324,7 +324,13 @@ where
         JobKind::Copy | JobKind::Move => {
             let counted: Vec<Option<usize>> = items
                 .iter()
-                .map(|i| ops.count_files_within(&i.src, COUNT_BUDGET).ok().flatten())
+                .map(|i| {
+                    if i.sync.is_some() {
+                        Some(usize::from(i.src.as_path().is_file()))
+                    } else {
+                        ops.count_files_within(&i.src, COUNT_BUDGET).ok().flatten()
+                    }
+                })
                 .collect();
             // `None`은 시간 제한이 있는(원격) 원본이 제한 안에 다 세어지지 않은 경우뿐이다. 일부만 더하면 분모가 틀리므로 모두 0으로 둔다.
             if counted.iter().any(Option::is_none) {
@@ -390,47 +396,51 @@ where
         let ctl = JobControl { shared, job: id };
         ctl.on_item(&item.src);
         let dest = item.dest_dir.as_ref();
-        let result = match kind {
-            JobKind::Copy => ops
-                .copy_with(
-                    &item.src,
-                    dest.expect("복사에는 대상 폴더가 필요하다"),
-                    item.policy,
-                    &ctl,
-                )
-                .map(|_| ()),
-            JobKind::Move => ops
-                .move_with(
-                    &item.src,
-                    dest.expect("이동에는 대상 폴더가 필요하다"),
-                    item.policy,
-                    &ctl,
-                )
-                .map(|_| ()),
-            JobKind::Duplicate => ops.duplicate_with(&item.src, &ctl).map(|_| ()),
-            JobKind::Compress => {
-                let mut sources = vec![item.src.clone()];
-                sources.extend(item.extra.iter().cloned());
-                ops.compress_with(
-                    &sources,
-                    dest.expect("압축에는 대상 폴더가 필요하다"),
-                    item.name.as_deref(),
-                    item.policy,
-                    &ctl,
-                )
-                .map(|_| ())
+        let result = if let Some(plan) = &item.sync {
+            plan.execute(&ctl)
+        } else {
+            match kind {
+                JobKind::Copy => ops
+                    .copy_with(
+                        &item.src,
+                        dest.expect("복사에는 대상 폴더가 필요하다"),
+                        item.policy,
+                        &ctl,
+                    )
+                    .map(|_| ()),
+                JobKind::Move => ops
+                    .move_with(
+                        &item.src,
+                        dest.expect("이동에는 대상 폴더가 필요하다"),
+                        item.policy,
+                        &ctl,
+                    )
+                    .map(|_| ()),
+                JobKind::Duplicate => ops.duplicate_with(&item.src, &ctl).map(|_| ()),
+                JobKind::Compress => {
+                    let mut sources = vec![item.src.clone()];
+                    sources.extend(item.extra.iter().cloned());
+                    ops.compress_with(
+                        &sources,
+                        dest.expect("압축에는 대상 폴더가 필요하다"),
+                        item.name.as_deref(),
+                        item.policy,
+                        &ctl,
+                    )
+                    .map(|_| ())
+                }
+                JobKind::Extract => ops
+                    .extract_with(
+                        &item.src,
+                        dest.expect("추출에는 대상 폴더가 필요하다"),
+                        item.name.as_deref(),
+                        item.policy,
+                        &ctl,
+                    )
+                    .map(|_| ()),
+                JobKind::Trash => ops.trash(&item.src),
+                JobKind::Delete => ops.delete_with(&item.src, &ctl),
             }
-            JobKind::Extract => ops
-                .extract_with(
-                    &item.src,
-                    dest.expect("추출에는 대상 폴더가 필요하다"),
-                    item.name.as_deref(),
-                    item.policy,
-                    &ctl,
-                )
-                .map(|_| ()),
-            JobKind::Trash => ops.trash(&item.src),
-            JobKind::Delete => ops.delete_with(&item.src, &ctl),
         };
 
         if let Some(c) = &counts {

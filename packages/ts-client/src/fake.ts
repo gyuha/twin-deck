@@ -1,3 +1,4 @@
+import type { SyncOptionsDto, SyncComparisonDto, SyncChoiceDto, SyncRowDto } from "./generated/bindings";
 import { archiveRoot, isArchivePath } from "./archive";
 import { BackendError, RemoteConnectError, SmbConnectError, baseName, joinPath, parentPath, remoteServerId, remoteUrl, splitRemote } from "./backend";
 import type { Backend, FileDropEvent, SearchEvent, TerminalEvent } from "./backend";
@@ -211,6 +212,72 @@ export class FakeBackend implements Backend {
     return this;
   }
 
+  private syncNextId = 1;
+  private syncComparisons = new Map<number, { rows: SyncRowDto[]; left: string; right: string; asymmetric: boolean; snapshot: Map<string, string> }>();
+  private syncCancelled = new Set<string>();
+  async cancelDirectoryComparison(requestId: string) { this.syncCancelled.add(requestId); }
+  async compareDirectories(requestId: string, left: string, right: string, options: SyncOptionsDto): Promise<SyncComparisonDto> {
+    const clean = (p: string) => (p === "/" ? p : p.replace(/\/$/, "")); left = clean(left); right = clean(right);
+    if ([left, right].some(p => p.includes("://") || isArchivePath(p))) throw new BackendError("원격·아카이브 경로는 동기화를 지원하지 않습니다");
+    if (left === right || left.startsWith(`${right}/`) || right.startsWith(`${left}/`)) throw new BackendError("같거나 서로 포함된 폴더는 동기화할 수 없습니다");
+    for (const p of [left, right]) if (this.need(p).kind !== "dir" || this.need(p).link) throw new BackendError("링크 또는 파일은 루트로 사용할 수 없습니다");
+    const scan = async (root: string) => {
+      const out = new Map<string, EntryDto>();
+      const walk = async (path: string, prefix: string) => { for (const e of await this.listDir(path, true)) {
+        await Promise.resolve(); if (this.syncCancelled.has(requestId)) throw new BackendError("폴더 비교가 취소되었습니다");
+        if (!prefix && options.selectedNames && !options.selectedNames.some(n => n.normalize("NFC") === e.name.normalize("NFC"))) continue;
+        const key = `${prefix}${e.name.normalize("NFC")}`;
+        if (e.kind === "dir" && options.recursive) await walk(e.path, `${key}/`);
+        if (out.has(key)) throw new BackendError("조합형 이름이 같은 항목이 여러 개 있습니다"); out.set(key, e);
+      }}; await walk(root, ""); return out;
+    };
+    try {
+      const a = await scan(left), b = await scan(right); const rows: SyncRowDto[] = []; const snapshot = new Map<string, string>();
+      for (const key of [...new Set([...a.keys(), ...b.keys()])].sort()) {
+        const l = a.get(key) ?? null, r = b.get(key) ?? null;
+        let status: SyncRowDto["status"], direction: SyncRowDto["direction"] = "skip", reason: string | null = null;
+        if (l?.kind === "symlink" || r?.kind === "symlink" || (l && r && l.kind !== r.kind)) { status = "conflict"; reason = "링크 또는 파일·폴더 종류 충돌은 건너뜁니다"; }
+        else if (!r) { status = "leftOnly"; direction = "leftToRight"; }
+        else if (!l) { status = "rightOnly"; direction = "rightToLeft"; }
+        else if (l.kind === "dir" || (l.size === r.size && (options.byContent ? this.need(l.path).content === this.need(r.path).content : options.ignoreDate || l.modifiedMs === r.modifiedMs))) status = "equal";
+        else if (!options.ignoreDate && (l.modifiedMs ?? 0) > (r.modifiedMs ?? 0)) { status = "leftNewer"; direction = "leftToRight"; }
+        else if (!options.ignoreDate && (l.modifiedMs ?? 0) < (r.modifiedMs ?? 0)) { status = "rightNewer"; direction = "rightToLeft"; }
+        else { status = "different"; reason = "복사 방향을 직접 선택해 주세요"; }
+        if (options.asymmetric && direction === "rightToLeft") direction = "skip";
+        for (const e of [l, r]) if (e) snapshot.set(e.path, JSON.stringify(this.need(e.path)));
+        rows.push({ relativePath: key, left: l, right: r, status, direction, reason });
+      }
+      for (const row of rows) if (rows.some(p => p.status === "conflict" && row.relativePath.startsWith(`${p.relativePath}/`))) { row.status = "conflict"; row.direction = "skip"; row.reason = "상위 경로에 종류 충돌이 있습니다"; }
+      const id = this.syncNextId++; this.syncComparisons.set(id, { rows, left, right, asymmetric: options.asymmetric, snapshot }); return { id, rows: structuredClone(rows.filter(row => !options.pattern.trim() || options.pattern.split(";").some(p => globMatch(p.trim(), row.relativePath.split("/").at(-1)!) || globMatch(p.trim(), row.relativePath)))) };
+    } finally { this.syncCancelled.delete(requestId); }
+  }
+  async syncDirectories(comparisonId: number, choices: SyncChoiceDto[]): Promise<number> {
+    const comparison = this.syncComparisons.get(comparisonId); if (!comparison) throw new BackendError("비교 결과가 만료되었습니다. 다시 비교해 주세요");
+    const items: QueueItemDto[] = []; const guards: { source: string; dest: string; sourceValue: string; destValue: string | undefined }[] = []; const seen = new Set<string>();
+    for (const choice of choices) {
+      if (seen.has(choice.relativePath)) throw new BackendError("중복된 동기화 항목입니다"); seen.add(choice.relativePath);
+      if (choice.direction === "skip") continue;
+      if (comparison.asymmetric && choice.direction === "rightToLeft") throw new BackendError("비대칭 비교에서는 오른쪽에서 왼쪽으로 복사할 수 없습니다");
+      const row = comparison.rows.find(r => r.relativePath === choice.relativePath); if (!row || row.status === "conflict") throw new BackendError("복사할 수 없는 항목입니다");
+      const source = choice.direction === "leftToRight" ? row.left : row.right, target = choice.direction === "leftToRight" ? row.right : row.left;
+      if (!source) throw new BackendError("원본이 없는 방향입니다");
+      let dest = target?.path;
+      if (!dest) { dest = choice.direction === "leftToRight" ? comparison.right : comparison.left; const parts = choice.relativePath.split("/");
+        for (let index = 0; index < parts.length; index++) { const ancestor = comparison.rows.find(r => r.relativePath === parts.slice(0, index + 1).join("/")); const entry = choice.direction === "leftToRight" ? ancestor?.right : ancestor?.left; dest = entry?.path ?? joinPath(dest, parts[index]!); }
+      }
+      const sourceValue = comparison.snapshot.get(source.path)!, destValue = target ? comparison.snapshot.get(target.path) : undefined;
+      if (JSON.stringify(this.nodes.get(source.path)) !== sourceValue || JSON.stringify(this.nodes.get(dest)) !== destValue) throw new BackendError("비교 뒤 파일이 바뀌었습니다. 다시 비교해 주세요");
+      guards.push({ source: source.path, dest, sourceValue, destValue }); items.push({ src: source.path, destDir: parentPath(dest), policy: "overwrite" });
+    }
+    if (!items.length) throw new BackendError("복사할 항목이 없습니다");
+    this.syncComparisons.delete(comparisonId);
+    // 큐가 대기하다 시작되는 경우에도 비교 스냅샷을 확인한다.
+    const selected = guards.filter(g => this.need(g.source).kind !== "dir" || !guards.some(other => other.dest.startsWith(`${g.dest}/`)));
+    this.pendingSyncGuards = selected;
+    return this.enqueue("copy", items.filter(i => selected.some(g => g.source === i.src)));
+  }
+  private pendingSyncGuards: { source: string; dest: string; sourceValue: string; destValue: string | undefined }[] | null = null;
+  private syncJobGuards = new Map<number, NonNullable<FakeBackend["pendingSyncGuards"]>>();
   async listDir(path: string, showHidden: boolean): Promise<EntryDto[]> {
     this.assertRemoteAlive(path);
     // 폴더를 가리키는 링크는 대상 폴더의 내용을 링크 경로 아래 항목으로 보여 준다(실제 파일시스템처럼).
@@ -1272,6 +1339,15 @@ export class FakeBackend implements Backend {
     this.notify(dir);
   }
 
+  private async runQueuedItem(id: number, kind: JobKindDto, item: QueueItemDto) {
+          const guard = this.syncJobGuards.get(id)?.find(g => g.source === item.src);
+          if (guard) {
+            if (JSON.stringify(this.nodes.get(guard.source)) !== guard.sourceValue || JSON.stringify(this.nodes.get(guard.dest)) !== guard.destValue) throw new BackendError("비교 뒤 파일이 바뀌었습니다. 다시 비교해 주세요");
+            const parents: string[] = []; let parent: string = parentPath(guard.dest) ?? "/"; while (!this.nodes.has(parent)) { parents.push(parent); const next: string = parentPath(parent) ?? "/"; if (next === parent) break; parent = next; } for (const p of parents.reverse()) this.nodes.set(p, { kind: "dir", content: "" });
+            const node = structuredClone(this.need(guard.source)); this.nodes.set(guard.dest, node);
+          } else await this.runItem(kind, item);
+  }
+
   private finish(job: FakeJob) {
     job.dto.current = null;
     job.dto.status = job.dto.errors.length ? "failed" : "done";
@@ -1285,7 +1361,7 @@ export class FakeBackend implements Backend {
     const item = job.items[job.dto.completed];
     job.dto.current = item.src;
     try {
-      await this.runItem(job.dto.kind, item);
+      await this.runQueuedItem(job.dto.id, job.dto.kind, item);
     } catch (e) {
       job.dto.errors.push({ path: item.src, message: e instanceof Error ? e.message : String(e) });
     }
@@ -1303,6 +1379,7 @@ export class FakeBackend implements Backend {
     const forcedError = this.nextJobError;
     this.nextJobError = null;
     const id = this.nextJobId++;
+    if (this.pendingSyncGuards) { this.syncJobGuards.set(id, this.pendingSyncGuards); this.pendingSyncGuards = null; }
     const job: FakeJob = {
       items,
       dto: { id, kind, status: "queued", total: items.length, completed: 0, filesTotal: kind === "extract" ? items.reduce((n, i) => n + this.archiveFileCount(i.src), 0) : ["copy", "move", "delete", "trash"].includes(kind) ? items.length : null, filesDone: 0, bytesTotal: null, bytesDone: 0, current: null, errors: [] },
@@ -1315,7 +1392,7 @@ export class FakeBackend implements Backend {
         job.dto.current = item.src;
         try {
           if (forcedError) throw new Error(forcedError);
-          await this.runItem(kind, item);
+          await this.runQueuedItem(id, kind, item);
         } catch (e) {
           job.dto.errors.push({ path: item.src, message: e instanceof Error ? e.message : String(e) });
         }

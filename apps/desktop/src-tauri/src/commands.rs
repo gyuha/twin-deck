@@ -13,7 +13,8 @@ use td_volumes::{SystemUnmounter, Volumes};
 use crate::service::{
     edit, open_file, open_releases, reveal, reveal_config, ConflictDto, EntryDto, ExpectedFileDto,
     FileInfoDto, FindSpecDto, JobDto, JobKindDto, PreviewDto, QueueItemDto, RemoteServerStatus,
-    SearchStartDto, SearchSummaryDto, Service, ServiceResult, WriteTextResultDto,
+    SearchStartDto, SearchSummaryDto, Service, ServiceResult, SyncChoiceDto, SyncComparisonDto,
+    SyncOptionsDto, WriteTextResultDto,
 };
 
 pub type AppService = Service<SystemTrash>;
@@ -1338,6 +1339,43 @@ pub fn copy_image_to_clipboard(svc: State<'_, AppService>, path: String) -> Serv
     svc.copy_image_to_clipboard(&path)
 }
 
+/// 양쪽 폴더를 비교한다. 큰 파일 비교는 명령 실행 스레드에서 수행한다.
+#[tauri::command]
+#[specta::specta]
+pub async fn compare_directories(
+    app: tauri::AppHandle,
+    request_id: String,
+    left: String,
+    right: String,
+    options: SyncOptionsDto,
+) -> ServiceResult<SyncComparisonDto> {
+    tauri::async_runtime::spawn_blocking(move || {
+        app.state::<AppService>()
+            .compare_directories(request_id, &left, &right, options)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+#[specta::specta]
+pub fn cancel_directory_comparison(svc: State<'_, AppService>, request_id: String) {
+    svc.cancel_directory_comparison(&request_id);
+}
+#[tauri::command]
+#[specta::specta]
+pub async fn sync_directories(
+    app: tauri::AppHandle,
+    comparison_id: u32,
+    choices: Vec<SyncChoiceDto>,
+) -> ServiceResult<u32> {
+    tauri::async_runtime::spawn_blocking(move || {
+        app.state::<AppService>()
+            .sync_directories(comparison_id, choices)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// 복사/이동/휴지통/삭제를 작업 큐에 넣는다. 작업 id를 돌려준다.
 #[tauri::command]
 #[specta::specta]
@@ -1609,6 +1647,9 @@ pub async fn install_update(app: tauri::AppHandle) -> ServiceResult<()> {
 pub fn specta_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new()
         .commands(collect_commands![
+            compare_directories,
+            cancel_directory_comparison,
+            sync_directories,
             get_config,
             load_state,
             save_state,

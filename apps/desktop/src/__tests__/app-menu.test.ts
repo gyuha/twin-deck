@@ -124,6 +124,7 @@ describe("상단 메뉴바 File 메뉴", () => {
       "파일 관리자에서 보기",
       "복사",
       "이동",
+      "디렉터리 동기화",
       "이름 변경",
       "다중 이름 바꾸기",
       "압축",
@@ -140,7 +141,8 @@ describe("상단 메뉴바 File 메뉴", () => {
     await installFileMenu(run);
     created.find((c) => c.text === "다중 이름 바꾸기")!.action!();
     created.find((c) => c.text === "복사")!.action!();
-    expect(run.mock.calls).toEqual([["core.rename.multi"], ["core.copy"]]);
+    created.find((c) => c.text === "디렉터리 동기화")!.action!();
+    expect(run.mock.calls).toEqual([["core.rename.multi"], ["core.copy"], ["core.directory_sync"]]);
   });
 
   it("단축키(accelerator)를 달지 않는다", async () => {

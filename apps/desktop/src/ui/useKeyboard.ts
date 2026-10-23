@@ -25,6 +25,8 @@ export function useKeyboard({ app, keymap, registry }: Options) {
       // 미리보기 편집 상자: 글자·방향키·Space·Enter·Delete는 상자가 받는다. Mod+S(저장)만 단축키로 간다(Esc는 상자가 직접 처리한다).
       if (e.target instanceof Element && e.target.closest("[data-preview-edit]") && !((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "s")) return;
       const s = store.getState();
+      // 동기화 창의 입력·선택·Tab·Esc는 창이 직접 처리한다. 패널/전역 키로 새 작업을 시작하지 않는다.
+      if (s.directorySyncOpen && !s.dialog) return;
       const stack = scopeStack(s);
       const top = stack[0];
       const plain = !e.ctrlKey && !e.metaKey && !e.altKey;

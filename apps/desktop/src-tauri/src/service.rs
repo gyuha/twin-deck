@@ -20,6 +20,65 @@ use td_watch::DirWatcher;
 
 use crate::epub::EpubInfoDto;
 
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncOptionsDto {
+    pub recursive: bool,
+    pub by_content: bool,
+    pub ignore_date: bool,
+    pub asymmetric: bool,
+    pub pattern: String,
+    pub selected_names: Option<Vec<String>>,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub enum SyncDirectionDto {
+    LeftToRight,
+    RightToLeft,
+    Skip,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub enum SyncStatusDto {
+    Equal,
+    LeftOnly,
+    RightOnly,
+    LeftNewer,
+    RightNewer,
+    Different,
+    Conflict,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncRowDto {
+    pub relative_path: String,
+    pub left: Option<EntryDto>,
+    pub right: Option<EntryDto>,
+    pub status: SyncStatusDto,
+    pub direction: SyncDirectionDto,
+    pub reason: Option<String>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncComparisonDto {
+    pub id: u32,
+    pub rows: Vec<SyncRowDto>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncChoiceDto {
+    pub relative_path: String,
+    pub direction: SyncDirectionDto,
+}
+impl SyncDirectionDto {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::LeftToRight => "leftToRight",
+            Self::RightToLeft => "rightToLeft",
+            Self::Skip => "skip",
+        }
+    }
+}
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "lowercase")]
 pub enum KindDto {
@@ -866,6 +925,9 @@ pub struct Service<T: Trasher> {
     /// 폴더 용량을 계산 중인 경로별 취소 표시(`dir_size`).
     dir_sizes: Mutex<HashMap<String, CancelToken>>,
     next_search: AtomicU32,
+    sync_comparisons: Mutex<HashMap<u32, td_ops::sync::SyncComparison>>,
+    sync_requests: Mutex<HashMap<String, Arc<std::sync::atomic::AtomicBool>>>,
+    sync_cancelled: Mutex<std::collections::HashSet<String>>,
     search_tx: Sender<SearchMsg>,
     file_clipboard: Box<dyn FileClipboard>,
     image_clipboard: Box<dyn ImageClipboard>,
@@ -980,6 +1042,9 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
                 searches: Arc::default(),
                 dir_sizes: Mutex::new(HashMap::new()),
                 next_search: AtomicU32::new(0),
+                sync_comparisons: Mutex::default(),
+                sync_requests: Mutex::default(),
+                sync_cancelled: Mutex::default(),
                 search_tx,
                 file_clipboard: Box::new(SystemFileClipboard),
                 image_clipboard: Box::new(SystemImageClipboard),
@@ -1569,7 +1634,144 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
         Ok(out)
     }
 
-    /// 복사/이동/휴지통/삭제를 큐에 넣는다. 작업 id를 돌려준다.
+    /// 두 폴더를 비교하고 실행 전에 재검증할 스냅샷을 보관한다.
+    pub fn compare_directories(
+        &self,
+        request_id: String,
+        left: &str,
+        right: &str,
+        options: SyncOptionsDto,
+    ) -> ServiceResult<SyncComparisonDto> {
+        let mut requests = self.sync_requests.lock().unwrap();
+        if self.sync_cancelled.lock().unwrap().remove(&request_id) {
+            return Err("폴더 비교가 취소되었습니다".into());
+        }
+        let cancel = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        {
+            if requests.contains_key(&request_id) {
+                return Err("이미 실행 중인 비교 요청입니다".into());
+            }
+            requests.insert(request_id.clone(), cancel.clone());
+        }
+        drop(requests);
+        let result = td_ops::sync::compare(
+            left,
+            right,
+            &td_ops::sync::SyncOptions {
+                recursive: options.recursive,
+                by_content: options.by_content,
+                ignore_date: options.ignore_date,
+                asymmetric: options.asymmetric,
+                pattern: options.pattern,
+                selected_names: options.selected_names,
+            },
+            &cancel,
+        );
+        self.sync_requests.lock().unwrap().remove(&request_id);
+        let comparison = result?;
+        let id = self.next_search.fetch_add(1, Ordering::Relaxed);
+        let rows = comparison
+            .rows
+            .iter()
+            .map(|r| SyncRowDto {
+                relative_path: r.relative_path.clone(),
+                left: r.left.as_ref().map(EntryDto::from),
+                right: r.right.as_ref().map(EntryDto::from),
+                status: match r.status {
+                    "equal" => SyncStatusDto::Equal,
+                    "leftOnly" => SyncStatusDto::LeftOnly,
+                    "rightOnly" => SyncStatusDto::RightOnly,
+                    "leftNewer" => SyncStatusDto::LeftNewer,
+                    "rightNewer" => SyncStatusDto::RightNewer,
+                    "different" => SyncStatusDto::Different,
+                    _ => SyncStatusDto::Conflict,
+                },
+                direction: match r.direction {
+                    "leftToRight" => SyncDirectionDto::LeftToRight,
+                    "rightToLeft" => SyncDirectionDto::RightToLeft,
+                    _ => SyncDirectionDto::Skip,
+                },
+                reason: r.reason.clone(),
+            })
+            .collect();
+        let mut comparisons = self.sync_comparisons.lock().unwrap();
+        // 오래 열린 창의 결과는 다시 비교하게 하고 메모리는 제한한다.
+        if comparisons.len() >= 16 {
+            if let Some(old) = comparisons.keys().min().copied() {
+                comparisons.remove(&old);
+            }
+        }
+        comparisons.insert(id, comparison);
+        Ok(SyncComparisonDto { id, rows })
+    }
+    pub fn cancel_directory_comparison(&self, request_id: &str) {
+        let requests = self.sync_requests.lock().unwrap();
+        if let Some(cancel) = requests.get(request_id) {
+            cancel.store(true, Ordering::Relaxed);
+        } else {
+            let mut cancelled = self.sync_cancelled.lock().unwrap();
+            if cancelled.len() >= 64 {
+                cancelled.clear();
+            }
+            cancelled.insert(request_id.into());
+        }
+    }
+    pub fn sync_directories(
+        &self,
+        comparison_id: u32,
+        choices: Vec<SyncChoiceDto>,
+    ) -> ServiceResult<u32> {
+        let mut comparisons = self.sync_comparisons.lock().unwrap();
+        let comparison = comparisons
+            .get(&comparison_id)
+            .ok_or("비교 결과가 만료되었습니다. 다시 비교해 주세요")?;
+        let mut seen = std::collections::HashSet::new();
+        let mut items = Vec::new();
+        for choice in choices {
+            if !seen.insert(choice.relative_path.clone()) {
+                return Err("중복된 동기화 항목입니다".into());
+            }
+            if choice.direction == SyncDirectionDto::Skip {
+                continue;
+            }
+            let plan = comparison.plan(&choice.relative_path, choice.direction.as_str())?;
+            plan.validate()?;
+            let mut item = Item::new(
+                VfsPath::new(&plan.src),
+                plan.dest.parent().map(VfsPath::new),
+                ConflictPolicy::Overwrite,
+            );
+            item.sync = Some(plan);
+            items.push(item);
+        }
+        if items.is_empty() {
+            return Err("복사할 항목이 없습니다".into());
+        }
+        // 빈 폴더는 자식 복사 뒤 생성한다. 자식이 만든 부모를 오래된 새 대상으로 오인하지 않게 한다.
+        let destinations: std::collections::BTreeSet<_> = items
+            .iter()
+            .filter_map(|i| i.sync.as_ref().map(|p| p.dest.clone()))
+            .collect();
+        items.retain(|i| {
+            !i.src.as_path().is_dir()
+                || !i.sync.as_ref().is_some_and(|plan| {
+                    destinations
+                        .range::<PathBuf, _>((
+                            std::ops::Bound::Excluded(&plan.dest),
+                            std::ops::Bound::Unbounded,
+                        ))
+                        .next()
+                        .is_some_and(|next| next.starts_with(&plan.dest))
+                })
+        });
+        items.sort_by_key(|i| std::cmp::Reverse(i.src.as_path().components().count()));
+        comparisons.remove(&comparison_id);
+        Ok(self.queue.enqueue(JobSpec {
+            kind: JobKind::Copy,
+            items,
+        }) as u32)
+    }
+
     pub fn enqueue(&self, kind: JobKindDto, items: Vec<QueueItemDto>) -> u32 {
         let items = items
             .into_iter()
@@ -2009,6 +2211,55 @@ mod tests {
             dest_dir: dest.map(str::to_string),
             policy,
         }
+    }
+
+    #[test]
+    fn 동기화_서비스가_중복부모없이_양방향_복사하고_미리온_취소를_기억한다() {
+        let (_tmp, svc, _ch, root) = setup();
+        let left = format!("{root}/왼쪽");
+        let right = format!("{root}/오른쪽");
+        std::fs::create_dir_all(format!("{left}/하위")).unwrap();
+        std::fs::create_dir_all(&right).unwrap();
+        std::fs::write(format!("{left}/하위/파일"), "내용").unwrap();
+        std::fs::write(format!("{right}/다른파일"), "고유").unwrap();
+        std::fs::create_dir(format!("{left}/빈폴더")).unwrap();
+        let options = || SyncOptionsDto {
+            recursive: true,
+            by_content: true,
+            ignore_date: false,
+            asymmetric: false,
+            pattern: String::new(),
+            selected_names: None,
+        };
+        svc.cancel_directory_comparison("미리취소");
+        assert!(svc
+            .compare_directories("미리취소".into(), &left, &right, options())
+            .unwrap_err()
+            .contains("취소"));
+        let compared = svc
+            .compare_directories("비교".into(), &left, &right, options())
+            .unwrap();
+        let choices = compared
+            .rows
+            .into_iter()
+            .map(|row| SyncChoiceDto {
+                relative_path: row.relative_path,
+                direction: row.direction,
+            })
+            .collect();
+        let id = svc.sync_directories(compared.id, choices).unwrap();
+        let job = wait_finished(&svc, id);
+        assert_eq!(job.status, JobStatusDto::Done);
+        assert_eq!(job.files_total, Some(2));
+        assert_eq!(
+            std::fs::read_to_string(format!("{right}/하위/파일")).unwrap(),
+            "내용"
+        );
+        assert_eq!(
+            std::fs::read_to_string(format!("{left}/다른파일")).unwrap(),
+            "고유"
+        );
+        assert!(Path::new(&format!("{right}/빈폴더")).is_dir());
     }
 
     #[test]

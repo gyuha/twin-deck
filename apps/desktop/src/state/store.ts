@@ -403,6 +403,7 @@ export interface AppState {
   smbMounts: (string | null)[];
   /** 패널별 현재 볼륨의 용량. 알 수 없으면 null. */
   diskSpace: Record<PaneId, DiskSpaceDto | null>;
+  directorySyncOpen: boolean;
   settingsOpen: boolean;
   /** 설정이 떠 있는 패널(열 때의 활성 패널). 설정은 그 패널 자리에 뜬다. */
   settingsPane: PaneId;
@@ -549,6 +550,7 @@ export function scopeStack(s: AppState): Scope[] {
   if (s.help) return ["help", "global"];
   // 파일 찾기 다이얼로그도 모달이다(find 스코프).
   if (s.find) return ["find", "global"];
+  if (s.directorySyncOpen) return ["dialog"];
   // Actions Panel은 입력창이 있는 모달이다(palette 스코프).
   if (s.palette) return ["palette", "global"];
   // 미리보기가 열려 있으면 패널 키는 받지 않는다(preview 스코프).
@@ -624,6 +626,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     previewSheet: null,
     help: null,
     rename: null,
+    directorySyncOpen: false,
     find: null,
     lastFind: null,
     settingsSection: 0,
@@ -3930,6 +3933,19 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       earlySearchEvents.delete(started.id);
     },
 
+    /** 양쪽 현재 폴더를 비교할 동기화 창을 연다. */
+    openDirectorySync() {
+      set({ directorySyncOpen: true, palette: null, menu: null, ctxMenu: null });
+    },
+    closeDirectorySync() {
+      set({ directorySyncOpen: false });
+    },
+    async runDirectorySync(comparisonId: number, choices: Parameters<Backend["syncDirectories"]>[1]) {
+      const jobId = await backend.syncDirectories(comparisonId, choices);
+      set({ directorySyncOpen: false });
+      void trackTransfer(jobId, tr("sync.title"), 0);
+      return jobId;
+    },
     /** 파일 찾기 다이얼로그를 연다(`core.find.open`). 시작 디렉터리의 기본값은 활성 패널의 현재 폴더다. */
     openFind() {
       set({ find: { form: defaultFindForm(hereOf(activeTab(get()))), error: null } });

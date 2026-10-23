@@ -517,3 +517,39 @@ fn extract_reports_file_progress() {
     assert_eq!(info.status, JobStatus::Done);
     assert_eq!((info.files_total, info.files_done), (Some(3), 3));
 }
+
+#[test]
+fn 동기화가_큐에서_기다리는_동안_생긴_목적지를_보호한다() {
+    let d = dirs(&["원본"]);
+    let comparison = td_ops::sync::compare(
+        &d.src.to_string(),
+        &d.dst.to_string(),
+        &td_ops::sync::SyncOptions::default(),
+        &std::sync::atomic::AtomicBool::new(false),
+    )
+    .unwrap();
+    let plan = comparison.plan("원본", "leftToRight").unwrap();
+    let mut item = Item::new(
+        d.src.join("원본"),
+        Some(d.dst.clone()),
+        ConflictPolicy::Overwrite,
+    );
+    item.sync = Some(plan);
+    let (permit, hook) = gated();
+    let (q, rx) = Queue::with_hook(ops(), Some(hook));
+    let id = q.enqueue(JobSpec {
+        kind: JobKind::Copy,
+        items: vec![item],
+    });
+    wait_for(&rx, |e| matches!(e, QueueEvent::Started(job) if *job == id));
+    std::fs::write(d.dst.join("원본").as_path(), "큐 대기 중 사용자 파일").unwrap();
+    permit.send(()).unwrap();
+    wait_for(
+        &rx,
+        |e| matches!(e, QueueEvent::Finished { job, status: JobStatus::Failed } if *job == id),
+    );
+    assert_eq!(
+        std::fs::read_to_string(d.dst.join("원본").as_path()).unwrap(),
+        "큐 대기 중 사용자 파일"
+    );
+}
