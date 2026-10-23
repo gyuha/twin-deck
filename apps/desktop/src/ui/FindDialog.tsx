@@ -4,8 +4,6 @@ import { useApp, useAppStore, useT } from "../state/context";
 import { activeTab } from "../state/store";
 import type { FindForm } from "../state/store";
 
-const TAB_KEYS = ["find.tab.basic", "find.tab.advanced", "find.tab.plugin", "find.tab.io", "find.tab.result"] as const;
-
 const field = "h-8 w-full rounded-md border border-app-line bg-app-input px-2 text-sm text-ink outline-none focus:ring-2 disabled:opacity-50";
 const btn = "h-8 w-full rounded-md border border-app-line px-3 text-sm hover:bg-app-selected disabled:opacity-40 disabled:hover:bg-transparent";
 
@@ -37,8 +35,8 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 /**
- * 파일 찾기 다이얼로그(`Mod+F`): Double Commander "파일 찾기"의 기본 탭. 시작하면 결과를 새 가상 탭에 스트리밍한다.
- * 아직 만들지 않은 항목(바꾸기, Office XML, 인코딩, 16진수, 압축파일에서 찾기)과 다른 탭은 비활성으로 보인다.
+ * 파일 찾기 다이얼로그(`Mod+F`): 시작하면 결과를 새 가상 탭에 스트리밍한다.
+ * 아직 만들지 않은 항목(바꾸기, Office XML, 인코딩, 16진수, 압축파일에서 찾기)은 비활성으로 보인다.
  */
 export function FindDialog() {
   const t = useT();
@@ -68,22 +66,7 @@ export function FindDialog() {
           void api.findStart();
         }}
       >
-        <h2 className="mb-2 text-center text-sm font-semibold">{t("find.title")}</h2>
-        <div role="tablist" aria-label={t("find.tabs_aria")} className="mx-auto mb-3 flex gap-1 rounded-md bg-app-dark-box p-0.5 text-sm">
-          {TAB_KEYS.map((tabKey, i) => (
-            <button
-              key={tabKey}
-              type="button"
-              role="tab"
-              aria-selected={i === 0}
-              disabled={i !== 0}
-              title={i === 0 ? undefined : t("find.unsupported")}
-              className={"rounded px-3 py-0.5 " + (i === 0 ? "bg-app-box shadow" : "opacity-50")}
-            >
-              {t(tabKey)}
-            </button>
-          ))}
-        </div>
+        <h2 className="mb-3 text-center text-sm font-semibold">{t("find.title")}</h2>
         <div className="flex gap-4">
           <div className="min-w-0 flex-1">
             <Section title={t("find.sec_dir")}>

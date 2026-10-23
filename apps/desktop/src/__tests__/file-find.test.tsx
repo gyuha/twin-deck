@@ -53,12 +53,11 @@ describe("파일 찾기 다이얼로그", () => {
     expect(screen.queryByRole("dialog", { name: "파일 찾기" })).toBeNull();
   });
 
-  it("다이얼로그에 기본 탭의 디렉터리·파일·데이터 찾기 영역과 버튼이 있다", async () => {
+  it("다이얼로그에 디렉터리·파일·데이터 찾기 영역과 버튼이 있다", async () => {
     const { user } = await renderApp(seed());
     const d = await openFind(user);
     for (const section of ["디렉터리", "파일", "데이터 찾기"]) expect(d.getByRole("region", { name: section })).toBeInTheDocument();
-    expect(d.getByRole("tab", { name: "기본" })).toHaveAttribute("aria-selected", "true");
-    for (const t of ["고급", "플러그인", "불러오기/저장", "결과"]) expect(d.getByRole("tab", { name: t })).toBeDisabled();
+    expect(d.queryByRole("tablist")).toBeNull();
     for (const l of ["디렉터리에서 시작(D)", "하위 디렉터리 제외(X)", "파일 마스크(F)", "파일 제외(E)", "찾을 텍스트"]) {
       expect(d.getByRole("textbox", { name: l })).toBeInTheDocument();
     }
