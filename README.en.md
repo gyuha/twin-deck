@@ -65,7 +65,7 @@ There are no installers for Intel Macs or Linux. You can build it yourself by fo
 
 ### Update
 
-Press **Check for Updates** at the top of the Settings screen (`Mod+,`; on macOS the **Settings…** item in the menu bar, and on every OS the **Settings** button in the status bar at the bottom), or run "update" in the Actions Panel (`Mod+Shift+P`). If there is a new version it shows the changes, installs it, and restarts the app. To read past changes again, press **Release notes** at the top of the Settings screen (or run "Open Release Notes" in the Actions Panel); it opens the GitHub releases list in your default browser. The app does not check by itself, so press it once in a while.
+Press **Check Now** in the **System > Updates** tab of the Settings screen (`Mod+,`; on macOS the **Settings…** item in the menu bar, and on every OS the **Settings** button in the status bar at the bottom), or run "update" in the Actions Panel (`Mod+Shift+P`), which opens that tab and checks right away. If there is a new version the tab shows the changes; press **Install and Restart** and confirm to install it and restart the app. To read past changes again, press **Release notes** in the same tab (or run "Open Release Notes" in the Actions Panel); it opens the GitHub releases list in your default browser. The open source software the app uses and its licenses are listed under **Open Source Licenses…** in the same tab. The app does not check by itself, so press it once in a while.
 
 `Mod` is `Cmd` on macOS and `Ctrl` on Windows.
 
@@ -269,7 +269,7 @@ How to build and publish a release is in [deploy.md](deploy.md) (Korean).
 
 ## Config files
 
-Settings and the keymap are human-readable TOML files. You can change most of them in the Settings screen (`Mod+,`) or edit them directly. Saving `config.toml` applies to the running app. The **Open Settings Folder** button at the top of the Settings screen opens this folder.
+Settings and the keymap are human-readable TOML files. You can change most of them in the Settings screen (`Mod+,`) or edit them directly. Saving `config.toml` applies to the running app. The **Open Folder** button on the "Settings location" row of the **Environment** tab opens this folder.
 
 - macOS: `~/Library/Application Support/dev.twindeck.app/config.toml`
 - Keymap: `keybindings.toml` in the same folder

@@ -1104,6 +1104,11 @@ export class FakeBackend implements Backend {
     return structuredClone(this.loaded);
   }
 
+  /** 테스트용: 앱 버전. */
+  version = "1.2.3";
+  async appVersion() {
+    return this.version;
+  }
   /** 테스트용: 다음 업데이트 확인 결과. 기본은 새 버전 없음. */
   updateScenario: { info: UpdateInfoDto | null; checkError?: string; installError?: string } = { info: null };
   /** 테스트용: `checkUpdate`/`installUpdate` 호출 횟수. */

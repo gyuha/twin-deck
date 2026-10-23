@@ -9,13 +9,14 @@ const open = (user: Awaited<ReturnType<typeof renderApp>>["user"]) => user.keybo
 const dialog = () => screen.findByRole("dialog", { name: "설정" });
 
 describe("릴리스 노트 열기 (이슈 #70)", () => {
-  it("설정 위쪽의 변경 사항 버튼은 업데이트 확인 옆에 있고 누르면 릴리스 목록을 연다", async () => {
+  it("업데이트 탭의 현재 버전 줄에 변경 사항 버튼이 있고 누르면 릴리스 목록을 연다", async () => {
     const backend = seedBackend();
     const { user } = await renderApp(backend);
     await open(user);
     const d = await dialog();
+    await user.click(within(d).getByRole("tab", { name: "업데이트" }));
     const releases = within(d).getByRole("button", { name: "변경 사항" });
-    expect(releases.previousElementSibling).toBe(within(d).getByRole("button", { name: "업데이트 확인" }));
+    expect(releases.parentElement).toHaveTextContent("1.2.3");
     expect(backend.openedUrls).toEqual([]);
     await user.click(releases);
     await waitFor(() => expect(backend.openedUrls).toEqual([URL]));
@@ -35,6 +36,7 @@ describe("릴리스 노트 열기 (이슈 #70)", () => {
     await backend.setConfigValue("behavior.language", { kind: "str", value: "en" });
     await open(user);
     const d = await screen.findByRole("dialog", { name: "Settings" });
+    await user.click(within(d).getByRole("tab", { name: "Updates" }));
     expect(within(d).getByRole("button", { name: "Release notes" })).toBeInTheDocument();
   });
 

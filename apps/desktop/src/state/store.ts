@@ -48,6 +48,7 @@ import type {
   FindSpecDto,
   SmbServer,
   RemoteServer,
+  UpdateInfoDto,
 } from "@twin-deck/ts-client";
 import type { ActionContext } from "@twin-deck/actions";
 import type { Scope } from "@twin-deck/keybinds";
@@ -302,6 +303,15 @@ export interface CatalogItem {
 }
 
 /** 도움말(단축키 목록) 화면의 검색어 (이슈 #56). */
+/** 설정 > 업데이트 탭의 상태. 확인은 수동으로만 한다. */
+export type UpdateState =
+  | { kind: "idle" }
+  | { kind: "checking" }
+  | { kind: "latest" }
+  | { kind: "available"; info: UpdateInfoDto }
+  | { kind: "installing"; info: UpdateInfoDto }
+  | { kind: "error"; message: string };
+
 export interface HelpState {
   query: string;
 }
@@ -412,6 +422,9 @@ export interface AppState {
   remoteConnecting: number[];
   /** 설정 파일 저장 경로. 설정 화면이 열릴 때 읽는다. */
   configLocation: ConfigLocationDto | null;
+  /** 지금 앱 버전. 설정 화면이 열릴 때 읽는다. */
+  appVersion: string | null;
+  update: UpdateState;
   queueCursor: number;
   /** 설정 파일에서 읽은 설정·키바인딩·경고. 로딩 전에는 내장 기본값. */
   loaded: Loaded;
@@ -618,6 +631,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     smbConnecting: [],
     remoteConnecting: [],
     configLocation: null,
+    appVersion: null,
+    update: { kind: "idle" },
     queueCursor: 0,
     loaded: defaultLoaded(),
     keymapWarnings: [],
@@ -1098,8 +1113,6 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     const idx = activeTab(get()).entries.findIndex((e) => e.name.normalize("NFC") === top?.normalize("NFC"));
     if (idx >= 0) api.setCursor(idx);
   };
-  /** 업데이트 확인·설치가 진행 중이면 다시 시작하지 않는다. */
-  let updateBusy = false;
 
   // 작업 상태가 바뀌면(진행/완료) 목록을 다시 읽는다.
   let lastSignature = "";
@@ -3615,31 +3628,34 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
      * `items`(`core.app.launch`): 선택한 항목 전체, 없으면 커서 항목, 항목이 하나도 없으면(빈 폴더) 현재 폴더를 넘긴다.
      * `folder`(`core.app.open_folder`): 선택·커서와 무관하게 항상 현재 패널의 폴더를 넘긴다.
      */
-    /** 업데이트 확인: 새 버전이 있으면 확인 창을 거쳐 설치하고 다시 시작한다. 확인은 수동으로만 한다. */
+    /** 업데이트 확인: 결과는 설정 > 업데이트 탭의 상태(`update`)로 보인다. 확인·설치 중이면 다시 시작하지 않는다. */
     async checkForUpdate() {
-      if (updateBusy) return;
-      updateBusy = true;
-      set({ notice: null });
+      const kind = get().update.kind;
+      if (kind === "checking" || kind === "installing") return;
+      set({ update: { kind: "checking" } });
       try {
-        flash(tr("store.update.checking"));
         const info = await backend.checkUpdate();
-        if (!info) {
-          flash(tr("store.update.latest"));
-          return;
-        }
-        const ok = await ask<boolean>({
-          kind: "confirm",
-          title: tr("store.update.available", { version: info.version }),
-          lines: (info.notes ?? "").split("\n").filter((l) => l.trim()).slice(0, 8),
-        });
-        if (ok !== true) return;
-        flash(tr("store.update.installing"));
+        set({ update: info ? { kind: "available", info } : { kind: "latest" } });
+      } catch (e) {
+        set({ update: { kind: "error", message: String(e instanceof Error ? e.message : e) } });
+      }
+    },
+    /** 확인한 새 버전을 내려받아 설치하고 앱을 다시 시작한다. 설치 확인은 업데이트 탭이 먼저 받는다. */
+    async installUpdate() {
+      const u = get().update;
+      if (u.kind !== "available") return;
+      set({ update: { kind: "installing", info: u.info } });
+      try {
         await backend.installUpdate();
       } catch (e) {
-        set({ flash: null });
-        fail(e);
-      } finally {
-        updateBusy = false;
+        set({ update: { kind: "error", message: String(e instanceof Error ? e.message : e) } });
+      }
+    },
+    async loadAppVersion() {
+      try {
+        set({ appVersion: await backend.appVersion() });
+      } catch (e) {
+        set({ settingsError: String(e instanceof Error ? e.message : e) });
       }
     },
     async launchApp(args?: Record<string, unknown>, target: "items" | "folder" = "items") {

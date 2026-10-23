@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import { useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { EmojiPicker } from "frimousse";
@@ -19,6 +20,8 @@ import { Switch } from "./Switch";
 import { TagInput } from "./TagInput";
 import { parseColumn, withExtensionColumn } from "../lib/columns";
 import { useUi } from "./uiContext";
+import licensesText from "../generated/licenses.md?raw";
+import { MarkdownView } from "./MarkdownView";
 
 type Control =
   | { type: "switch" }
@@ -153,6 +156,12 @@ const smbSection: { title: string; desc?: string; items: Item[] } = {
   items: [{ key: "smb.servers", get title() { return translate("settings.smb.list"); }, control: { type: "smb-servers" } }],
 };
 
+/** 업데이트 탭. 항목 대신 `UpdatePanel`(현재 버전·확인·설치·오픈소스 라이선스)을 그린다. */
+const updateSection: { title: string; desc?: string; items: Item[] } = {
+  get title() { return translate("settings.section.update.title"); },
+  items: [],
+};
+
 const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
   {
     get title() { return translate("settings.section.appearance.title"); },
@@ -255,6 +264,7 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
       { key: "behavior.layout.recent_limit", get title() { return translate("settings.item.behavior.layout.recent_limit.title"); }, get desc() { return translate("settings.item.behavior.layout.recent_limit.desc"); }, control: { type: "int" } },
     ],
   },
+  updateSection,
   smbSection,
   remoteSection,
   twinDeckRemoteSection,
@@ -267,10 +277,12 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
 export const SECTION_GROUPS: { titleKey: Key; count: number }[] = [
   { titleKey: "settings.group.view", count: 4 },
   { titleKey: "settings.group.behavior", count: 3 },
-  { titleKey: "settings.group.system", count: 1 },
+  { titleKey: "settings.group.system", count: 2 },
   { titleKey: "settings.group.connection", count: 3 },
 ];
 
+/** 업데이트 탭의 순번. 업데이트 확인 액션이 이 탭을 연다. */
+export const UPDATE_SECTION = SECTIONS.indexOf(updateSection);
 /** SMB 서버 탭의 순번. `api.openSettings(SMB_SECTION)`으로 이 탭을 바로 연다. */
 export const SMB_SECTION = SECTIONS.indexOf(smbSection);
 /** 원격(SFTP·FTP) 서버 탭의 순번. `api.openSettings(REMOTE_SECTION)`으로 이 탭을 바로 연다. */
@@ -545,12 +557,14 @@ function HotkeyControl({ name, value, disabled, onCommit }: { name: string; valu
 /**
  * 서버 입력 창. 설정 화면의 좁은 칸 대신 가운데에 띄운다. 키 입력은 설정 화면(바깥)으로 새지 않게 여기서 멈추고,
  * Esc·바깥 클릭·닫기로 닫는다. 입력한 값은 닫아도 목록 초안에 남고, 파일에는 바깥의 "저장"을 눌러야 쓴다.
+ * 업데이트 탭의 설치 확인(`footer`로 버튼을 바꾼다)과 오픈소스 라이선스(`wide`로 창 대부분을 쓴다)도 이 창을 쓴다.
  */
-function ServerModal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+function ServerModal({ title, onClose, children, footer, wide }: { title: string; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
   const t = useT();
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    root.current?.querySelector<HTMLElement>("input, select")?.focus();
+    // 입력 칸이 없으면 창 자체에 포커스를 둬야 Esc가 설정 화면까지 가지 않는다.
+    (root.current?.querySelector<HTMLElement>("input, select") ?? root.current)?.focus();
   }, []);
   return (
     <div
@@ -564,7 +578,8 @@ function ServerModal({ title, onClose, children }: { title: string; onClose: () 
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="flex max-h-full w-[32rem] max-w-full flex-col gap-3 overflow-auto rounded border border-app-line bg-app-box p-4 text-sm shadow-lg"
+        tabIndex={-1}
+        className={"flex max-h-full max-w-full flex-col gap-3 overflow-auto rounded border border-app-line bg-app-box p-4 text-sm shadow-lg outline-none " + (wide ? "h-[90vh] w-[90vw]" : "w-[32rem]")}
         onKeyDown={(e) => {
           e.stopPropagation();
           if (e.key === "Escape" && !e.nativeEvent.isComposing) onClose();
@@ -572,10 +587,12 @@ function ServerModal({ title, onClose, children }: { title: string; onClose: () 
       >
         <h2 className="font-semibold">{title}</h2>
         {children}
-        <div className="flex justify-end">
-          <Button type="button" size="sm" variant="accent" onClick={onClose}>
-            {t("common.close")}
-          </Button>
+        <div className="flex justify-end gap-2">
+          {footer ?? (
+            <Button type="button" size="sm" variant="accent" onClick={onClose}>
+              {t("common.close")}
+            </Button>
+          )}
         </div>
       </div>
     </div>
@@ -1385,24 +1402,6 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
         <header className="flex flex-wrap items-center justify-between gap-2 border-b border-app-line px-4 py-2">
           <h2 className="text-base font-semibold">{t("settings.aria")}</h2>
           <div className="flex items-center gap-3">
-            {/* 확인 창이 설정 화면에 가려지지 않게 설정을 닫고 확인한다. */}
-            <Button
-              size="sm"
-              variant="gray"
-              onClick={() => {
-                api.closeSettings();
-                void api.checkForUpdate();
-              }}
-            >
-              {t("settings.update")}
-            </Button>
-            {/* GitHub 릴리스 목록을 기본 브라우저로 연다(이슈 #70). 설정은 그대로 둔다. */}
-            <Button size="sm" variant="gray" onClick={() => void api.openReleasesPage()}>
-              {t("settings.releases")}
-            </Button>
-            <Button size="sm" variant="gray" onClick={() => void api.revealConfigDir()}>
-              {t("settings.open_config_dir")}
-            </Button>
             <Button size="sm" variant="gray" onClick={() => api.closeSettings()}>
               {t("settings.close")} <span className="ml-1 text-ink-faint">Esc</span>
             </Button>
@@ -1602,6 +1601,9 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
                   <span data-testid="config-location" className="min-w-0 truncate text-sm text-ink-dull" title={location?.dir}>
                     {location ? (location.custom ? location.dir : `${t("settings.config_location.default")} (${location.dir})`) : ""}
                   </span>
+                  <Button size="sm" variant="gray" className="shrink-0 whitespace-nowrap" onClick={() => void api.revealConfigDir()}>
+                    {t("settings.config_location.open")}
+                  </Button>
                   <Button size="sm" variant="gray" className="shrink-0 whitespace-nowrap" onClick={() => void api.pickConfigLocation()}>
                     {t("settings.config_location.change")}
                   </Button>
@@ -1631,9 +1633,109 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
                 </div>
               </div>
             )}
+            {current === updateSection && <UpdatePanel />}
           </section>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * 업데이트 탭: 현재 버전과 변경 사항, 업데이트 확인 상태와 설치, 오픈소스 라이선스 고지.
+ * 설치 확인과 라이선스는 설정 위에 모달로 띄운다(설정의 다른 창처럼 설정 화면에 가려지지 않는다).
+ */
+function UpdatePanel() {
+  const t = useT();
+  const { api } = useAppStore();
+  const version = useApp((s) => s.appVersion);
+  const update = useApp((s) => s.update);
+  const [confirming, setConfirming] = useState(false);
+  const [licenses, setLicenses] = useState(false);
+  useEffect(() => {
+    void api.loadAppVersion();
+  }, [api]);
+  const status =
+    update.kind === "idle" ? t("settings.update.idle")
+    : update.kind === "checking" ? t("settings.update.checking")
+    : update.kind === "latest" ? t("settings.update.latest")
+    : update.kind === "error" ? t("settings.update.error", { message: update.message })
+    : update.kind === "installing" ? t("settings.update.installing")
+    : t("settings.update.available", { version: update.info.version });
+  const notes = update.kind === "available" || update.kind === "installing" ? (update.info.notes ?? "").split("\n").filter((l) => l.trim()) : [];
+  const busy = update.kind === "checking" || update.kind === "installing";
+  return (
+    <div className="flex flex-col gap-3 pt-1">
+      <div className="rounded-md border border-app-line bg-app-box px-3">
+        <div className="flex items-center justify-between gap-4 border-b border-app-line py-2.5 text-sm">
+          <span>{t("settings.update.current_version")}</span>
+          <div className="flex items-center gap-3">
+            <span data-testid="app-version" className="text-ink-dull">{version ?? ""}</span>
+            {/* GitHub 릴리스 목록을 기본 브라우저로 연다(이슈 #70). */}
+            <Button size="sm" variant="gray" className="whitespace-nowrap" onClick={() => void api.openReleasesPage()}>
+              {t("settings.releases")}
+            </Button>
+          </div>
+        </div>
+        <div className="flex items-center justify-between gap-4 py-2.5 text-sm">
+          <span role="status" className={"min-w-0 " + (update.kind === "error" ? "text-status-error" : update.kind === "idle" ? "text-ink-faint" : "text-ink-dull")}>
+            {status}
+          </span>
+          <Button size="sm" variant="gray" className="shrink-0 whitespace-nowrap" disabled={busy} onClick={() => void api.checkForUpdate()}>
+            {t("settings.update.check_now")}
+          </Button>
+        </div>
+        {(update.kind === "available" || update.kind === "installing") && (
+          <div className="flex flex-col gap-2 border-t border-app-line py-2.5 text-sm">
+            {notes.length > 0 && (
+              <div className="td-thin-scroll max-h-48 overflow-auto whitespace-pre-wrap text-ink-dull">{notes.join("\n")}</div>
+            )}
+            <div className="flex justify-end">
+              <Button size="sm" variant="accent" disabled={update.kind === "installing"} onClick={() => setConfirming(true)}>
+                {t("settings.update.install")}
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="rounded-md border border-app-line bg-app-box px-3 py-2.5">
+        <Button size="sm" variant="gray" className="whitespace-nowrap" onClick={() => setLicenses(true)}>
+          {t("settings.licenses")}
+        </Button>
+      </div>
+      {confirming && update.kind === "available" && (
+        <ServerModal
+          title={t("settings.update.confirm_title", { version: update.info.version })}
+          onClose={() => setConfirming(false)}
+          footer={
+            <>
+              <Button type="button" size="sm" variant="gray" onClick={() => setConfirming(false)}>
+                {t("common.cancel")}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="accent"
+                onClick={() => {
+                  setConfirming(false);
+                  void api.installUpdate();
+                }}
+              >
+                {t("settings.update.confirm_install")}
+              </Button>
+            </>
+          }
+        >
+          <p className="text-ink-dull">{t("settings.update.confirm_desc")}</p>
+        </ServerModal>
+      )}
+      {licenses && (
+        <ServerModal title={t("settings.licenses.title")} onClose={() => setLicenses(false)} wide>
+          <div className="td-thin-scroll min-h-0 flex-1 select-text overflow-auto rounded border border-app-line bg-app px-4 py-2">
+            <MarkdownView text={licensesText} />
+          </div>
+        </ServerModal>
+      )}
     </div>
   );
 }

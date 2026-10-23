@@ -1,3 +1,4 @@
+import { getVersion } from "@tauri-apps/api/app";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
@@ -342,6 +343,9 @@ export class TauriBackend implements Backend {
   }
   async openExternalUrl(url: string) {
     unwrap(await commands.openExternalUrl(url));
+  }
+  async appVersion() {
+    return getVersion();
   }
   async checkUpdate() {
     return unwrap(await commands.checkUpdate());

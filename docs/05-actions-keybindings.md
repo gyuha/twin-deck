@@ -207,8 +207,8 @@ Shift+이동 키(범위의 선택 반전)는 액션이 아니라 `pane` 스코�
 | `core.cli.uninstall` | 명령줄 도구 제거(`td`): 이 앱이 만든 링크(macOS)·`td.cmd`와 PATH 항목(Windows)만 지운다. 남의 `td`는 지우지 않는다. 구현됨(이슈 #45) | 없음 | 없음 | global, 자체 ID |
 | `core.terminal.external` | 외부 터미널 | `F11` | `F11` | 자체 ID, 키 확인 |
 | `core.config.open` | 설정 폴더 열기 | 없음 | 없음 | 자체 |
-| `core.app.check_update` | 업데이트 확인 (GitHub 최신 릴리스를 보고, 새 버전이면 확인 창을 거쳐 설치 후 다시 시작) | 없음 | 없음 | 자체 |
-| `core.app.releases` | 릴리스 노트 열기: GitHub 릴리스 목록(`https://github.com/gyuha/twin-deck/releases`)을 기본 브라우저로 연다. 설정 화면 위쪽의 **변경 사항** 버튼과 같은 동작이다. 주소는 Rust 상수 하나이고 인수는 없다. 구현됨(이슈 #70) | 없음 | 없음 | global, 자체 ID |
+| `core.app.check_update` | 업데이트 확인: 설정의 **업데이트** 탭을 열고 바로 GitHub 최신 릴리스를 확인한다. 결과·변경 사항은 그 탭에 보이고, 새 버전이면 **설치하고 다시 시작** → 확인 창을 거쳐 설치 후 다시 시작 | 없음 | 없음 | 자체 |
+| `core.app.releases` | 릴리스 노트 열기: GitHub 릴리스 목록(`https://github.com/gyuha/twin-deck/releases`)을 기본 브라우저로 연다. 설정 화면 **업데이트** 탭의 **변경 사항** 버튼과 같은 동작이다. 주소는 Rust 상수 하나이고 인수는 없다. 구현됨(이슈 #70) | 없음 | 없음 | global, 자체 ID |
 | `core.state.reset` | 상태 초기화 후 종료 | 없음 | 없음 | 자체 |
 | `core.theme.switch` | 테마 전환 | 없음 | 없음 | 자체 |
 

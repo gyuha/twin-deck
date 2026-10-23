@@ -8,6 +8,7 @@ dev:
 
 gen-types:
     node scripts/gen-themes.mjs
+    node scripts/gen-licenses.mjs
     UPDATE_BINDINGS=1 cargo test -p twin-deck-desktop up_to_date
 
 test:
@@ -18,6 +19,7 @@ check:
     cargo fmt --all --check
     cargo clippy --workspace --all-targets -- -D warnings
     bun run typecheck
+    node scripts/gen-licenses.mjs --check
 
 fmt:
     cargo fmt --all

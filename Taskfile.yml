@@ -20,9 +20,10 @@ tasks:
       - swift scripts/generate-icons.swift
 
   gen-types:
-    desc: Rust 타입에서 TS 바인딩(bindings.ts)과 기본 설정 fixture 재생성, 테마 YAML에서 색 표(themes.generated.ts)·이름 목록(themes.rs) 재생성
+    desc: Rust 타입에서 TS 바인딩(bindings.ts)과 기본 설정 fixture 재생성, 테마 YAML에서 색 표(themes.generated.ts)·이름 목록(themes.rs) 재생성, 오픈소스 라이선스 고지(licenses.md) 재생성
     cmds:
       - node scripts/gen-themes.mjs
+      - node scripts/gen-licenses.mjs
       - cargo test -p twin-deck-desktop up_to_date
     env:
       UPDATE_BINDINGS: "1"
@@ -34,11 +35,12 @@ tasks:
       - bun run test
 
   check:
-    desc: fmt 검사, clippy, TS 타입 검사
+    desc: fmt 검사, clippy, TS 타입 검사, 라이선스 고지 최신 여부
     cmds:
       - cargo fmt --all --check
       - cargo clippy --workspace --all-targets -- -D warnings
       - bun run typecheck
+      - node scripts/gen-licenses.mjs --check
 
   fmt:
     desc: Rust 포맷

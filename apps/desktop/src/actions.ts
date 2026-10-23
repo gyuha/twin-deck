@@ -1,6 +1,6 @@
 import type { ActionHandlers } from "@twin-deck/actions";
 import { scrollPreview } from "./ui/previewScroll";
-import { REMOTE_SECTION, SMB_SECTION, TWIN_DECK_REMOTE_SECTION } from "./ui/Settings";
+import { REMOTE_SECTION, SMB_SECTION, TWIN_DECK_REMOTE_SECTION, UPDATE_SECTION } from "./ui/Settings";
 import type { AppStore } from "./state/store";
 import { PAGE_SIZE } from "./state/store";
 
@@ -179,7 +179,11 @@ export function paletteHandlers({ api }: AppStore): Partial<ActionHandlers> {
     "core.app.launch": (_ctx, args) => api.launchApp(args),
     "core.app.open_folder": (_ctx, args) => api.launchApp(args, "folder"),
     "core.help": () => api.openHelp(),
-    "core.app.check_update": () => api.checkForUpdate(),
+    // 설정의 업데이트 탭을 열고 바로 확인한다(결과는 그 탭에 보인다).
+    "core.app.check_update": () => {
+      api.openSettings(UPDATE_SECTION);
+      void api.checkForUpdate();
+    },
     "core.app.releases": () => api.openReleasesPage(),
     "core.help.close": () => api.closeHelp(),
   };
