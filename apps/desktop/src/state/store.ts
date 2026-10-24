@@ -3813,6 +3813,10 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         fail(e);
       }
     },
+    /** 설정 화면: 앱을 실제로 끝낸다(백그라운드 유지 중에도). */
+    async quitApp() {
+      await backend.quitApp();
+    },
     async revealConfigDir() {
       try {
         await backend.revealConfigDir();

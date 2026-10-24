@@ -59,7 +59,8 @@
       "terminal": "default",
       "single_instance": true,
       "global_hotkey_enabled": true,
-      "global_hotkey": "Mod+Alt+O"
+      "global_hotkey": "Mod+Alt+O",
+      "background_on_close": false
     },
     "core": {
       "confirm": {

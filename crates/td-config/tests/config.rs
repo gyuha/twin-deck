@@ -1386,6 +1386,21 @@ fn global_hotkey_enabled_defaults_on_and_can_be_turned_off() {
 }
 
 #[test]
+fn background_on_close_defaults_off_and_can_be_turned_on() {
+    let d = user_value_dir(None);
+    assert!(
+        !load_dir(d.path(), Platform::Linux)
+            .config
+            .environment
+            .background_on_close
+    );
+    let d = user_value_dir(Some("[environment]\nbackground_on_close = true\n"));
+    let l = load_dir(d.path(), Platform::Linux);
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert!(l.config.environment.background_on_close);
+}
+
+#[test]
 fn single_instance_defaults_on_and_can_be_turned_off() {
     let d = user_value_dir(None);
     assert!(

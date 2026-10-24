@@ -1221,6 +1221,13 @@ pub fn reset_state(app: tauri::AppHandle, config: State<'_, ConfigState>) -> Ser
     Ok(())
 }
 
+/// 앱을 실제로 끝낸다. 백그라운드 유지(`environment.background_on_close`)를 켜도 설정의 종료 버튼은 이 명령으로 끝낸다.
+#[tauri::command]
+#[specta::specta]
+pub fn quit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
 struct TauriSpawner(tauri::AppHandle);
 
 impl Spawner for TauriSpawner {
@@ -1654,6 +1661,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             load_state,
             save_state,
             reset_state,
+            quit_app,
             new_window,
             file_info,
             preview_file,

@@ -142,6 +142,8 @@ pub struct Environment {
     pub global_hotkey_enabled: bool,
     /// 앱이 뒤에 있어도 누르면 창을 앞으로 불러오는 전역 단축키(예: `Mod+Alt+O`). `Mod`는 macOS ⌘, 그 밖은 Ctrl이다. 비우면 끈다.
     pub global_hotkey: String,
+    /// 창 닫기 버튼과 `Mod+Q`로 앱을 끝내지 않고 창만 숨겨 백그라운드에 둔다(macOS). 실제 종료는 설정의 종료 버튼이나 Dock 메뉴의 종료로 한다.
+    pub background_on_close: bool,
 }
 
 /// 미리보기 옵션. 사운드/비디오는 기본으로 자동 재생하지 않고 재생 UI만 띄운다.

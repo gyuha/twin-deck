@@ -154,6 +154,9 @@ export class TauriBackend implements Backend {
   async saveState(snapshot: Snapshot) {
     unwrap(await commands.saveState(snapshot));
   }
+  async quitApp() {
+    await commands.quitApp();
+  }
   async resetState() {
     unwrap(await commands.resetState());
   }

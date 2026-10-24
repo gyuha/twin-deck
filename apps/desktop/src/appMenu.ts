@@ -59,13 +59,25 @@ async function addEntryItems(menu: Menu, run: (actionId: string) => void, keyOf?
   await help.append(await item(translate("menu.help_shortcuts"), "core.help"));
 }
 
-/** 첫 번째 메뉴(앱 메뉴)의 제목과 About/Hide/Quit 항목 이름을 `Twin Deck`으로 맞춘다. */
+/** Rust가 메뉴 이벤트로 받아 처리하는 종료 항목 id(`environment.background_on_close`가 켜져 있으면 끝내지 않고 창만 숨긴다). */
+export const QUIT_MENU_ID = "quit";
+
+/**
+ * 첫 번째 메뉴(앱 메뉴)의 제목과 About/Hide 항목 이름을 `Twin Deck`으로 맞추고, 기본 Quit을 `Cmd+Q` 항목으로 바꾼다.
+ * 기본 Quit은 OS가 곧바로 앱을 끝내서, 백그라운드 유지 설정이 Cmd+Q를 가로챌 수 없다.
+ */
 async function renameAppMenu(menu: Menu): Promise<void> {
   const app = (await menu.items())[0];
   if (!(app instanceof Submenu)) return;
   await app.setText(APP_NAME);
   for (const item of await app.items()) {
-    const label = appItemLabel(await item.text());
+    const text = await item.text();
+    if (text.startsWith("Quit ")) {
+      await app.remove(item);
+      await app.append(await MenuItem.new({ id: QUIT_MENU_ID, text: `Quit ${APP_NAME}`, accelerator: "Cmd+Q" }));
+      continue;
+    }
+    const label = appItemLabel(text);
     if (label) await item.setText(label);
   }
 }
