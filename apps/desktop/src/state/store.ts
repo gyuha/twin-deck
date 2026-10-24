@@ -3701,16 +3701,22 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
      * `folder`(`core.app.open_folder`): 선택·커서와 무관하게 항상 현재 패널의 폴더를 넘긴다.
      */
     /** 업데이트 확인: 결과는 설정 > 업데이트 탭의 상태(`update`)로 보인다. 확인·설치 중이면 다시 시작하지 않는다. */
-    async checkForUpdate() {
+    async checkForUpdate(quiet = false) {
       const kind = get().update.kind;
       if (kind === "checking" || kind === "installing") return;
       set({ update: { kind: "checking" } });
       try {
         const info = await backend.checkUpdate();
-        set({ update: info ? { kind: "available", info } : { kind: "latest" } });
+        set({ update: info ? { kind: "available", info } : { kind: quiet ? "idle" : "latest" } });
       } catch (e) {
-        set({ update: { kind: "error", message: String(e instanceof Error ? e.message : e) } });
+        // 시작할 때 자동으로 하는 확인은 오프라인 같은 실패를 알리지 않고 조용히 넘어간다.
+        set({ update: quiet ? { kind: "idle" } : { kind: "error", message: String(e instanceof Error ? e.message : e) } });
       }
+    },
+    /** 앱을 시작할 때 설정(`environment.auto_update_check`)이 켜져 있으면 새 버전을 조용히 확인한다(이슈 #115). 새 버전이 있으면 상태 줄에 배지가 뜬다. */
+    async autoCheckUpdate() {
+      if (!get().loaded.config.environment.auto_update_check || get().update.kind !== "idle") return;
+      await api.checkForUpdate(true);
     },
     /** 확인한 새 버전을 내려받아 설치하고 앱을 다시 시작한다. 설치 확인은 업데이트 탭이 먼저 받는다. */
     async installUpdate() {

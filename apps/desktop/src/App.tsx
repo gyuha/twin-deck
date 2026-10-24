@@ -15,6 +15,7 @@ import { StoreContext, useApp, useAppStore, useT } from "./state/context";
 import { actionContext, activeTab, createAppStore, scopeStack } from "./state/store";
 import { ActionBar, useBarIds } from "./ui/ActionBar";
 import { CommandLine } from "./ui/CommandLine";
+import { UPDATE_SECTION } from "./ui/Settings";
 import { textColorFor, useTabColors, useTextColor, useUiFont } from "./ui/fonts";
 import { ActionsPalette } from "./ui/ActionsPalette";
 import { Dialog } from "./ui/Dialog";
@@ -102,6 +103,7 @@ function StatusBar() {
   const fileWarnings = useApp((s) => s.loaded.warnings.length);
   const keymapWarnings = useApp((s) => s.keymapWarnings.length);
   const showActionBar = useApp((s) => s.loaded.config.behavior.layout.show_action_bar);
+  const update = useApp((s) => s.update);
   const showCommandLine = useApp((s) => s.loaded.config.behavior.layout.show_command_line);
   const showDriveBar = useApp((s) => s.loaded.config.behavior.layout.show_drive_bar);
   const showHidden = useApp((s) => s.showHidden);
@@ -142,6 +144,11 @@ function StatusBar() {
       {warnings > 0 && (
         <button type="button" tabIndex={-1} onClick={() => void api.showConfigWarnings()} className="ml-4 text-status-warning">
           {t("status.warnings", { count: warnings })}
+        </button>
+      )}
+      {(update.kind === "available" || update.kind === "installing") && (
+        <button type="button" tabIndex={-1} aria-label={t("status.update_aria", { version: update.info.version })} title={t("status.update_aria", { version: update.info.version })} onClick={() => api.openSettings(UPDATE_SECTION)} className="ml-4 rounded-full bg-status-success px-2 text-white">
+          {t("status.update", { version: update.info.version })}
         </button>
       )}
       {notice && (
@@ -271,6 +278,8 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
   useEffect(() => {
     void app.api.init().then(() => {
       if (stateWarning) app.api.reportStateWarning(stateWarning);
+      // 시작할 때 새 버전을 조용히 확인한다(테스트의 가짜 백엔드는 확인 횟수를 세므로 실제 앱에서만).
+      if (isTauri()) void app.api.autoCheckUpdate();
     });
     // 창이 닫히기 직전에는 미뤄 둔 저장을 바로 실행한다.
     const flush = () => void app.api.saveNow();
