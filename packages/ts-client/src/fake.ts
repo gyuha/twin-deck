@@ -28,6 +28,7 @@ import type {
   ExpectedFileDto,
   WriteTextResultDto,
   OpenPathsDto,
+  ShellResultDto,
   CliOutcomeDto,
   CliStatusDto,
   SmbServer,
@@ -401,6 +402,13 @@ export class FakeBackend implements Backend {
     this.savedStates.push(structuredClone(snapshot));
   }
 
+  /** 테스트용: `runShellCommand`로 실행한 (폴더, 명령) 기록과, 다음 호출이 돌려줄 결과. */
+  readonly shellRuns: { cwd: string; command: string }[] = [];
+  shellResult: ShellResultDto = { exit_code: 0, output: "", timed_out: false };
+  async runShellCommand(cwd: string, command: string): Promise<ShellResultDto> {
+    this.shellRuns.push({ cwd, command });
+    return this.shellResult;
+  }
   /** `quitApp`이 불렸는지. */
   appQuit = false;
   async quitApp() {

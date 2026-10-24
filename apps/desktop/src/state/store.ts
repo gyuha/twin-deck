@@ -433,6 +433,8 @@ export interface AppState {
   keymapWarnings: string[];
   /** 성공 알림 (경로 복사 등). 몇 초 뒤 사라진다. */
   flash: string | null;
+  /** 명령어 줄로 포커스를 옮기라는 요청 횟수. 늘어날 때마다 줄이 입력칸에 포커스를 준다. */
+  commandLineFocus: number;
   /** 마지막 작업 오류. 다음 작업이 시작되면 지워진다. */
   notice: string | null;
 }
@@ -640,6 +642,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     loaded: defaultLoaded(),
     keymapWarnings: [],
     flash: null,
+    commandLineFocus: 0,
     notice: null,
   }));
   const { getState: get, setState: set } = store;
@@ -2245,6 +2248,32 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         fail(e);
       }
     },
+    /** 명령어 줄로 포커스를 옮긴다(이슈 #110). 줄이 꺼져 있으면 먼저 켠다. 로컬 폴더가 아니면 알림만 보인다. */
+    async focusCommandLine() {
+      const tab = activeTab(get());
+      if (tab.virtual || isArchivePath(tab.path) || isRemotePath(tab.path)) return fail(tr("store.run_command.local_only"));
+      if (!get().loaded.config.behavior.layout.show_command_line) await api.toggleLayoutFlag("show_command_line");
+      set({ commandLineFocus: get().commandLineFocus + 1 });
+    },
+    /** 명령어 줄에 입력한 셸 한 줄을 활성 탭의 로컬 폴더에서 실행한다. 출력이 있거나 실패하면 결과 창을 띄우고, 끝나면 목록을 다시 읽는다. */
+    async runCommand(command: string) {
+      const tab = activeTab(get());
+      if (tab.virtual || isArchivePath(tab.path) || isRemotePath(tab.path)) return fail(tr("store.run_command.local_only"));
+      command = command.trim();
+      if (!command) return;
+      set({ notice: null });
+      flash(tr("store.run_command.running", { command }));
+      try {
+        const r = await backend.runShellCommand(tab.path, command);
+        await reloadAll();
+        const failed = r.timed_out || r.exit_code !== 0;
+        if (!failed && !r.output) return flash(tr("store.run_command.done", { command }));
+        const status = r.timed_out ? tr("store.run_command.timed_out") : tr("store.run_command.exit_code", { code: String(r.exit_code ?? "?") });
+        await ask<boolean>({ kind: "info", title: tr("store.run_command.result"), lines: [command, status, ...(r.output ? r.output.split("\n") : [])], copyText: r.output || undefined });
+      } catch (e) {
+        fail(e);
+      }
+    },
     /** 새 파일 (OP-02). */
     async newFile() {
       const tab = activeTab(get());
@@ -3733,7 +3762,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     async toggleGroupByModified() {
       await api.setConfigValue("behavior.table.group_by_modified", { kind: "bool", value: !get().loaded.config.behavior.table.group_by_modified });
     },
-    async toggleLayoutFlag(flag: "show_action_bar" | "show_drive_bar") {
+    async toggleLayoutFlag(flag: "show_action_bar" | "show_drive_bar" | "show_command_line") {
       await api.setConfigValue(`behavior.layout.${flag}`, { kind: "bool", value: !get().loaded.config.behavior.layout[flag] });
     },
     /** 설정 하나를 사용자 config.toml에 즉시 쓰고, 돌려받은 새 설정을 바로 적용한다(변경 이벤트를 기다리지 않는다). */

@@ -175,19 +175,20 @@ describe("상단 메뉴바 File 메뉴", () => {
   });
 
   it("View 메뉴 끝에 드라이브 바와 Action Bar를 켜고 끄는 체크 항목이 붙고 체크 표시는 현재 설정을 따른다", async () => {
-    await installFileMenu(() => {}, { driveBar: true, actionBar: false });
+    await installFileMenu(() => {}, { driveBar: true, actionBar: false, commandLine: true });
     expect(checks.map((c) => [c.id, c.text, c.checked])).toEqual([
       ["core.view.drive_bar", "드라이브바 표시", true],
       ["core.view.action_bar", "액션바 표시", false],
+      ["core.view.command_line", "명령어 줄 표시", true],
     ]);
-    expect(viewAdds).toHaveLength(3); // 구분선 + 항목 2개
+    expect(viewAdds).toHaveLength(4); // 구분선 + 항목 3개
     expect(viewAdds[0]).toEqual({ separator: true });
   });
 
   it("보기 단축키: keyOf를 주면 View 항목 글자에 키가 붙고 accelerator는 달지 않는다", async () => {
-    const keys: Record<string, string> = { "core.view.drive_bar": "Cmd+Shift+D", "core.view.action_bar": "Cmd+Shift+A" };
-    await installFileMenu(() => {}, { driveBar: true, actionBar: true }, (id) => keys[id]);
-    expect(checks.map((c) => c.text)).toEqual(["드라이브바 표시 (Cmd+Shift+D)", "액션바 표시 (Cmd+Shift+A)"]);
+    const keys: Record<string, string> = { "core.view.drive_bar": "Cmd+Shift+D", "core.view.action_bar": "Cmd+Shift+A", "core.view.command_line": "Cmd+Shift+L" };
+    await installFileMenu(() => {}, { driveBar: true, actionBar: true, commandLine: true }, (id) => keys[id]);
+    expect(checks.map((c) => c.text)).toEqual(["드라이브바 표시 (Cmd+Shift+D)", "액션바 표시 (Cmd+Shift+A)", "명령어 줄 표시 (Cmd+Shift+L)"]);
     for (const c of checks) expect(c).not.toHaveProperty("accelerator");
   });
 
@@ -205,6 +206,8 @@ describe("상단 메뉴바 File 메뉴", () => {
     checks[0].action();
     checks[1].action();
     expect(run.mock.calls).toEqual([["core.view.drive_bar"], ["core.view.action_bar"]]);
+    checks[2].action();
+    expect(run.mock.calls[2]).toEqual(["core.view.command_line"]);
   });
 
   it("View 메뉴가 없으면 만들어 세 번째 자리에 넣는다", async () => {
@@ -291,7 +294,7 @@ describe("영어 메뉴 (이슈 #32)", () => {
       expect(texts).toContain("Move to Trash");
       expect(texts).toContain("Settings… (Cmd+,)");
       expect(texts).toContain("Keyboard Shortcuts");
-      expect(checks.map((c) => c.text)).toEqual(["Show Drive Bar", "Show Action Bar"]);
+      expect(checks.map((c) => c.text)).toEqual(["Show Drive Bar", "Show Action Bar", "Show Command Line"]);
       for (const x of [...texts, ...checks.map((c) => c.text)]) expect(/[가-힣]/.test(x ?? ""), String(x)).toBe(false);
     } finally {
       setLanguage("ko");

@@ -112,6 +112,7 @@ shift_mode = "invert"             # "invert"(Marta 방식) | "extend"
 
 [behavior.layout]
 show_action_bar = true
+show_command_line = true          # 창 아래의 명령어 줄(이슈 #110). 현재 로컬 폴더에서 셸 한 줄을 실행한다
 pane_highlight = true             # 활성 패널의 accent 테두리. false면 두 패널 모두 투명(폭은 그대로)
 tab_style = "underline"           # "underline"(활성 탭 밑줄) | "segments"(폭 균등 분할 + 활성 탭 배경, Marta식)
 tab_close_button = false          # true면 마우스를 올린 탭 오른쪽에 ✕(닫기)가 보이고 모든 탭의 좌우 패딩이 넓어진다(탭이 하나뿐이면 ✕ 숨김, 이슈 #36)

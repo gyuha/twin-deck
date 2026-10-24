@@ -107,6 +107,8 @@ pub struct BehaviorLayout {
     pub recent_limit: u32,
     /// 패널 위의 드라이브 바(볼륨 버튼, 언마운트). 남은 용량은 이 바와 별개로 경로 표시줄 오른쪽 끝에 항상 보인다.
     pub show_drive_bar: bool,
+    /// 창 아래의 명령어 줄(Double Commander식). 현재 폴더에서 셸 한 줄을 실행한다.
+    pub show_command_line: bool,
     /// 활성 패널을 감싸는 accent 테두리를 보인다. 끄면 두 패널 모두 테두리가 투명이다(폭은 그대로).
     pub pane_highlight: bool,
     /// 탭 모양: "underline"(글자 + 활성 탭 밑줄) | "segments"(폭을 균등 분할, 활성 탭은 배경).

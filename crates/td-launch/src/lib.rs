@@ -316,3 +316,181 @@ impl<L: Launcher> Launch<L> {
         self.launcher.run(&app_command(self.os, app, paths)?)
     }
 }
+
+/// 셸 한 줄(`git clone …`)을 실행한 결과. 출력은 표준 출력 뒤에 표준 오류를 붙인 글이다.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShellOutput {
+    /// 종료 코드. 시간 초과로 죽였거나 신호로 끝났으면 없다.
+    pub exit_code: Option<i32>,
+    pub output: String,
+    pub timed_out: bool,
+}
+
+/// 돌려주는 출력의 최대 바이트. 넘으면 앞을 버리고 끝부분만 남긴다(진행 줄이 많은 명령은 끝이 중요하다).
+const SHELL_OUTPUT_MAX: usize = 20_000;
+
+/// 셸 한 줄을 실행하는 명령. Windows는 `cmd /C`, 그 밖은 로그인 셸(`$SHELL -lc`)이다.
+/// 앱을 Dock·탐색기에서 띄우면 PATH가 짧아 `git` 같은 명령을 못 찾으므로 로그인 셸의 PATH를 쓴다.
+pub fn shell_command(os: Os, shell: Option<&str>, line: &str) -> Command {
+    match os {
+        Os::Windows => Command::new("cmd", ["/C".to_string(), line.to_string()]),
+        _ => Command::new(
+            shell.filter(|s| !s.is_empty()).unwrap_or("/bin/sh"),
+            ["-lc".to_string(), line.to_string()],
+        ),
+    }
+}
+
+/// `cwd`에서 셸 한 줄을 실행하고 끝나기를 기다린다. 입력은 막아(`stdin` 없음) 입력을 기다리는 명령이 멈춰 있지 않게 하고,
+/// `timeout`이 지나면 죽인다.
+pub fn run_shell(
+    os: Os,
+    cwd: &str,
+    line: &str,
+    timeout: std::time::Duration,
+) -> Result<ShellOutput, String> {
+    use std::io::Read;
+    use std::process::Stdio;
+    let cmd = shell_command(os, std::env::var("SHELL").ok().as_deref(), line);
+    let mut process = Process::new(&cmd.program);
+    process
+        .args(&cmd.args)
+        .current_dir(cwd)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        process.creation_flags(0x0800_0000); // CREATE_NO_WINDOW: 콘솔 창이 번쩍이지 않게
+    }
+    let mut child = process
+        .spawn()
+        .map_err(|e| format!("{program} 실행 실패: {e}", program = cmd.program))?;
+    // 파이프가 가득 차 자식이 멈추지 않게 두 출력을 따로 읽는다.
+    let read = |mut pipe: Box<dyn Read + Send>| {
+        std::thread::spawn(move || {
+            let mut buf = Vec::new();
+            let _ = pipe.read_to_end(&mut buf);
+            buf
+        })
+    };
+    let out = read(Box::new(child.stdout.take().expect("piped stdout")));
+    let err = read(Box::new(child.stderr.take().expect("piped stderr")));
+    let start = std::time::Instant::now();
+    let (status, timed_out) = loop {
+        match child.try_wait().map_err(|e| e.to_string())? {
+            Some(status) => break (Some(status), false),
+            None if start.elapsed() >= timeout => {
+                let _ = child.kill();
+                let _ = child.wait();
+                break (None, true);
+            }
+            None => std::thread::sleep(std::time::Duration::from_millis(20)),
+        }
+    };
+    let mut bytes = out.join().unwrap_or_default();
+    bytes.extend(err.join().unwrap_or_default());
+    if bytes.len() > SHELL_OUTPUT_MAX {
+        bytes.drain(..bytes.len() - SHELL_OUTPUT_MAX);
+    }
+    Ok(ShellOutput {
+        exit_code: status.and_then(|s| s.code()),
+        output: String::from_utf8_lossy(&bytes).trim().to_string(),
+        timed_out,
+    })
+}
+
+#[cfg(test)]
+mod shell_tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[test]
+    fn 셸_명령은_운영체제별_셸로_조립된다() {
+        assert_eq!(
+            shell_command(Os::Windows, Some("/bin/zsh"), "dir"),
+            Command::new("cmd", ["/C".to_string(), "dir".to_string()])
+        );
+        assert_eq!(
+            shell_command(Os::Mac, Some("/bin/zsh"), "ls -l"),
+            Command::new("/bin/zsh", ["-lc".to_string(), "ls -l".to_string()])
+        );
+        // SHELL이 없거나 비어 있으면 /bin/sh
+        assert_eq!(shell_command(Os::Linux, None, "ls").program, "/bin/sh");
+        assert_eq!(shell_command(Os::Linux, Some(""), "ls").program, "/bin/sh");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn 지정한_폴더에서_실행하고_출력과_종료_코드를_돌려준다() {
+        let dir = std::env::temp_dir().canonicalize().unwrap();
+        let r = run_shell(
+            Os::current(),
+            dir.to_str().unwrap(),
+            "pwd; echo err >&2; exit 3",
+            Duration::from_secs(10),
+        )
+        .unwrap();
+        assert_eq!(r.exit_code, Some(3));
+        assert!(!r.timed_out);
+        assert!(r.output.starts_with(dir.to_str().unwrap()), "{}", r.output);
+        assert!(r.output.ends_with("err"), "{}", r.output);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn 시간이_지나면_죽이고_시간_초과로_알린다() {
+        let dir = std::env::temp_dir();
+        let r = run_shell(
+            Os::current(),
+            dir.to_str().unwrap(),
+            "sleep 30",
+            Duration::from_millis(200),
+        )
+        .unwrap();
+        assert!(r.timed_out);
+        assert_eq!(r.exit_code, None);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn 입력을_기다리는_명령은_멈추지_않고_끝난다() {
+        let dir = std::env::temp_dir();
+        let r = run_shell(
+            Os::current(),
+            dir.to_str().unwrap(),
+            "cat",
+            Duration::from_secs(10),
+        )
+        .unwrap();
+        assert_eq!(r.exit_code, Some(0));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn 없는_폴더면_오류다() {
+        assert!(run_shell(
+            Os::current(),
+            "/no/such/dir/xyz",
+            "ls",
+            Duration::from_secs(5)
+        )
+        .is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn 출력이_길면_끝부분만_남긴다() {
+        let dir = std::env::temp_dir();
+        let r = run_shell(
+            Os::current(),
+            dir.to_str().unwrap(),
+            "seq 1 20000",
+            Duration::from_secs(10),
+        )
+        .unwrap();
+        assert!(r.output.len() <= SHELL_OUTPUT_MAX);
+        assert!(r.output.ends_with("20000"));
+    }
+}
