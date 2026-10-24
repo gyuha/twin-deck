@@ -139,7 +139,9 @@ const ENUMS: [(&str, &str, &[&str]); 10] = [
 /// `behavior.theme`·`behavior.terminal_theme`은 고정 목록 말고 생성된 테마 이름 목록도 받는다.
 fn is_allowed(section: &str, key: &str, v: &str, allowed: &[&str]) -> bool {
     allowed.contains(&v)
-        || (section == "behavior" && matches!(key, "theme" | "terminal_theme") && THEME_IDS.contains(&v))
+        || (section == "behavior"
+            && matches!(key, "theme" | "terminal_theme")
+            && THEME_IDS.contains(&v))
 }
 
 /// 허용값이 정해진 키가 벗어나면 기본값으로 되돌리고 경고한다.
