@@ -1,6 +1,6 @@
 import { screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { renderApp, seedBackend } from "./helpers";
+import { renderApp, seedBackend, selectedNames } from "./helpers";
 
 describe("명령어 줄 (core.run_command, 이슈 #110)", () => {
   const line = () => screen.findByRole("textbox", { name: "명령어 줄" });
@@ -88,13 +88,39 @@ describe("명령어 줄 (core.run_command, 이슈 #110)", () => {
     expect((await backend.getConfig()).config.behavior.layout.show_command_line).toBe(false);
   });
 
-  it("Ctrl+Shift+K도 줄을 끄고 켠다 (이슈 #119)", async () => {
+  it("Ctrl+Shift+L은 줄을 끄고 다시 켠다", async () => {
     const { user, backend } = await open();
-    await user.keyboard("{Control>}{Shift>}k{/Shift}{/Control}");
+    await user.keyboard("{Control>}{Shift>}l{/Shift}{/Control}");
     await waitFor(() => expect(screen.queryByRole("textbox", { name: "명령어 줄" })).not.toBeInTheDocument());
     expect((await backend.getConfig()).config.behavior.layout.show_command_line).toBe(false);
-    await user.keyboard("{Control>}{Shift>}k{/Shift}{/Control}");
+    await user.keyboard("{Control>}{Shift>}l{/Shift}{/Control}");
     expect(await line()).toBeInTheDocument();
     expect((await backend.getConfig()).config.behavior.layout.show_command_line).toBe(true);
+  });
+});
+
+describe("명령어 줄 입력칸에 포커스가 있을 때의 키 (이슈 #119)", () => {
+  const focused = async () => {
+    const r = await renderApp();
+    const input = await screen.findByRole("textbox", { name: "명령어 줄" });
+    await r.user.click(input);
+    expect(input).toHaveFocus();
+    return { ...r, input };
+  };
+  const gone = () => waitFor(() => expect(screen.queryByRole("textbox", { name: "명령어 줄" })).not.toBeInTheDocument());
+
+  it("입력칸에 포커스가 있어도 Ctrl+Shift+L이 줄을 끈다", async () => {
+    const { user } = await focused();
+    await user.keyboard("{Control>}{Shift>}l{/Shift}{/Control}");
+    await gone();
+  });
+
+  it("입력칸에서 전체 선택 키는 파일 선택을 바꾸지 않는다(입력 보호)", async () => {
+    const { user, input } = await focused();
+    await user.type(input, "abc");
+    await user.keyboard("{Control>}a{/Control}");
+    expect(selectedNames("left")).toEqual([]);
+    expect(input).toHaveValue("abc");
+    expect(input).toHaveFocus();
   });
 });
