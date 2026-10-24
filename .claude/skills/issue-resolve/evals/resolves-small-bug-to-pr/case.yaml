@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: resolves-small-bug-to-pr
+expected_outcome: |
+  별도 워크트리의 이슈 브랜치에서 테스트와 함께 고치고, 한글 커밋(이슈 번호 포함), Closes 포함 PR, 시작·완료 댓글이 남는다. 머지나 이슈 닫기는 하지 않는다.
