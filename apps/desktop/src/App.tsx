@@ -281,6 +281,8 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
       // 시작할 때 새 버전을 조용히 확인한다(테스트의 가짜 백엔드는 확인 횟수를 세므로 실제 앱에서만).
       if (isTauri()) void app.api.autoCheckUpdate();
     });
+    // 켜 둔 채 지나도 하루에 한 번 새 버전을 확인한다(이슈 #122). 실제 앱에서만.
+    const stopUpdateCheck = isTauri() ? app.api.startUpdateCheckSchedule() : () => {};
     // 창이 닫히기 직전에는 미뤄 둔 저장을 바로 실행한다.
     const flush = () => void app.api.saveNow();
     window.addEventListener("pagehide", flush);
@@ -288,6 +290,7 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
     const refresh = () => void app.api.refreshVolumes();
     window.addEventListener("focus", refresh);
     return () => {
+      stopUpdateCheck();
       window.removeEventListener("pagehide", flush);
       window.removeEventListener("focus", refresh);
       app.api.dispose();

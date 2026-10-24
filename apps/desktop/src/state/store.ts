@@ -441,6 +441,8 @@ export interface AppState {
 
 export const PAGE_SIZE = 10;
 const VIRTUAL_NO_CREATE = () => tr("store.virtual.no_create");
+/** 켜 둔 동안 업데이트를 자동으로 확인하는 간격: 하루(이슈 #122). */
+export const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 /** 삭제·휴지통·압축은 이 시간을 넘겨 계속 실행 중일 때만 진행 창을 띄운다(자주 쓰는 작업이라 깜빡이지 않게). */
 const TRANSFER_PROGRESS_DELAY_MS = 300;
 /** 확인 창을 거친 복사·이동은 기다리지 않는다: 첫 조회에서 아직 진행 중이면 바로 진행 창을 띄운다. */
@@ -3713,10 +3715,19 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         set({ update: quiet ? { kind: "idle" } : { kind: "error", message: String(e instanceof Error ? e.message : e) } });
       }
     },
-    /** 앱을 시작할 때 설정(`environment.auto_update_check`)이 켜져 있으면 새 버전을 조용히 확인한다(이슈 #115). 새 버전이 있으면 상태 줄에 배지가 뜬다. */
+    /**
+     * 설정(`environment.auto_update_check`)이 켜져 있으면 새 버전을 조용히 확인한다(이슈 #115). 새 버전이 있으면 상태 줄에 배지가 뜬다.
+     * 이미 새 버전을 찾았거나 확인·설치 중이면 하지 않는다. 앱을 켜 둔 채 며칠 지나도 확인하도록 최신·오류 상태에서는 다시 확인한다(이슈 #122).
+     */
     async autoCheckUpdate() {
-      if (!get().loaded.config.environment.auto_update_check || get().update.kind !== "idle") return;
+      const kind = get().update.kind;
+      if (!get().loaded.config.environment.auto_update_check || kind === "checking" || kind === "available" || kind === "installing") return;
       await api.checkForUpdate(true);
+    },
+    /** 켜 둔 동안 하루에 한 번(`intervalMs`) 자동 확인한다(이슈 #122). 돌려주는 함수로 멈춘다. 설정은 확인할 때마다 다시 읽으므로 켜고 꺼도 바로 따른다. */
+    startUpdateCheckSchedule(intervalMs = UPDATE_CHECK_INTERVAL_MS) {
+      const timer = setInterval(() => void api.autoCheckUpdate(), intervalMs);
+      return () => clearInterval(timer);
     },
     /** 확인한 새 버전을 내려받아 설치하고 앱을 다시 시작한다. 설치 확인은 업데이트 탭이 먼저 받는다. */
     async installUpdate() {
