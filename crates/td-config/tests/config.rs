@@ -672,6 +672,14 @@ fn terminal_theme_defaults_to_following_app_theme_and_validates() {
 }
 
 #[test]
+fn folder_tree_defaults_off_and_can_be_turned_on() {
+    assert!(!load("").config.behavior.layout.show_folder_tree);
+    let l = load("[behavior.layout]\nshow_folder_tree = true\n");
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert!(l.config.behavior.layout.show_folder_tree);
+}
+
+#[test]
 fn command_line_defaults_on_and_can_be_turned_off() {
     assert!(load("").config.behavior.layout.show_command_line);
     let l = load("[behavior.layout]\nshow_command_line = false\n");

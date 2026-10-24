@@ -304,7 +304,7 @@ export function FileTable({ pane }: { pane: PaneId }) {
         data-path={e.path}
         data-pane={pane}
         data-row-kind={e.kind}
-        data-drop-target={drag?.target?.row && drag.target.pane === pane && drag.target.dir === e.path ? "true" : undefined}
+        data-drop-target={drag?.target?.row && !drag.target.tree && drag.target.pane === pane && drag.target.dir === e.path ? "true" : undefined}
         onMouseDown={(ev) => {
           // 왼쪽 단추만, 수정자 없이 눌렀을 때 드래그의 시작점이 된다(Ctrl/Shift/Cmd+클릭은 선택용이다).
           if (ev.button === 0 && !ev.ctrlKey && !ev.shiftKey && !ev.metaKey) api.dragPress(pane, i, ev.clientX, ev.clientY);

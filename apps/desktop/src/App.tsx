@@ -15,6 +15,7 @@ import { StoreContext, useApp, useAppStore, useT } from "./state/context";
 import { actionContext, activeTab, createAppStore, scopeStack } from "./state/store";
 import { ActionBar, useBarIds } from "./ui/ActionBar";
 import { CommandLine } from "./ui/CommandLine";
+import { FolderTree } from "./ui/FolderTree";
 import { UPDATE_SECTION } from "./ui/Settings";
 import { textColorFor, useTabColors, useTextColor, useUiFont } from "./ui/fonts";
 import { ActionsPalette } from "./ui/ActionsPalette";
@@ -104,6 +105,7 @@ function StatusBar() {
   const keymapWarnings = useApp((s) => s.keymapWarnings.length);
   const showActionBar = useApp((s) => s.loaded.config.behavior.layout.show_action_bar);
   const update = useApp((s) => s.update);
+  const showFolderTree = useApp((s) => s.loaded.config.behavior.layout.show_folder_tree);
   const showCommandLine = useApp((s) => s.loaded.config.behavior.layout.show_command_line);
   const showDriveBar = useApp((s) => s.loaded.config.behavior.layout.show_drive_bar);
   const showHidden = useApp((s) => s.showHidden);
@@ -162,6 +164,7 @@ function StatusBar() {
         {viewToggle(t("status.hidden_aria"), t("status.hidden"), showHidden, () => api.toggleHidden(), "core.view.hidden")}
         {viewToggle(t("status.group_aria"), t("status.group"), groupByModified, () => api.toggleGroupByModified(), "")}
         {viewToggle(t("menu.view.drive_bar"), t("status.drive_bar"), showDriveBar, () => api.toggleLayoutFlag("show_drive_bar"), "core.view.drive_bar")}
+        {viewToggle(t("menu.view.folder_tree"), t("status.folder_tree"), showFolderTree, () => api.toggleLayoutFlag("show_folder_tree"), "core.view.folder_tree")}
         {viewToggle(t("menu.view.command_line"), t("status.command_line"), showCommandLine, () => api.toggleLayoutFlag("show_command_line"), "core.view.command_line")}
         {viewToggle(t("menu.view.action_bar"), t("status.action_bar"), showActionBar, () => api.toggleLayoutFlag("show_action_bar"), "core.view.action_bar")}
       </span>
@@ -254,6 +257,7 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
   const driveBar = loaded.config.behavior.layout.show_drive_bar;
   const actionBar = loaded.config.behavior.layout.show_action_bar;
   const commandLine = loaded.config.behavior.layout.show_command_line;
+  const folderTree = loaded.config.behavior.layout.show_folder_tree;
   const language = loaded.config.behavior.language; // 바뀌면 메뉴 글자를 다시 만든다
   useEffect(() => {
     if (platform !== "mac" || !isTauri()) return;
@@ -263,7 +267,7 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
       const s = app.store.getState();
       if (scopeStack(s)[0] !== "pane") return;
       void registry.dispatch(id, actionContext(s));
-    }, { driveBar, actionBar, commandLine }, (id) => {
+    }, { driveBar, actionBar, commandLine, folderTree }, (id) => {
       const key = keymap.keysFor(id)[0];
       return key ? formatKey(key, platform) : undefined;
     })
@@ -273,7 +277,7 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
       gone = true;
       off?.();
     };
-  }, [app, registry, keymap, platform, driveBar, actionBar, commandLine, language]);
+  }, [app, registry, keymap, platform, driveBar, actionBar, commandLine, folderTree, language]);
 
   useEffect(() => {
     void app.api.init().then(() => {
@@ -302,7 +306,10 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
       <UiContext.Provider value={{ registry, keymap, platform, theme }}>
       <BarWarnings base={warnings} />
       <main className="flex h-screen flex-col">
-        <PaneSplit onThemePreview={setThemePreview} />
+        <div className="flex min-h-0 flex-1">
+          <FolderTree />
+          <PaneSplit onThemePreview={setThemePreview} />
+        </div>
         <StatusBar />
         <CommandLine />
         <ActionBar />

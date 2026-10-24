@@ -111,6 +111,8 @@ pub struct BehaviorLayout {
     pub show_drive_bar: bool,
     /// 창 아래의 명령어 줄(Double Commander식). 현재 폴더에서 셸 한 줄을 실행한다.
     pub show_command_line: bool,
+    /// 왼쪽의 폴더 트리(VS Code식). 좌우 패널의 현재 폴더를 보이고, 노드를 누르면 활성 패널이 그 폴더로 가며, 폴더에 끌어 놓아 복사·이동한다(이슈 #125).
+    pub show_folder_tree: bool,
     /// 활성 패널을 감싸는 accent 테두리를 보인다. 끄면 두 패널 모두 테두리가 투명이다(폭은 그대로).
     pub pane_highlight: bool,
     /// 탭 모양: "underline"(글자 + 활성 탭 밑줄) | "segments"(폭을 균등 분할, 활성 탭은 배경).

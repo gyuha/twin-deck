@@ -170,6 +170,8 @@ export interface DropTarget {
   pane: PaneId;
   dir: string;
   row: boolean;
+  /** 폴더 트리의 노드에 놓는다(이슈 #125). 이때 `pane`은 놓은 순간의 활성 패널일 뿐 대상이 아니다. */
+  tree?: boolean;
 }
 
 export interface DragState {
@@ -1460,6 +1462,12 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
 
   /** 커서 아래 요소에서 드롭 대상을 정한다: 폴더 행이면 그 폴더 안으로, 아니면 그 패널의 현재 폴더(같은 패널·가상 탭은 받지 않는다). */
   function dropTargetAt(el: Element | null, drag: { paths: string[]; sourcePane: PaneId | null }): DropTarget | null {
+    // 폴더 트리의 노드: 그 폴더 안으로(이슈 #125). 끄는 항목 자신은 받지 않는다.
+    const node = el?.closest<HTMLElement>("[data-tree-path]");
+    if (node) {
+      const dir = node.dataset.treePath;
+      return dir && !drag.paths.includes(dir) ? { pane: get().activePane, dir, row: true, tree: true } : null;
+    }
     const row = el?.closest<HTMLElement>("[data-row-kind='dir']");
     if (row) {
       const path = row.dataset.path;
@@ -3779,7 +3787,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     async toggleGroupByModified() {
       await api.setConfigValue("behavior.table.group_by_modified", { kind: "bool", value: !get().loaded.config.behavior.table.group_by_modified });
     },
-    async toggleLayoutFlag(flag: "show_action_bar" | "show_drive_bar" | "show_command_line") {
+    async toggleLayoutFlag(flag: "show_action_bar" | "show_drive_bar" | "show_command_line" | "show_folder_tree") {
       await api.setConfigValue(`behavior.layout.${flag}`, { kind: "bool", value: !get().loaded.config.behavior.layout[flag] });
     },
     /** 설정 하나를 사용자 config.toml에 즉시 쓰고, 돌려받은 새 설정을 바로 적용한다(변경 이벤트를 기다리지 않는다). */
