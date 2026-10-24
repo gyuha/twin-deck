@@ -166,6 +166,18 @@ describe("설정 값 바꾸기", () => {
     await waitFor(() => expect(document.documentElement.dataset.colorTheme).toBe("dracula-default"));
   });
 
+  it("터미널 테마는 기본이 '앱 테마를 따름'이고, 다른 테마를 고르면 설정에 저장된다(이슈 #118)", async () => {
+    const { user, backend } = await renderApp();
+    await open(user);
+    await dialog();
+    const group = screen.getByRole("group", { name: "터미널 테마" });
+    expect(within(group).getByRole("combobox")).toHaveTextContent("앱 테마를 따름");
+    await user.click(within(group).getByRole("combobox"));
+    await user.click(await screen.findByRole("option", { name: /Dracula Default/ }));
+    await waitFor(async () => expect((await backend.getConfig()).config.behavior.terminal_theme).toBe("dracula-default"));
+    expect((await backend.getConfig()).config.behavior.theme).toBe("system"); // 앱 테마는 그대로
+  });
+
   it("테마 목록은 system·light·dark와 Warp 테마 112개(총 115개)이고 옛 이름은 없다", async () => {
     const { user } = await renderApp();
     await open(user);

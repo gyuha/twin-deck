@@ -659,6 +659,19 @@ fn fkeys_defaults_merge_and_unknown_key_warning() {
 }
 
 #[test]
+fn terminal_theme_defaults_to_following_app_theme_and_validates() {
+    assert_eq!(load("").config.behavior.terminal_theme, "");
+    for ok in ["light", "dark", "dracula-default"] {
+        let l = load(&format!("[behavior]\nterminal_theme = \"{ok}\"\n"));
+        assert!(l.warnings.is_empty(), "{ok}: {:?}", l.warnings);
+        assert_eq!(l.config.behavior.terminal_theme, ok);
+    }
+    let l = load("[behavior]\nterminal_theme = \"nope\"\n");
+    assert_eq!(l.config.behavior.terminal_theme, "");
+    assert!(!l.warnings.is_empty());
+}
+
+#[test]
 fn command_line_defaults_on_and_can_be_turned_off() {
     assert!(load("").config.behavior.layout.show_command_line);
     let l = load("[behavior.layout]\nshow_command_line = false\n");

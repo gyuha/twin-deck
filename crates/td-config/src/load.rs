@@ -91,7 +91,7 @@ fn syntax_warning(file: &str, src: &str, e: &toml::de::Error) -> Warning {
     }
 }
 
-const ENUMS: [(&str, &str, &[&str]); 9] = [
+const ENUMS: [(&str, &str, &[&str]); 10] = [
     // 내장 터미널의 셸. Windows에서만 의미가 있고(다른 OS는 `$SHELL`), apps/desktop의 Settings.tsx에 같은 목록이 있다.
     (
         "environment",
@@ -106,6 +106,8 @@ const ENUMS: [(&str, &str, &[&str]); 9] = [
         // 이 셋 말고 apps/desktop/themes의 테마 이름(`themes::THEME_IDS`)도 허용한다(`is_allowed`).
         &["system", "light", "dark"],
     ),
+    // 터미널 테마: 빈 값은 앱 테마를 따른다. 테마 이름(`themes::THEME_IDS`)도 허용한다(`is_allowed`).
+    ("behavior", "terminal_theme", &["", "light", "dark"]),
     ("behavior.selection", "shift_mode", &["invert", "extend"]),
     (
         "behavior.table",
@@ -134,9 +136,10 @@ const ENUMS: [(&str, &str, &[&str]); 9] = [
     ),
 ];
 
-/// `behavior.theme`은 고정 목록 말고 생성된 테마 이름 목록도 받는다.
+/// `behavior.theme`·`behavior.terminal_theme`은 고정 목록 말고 생성된 테마 이름 목록도 받는다.
 fn is_allowed(section: &str, key: &str, v: &str, allowed: &[&str]) -> bool {
-    allowed.contains(&v) || ((section, key) == ("behavior", "theme") && THEME_IDS.contains(&v))
+    allowed.contains(&v)
+        || (section == "behavior" && matches!(key, "theme" | "terminal_theme") && THEME_IDS.contains(&v))
 }
 
 /// 허용값이 정해진 키가 벗어나면 기본값으로 되돌리고 경고한다.

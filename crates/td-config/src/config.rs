@@ -48,6 +48,8 @@ pub struct Behavior {
     pub preview_font: String,
     /// 내장 터미널의 글꼴. CSS `font-family` 값이고 비우면 기본 고정폭 글꼴이다(미리보기 글꼴과 따로 쓴다).
     pub terminal_font: String,
+    /// 내장 터미널의 테마. 비우면 앱 테마(`theme`)를 따르고, `light`/`dark`나 테마 이름이면 터미널만 그 테마의 색을 쓴다(이슈 #118).
+    pub terminal_theme: String,
     /// 이전 버전의 앱 기본 글자색(`#rrggbb` 또는 `#rgb`, 모든 테마 공통). 테마별 키(`text_color_dark`/`text_color_light`)가 비어 있을 때만 쓴다(이슈 #58).
     pub text_color: String,
     /// 다크 테마의 앱 기본 글자색(`#rrggbb` 또는 `#rgb`). 비우면 `text_color`, 그것도 비면 테마 그대로다. 흐린 글자색은 이 색을 배경 쪽으로 섞어 만든다.

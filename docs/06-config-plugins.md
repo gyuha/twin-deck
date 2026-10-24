@@ -89,6 +89,7 @@ Marta에서 확인된 옵션 이름을 그대로 옮길 수 있는 곳은 옮기
 theme = "system"                  # system·light·dark 또는 테마 이름(예: dracula-default)
 language = "ko"                   # 화면 언어: ko(한국어), en(English)
 terminal_font = ""                # 내장 터미널의 CSS font-family. 비우거나 글꼴이 없으면 기본 고정폭 글꼴
+terminal_theme = ""               # 내장 터미널의 테마. 비우면 앱 테마(theme)를 따르고, "light"·"dark"·테마 이름이면 터미널만 그 색을 쓴다(이슈 #118)
 
 [behavior.table]
 icon_size = 16

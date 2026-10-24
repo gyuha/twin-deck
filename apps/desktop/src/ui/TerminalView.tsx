@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { acquireTerminal } from "../lib/terminalSessions";
 import type { TerminalHandle, TerminalState } from "../lib/terminalSessions";
 import { Button } from "@spacedrive/primitives";
-import { terminalTheme } from "../lib/themeColors";
+import { resolveTheme, terminalTheme } from "../lib/themeColors";
 import { useApp, useAppStore, useT } from "../state/context";
 import { useUi } from "./uiContext";
 import type { PaneId } from "../state/store";
@@ -23,7 +23,10 @@ export function TerminalView({ pane, tabId, id, lost, shown, focused }: { pane: 
   const fontRef = useRef(font);
   fontRef.current = font;
   // 터미널 색은 앱 테마를 따른다(이슈 #118). 미리보기·랜덤 테마도 같은 테마 값이라 함께 바뀐다.
-  const { theme } = useUi();
+  // `behavior.terminal_theme`이 있으면 터미널만 그 테마를 쓴다(이슈 #118).
+  const { theme: appTheme } = useUi();
+  const terminalThemeId = useApp((s) => s.loaded.config.behavior.terminal_theme);
+  const theme = terminalThemeId ? resolveTheme(terminalThemeId, false) : appTheme;
   const colors = theme ? terminalTheme(theme) : undefined;
   const colorsRef = useRef(colors);
   colorsRef.current = colors;
@@ -46,7 +49,7 @@ export function TerminalView({ pane, tabId, id, lost, shown, focused }: { pane: 
   // 테마를 바꾸면 열려 있는 터미널에도 바로 반영한다.
   useEffect(() => {
     if (theme) handle.current?.setTheme(terminalTheme(theme));
-  }, [theme]);
+  }, [theme?.id]);
 
   // 설정에서 글꼴을 바꾸면 열려 있는 터미널에도 바로 반영한다.
   useEffect(() => {
