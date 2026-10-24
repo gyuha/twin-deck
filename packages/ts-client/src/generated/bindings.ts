@@ -940,6 +940,10 @@ recent_limit: number;
  */
 show_drive_bar: boolean; 
 /**
+ * 창 아래의 명령어 줄(Double Commander식). 현재 폴더에서 셸 한 줄을 실행한다.
+ */
+show_command_line: boolean; 
+/**
  * 활성 패널을 감싸는 accent 테두리를 보인다. 끄면 두 패널 모두 테두리가 투명이다(폭은 그대로).
  */
 pane_highlight: boolean; 

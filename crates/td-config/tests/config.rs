@@ -659,6 +659,14 @@ fn fkeys_defaults_merge_and_unknown_key_warning() {
 }
 
 #[test]
+fn command_line_defaults_on_and_can_be_turned_off() {
+    assert!(load("").config.behavior.layout.show_command_line);
+    let l = load("[behavior.layout]\nshow_command_line = false\n");
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert!(!l.config.behavior.layout.show_command_line);
+}
+
+#[test]
 fn drive_bar_can_be_turned_off() {
     let l = load("[behavior.layout]\nshow_drive_bar = false\n");
     assert!(l.warnings.is_empty(), "{:?}", l.warnings);
