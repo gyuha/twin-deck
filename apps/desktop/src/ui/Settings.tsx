@@ -162,7 +162,9 @@ const smbSection: { title: string; desc?: string; items: Item[] } = {
 /** 업데이트 탭. 항목 대신 `UpdatePanel`(현재 버전·확인·설치·오픈소스 라이선스)을 그린다. */
 const updateSection: { title: string; desc?: string; items: Item[] } = {
   get title() { return translate("settings.section.update.title"); },
-  items: [],
+  items: [
+    { key: "environment.auto_update_check", get title() { return translate("settings.item.environment.auto_update_check.title"); }, get desc() { return translate("settings.item.environment.auto_update_check.desc"); }, control: { type: "switch" } },
+  ],
 };
 
 const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [

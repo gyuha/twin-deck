@@ -59,6 +59,7 @@
       "text_editor": "",
       "terminal": "default",
       "single_instance": true,
+      "auto_update_check": true,
       "global_hotkey_enabled": true,
       "global_hotkey": "Mod+Alt+O",
       "background_on_close": false

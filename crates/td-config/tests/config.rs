@@ -1409,6 +1409,21 @@ fn background_on_close_defaults_off_and_can_be_turned_on() {
 }
 
 #[test]
+fn auto_update_check_defaults_on_and_can_be_turned_off() {
+    let d = user_value_dir(None);
+    assert!(
+        load_dir(d.path(), Platform::Linux)
+            .config
+            .environment
+            .auto_update_check
+    );
+    let d = user_value_dir(Some("[environment]\nauto_update_check = false\n"));
+    let l = load_dir(d.path(), Platform::Linux);
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert!(!l.config.environment.auto_update_check);
+}
+
+#[test]
 fn single_instance_defaults_on_and_can_be_turned_off() {
     let d = user_value_dir(None);
     assert!(

@@ -1140,6 +1140,10 @@ export type Environment = { text_editor: string; terminal: string;
  */
 single_instance: boolean; 
 /**
+ * 앱을 시작할 때 새 버전이 있는지 자동으로 확인한다. 끄면 설정 > 업데이트의 "지금 확인"으로만 확인한다.
+ */
+auto_update_check: boolean; 
+/**
  * 전역 화면 열기 단축키를 쓸지. 끄면 `global_hotkey` 값이 있어도 등록하지 않는다.
  */
 global_hotkey_enabled: boolean; 
