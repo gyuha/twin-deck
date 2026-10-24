@@ -2,6 +2,8 @@
 
 # Twin Deck
 
+[제품 소개 페이지](https://gyuha.com/twin-deck/) · [소개 페이지 개발·배포 안내](site/README.md)
+
 두 개의 패널을 나란히 놓고 파일을 옮기고 정리하는 파일 관리자입니다. 마우스 없이 키보드만으로도 거의 모든 일을 할 수 있습니다.
 
 ![Twin Deck 메인 화면](docs/screenshots/main.png)

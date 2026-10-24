@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      name="description"
+      content="두 개의 패널, 하나의 흐름. Twin Deck은 키보드로 파일을 옮기고, 미리 보고, 정리하는 macOS와 Windows 파일 관리자입니다."
+    />
+    <meta property="og:title" content="Twin Deck | 파일 정리의 새로운 리듬" />
+    <meta
+      property="og:description"
+      content="두 개의 패널, 하나의 흐름. 키보드 중심의 macOS · Windows 파일 관리자."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://gyuha.com/twin-deck/" />
+    <meta
+      property="og:image"
+      content="https://gyuha.com/twin-deck/assets/main.png"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="canonical" href="https://gyuha.com/twin-deck/" />
+    <link rel="icon" type="image/png" href="assets/icon.png" />
+    <link rel="preload" as="image" href="assets/main.png" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="main.js" defer></script>
+    <noscript
+      ><style>
+        .gallery-tabs,
+        .key-controls,
+        .theme-choices,
+        .key-experience > .caption {
+          display: none;
+        }
+        .gallery-panel[hidden] {
+          display: block !important;
+        }
+        .gallery-panel + .gallery-panel {
+          margin-top: 40px;
+        }
+        .panel-focus {
+          display: none;
+        }
+      </style></noscript
+    >
+    <title>Twin Deck | 파일 정리의 새로운 리듬</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">본문으로 건너뛰기</a>
+    <header class="header">
+      <nav class="nav wrap" aria-label="주 메뉴">
+        <a class="brand" href="#" aria-label="Twin Deck 처음으로"
+          ><img src="assets/icon.png" width="32" height="32" alt="" /><span
+            >Twin Deck</span
+          ></a
+        >
+        <div class="nav-links">
+          <a href="#workflow">작업의 흐름</a><a href="#features">기능</a
+          ><a href="#personal">나만의 공간</a>
+        </div>
+        <div class="nav-actions">
+          <button
+            class="theme-toggle"
+            type="button"
+            aria-label="어두운 화면으로 전환"
+            hidden
+          >
+            <span aria-hidden="true">◐</span></button
+          ><a class="button small" href="#download"
+            >다운로드 <span aria-hidden="true">↗</span></a
+          >
+        </div>
+      </nav>
+    </header>
+    <main id="main">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy wrap">
+          <p class="eyebrow">macOS와 Windows를 위한 파일 관리자</p>
+          <h1 id="hero-title">두 개의 패널.<br /><span>하나의 흐름.</span></h1>
+          <p class="hero-description">
+            찾고, 옮기고, 미리 보고.<br />파일을 다루는 모든 순간이 자연스럽게
+            이어집니다.
+          </p>
+          <a class="text-link" href="#workflow"
+            >Twin Deck 만나보기 <span aria-hidden="true">↘</span></a
+          >
+        </div>
+        <div class="hero-stage wrap">
+          <div class="orbit orbit-one" aria-hidden="true"></div>
+          <div class="orbit orbit-two" aria-hidden="true"></div>
+          <figure class="hero-product">
+            <img
+              src="assets/main.png"
+              alt="왼쪽 프로젝트 폴더와 오른쪽 다운로드 폴더를 나란히 보여 주는 Twin Deck 실제 화면"
+              width="1800"
+              height="705"
+              fetchpriority="high"
+            />
+          </figure>
+          <div class="hero-caption">
+            <span>왼쪽에서 고르고.</span><span>오른쪽으로 보내고.</span>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="workflow"
+        class="workflow section wrap"
+        aria-labelledby="workflow-title"
+      >
+        <div class="section-heading reveal">
+          <p class="eyebrow">손끝에서 이어지는 작업</p>
+          <h2 id="workflow-title">창을 오가는 대신.<br />흐름을 이어가세요.</h2>
+          <p>
+            출발지와 목적지를 한눈에. 키보드에서 손을 떼지 않고<br
+              class="desktop-break"
+            />
+            파일을 고르고, 복사하고, 다음 작업으로 넘어갑니다.
+          </p>
+        </div>
+        <div class="key-experience reveal">
+          <div
+            class="key-controls"
+            role="group"
+            aria-label="단축키 기능 살펴보기"
+          >
+            <button
+              class="key-choice is-active"
+              type="button"
+              data-action="switch"
+              aria-pressed="true"
+            >
+              <kbd>Tab</kbd><span>패널 전환</span>
+            </button>
+            <button
+              class="key-choice"
+              type="button"
+              data-action="copy"
+              aria-pressed="false"
+            >
+              <kbd>F5</kbd><span>복사</span>
+            </button>
+            <button
+              class="key-choice"
+              type="button"
+              data-action="move"
+              aria-pressed="false"
+            >
+              <kbd>F6</kbd><span>이동</span>
+            </button>
+            <button
+              class="key-choice"
+              type="button"
+              data-action="preview"
+              aria-pressed="false"
+            >
+              <kbd>→</kbd><span>미리보기</span>
+            </button>
+          </div>
+          <div class="key-story" aria-live="polite" aria-atomic="true">
+            <h3 id="key-title">시선도, 작업도. 바로 옆으로.</h3>
+            <p id="key-description">
+              Tab으로 왼쪽과 오른쪽 패널을 오갑니다. 두 폴더가 함께 보여 다음
+              목적지를 놓치지 않습니다.
+            </p>
+          </div>
+          <div class="workflow-screen" data-mode="switch">
+            <img
+              id="workflow-image"
+              src="assets/main.png"
+              alt="두 폴더를 나란히 보여 주는 듀얼 패널"
+              width="1800"
+              height="705"
+              loading="lazy"
+            />
+            <div class="panel-focus" aria-hidden="true"></div>
+          </div>
+          <p class="caption">
+            키를 눌러 기능을 살펴보세요. 실제 앱 화면을 사용한 기능 안내입니다.
+          </p>
+        </div>
+      </section>
+
+      <section
+        id="features"
+        class="features section"
+        aria-labelledby="features-title"
+      >
+        <div class="wrap">
+          <div class="section-heading reveal">
+            <h2 id="features-title">
+              열기 전에 알고.<br /><span class="muted">찾는 순간, 보이고.</span>
+            </h2>
+            <p>
+              파일 이름 너머의 내용까지.<br />미리보기부터 검색, 용량 분석까지
+              한곳에서 해결하세요.
+            </p>
+          </div>
+          <div class="gallery reveal">
+            <div class="gallery-tabs" role="tablist" aria-label="주요 기능">
+              <button
+                type="button"
+                role="tab"
+                id="tab-preview"
+                aria-controls="panel-preview"
+                aria-selected="true"
+                tabindex="0"
+              >
+                미리보기
+              </button>
+              <button
+                type="button"
+                role="tab"
+                id="tab-search"
+                aria-controls="panel-search"
+                aria-selected="false"
+                tabindex="-1"
+              >
+                파일 검색
+              </button>
+              <button
+                type="button"
+                role="tab"
+                id="tab-space"
+                aria-controls="panel-space"
+                aria-selected="false"
+                tabindex="-1"
+              >
+                용량 분석
+              </button>
+            </div>
+            <div
+              class="gallery-panel"
+              id="panel-preview"
+              role="tabpanel"
+              aria-labelledby="tab-preview"
+              tabindex="0"
+            >
+              <div class="gallery-copy">
+                <h3>열지 않아도,<br />이미 충분히.</h3>
+                <p>
+                  코드, Markdown, 이미지, PDF, 동영상부터<br />3D 모델, HWP,
+                  epub까지. <kbd>→</kbd> 키로 살펴보세요.
+                </p>
+                <span class="detail"
+                  >Office 문서는 글자와 표 중심의 데이터 미리보기를
+                  제공합니다.</span
+                >
+              </div>
+              <img
+                src="assets/preview-code.png"
+                alt="구문 색상이 적용된 소스 코드 미리보기"
+                width="1800"
+                height="960"
+                loading="lazy"
+              />
+            </div>
+            <div
+              class="gallery-panel"
+              id="panel-search"
+              role="tabpanel"
+              aria-labelledby="tab-search"
+              tabindex="0"
+              hidden
+            >
+              <div class="gallery-copy">
+                <h3>이름 한 조각.<br />내용 한 문장.</h3>
+                <p>
+                  파일 이름과 내용, 마스크와 정규식으로 검색하세요.<br />찾은
+                  결과는 새 탭에 모여 다음 작업으로 이어집니다.
+                </p>
+                <span class="detail"
+                  ><kbd>Mod</kbd> + <kbd>F</kbd>로 검색 시작. Mac은 Cmd,
+                  Windows는 Ctrl입니다.</span
+                >
+              </div>
+              <img
+                src="assets/find.png"
+                alt="검색 결과를 별도 탭에 모아 보여 주는 Twin Deck"
+                width="1800"
+                height="630"
+                loading="lazy"
+              />
+            </div>
+            <div
+              class="gallery-panel"
+              id="panel-space"
+              role="tabpanel"
+              aria-labelledby="tab-space"
+              tabindex="0"
+              hidden
+            >
+              <div class="gallery-copy">
+                <h3>어디가 큰지.<br />보면 압니다.</h3>
+                <p>
+                  폴더와 파일의 크기를 타일 면적으로 표현합니다.<br />큰
+                  타일부터 살펴보고 정리할 공간을 찾아보세요.
+                </p>
+                <span class="detail"
+                  ><kbd>Alt</kbd> + <kbd>T</kbd>로 목록과 용량 보기 전환.</span
+                >
+              </div>
+              <img
+                src="assets/treemap.png"
+                alt="폴더와 파일의 용량을 크기가 다른 타일로 보여 주는 트리맵"
+                width="1800"
+                height="1050"
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="more section wrap" aria-labelledby="more-title">
+        <div class="section-heading reveal">
+          <h2 id="more-title">작은 일부터.<br />더 큰 작업까지.</h2>
+        </div>
+        <div class="feature-grid">
+          <article class="feature-card transfer-card reveal">
+            <div>
+              <h3>기다리는 동안에도,<br />멈추지 않는 작업.</h3>
+              <p>
+                복사와 이동을 백그라운드로 보내세요. 다른 파일을 정리하는 동안
+                진행률과 작업 결과를 확인할 수 있습니다.
+              </p>
+            </div>
+            <div class="transfer-art" aria-hidden="true">
+              <span class="file-sheet">파일</span
+              ><span class="transfer-line"></span
+              ><span class="destination">폴더</span>
+            </div>
+            <span class="card-note">충돌 처리 / 진행률 확인 / 작업 중단</span>
+          </article>
+          <article class="feature-card archive-card reveal">
+            <span class="archive-mark" aria-hidden="true">.zip</span>
+            <h3>압축 파일도<br />폴더처럼.</h3>
+            <p>
+              압축을 풀기 전에 안을 둘러보고, 압축과 해제 작업도 백그라운드로
+              이어가세요.
+            </p>
+          </article>
+          <article class="feature-card terminal-card reveal">
+            <span class="terminal-mark" aria-hidden="true">&gt;_</span>
+            <div>
+              <h3>폴더 옆에,<br />터미널 하나.</h3>
+              <p>
+                현재 폴더에서 터미널을 열고 작업을 이어가세요. 탭을 반대편
+                패널로 옮겨도 셸과 화면은 그대로입니다.
+              </p>
+              <code>td ~/work</code
+              ><span class="detail"
+                >터미널에서도 Twin Deck을 바로 열 수 있습니다.</span
+              >
+            </div>
+          </article>
+          <article class="feature-card remote-card reveal">
+            <div class="protocols" aria-hidden="true">
+              <span>SFTP</span><span>FTP</span><span>SMB</span>
+            </div>
+            <h3>다른 서버의 파일도.<br />익숙한 두 패널로.</h3>
+            <p>
+              저장한 서버에 연결해 로컬과 원격 폴더 사이로 파일을 주고받으세요.
+            </p>
+            <a
+              class="text-link"
+              href="https://github.com/gyuha/twin-deck#탭과-패널"
+              >연결 방식과 지원 범위 <span aria-hidden="true">↗</span></a
+            >
+          </article>
+        </div>
+      </section>
+
+      <section
+        id="personal"
+        class="personal section"
+        aria-labelledby="personal-title"
+      >
+        <div class="wrap">
+          <div class="personal-heading reveal">
+            <div class="theme-number" aria-hidden="true">
+              112<span>가지 테마</span>
+            </div>
+            <div>
+              <h2 id="personal-title">매일 쓰는 공간.<br />내 취향 그대로.</h2>
+              <p>
+                밝게, 어둡게, 나답게.<br />112가지 테마에 글꼴과 단축키까지
+                더해보세요.
+              </p>
+            </div>
+          </div>
+          <div class="theme-showcase reveal">
+            <img
+              id="theme-image"
+              src="assets/theme-light.png"
+              alt="Catppuccin Latte 밝은 테마의 Twin Deck"
+              width="1800"
+              height="960"
+              loading="lazy"
+            />
+          </div>
+          <div class="theme-choices" role="group" aria-label="앱 테마 미리보기">
+            <button
+              type="button"
+              class="is-active"
+              data-theme-preview="light"
+              aria-pressed="true"
+            >
+              <span class="swatch latte" aria-hidden="true"></span>Catppuccin
+              Latte</button
+            ><button
+              type="button"
+              data-theme-preview="dark"
+              aria-pressed="false"
+            >
+              <span class="swatch dracula" aria-hidden="true"></span>Dracula
+            </button>
+          </div>
+          <p class="caption">
+            한국어와 English 지원. 설정은 TOML로 저장하고, 앱에서 바로 바꿀 수
+            있습니다.
+          </p>
+        </div>
+      </section>
+
+      <section
+        id="download"
+        class="download section wrap"
+        aria-labelledby="download-title"
+      >
+        <img
+          class="download-icon reveal"
+          src="assets/icon.png"
+          width="104"
+          height="104"
+          alt=""
+          loading="lazy"
+        />
+        <h2 id="download-title" class="reveal">
+          파일 정리의<br /><span class="muted">새로운 리듬.</span>
+        </h2>
+        <p>이제, Twin Deck으로 시작하세요.</p>
+        <div class="download-options">
+          <a
+            class="button"
+            href="https://github.com/gyuha/twin-deck/releases/latest"
+            >macOS 다운로드 <span aria-hidden="true">↗</span
+            ><small>Apple Silicon</small></a
+          ><a
+            class="button secondary"
+            href="https://github.com/gyuha/twin-deck/releases/latest"
+            >Windows 다운로드 <span aria-hidden="true">↗</span
+            ><small>x64</small></a
+          >
+        </div>
+        <div class="brew">
+          <code id="brew-command">brew install --cask gyuha/tap/twin-deck</code
+          ><button
+            type="button"
+            id="copy-command"
+            aria-label="Homebrew 설치 명령 복사"
+            hidden
+          >
+            복사
+          </button>
+        </div>
+        <p id="copy-status" class="copy-status" role="status"></p>
+        <p class="install-note">
+          서명되지 않은 앱으로 첫 실행 시 OS의 확인이 필요할 수 있습니다.<br /><a
+            href="https://github.com/gyuha/twin-deck#설치"
+            >설치 안내 보기 <span aria-hidden="true">↗</span></a
+          >
+        </p>
+      </section>
+    </main>
+    <footer class="footer wrap">
+      <a class="brand" href="#"
+        ><img src="assets/icon.png" width="25" height="25" alt="" />Twin Deck</a
+      ><span>두 개의 패널. 하나의 흐름.</span>
+      <div>
+        <a href="https://github.com/gyuha/twin-deck">GitHub ↗</a
+        ><a href="https://github.com/gyuha/twin-deck/releases">변경 사항 ↗</a
+        ><a href="https://github.com/gyuha/twin-deck/issues">피드백 ↗</a>
+      </div>
+    </footer>
+  </body>
+</html>

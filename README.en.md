@@ -2,6 +2,8 @@
 
 # Twin Deck
 
+[Product website](https://gyuha.com/twin-deck/) · [Website development and deployment guide (Korean)](site/README.md)
+
 A file manager that puts two panes side by side so you can move and organize files. You can do almost everything from the keyboard alone, without a mouse.
 
 ![Twin Deck main screen](docs/screenshots/main.png)
