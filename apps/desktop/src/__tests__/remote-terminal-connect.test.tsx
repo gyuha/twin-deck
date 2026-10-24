@@ -11,7 +11,7 @@ vi.mock("../lib/terminalEngine", () => ({
     onResize: () => {},
     cols: 100,
     rows: 30,
-    setFontFamily: () => {},
+    setFontFamily: () => {}, setTheme: () => {},
     focus: () => {},
     dispose: () => {},
   }),

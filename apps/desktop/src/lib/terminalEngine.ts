@@ -1,5 +1,6 @@
 // 터미널 화면 엔진. xterm.js로 그리고, 테스트에서는 이 모듈을 가짜로 바꾼다.
 import { installImeBridge } from "./imeBridge";
+import type { TerminalColors } from "./themeColors";
 import { findUrls } from "./terminalLinks";
 
 export interface TerminalEngine {
@@ -16,6 +17,8 @@ export interface TerminalEngine {
   onResize(cb: (size: { cols: number; rows: number }) => void): void;
   readonly cols: number;
   readonly rows: number;
+  /** 테마 색(배경·글자·커서·ANSI 색)을 바꾼다(이슈 #118). 이미 그려진 글자도 새 색으로 다시 그려진다. */
+  setTheme(colors: TerminalColors): void;
   /** 글꼴을 바꾸고 칸 수를 다시 맞춘다. */
   setFontFamily(font: string): void;
   focus(): void;
@@ -44,11 +47,11 @@ async function loadFont(font: string): Promise<void> {
  * xterm.js를 처음 쓸 때 불러 엔진을 만든다. `fontFamily`는 터미널 글꼴 설정이며 패널 크기에 맞춰 칸 수를 조절한다.
  * 화면에 보이는 주소(`http`·`https`)를 Ctrl(macOS는 Cmd)+클릭하면 `openLink`를 부른다(이슈 #107).
  */
-export async function createTerminalEngine(fontFamily = "", openLink: (url: string) => void = () => {}): Promise<TerminalEngine> {
+export async function createTerminalEngine(fontFamily = "", openLink: (url: string) => void = () => {}, colors?: TerminalColors): Promise<TerminalEngine> {
   const initialFont = terminalFontFamily(fontFamily);
   const [{ Terminal }, { FitAddon }] = await Promise.all([import("@xterm/xterm"), import("@xterm/addon-fit"), import("@xterm/xterm/css/xterm.css")]);
   await loadFont(initialFont);
-  const term = new Terminal({ fontSize: 13, fontFamily: initialFont, cursorBlink: true });
+  const term = new Terminal({ fontSize: 13, fontFamily: initialFont, cursorBlink: true, ...(colors ? { theme: colors } : {}) });
   const fit = new FitAddon();
   term.loadAddon(fit);
   let observer: ResizeObserver | null = null;
@@ -124,6 +127,9 @@ export async function createTerminalEngine(fontFamily = "", openLink: (url: stri
     },
     get rows() {
       return term.rows;
+    },
+    setTheme(next) {
+      term.options.theme = next;
     },
     setFontFamily(font) {
       const family = terminalFontFamily(font);

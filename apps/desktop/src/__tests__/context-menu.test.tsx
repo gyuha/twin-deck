@@ -5,7 +5,7 @@ import { cursorName, list, renderApp, selectedNames } from "./helpers";
 
 // 터미널 열기 항목 시험용: xterm.js는 jsdom에서 그려지지 않으므로 화면 엔진을 비운 가짜로 바꾼다.
 vi.mock("../lib/terminalEngine", () => ({
-  createTerminalEngine: async () => ({ open() {}, write() {}, onData() {}, onResize() {}, setFontFamily() {}, focus() {}, dispose() {}, cols: 80, rows: 24 }),
+  createTerminalEngine: async () => ({ open() {}, write() {}, onData() {}, onResize() {}, setFontFamily() {}, setTheme() {}, focus() {}, dispose() {}, cols: 80, rows: 24 }),
 }));
 
 // 이름순: docs, a.txt, b.txt

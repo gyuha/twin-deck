@@ -107,6 +107,45 @@ export function themeVars(t: WarpTheme): Record<string, string> {
   };
 }
 
+/** xterm의 `theme` 옵션에 그대로 넘기는 색 묶음(배경·글자·커서·선택·ANSI 16색). */
+export type TerminalColors = Record<string, string>;
+
+/**
+ * 테마에서 터미널 색을 만든다(이슈 #118). 배경·글자·강조색(커서)은 테마 그대로이고, ANSI 빨강·초록·노랑·파랑은 테마의 상태색(`red`·`green`·`yellow`·`blue`)이다.
+ * 테마에 없는 마젠타·시안은 이웃 색을 섞어 만들고, 검정·흰색은 배경·글자색에서 가깝게 잡는다. 밝은 색(bright)은 글자색 쪽으로 조금 섞는다.
+ */
+export function terminalTheme(t: WarpTheme): TerminalColors {
+  const { background: b, foreground: f, accent, red, green, yellow, blue } = t;
+  const magenta = mix(red, blue, 0.5);
+  const cyan = mix(green, blue, 0.5);
+  const black = mix(b, f, 0.2);
+  const white = mix(f, b, 0.15);
+  const bright = (c: string) => mix(c, f, 0.25);
+  return {
+    background: b,
+    foreground: f,
+    cursor: accent,
+    cursorAccent: b,
+    selectionBackground: mix(b, accent, 0.35),
+    black,
+    red,
+    green,
+    yellow,
+    blue,
+    magenta,
+    cyan,
+    white,
+    brightBlack: mix(b, f, 0.45),
+    brightRed: bright(red),
+    brightGreen: bright(green),
+    brightYellow: bright(yellow),
+    brightBlue: bright(blue),
+    brightMagenta: bright(magenta),
+    brightCyan: bright(cyan),
+    brightWhite: f,
+  };
+}
+
 /**
  * `behavior.theme` 설정값을 테마로 푼다. `light`/`dark`는 기본 짝, `system`은 OS가 다크인지(`osDark`)에 따라 그 둘 중 하나,
  * 테마 파일 이름이면 그 테마, 그 밖의 값(옛 이름 포함)은 `system`처럼 다룬다.

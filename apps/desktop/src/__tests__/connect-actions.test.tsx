@@ -10,7 +10,7 @@ import { runAction, tabTitles } from "./search-helpers";
 // 이슈 #95: 원격(SFTP·SSH) 연결 기능을 설정 창 말고 액션 패널·단축키·메뉴바에서도 쓴다.
 // xterm.js는 jsdom에서 그려지지 않으므로 화면 엔진은 가짜로 바꾼다(remote-terminal-menu.test.tsx와 같은 방식).
 vi.mock("../lib/terminalEngine", () => ({
-  createTerminalEngine: async () => ({ open() {}, write() {}, onData() {}, onResize() {}, cols: 100, rows: 30, setFontFamily() {}, focus() {}, dispose() {} }),
+  createTerminalEngine: async () => ({ open() {}, write() {}, onData() {}, onResize() {}, cols: 100, rows: 30, setFontFamily() {}, setTheme() {}, focus() {}, dispose() {} }),
 }));
 
 const SFTP = { name: "회사", protocol: "sftp", host: "nas", port: 22, user: "kim", base_dir: "", icon: "" };

@@ -296,7 +296,7 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
 
   return (
     <StoreContext.Provider value={app}>
-      <UiContext.Provider value={{ registry, keymap, platform }}>
+      <UiContext.Provider value={{ registry, keymap, platform, theme }}>
       <BarWarnings base={warnings} />
       <main className="flex h-screen flex-col">
         <PaneSplit onThemePreview={setThemePreview} />
