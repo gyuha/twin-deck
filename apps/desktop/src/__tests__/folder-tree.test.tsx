@@ -45,6 +45,14 @@ describe("폴더 트리 (이슈 #125)", () => {
     expect(node("/home/a/other")).not.toBeNull(); // 조상 /home/a가 펼쳐져 형제도 보인다
   });
 
+  it("패널에서 폴더를 만들면 트리에도 나타난다", async () => {
+    const { user } = await renderApp(seed());
+    await waitFor(() => expect(node("/home/a/other")).not.toBeNull());
+    await user.keyboard("{F7}");
+    await user.keyboard("newdir{Enter}");
+    await waitFor(() => expect(node("/home/a/newdir")).not.toBeNull());
+  });
+
   it("노드를 누르면 포커스가 있는 패널의 폴더가 바뀐다", async () => {
     const { user } = await renderApp(seed());
     await waitFor(() => expect(node("/home/a/other")).not.toBeNull());

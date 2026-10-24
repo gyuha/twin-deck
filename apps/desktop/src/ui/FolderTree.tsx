@@ -40,6 +40,10 @@ export function FolderTree() {
   const activePane = useApp((s) => s.activePane);
   const leftPath = useApp((s) => localPath(activeTab(s, "left")));
   const rightPath = useApp((s) => localPath(activeTab(s, "right")));
+  // 패널 목록의 하위 폴더 이름들. 패널에서 폴더를 만들거나 지우거나 옮겨 이 값이 바뀌면 트리의 그 폴더도 다시 읽는다.
+  const dirSig = (pane: PaneId) => (s: Parameters<typeof activeTab>[0]) => activeTab(s, pane).entries.filter((e) => e.kind === "dir").map((e) => e.name).join("/");
+  const leftDirs = useApp(dirSig("left"));
+  const rightDirs = useApp(dirSig("right"));
   const configWidth = useApp((s) => s.loaded.config.behavior.layout.folder_tree_width);
   const draftWidth = useApp((s) => s.treeWidthDraft);
   const width = draftWidth ?? clampTreeWidth(configWidth);
@@ -85,6 +89,22 @@ export function FolderTree() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show, revealKey, roots]);
 
+  // 패널의 하위 폴더가 바뀌면(만들기·삭제·이동) 그 폴더의 트리 목록을 다시 읽는다. 처음 그릴 때는 위에서 이미 읽는다.
+  const lastDirs = useRef<string | null>(null);
+  useEffect(() => {
+    if (!show) return;
+    const sig = `${leftPath}|${leftDirs}||${rightPath}|${rightDirs}`;
+    if (lastDirs.current !== null && lastDirs.current !== sig) {
+      for (const p of [leftPath, rightPath]) {
+        if (!p) continue;
+        requested.current.delete(p);
+        load(p);
+      }
+    }
+    lastDirs.current = sig;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [show, leftPath, rightPath, leftDirs, rightDirs]);
+
   // 활성 패널의 폴더가 바뀌면 그 노드가 보이게 스크롤한다.
   const activeDir = activePane === "left" ? leftPath : rightPath;
   useEffect(() => {
@@ -120,6 +140,7 @@ export function FolderTree() {
   return (
     <>
     <nav ref={box} aria-label={t("foldertree.aria")} data-folder-tree style={{ width }} className="td-thin-scroll shrink-0 overflow-auto bg-app-dark-box py-1 text-xs">
+      <div role="tree" aria-label={t("foldertree.aria")}>
       {rows.map((r) => {
         const here = badges(r.path);
         const isActive = here.includes(activePane);
@@ -164,6 +185,7 @@ export function FolderTree() {
           </div>
         );
       })}
+      </div>
     </nav>
     {/* 오른쪽 경계를 끌어 너비를 바꾼다. 더블클릭하면 기본 너비로 돌아간다(파일 패널 사이 구분선과 같은 방식). */}
     <div
