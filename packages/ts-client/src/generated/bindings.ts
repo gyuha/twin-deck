@@ -915,6 +915,10 @@ preview_font: string;
  */
 terminal_font: string; 
 /**
+ * 내장 터미널의 테마. 비우면 앱 테마(`theme`)를 따르고, `light`/`dark`나 테마 이름이면 터미널만 그 테마의 색을 쓴다(이슈 #118).
+ */
+terminal_theme: string; 
+/**
  * 이전 버전의 앱 기본 글자색(`#rrggbb` 또는 `#rgb`, 모든 테마 공통). 테마별 키(`text_color_dark`/`text_color_light`)가 비어 있을 때만 쓴다(이슈 #58).
  */
 text_color: string; 

@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { acquireTerminal } from "../lib/terminalSessions";
 import type { TerminalHandle, TerminalState } from "../lib/terminalSessions";
 import { Button } from "@spacedrive/primitives";
+import { resolveTheme, terminalTheme } from "../lib/themeColors";
 import { useApp, useAppStore, useT } from "../state/context";
+import { useUi } from "./uiContext";
 import type { PaneId } from "../state/store";
 
 /**
@@ -20,6 +22,14 @@ export function TerminalView({ pane, tabId, id, lost, shown, focused }: { pane: 
   const font = useApp((s) => s.loaded.config.behavior.terminal_font);
   const fontRef = useRef(font);
   fontRef.current = font;
+  // 터미널 색은 앱 테마를 따른다(이슈 #118). 미리보기·랜덤 테마도 같은 테마 값이라 함께 바뀐다.
+  // `behavior.terminal_theme`이 있으면 터미널만 그 테마를 쓴다(이슈 #118).
+  const { theme: appTheme } = useUi();
+  const terminalThemeId = useApp((s) => s.loaded.config.behavior.terminal_theme);
+  const theme = terminalThemeId ? resolveTheme(terminalThemeId, false) : appTheme;
+  const colors = theme ? terminalTheme(theme) : undefined;
+  const colorsRef = useRef(colors);
+  colorsRef.current = colors;
   const host = useRef<HTMLDivElement>(null);
   const handle = useRef<TerminalHandle | null>(null);
   const [state, setState] = useState<TerminalState>({ ready: false, error: null });
@@ -27,7 +37,7 @@ export function TerminalView({ pane, tabId, id, lost, shown, focused }: { pane: 
 
   useEffect(() => {
     if (!host.current) return;
-    const h = acquireTerminal(backend, id, fontRef.current, setState);
+    const h = acquireTerminal(backend, id, fontRef.current, setState, colorsRef.current);
     handle.current = h;
     h.attach(host.current);
     return () => {
@@ -35,6 +45,11 @@ export function TerminalView({ pane, tabId, id, lost, shown, focused }: { pane: 
       handle.current = null;
     };
   }, [backend, id]);
+
+  // 테마를 바꾸면 열려 있는 터미널에도 바로 반영한다.
+  useEffect(() => {
+    if (theme) handle.current?.setTheme(terminalTheme(theme));
+  }, [theme?.id]);
 
   // 설정에서 글꼴을 바꾸면 열려 있는 터미널에도 바로 반영한다.
   useEffect(() => {
@@ -46,7 +61,7 @@ export function TerminalView({ pane, tabId, id, lost, shown, focused }: { pane: 
   }, [shown, focused, ready]);
 
   return (
-    <div role="region" aria-label={t("terminal.aria")} data-terminal data-shown={shown} className={shown ? "relative min-h-0 flex-1 bg-black" : "hidden"}>
+    <div role="region" aria-label={t("terminal.aria")} data-terminal data-shown={shown} className={shown ? "relative min-h-0 flex-1 bg-app" : "hidden"}>
       <div ref={host} className="absolute inset-0" />
       {lost && (
         <div data-terminal-disconnected role="alert" className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black/70 p-4 text-center text-white">

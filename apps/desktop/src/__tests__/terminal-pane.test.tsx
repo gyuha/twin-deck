@@ -15,11 +15,13 @@ const hoisted = vi.hoisted(() => ({
     emitData(d: string): void;
     emitResize(c: number, r: number): void;
     fonts: string[];
+    themes: Record<string, string>[];
+    initialColors?: Record<string, string>;
   }[],
   created: [] as string[],
 }));
 vi.mock("../lib/terminalEngine", () => ({
-  createTerminalEngine: async (font = "") => {
+  createTerminalEngine: async (font = "", _openLink?: unknown, colors?: Record<string, string>) => {
     hoisted.created.push(font);
     let data: (d: string) => void = () => {};
     let resize: (s: { cols: number; rows: number }) => void = () => {};
@@ -33,6 +35,8 @@ vi.mock("../lib/terminalEngine", () => ({
       emitData: (d: string) => data(d),
       emitResize: (c: number, r: number) => resize({ cols: c, rows: r }),
       fonts: [] as string[],
+      themes: [] as Record<string, string>[],
+      initialColors: colors,
     };
     hoisted.engines.push(eng);
     return {
@@ -47,6 +51,7 @@ vi.mock("../lib/terminalEngine", () => ({
         return eng.rows;
       },
       setFontFamily: (f: string) => void eng.fonts.push(f),
+      setTheme: (c: Record<string, string>) => void eng.themes.push(c),
       focus: () => void eng.focused++,
       dispose: () => void (eng.disposed = true),
     };
@@ -210,6 +215,35 @@ describe("내장 터미널 탭", () => {
     act(() => b.setConfig((l) => (l.config.behavior.terminal_font = "Fira Code")));
     await waitFor(() => expect(hoisted.engines[0].fonts.at(-1)).toBe("Fira Code"));
     expect(hoisted.engines).toHaveLength(1);
+  });
+
+  it("터미널 색은 앱 테마를 따른다: 처음부터 그 색으로 열리고, 테마를 바꾸면 열린 터미널에도 반영된다(이슈 #118)", async () => {
+    const b = backend();
+    b.setConfig((l) => (l.config.behavior.theme = "catppuccin-mocha"));
+    const { user } = await renderApp(b);
+    await user.keyboard(OPEN);
+    await waitFor(() => expect(hoisted.engines[0]?.opened).not.toBeNull());
+    expect(hoisted.engines[0].initialColors).toMatchObject({ background: "#1e1e2e", foreground: "#cdd6f4" });
+    act(() => b.setConfig((l) => (l.config.behavior.theme = "catppuccin-latte")));
+    await waitFor(() => expect(hoisted.engines[0].themes.at(-1)).toMatchObject({ background: "#eff1f5", foreground: "#4c4f69" }));
+    expect(hoisted.engines).toHaveLength(1);
+  });
+
+  it("behavior.terminal_theme을 고르면 터미널만 그 테마를 쓰고, 비우면 앱 테마를 다시 따른다(이슈 #118)", async () => {
+    const b = backend();
+    b.setConfig((l) => {
+      l.config.behavior.theme = "catppuccin-mocha";
+      l.config.behavior.terminal_theme = "catppuccin-latte";
+    });
+    const { user } = await renderApp(b);
+    await user.keyboard(OPEN);
+    await waitFor(() => expect(hoisted.engines[0]?.opened).not.toBeNull());
+    expect(hoisted.engines[0].initialColors).toMatchObject({ background: "#eff1f5" }); // 앱은 mocha지만 터미널은 latte
+    act(() => b.setConfig((l) => (l.config.behavior.theme = "catppuccin-frappe")));
+    await new Promise((r) => setTimeout(r, 30));
+    expect(hoisted.engines[0].themes).toEqual([]); // 앱 테마를 바꿔도 터미널 색은 그대로
+    act(() => b.setConfig((l) => (l.config.behavior.terminal_theme = "")));
+    await waitFor(() => expect(hoisted.engines[0].themes.at(-1)).toMatchObject({ background: "#303446" })); // 다시 앱 테마(frappe)
   });
 
   it("터미널 탭이 있는 패널에서 설정을 열어도 터미널은 지워지지 않고, 설정에서 바꾼 글꼴이 닫을 때 보인다", async () => {

@@ -35,7 +35,7 @@ vi.mock("../lib/terminalEngine", () => ({
       onResize: (cb: (s: { cols: number; rows: number }) => void) => void (resize = cb),
       cols: 100,
       rows: 30,
-      setFontFamily: () => {},
+      setFontFamily: () => {}, setTheme: () => {},
       focus: () => {},
       dispose: () => void (eng.disposed = true),
     };

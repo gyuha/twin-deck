@@ -121,6 +121,8 @@ const themeChoices = (): readonly ComboOption[] => [
   { value: "dark", label: "dark · Catppuccin Mocha" },
   ...THEMES.map((t) => ({ value: t.id, label: `${t.name} · ${t.dark ? translate("settings.theme.dark") : translate("settings.theme.light")}`, keywords: t.id })),
 ];
+// 터미널 테마: 빈 값은 앱 테마를 따른다. 그 뒤에 light·dark·테마 이름이 이어진다(system은 없다).
+const terminalThemeChoices = (): readonly ComboOption[] => [{ value: "", label: translate("settings.theme.follow_app") }, ...themeChoices().slice(1)];
 // 랜덤 테마 후보는 system·light·dark 없이 테마 이름만 받는다.
 const themeTagChoices = (): readonly ComboOption[] => themeChoices().slice(3);
 // size_format의 허용 값은 td-config의 검증 목록과 같아야 한다(crates/td-config/src/load.rs).
@@ -177,6 +179,7 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
       { key: "behavior.random_themes", get title() { return translate("settings.item.behavior.random_themes.title"); }, get desc() { return translate("settings.item.behavior.random_themes.desc"); }, get control() { return { type: "tags", options: themeTagChoices() } as const; } },
       { key: "behavior.ui_font", get title() { return translate("settings.item.behavior.ui_font.title"); }, get desc() { return translate("settings.item.behavior.ui_font.desc"); }, control: { type: "text" } },
       { key: "behavior.preview_font", get title() { return translate("settings.item.behavior.preview_font.title"); }, get desc() { return translate("settings.item.behavior.preview_font.desc"); }, control: { type: "text" } },
+      { key: "behavior.terminal_theme", get title() { return translate("settings.item.behavior.terminal_theme.title"); }, get desc() { return translate("settings.item.behavior.terminal_theme.desc"); }, get control() { return { type: "combo", options: terminalThemeChoices() } as const; } },
       { key: "behavior.terminal_font", get title() { return translate("settings.item.behavior.terminal_font.title"); }, get desc() { return translate("settings.item.behavior.terminal_font.desc"); }, control: { type: "text" } },
       { key: "behavior.text_color_dark", get title() { return translate("settings.item.behavior.text_color_dark.title"); }, get desc() { return translate("settings.item.behavior.text_color_dark.desc"); }, control: { type: "color" } },
       { key: "behavior.text_color_light", get title() { return translate("settings.item.behavior.text_color_light.title"); }, get desc() { return translate("settings.item.behavior.text_color_light.desc"); }, control: { type: "color" } },
