@@ -132,7 +132,7 @@ folder_size_on_select = true      # 폴더를 선택하면 하위 파일의 총 
 
 [environment]
 text_editor = "Visual Studio Code" # 편집 액션이 사용할 앱
-auto_update_check = true          # 앱을 시작할 때 새 버전이 있는지 확인한다. false면 설정 > 업데이트의 "지금 확인"으로만 확인한다(이슈 #115)
+auto_update_check = true          # 앱을 시작할 때와 켜 둔 동안 하루에 한 번 새 버전이 있는지 확인한다. false면 설정 > 업데이트의 "지금 확인"으로만 확인한다(이슈 #115·#122)
 single_instance = true            # 앱을 하나만 띄운다. false면 실행할 때마다 새로 뜬다(앱을 다시 시작해야 반영)
 global_hotkey_enabled = true      # 전역 화면 열기 단축키 사용 여부
 global_hotkey = "Mod+Alt+O"       # 앱이 뒤에 있을 때 창을 불러오는 전역 단축키(Mod는 macOS ⌘, 그 밖은 Ctrl). 비우면 끈다
