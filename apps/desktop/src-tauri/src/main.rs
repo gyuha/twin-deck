@@ -161,8 +161,6 @@ fn main() {
         .setup(move |app| {
             #[cfg(target_os = "macos")]
             set_dock_icon();
-            #[cfg(target_os = "macos")]
-            install_quit_menu(app.handle())?;
             builder.mount_events(app);
             let handle = app.handle().clone();
             std::thread::spawn(move || {
@@ -281,7 +279,7 @@ fn main() {
         });
 }
 
-/// 앱 메뉴의 종료 항목 id. 기본 메뉴의 종료를 이 항목으로 바꿔 `Mod+Q`를 가로챈다.
+/// 앱 메뉴의 종료 항목 id. 프런트(`appMenu.ts`)가 기본 메뉴의 종료를 이 id의 `Cmd+Q` 항목으로 바꿔 `Mod+Q`를 가로챈다.
 const QUIT_MENU_ID: &str = "quit";
 
 /// 지금 설정이 "닫으면 백그라운드로"인가. 숨긴 창을 되살릴 Dock이 있는 macOS에서만 켜진다.
@@ -290,26 +288,6 @@ fn background_on_close(app: &tauri::AppHandle) -> bool {
         && app
             .try_state::<ConfigState>()
             .is_some_and(|c| c.current().config.environment.background_on_close)
-}
-
-/// macOS 기본 앱 메뉴의 마지막 항목(종료)을 `Mod+Q` 메뉴 항목으로 바꾼다.
-#[cfg(target_os = "macos")]
-fn install_quit_menu(app: &tauri::AppHandle) -> tauri::Result<()> {
-    use tauri::menu::{Menu, MenuItem};
-    let menu = Menu::default(app)?;
-    if let Some(app_menu) = menu.items()?.first().and_then(|i| i.as_submenu()) {
-        let last = app_menu.items()?.len().saturating_sub(1);
-        app_menu.remove_at(last)?;
-        app_menu.append(&MenuItem::with_id(
-            app,
-            QUIT_MENU_ID,
-            "Quit Twin Deck",
-            true,
-            Some("Cmd+Q"),
-        )?)?;
-    }
-    app.set_menu(menu)?;
-    Ok(())
 }
 
 /// `tauri dev`는 .app 번들 없이 실행되어 macOS가 아이콘을 읽지 못하므로 Dock 아이콘을 직접 지정한다.

@@ -39,6 +39,9 @@ class FakeSubmenu {
     if (this.label !== "Help") viewAdds.push(item);
     (appended[this.label] ??= []).push(item);
   }
+  async remove(item: FakeItem) {
+    this.children = this.children.filter((c) => c !== item);
+  }
   async insert(item: unknown, pos: number) {
     (inserted[this.label] ??= []).push({ pos, item });
   }
@@ -150,7 +153,7 @@ describe("상단 메뉴바 File 메뉴", () => {
     for (const c of created) expect(c).not.toHaveProperty("accelerator");
   });
 
-  it("앱 메뉴의 제목과 About/Hide/Quit 항목을 Twin Deck으로 바꾼다", async () => {
+  it("앱 메뉴의 제목과 About/Hide 항목을 Twin Deck으로 바꾸고 Quit은 Cmd+Q 항목으로 교체한다", async () => {
     submenus = [
       new FakeSubmenu("twin-deck", [
         new FakeItem("About twin-deck-desktop"),
@@ -166,8 +169,9 @@ describe("상단 메뉴바 File 메뉴", () => {
       "twin-deck->Twin Deck",
       "About twin-deck-desktop->About Twin Deck",
       "Hide twin-deck-desktop->Hide Twin Deck",
-      "Quit twin-deck-desktop->Quit Twin Deck",
     ]);
+    expect((await submenus[0].items()).map((i) => i.label)).not.toContain("Quit twin-deck-desktop");
+    expect(appended["Twin Deck"]).toEqual([{ id: "quit", text: "Quit Twin Deck", accelerator: "Cmd+Q" }]);
   });
 
   it("View 메뉴 끝에 드라이브 바와 Action Bar를 켜고 끄는 체크 항목이 붙고 체크 표시는 현재 설정을 따른다", async () => {
