@@ -401,6 +401,11 @@ export class FakeBackend implements Backend {
     this.savedStates.push(structuredClone(snapshot));
   }
 
+  /** `quitApp`이 불렸는지. */
+  appQuit = false;
+  async quitApp() {
+    this.appQuit = true;
+  }
   async resetState() {
     this.storedState = null;
     this.stateReset = true;

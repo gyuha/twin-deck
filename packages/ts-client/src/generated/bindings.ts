@@ -56,6 +56,12 @@ async resetState() : Promise<Result<null, string>> {
 }
 },
 /**
+ * 앱을 실제로 끝낸다. 백그라운드 유지(`environment.background_on_close`)를 켜도 설정의 종료 버튼은 이 명령으로 끝낸다.
+ */
+async quitApp() : Promise<void> {
+    await TAURI_INVOKE("quit_app");
+},
+/**
  * 새 창을 연다 (PANE-03). 새 창의 상태는 창 레이블별로 따로 저장된다. 만든 창의 레이블을 돌려준다.
  */
 async newWindow() : Promise<Result<string, string>> {
@@ -1125,7 +1131,11 @@ global_hotkey_enabled: boolean;
 /**
  * 앱이 뒤에 있어도 누르면 창을 앞으로 불러오는 전역 단축키(예: `Mod+Alt+O`). `Mod`는 macOS ⌘, 그 밖은 Ctrl이다. 비우면 끈다.
  */
-global_hotkey: string }
+global_hotkey: string; 
+/**
+ * 창 닫기 버튼과 `Mod+Q`로 앱을 끝내지 않고 창만 숨겨 백그라운드에 둔다(macOS). 실제 종료는 설정의 종료 버튼이나 Dock 메뉴의 종료로 한다.
+ */
+background_on_close: boolean }
 export type EpubChapterDto = { title: string }
 /**
  * epub 한 권의 겉모습. `cover`는 이미지 한도 안일 때만 들어 있다(데이터 주소).

@@ -161,6 +161,8 @@ fn main() {
         .setup(move |app| {
             #[cfg(target_os = "macos")]
             set_dock_icon();
+            #[cfg(target_os = "macos")]
+            install_quit_menu(app.handle())?;
             builder.mount_events(app);
             let handle = app.handle().clone();
             std::thread::spawn(move || {
@@ -238,8 +240,76 @@ fn main() {
             });
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("twin-deck 실행 중 오류가 발생했습니다");
+        .on_window_event(|window, event| {
+            // 백그라운드 유지: 닫기 버튼이 앱을 끝내지 않고 창만 숨긴다. 마지막 창이 닫히면 앱이 끝나므로 닫기 자체를 막는다.
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if background_on_close(window.app_handle()) {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
+        })
+        .on_menu_event(|app, event| {
+            if event.id().as_ref() == QUIT_MENU_ID {
+                // 메뉴의 종료(Mod+Q)는 백그라운드 유지가 켜져 있으면 창만 숨긴다. Dock의 종료는 이 메뉴를 거치지 않아 앱을 끝낸다.
+                if background_on_close(app) {
+                    for w in app.webview_windows().into_values() {
+                        let _ = w.hide();
+                    }
+                } else {
+                    app.exit(0);
+                }
+            }
+        })
+        .build(tauri::generate_context!())
+        .expect("twin-deck 실행 중 오류가 발생했습니다")
+        .run(|app, event| {
+            // 백그라운드에 있을 때 Dock 아이콘을 누르면 숨긴 창을 다시 보인다.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen {
+                has_visible_windows: false,
+                ..
+            } = event
+            {
+                for w in app.webview_windows().into_values() {
+                    let _ = w.show();
+                    let _ = w.set_focus();
+                }
+            }
+            #[cfg(not(target_os = "macos"))]
+            let _ = (app, event);
+        });
+}
+
+/// 앱 메뉴의 종료 항목 id. 기본 메뉴의 종료를 이 항목으로 바꿔 `Mod+Q`를 가로챈다.
+const QUIT_MENU_ID: &str = "quit";
+
+/// 지금 설정이 "닫으면 백그라운드로"인가. 숨긴 창을 되살릴 Dock이 있는 macOS에서만 켜진다.
+fn background_on_close(app: &tauri::AppHandle) -> bool {
+    cfg!(target_os = "macos")
+        && app
+            .try_state::<ConfigState>()
+            .is_some_and(|c| c.current().config.environment.background_on_close)
+}
+
+/// macOS 기본 앱 메뉴의 마지막 항목(종료)을 `Mod+Q` 메뉴 항목으로 바꾼다.
+#[cfg(target_os = "macos")]
+fn install_quit_menu(app: &tauri::AppHandle) -> tauri::Result<()> {
+    use tauri::menu::{Menu, MenuItem};
+    let menu = Menu::default(app)?;
+    if let Some(app_menu) = menu.items()?.first().and_then(|i| i.as_submenu()) {
+        let last = app_menu.items()?.len().saturating_sub(1);
+        app_menu.remove_at(last)?;
+        app_menu.append(&MenuItem::with_id(
+            app,
+            QUIT_MENU_ID,
+            "Quit Twin Deck",
+            true,
+            Some("Cmd+Q"),
+        )?)?;
+    }
+    app.set_menu(menu)?;
+    Ok(())
 }
 
 /// `tauri dev`는 .app 번들 없이 실행되어 macOS가 아이콘을 읽지 못하므로 Dock 아이콘을 직접 지정한다.

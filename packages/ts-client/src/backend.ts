@@ -101,6 +101,8 @@ export interface Backend {
   saveState(snapshot: Snapshot): Promise<void>;
   /** 저장된 상태를 모두 지우고 앱을 종료한다. */
   resetState(): Promise<void>;
+  /** 앱을 실제로 끝낸다. 백그라운드 유지 설정과 상관없다. */
+  quitApp(): Promise<void>;
   /** 새 창을 열고 그 창의 레이블을 돌려준다 (PANE-03). */
   newWindow(): Promise<string>;
   /** 미리보기: 텍스트 앞부분, 이미지 data URL, 종류 판별. */

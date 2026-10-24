@@ -262,6 +262,7 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
       { key: "environment.text_editor", get title() { return translate("settings.item.environment.text_editor.title"); }, get desc() { return translate("settings.item.environment.text_editor.desc"); }, control: { type: "text" } },
       { key: "environment.terminal", get title() { return translate("settings.item.environment.terminal.title"); }, get desc() { return translate("settings.item.environment.terminal.desc"); }, control: { type: "select", options: TERMINAL_SHELLS } , hideOn: ["mac", "linux"] }, // Windows에서만 쓰는 설정이다
       { key: "environment.single_instance", get title() { return translate("settings.item.environment.single_instance.title"); }, get desc() { return translate("settings.item.environment.single_instance.desc"); }, control: { type: "switch" } },
+      { key: "environment.background_on_close", get title() { return translate("settings.item.environment.background_on_close.title"); }, get desc() { return translate("settings.item.environment.background_on_close.desc"); }, control: { type: "switch" }, hideOn: ["windows", "linux"] }, // Dock이 있는 macOS에서만 쓴다
       { key: "environment.global_hotkey_enabled", get title() { return translate("settings.item.environment.global_hotkey_enabled.title"); }, get desc() { return translate("settings.item.environment.global_hotkey_enabled.desc"); }, control: { type: "switch" } },
       { key: "environment.global_hotkey", get title() { return translate("settings.item.environment.global_hotkey.title"); }, get desc() { return translate("settings.item.environment.global_hotkey.desc"); }, control: { type: "hotkey" } },
       { key: "behavior.layout.recent_limit", get title() { return translate("settings.item.behavior.layout.recent_limit.title"); }, get desc() { return translate("settings.item.behavior.layout.recent_limit.desc"); }, control: { type: "int" } },
@@ -1634,6 +1635,13 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
                     {t("settings.config_import")}
                   </Button>
                 </div>
+              </div>
+            )}
+            {current.title === t("settings.section.environment.title") && platform === "mac" && (
+              <div className="flex justify-end py-3">
+                <Button size="sm" variant="gray" className="shrink-0 whitespace-nowrap bg-status-error text-white" onClick={() => void api.quitApp()}>
+                  {t("settings.quit_app")}
+                </Button>
               </div>
             )}
             {current === updateSection && <UpdatePanel />}
