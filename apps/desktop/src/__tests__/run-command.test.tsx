@@ -87,4 +87,14 @@ describe("명령어 줄 (core.run_command, 이슈 #110)", () => {
     await waitFor(() => expect(screen.queryByRole("textbox", { name: "명령어 줄" })).not.toBeInTheDocument());
     expect((await backend.getConfig()).config.behavior.layout.show_command_line).toBe(false);
   });
+
+  it("Ctrl+Shift+K도 줄을 끄고 켠다 (이슈 #119)", async () => {
+    const { user, backend } = await open();
+    await user.keyboard("{Control>}{Shift>}k{/Shift}{/Control}");
+    await waitFor(() => expect(screen.queryByRole("textbox", { name: "명령어 줄" })).not.toBeInTheDocument());
+    expect((await backend.getConfig()).config.behavior.layout.show_command_line).toBe(false);
+    await user.keyboard("{Control>}{Shift>}k{/Shift}{/Control}");
+    expect(await line()).toBeInTheDocument();
+    expect((await backend.getConfig()).config.behavior.layout.show_command_line).toBe(true);
+  });
 });
