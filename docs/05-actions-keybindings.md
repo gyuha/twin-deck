@@ -95,7 +95,7 @@ Marta에서는 수정자 없는 단일 키 바인딩이 Quick Select에 가로�
 | `core.rename.next` | 이름 변경: 저장하고 아래 항목으로 (편집 전 위치 기준, 실패하면 머문다) | `↓` | `↓` | rename | 자체 ID |
 | `core.rename.multi` | 다중 이름 바꾸기 (2개 이상 선택했을 때) | `Mod+Shift+R` | `Ctrl+Shift+R` | pane | 자체 ID |
 | `core.file.new_folder` | 새 폴더 | `F7` | `F7` | pane | 자체 ID, 키 확인 |
-| `core.run_command` | 명령 실행 (이슈 #110): Windows의 `Win+R`처럼 셸 한 줄(`git clone …`, `mkdir`, `rm` 등)을 입력해 실행한다. 활성 탭의 **로컬 폴더**에서 로그인 셸(Windows는 `cmd /C`)로 돌리고, 입력은 막혀 있어 입력을 기다리는 명령은 바로 끝난다. 5분이 넘으면 죽인다. 끝나면 목록을 다시 읽고, 출력이 있거나 종료 코드가 0이 아니면 결과 창(출력 끝 20KB)을 띄운다. 검색 결과·압축 안·원격(`sftp://`) 탭에서는 알림만 보인다. 터미널 스코프에서는 키가 pty로 가므로 쓰지 않는다 | `Alt+Mod+R` | `Ctrl+Alt+R` | pane, 자체 ID, 키 확인 |
+| `core.run_command` | 명령 실행 (이슈 #110): Windows의 `Win+R`처럼 셸 한 줄(`git clone …`, `mkdir`, `rm` 등)을 입력해 실행한다. 활성 탭의 **로컬 폴더**에서 로그인 셸(Windows는 `cmd /C`)로 돌리고, 입력은 막혀 있어 입력을 기다리는 명령은 바로 끝난다. 5분이 넘으면 죽인다. 끝나면 목록을 다시 읽고, 출력이 있거나 종료 코드가 0이 아니면 결과 창(출력 끝 20KB)을 띄운다. 검색 결과·압축 안·원격(`sftp://`) 탭에서는 알림만 보인다. 터미널 스코프에서는 키가 pty로 가므로 쓰지 않는다 | `Alt+Mod+X` | `Ctrl+Alt+X` | pane, 자체 ID, 키 확인 |
 | `core.file.new_file` | 새 파일 | `Shift+F7` | `Shift+F7` | pane | 자체 ID, 키 확인 |
 | `core.trash` | 휴지통으로 이동 | `F8` | `F8` | pane | 자체 ID, 키 확인 |
 | `core.delete` | 영구 삭제 | `Shift+F8` 또는 `Delete` | `Shift+F8` 또는 `Delete` | pane | 자체 ID, 키 확인 |

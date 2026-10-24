@@ -337,7 +337,7 @@ export const DEFAULT_BINDINGS: Binding[] = [
   b("palette", "core.palette.run", "Return"),
   b("palette", "core.palette.close", "Escape"),
   b("global", "core.queue.open", "="),
-  b("pane", "core.run_command", "Alt+Mod+R"),
+  b("pane", "core.run_command", "Alt+Mod+X"),
   b("pane", "core.terminal.focus", "Alt+Mod+T"),
   b("terminal", "core.terminal.focus", "Alt+Mod+T"),
   b("global", "core.settings.open", "Mod+,"),

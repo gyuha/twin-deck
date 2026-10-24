@@ -5,11 +5,11 @@ import { renderApp, seedBackend } from "./helpers";
 describe("명령 실행 (core.run_command, 이슈 #110)", () => {
   const open = async (backend = seedBackend()) => {
     const r = await renderApp(backend);
-    await r.user.keyboard("{Control>}{Alt>}r{/Alt}{/Control}");
+    await r.user.keyboard("{Control>}{Alt>}x{/Alt}{/Control}");
     return { ...r, backend, input: await screen.findByRole("textbox", { name: "명령" }) };
   };
 
-  it("Ctrl+Alt+R로 명령 입력 창이 열리고, 입력한 한 줄을 활성 탭의 폴더에서 실행한다", async () => {
+  it("Ctrl+Alt+X로 명령 입력 창이 열리고, 입력한 한 줄을 활성 탭의 폴더에서 실행한다", async () => {
     const { user, backend, input } = await open();
     expect(screen.getByRole("dialog", { name: "명령 실행" })).toBeInTheDocument();
     await user.type(input, "mkdir out{Enter}");
@@ -46,7 +46,7 @@ describe("명령 실행 (core.run_command, 이슈 #110)", () => {
   it("빈 입력이나 취소는 아무것도 실행하지 않는다", async () => {
     const { user, backend, input } = await open();
     await user.type(input, "   {Enter}");
-    await user.keyboard("{Control>}{Alt>}r{/Alt}{/Control}");
+    await user.keyboard("{Control>}{Alt>}x{/Alt}{/Control}");
     await screen.findByRole("textbox", { name: "명령" });
     await user.keyboard("{Escape}");
     expect(backend.shellRuns).toEqual([]);
