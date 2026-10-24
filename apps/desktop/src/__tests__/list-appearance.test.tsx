@@ -43,21 +43,23 @@ describe("줄무늬 행 (behavior.table.zebra_rows)", () => {
 });
 
 describe("표시 칸 (behavior.table.show_marks)", () => {
-  it("켜져 있으면(기본) 행 맨 앞에 표시 칸이 있고 폴더에는 ▸가 들어 있다", async () => {
+  it("켜져 있으면(기본) 행 맨 앞에 표시 칸이 있고 폴더에는 macOS식 꺾쇠(>)가 들어 있다", async () => {
     await renderApp(withTable({}));
     const first = rows()[0];
     expect(first.querySelector("[data-mark]")).not.toBeNull();
-    expect(first.querySelector("[data-mark]")?.textContent).toBe("▸");
+    expect(first.querySelector("[data-mark] svg[data-chevron]")).not.toBeNull();
+    expect(first.querySelector("[data-mark]")?.textContent).toBe(""); // 글자 ▸가 아니라 그림이다
     expect(first.style.gridTemplateColumns.startsWith("1.25rem")).toBe(true);
     expect(header().style.gridTemplateColumns.startsWith("1.25rem")).toBe(true);
   });
 
-  it("끄면 표시 칸이 사라지고 ▸·●가 DOM에 없으며 이름 칸이 첫 글자 칸이 된다", async () => {
+  it("끄면 표시 칸이 사라지고 꺾쇠·●가 DOM에 없으며 이름 칸이 첫 글자 칸이 된다", async () => {
     await renderApp(withTable({ show_marks: false }));
     const r = rows();
     for (const row of r) {
       expect(row.querySelector("[data-mark]")).toBeNull();
       expect(row.textContent).not.toMatch(/[▸●]/);
+      expect(row.querySelector("svg[data-chevron]")).toBeNull();
       expect(row.style.gridTemplateColumns.startsWith("1.25rem")).toBe(false);
     }
     expect(header().style.gridTemplateColumns.startsWith("1.25rem")).toBe(false);

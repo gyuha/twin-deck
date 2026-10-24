@@ -113,6 +113,7 @@ export const VIEW_TOGGLES = [
   { key: "menu.view.drive_bar", actionId: "core.view.drive_bar", flag: "driveBar" },
   { key: "menu.view.action_bar", actionId: "core.view.action_bar", flag: "actionBar" },
   { key: "menu.view.command_line", actionId: "core.view.command_line", flag: "commandLine" },
+  { key: "menu.view.folder_tree", actionId: "core.view.folder_tree", flag: "folderTree" },
 ] as const;
 
 /** 지금 화면 요소가 켜져 있는지. View 메뉴의 체크 표시가 이 값을 따른다. */
@@ -120,6 +121,7 @@ export interface LayoutFlags {
   driveBar: boolean;
   actionBar: boolean;
   commandLine: boolean;
+  folderTree: boolean;
 }
 
 /**
@@ -129,7 +131,7 @@ export interface LayoutFlags {
  */
 export async function installFileMenu(
   run: (actionId: string) => void,
-  flags: LayoutFlags = { driveBar: true, actionBar: true, commandLine: true },
+  flags: LayoutFlags = { driveBar: true, actionBar: true, commandLine: true, folderTree: false },
   keyOf?: KeyOf,
 ): Promise<void> {
   const menu = await Menu.default();

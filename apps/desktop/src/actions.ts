@@ -101,6 +101,7 @@ export function fileOpHandlers({ api }: AppStore): Partial<ActionHandlers> {
     "core.file.new_folder": () => api.newFolder(),
     "core.run_command": () => api.focusCommandLine(),
     "core.view.command_line": () => api.toggleLayoutFlag("show_command_line"),
+    "core.view.folder_tree": () => api.toggleLayoutFlag("show_folder_tree"),
     "core.file.new_file": () => api.newFile(),
     "core.trash": () => api.trashTargets(),
     "core.delete": () => api.deleteTargets(),

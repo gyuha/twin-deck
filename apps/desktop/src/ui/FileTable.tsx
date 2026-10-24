@@ -9,6 +9,7 @@ import type { ColumnSpec } from "../lib/columns";
 import { COLUMN_TITLES, cellText } from "../lib/format";
 import { quickMatchRange } from "../lib/names";
 import { SORT_KEYS, splitExtension } from "../lib/sort";
+import { Chevron } from "./Chevron";
 import { FileIcon } from "./FileIcon";
 import type { SortKey } from "../lib/sort";
 import { useApp, useAppStore, useT } from "../state/context";
@@ -35,7 +36,7 @@ const DEFAULT_WIDTH: Record<ColumnSpec["name"], string> = {
 /** 아이콘 칸은 아이콘 크기에 이름과의 간격(6px)을 더한 폭이다. */
 const iconColumn = (iconSize: number) => `${iconSize + 6}px`;
 
-/** 표시 칸(`●`/`▸`)의 폭. 표시 칸을 끄면 이 칸이 열 정의에서 빠진다. */
+/** 표시 칸(`●`/꺾쇠)의 폭. 표시 칸을 끄면 이 칸이 열 정의에서 빠진다. */
 const MARK_COLUMN = "1.25rem";
 
 const gridTemplate = (cols: ColumnSpec[], iconSize: number, showMarks: boolean) =>
@@ -287,7 +288,8 @@ export function FileTable({ pane }: { pane: PaneId }) {
   const renderRow = (e: EntryDto, i: number) => {
     const selected = tab.selection.has(e.path);
     const cursor = i === tab.cursor;
-    const mark = selected ? "●" : e.kind === "dir" ? "▸" : "";
+    // 선택은 ●, 폴더는 macOS Finder식 꺾쇠(>)다.
+    const mark = selected ? "●" : e.kind === "dir" ? <Chevron /> : "";
     const fill = cursor && isActive && cursorFill;
     const stripe = zebra ? (i % 2 === 1 ? "odd" : "even") : undefined;
     const [pre, post] = isFolderEntry(e) ? [decoPre, decoPost] : ["", ""];
@@ -304,7 +306,7 @@ export function FileTable({ pane }: { pane: PaneId }) {
         data-path={e.path}
         data-pane={pane}
         data-row-kind={e.kind}
-        data-drop-target={drag?.target?.row && drag.target.pane === pane && drag.target.dir === e.path ? "true" : undefined}
+        data-drop-target={drag?.target?.row && !drag.target.tree && drag.target.pane === pane && drag.target.dir === e.path ? "true" : undefined}
         onMouseDown={(ev) => {
           // 왼쪽 단추만, 수정자 없이 눌렀을 때 드래그의 시작점이 된다(Ctrl/Shift/Cmd+클릭은 선택용이다).
           if (ev.button === 0 && !ev.ctrlKey && !ev.shiftKey && !ev.metaKey) api.dragPress(pane, i, ev.clientX, ev.clientY);
