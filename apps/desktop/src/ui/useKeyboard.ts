@@ -22,8 +22,8 @@ export function useKeyboard({ app, keymap, registry }: Options) {
       if (e.isComposing) return;
       // 경로 표시줄의 직접 입력 중에는 글자·방향키가 단축키로 가지 않게 한다(입력창이 처리한다).
       if (e.target instanceof Element && e.target.closest("[data-path-edit]")) return;
-      // 명령어 줄의 입력은 줄이 직접 처리한다(글자가 Quick Select나 단축키로 가지 않게).
-      if (e.target instanceof Element && e.target.closest("[data-command-line]")) return;
+      // 명령어 줄의 입력은 줄이 직접 처리한다(글자가 Quick Select나 단축키로 가지 않게). 줄을 켜고 끄는 키만 키맵으로 넘긴다(이슈 #119).
+      if (e.target instanceof Element && e.target.closest("[data-command-line]") && keymap.resolveBinding(e, scopeStack(store.getState()))?.actionId !== "core.view.command_line") return;
       // 미리보기 편집 상자: 글자·방향키·Space·Enter·Delete는 상자가 받는다. Mod+S(저장)만 단축키로 간다(Esc는 상자가 직접 처리한다).
       if (e.target instanceof Element && e.target.closest("[data-preview-edit]") && !((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "s")) return;
       const s = store.getState();
