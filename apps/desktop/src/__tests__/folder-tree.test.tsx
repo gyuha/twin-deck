@@ -110,3 +110,57 @@ describe("폴더 트리 (이슈 #125)", () => {
     fireEvent.mouseUp(node("/home/a/docs")!, { button: 0 });
   });
 });
+
+describe("폴더 트리 너비 조절 (이슈 #125)", () => {
+  const sep = () => screen.getByRole("separator", { name: "폴더 트리 너비 조절" });
+  const width = () => Number(tree()!.style.width.replace("px", ""));
+  // jsdom에는 레이아웃·PointerEvent·포인터 캡처가 없어서, 트리의 왼쪽 경계를 0으로 두고 항상 캡처된 포인터를 흉내 낸다.
+  const at = (type: string, clientX = 0) => {
+    const el = sep();
+    el.setPointerCapture = () => undefined;
+    el.releasePointerCapture = () => undefined;
+    el.hasPointerCapture = () => true;
+    tree()!.getBoundingClientRect = () => ({ left: 0, width: width() }) as DOMRect;
+    fireEvent(el, new MouseEvent(type, { bubbles: true, cancelable: true, clientX }));
+  };
+
+  it("기본 너비는 224px이고 경계 막대가 있다", async () => {
+    await renderApp(seed());
+    await waitFor(() => expect(tree()).toBeInTheDocument());
+    expect(width()).toBe(224);
+    expect(sep()).toHaveAttribute("aria-valuenow", "224");
+  });
+
+  it("경계를 끌면 너비가 바뀌고, 놓으면 설정(folder_tree_width)에 저장된다", async () => {
+    const { backend } = await renderApp(seed());
+    await waitFor(() => expect(tree()).toBeInTheDocument());
+    at("pointerdown", 224);
+    at("pointermove", 320);
+    expect(width()).toBe(320); // 끄는 동안 바로 보인다
+    at("pointerup", 320);
+    await waitFor(async () => expect((await backend.getConfig()).config.behavior.layout.folder_tree_width).toBe(320));
+    expect(width()).toBe(320);
+  });
+
+  it("너비는 120~600으로 제한된다", async () => {
+    await renderApp(seed());
+    await waitFor(() => expect(tree()).toBeInTheDocument());
+    at("pointerdown", 224);
+    at("pointermove", 5);
+    expect(width()).toBe(120);
+    at("pointermove", 5000);
+    expect(width()).toBe(600);
+    at("pointerup", 5000);
+  });
+
+  it("경계를 더블클릭하면 기본 너비로 돌아가고, 저장된 너비로 다시 열린다", async () => {
+    const b = seed();
+    b.setConfig((l) => (l.config.behavior.layout.folder_tree_width = 400));
+    const { backend } = await renderApp(b);
+    await waitFor(() => expect(tree()).toBeInTheDocument());
+    expect(width()).toBe(400);
+    fireEvent.doubleClick(sep());
+    await waitFor(() => expect(width()).toBe(224));
+    expect((await backend.getConfig()).config.behavior.layout.folder_tree_width).toBe(224);
+  });
+});

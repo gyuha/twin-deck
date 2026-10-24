@@ -952,6 +952,10 @@ show_command_line: boolean;
  */
 show_folder_tree: boolean; 
 /**
+ * 폴더 트리의 너비(px). 트리의 오른쪽 경계를 끌어 바꾼다. 120~600으로 맞춰 쓴다.
+ */
+folder_tree_width: number; 
+/**
  * 활성 패널을 감싸는 accent 테두리를 보인다. 끄면 두 패널 모두 테두리가 투명이다(폭은 그대로).
  */
 pane_highlight: boolean; 

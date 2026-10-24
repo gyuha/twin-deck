@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { baseName, isArchivePath, isRemotePath, parentPath } from "@twin-deck/ts-client";
-import { activeTab } from "../state/store";
+import { activeTab, clampTreeWidth, TREE_WIDTH_DEFAULT, TREE_WIDTH_MAX, TREE_WIDTH_MIN } from "../state/store";
 import type { PaneId } from "../state/store";
 import { useApp, useAppStore, useT } from "../state/context";
+import { Chevron } from "./Chevron";
 
 /** 폴더 트리 (이슈 #125, VS Code식): 하나뿐인 왼쪽 트리가 좌우 패널의 현재 폴더를 보인다. `behavior.layout.show_folder_tree`로 켠다. */
 
@@ -39,13 +40,16 @@ export function FolderTree() {
   const activePane = useApp((s) => s.activePane);
   const leftPath = useApp((s) => localPath(activeTab(s, "left")));
   const rightPath = useApp((s) => localPath(activeTab(s, "right")));
+  const configWidth = useApp((s) => s.loaded.config.behavior.layout.folder_tree_width);
+  const draftWidth = useApp((s) => s.treeWidthDraft);
+  const width = draftWidth ?? clampTreeWidth(configWidth);
   const dropDir = useApp((s) => (s.drag?.target?.tree ? s.drag.target.dir : null));
   const roots = useMemo(() => rootsOf(mounts ? mounts.split("\n") : []), [mounts]);
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   /** 폴더 경로 → 하위 폴더 경로들. 키가 없으면 아직 읽지 않았다. */
   const [children, setChildren] = useState<ReadonlyMap<string, string[]>>(new Map());
   const requested = useRef(new Set<string>());
-  const box = useRef<HTMLDivElement>(null);
+  const box = useRef<HTMLElement>(null);
 
   const load = (dir: string) => {
     if (requested.current.has(dir)) return;
@@ -114,7 +118,8 @@ export function FolderTree() {
   };
   const badges = (path: string): PaneId[] => (["left", "right"] as const).filter((p) => (p === "left" ? leftPath : rightPath) === path);
   return (
-    <nav ref={box} aria-label={t("foldertree.aria")} data-folder-tree className="td-thin-scroll w-56 shrink-0 overflow-auto border-r border-app-line bg-app-dark-box py-1 text-xs">
+    <>
+    <nav ref={box} aria-label={t("foldertree.aria")} data-folder-tree style={{ width }} className="td-thin-scroll shrink-0 overflow-auto bg-app-dark-box py-1 text-xs">
       {rows.map((r) => {
         const here = badges(r.path);
         const isActive = here.includes(activePane);
@@ -142,13 +147,13 @@ export function FolderTree() {
               type="button"
               tabIndex={-1}
               aria-label={r.open ? t("foldertree.collapse", { name: baseName(r.path) || r.path }) : t("foldertree.expand", { name: baseName(r.path) || r.path })}
-              className={"flex size-4 shrink-0 items-center justify-center " + (r.hasChildren ? "" : "invisible")}
+              className={"flex size-4 shrink-0 items-center justify-center text-ink-dull hover:text-ink " + (r.hasChildren ? "" : "invisible")}
               onClick={(e) => {
                 e.stopPropagation();
                 toggle(r.path);
               }}
             >
-              {r.open ? "▾" : "▸"}
+              <Chevron open={r.open} />
             </button>
             <span className="min-w-0 flex-1 truncate">{baseName(r.path) || r.path}</span>
             {here.map((p) => (
@@ -160,5 +165,30 @@ export function FolderTree() {
         );
       })}
     </nav>
+    {/* 오른쪽 경계를 끌어 너비를 바꾼다. 더블클릭하면 기본 너비로 돌아간다(파일 패널 사이 구분선과 같은 방식). */}
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label={t("foldertree.resize")}
+      aria-valuemin={TREE_WIDTH_MIN}
+      aria-valuemax={TREE_WIDTH_MAX}
+      aria-valuenow={width}
+      className="w-1 shrink-0 cursor-col-resize touch-none bg-app-line transition-colors hover:bg-accent"
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        e.preventDefault();
+      }}
+      onPointerMove={(e) => {
+        const left = box.current?.getBoundingClientRect().left;
+        if (e.currentTarget.hasPointerCapture(e.pointerId) && left !== undefined) api.setTreeWidthDraft(e.clientX - left);
+      }}
+      onPointerUp={(e) => {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+        const w = api.getTreeWidthDraft();
+        if (w !== null) void api.setTreeWidth(w);
+      }}
+      onDoubleClick={() => void api.setTreeWidth(TREE_WIDTH_DEFAULT)}
+    />
+    </>
   );
 }

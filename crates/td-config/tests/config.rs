@@ -677,6 +677,9 @@ fn folder_tree_defaults_off_and_can_be_turned_on() {
     let l = load("[behavior.layout]\nshow_folder_tree = true\n");
     assert!(l.warnings.is_empty(), "{:?}", l.warnings);
     assert!(l.config.behavior.layout.show_folder_tree);
+    assert_eq!(load("").config.behavior.layout.folder_tree_width, 224);
+    let l = load("[behavior.layout]\nfolder_tree_width = 300\n");
+    assert_eq!(l.config.behavior.layout.folder_tree_width, 300);
 }
 
 #[test]
