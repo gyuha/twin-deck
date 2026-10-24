@@ -7,6 +7,7 @@ on:
       - "site/**"
       - "scripts/build-site.mjs"
       - "scripts/check-site.mjs"
+      - "scripts/site-language.test.mjs"
       - "docs/screenshots/**"
       - "apps/desktop/src-tauri/icons/128x128@2x.png"
       - ".github/workflows/pages.yml"
@@ -15,6 +16,7 @@ on:
       - "site/**"
       - "scripts/build-site.mjs"
       - "scripts/check-site.mjs"
+      - "scripts/site-language.test.mjs"
       - "docs/screenshots/**"
       - "apps/desktop/src-tauri/icons/128x128@2x.png"
       - ".github/workflows/pages.yml"
@@ -36,7 +38,7 @@ jobs:
         with:
           node-version: "22"
       - name: 정적 소개 페이지 생성 및 검사
-        run: node scripts/build-site.mjs && node scripts/check-site.mjs
+        run: node --test scripts/site-language.test.mjs && node scripts/build-site.mjs && node scripts/check-site.mjs
       - uses: actions/upload-pages-artifact@v4
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         with:

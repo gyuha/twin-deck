@@ -1181,3 +1181,56 @@ p {
     -webkit-backdrop-filter: none;
   }
 }
+
+.language-toggle {
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+  padding: 10px 2px;
+  color: var(--muted);
+}
+.language-toggle:hover {
+  color: var(--accent);
+}
+html[lang="en"] h1,
+html[lang="en"] h2 {
+  letter-spacing: -0.055em;
+}
+html[lang="en"] .key-story {
+  min-height: 125px;
+}
+@media (max-width: 767px) {
+  html[lang="en"] .key-story {
+    min-height: 170px;
+  }
+  html[lang="en"] .download-options .button {
+    padding: 16px 12px;
+    font-size: 12px;
+  }
+  .nav-actions {
+    gap: 8px;
+  }
+}
+@media (max-width: 374px) {
+  .nav {
+    gap: 6px;
+  }
+  .nav .brand {
+    font-size: 15px;
+    gap: 5px;
+  }
+  .nav .brand img {
+    width: 23px;
+    height: 23px;
+  }
+  .nav-actions {
+    gap: 5px;
+  }
+  .nav .theme-toggle {
+    width: 28px;
+  }
+  .nav .button.small {
+    padding: 9px 10px;
+    gap: 5px;
+  }
+}
