@@ -1,5 +1,6 @@
 export type {
   SyncOptionsDto, SyncComparisonDto, SyncChoiceDto, SyncRowDto, SyncStatusDto, SyncDirectionDto,
+  ShellResultDto,
   CliOutcomeDto,
   CliStateDto,
   CliStatusDto,

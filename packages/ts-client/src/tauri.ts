@@ -6,7 +6,7 @@ import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { HostKeyError, BackendError, RemoteConnectError, SmbConnectError } from "./backend";
 import type { Backend, FileDropEvent, SearchEvent, TerminalEvent } from "./backend";
 import { commands, events } from "./generated/bindings";
-import type { CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigValue, ConflictDto, LocationConflict, ExpectedFileDto, FileInfoDto, FindSpecDto, JobDto, LoadedState, PreviewDto, OfficePreviewDto, EpubInfoDto, Snapshot, JobKindDto, Loaded, QueueItemDto, RemoteServer, Result, SmbServer, WriteTextResultDto } from "./generated/bindings";
+import type { ShellResultDto, CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigValue, ConflictDto, LocationConflict, ExpectedFileDto, FileInfoDto, FindSpecDto, JobDto, LoadedState, PreviewDto, OfficePreviewDto, EpubInfoDto, Snapshot, JobKindDto, Loaded, QueueItemDto, RemoteServer, Result, SmbServer, WriteTextResultDto } from "./generated/bindings";
 
 function unwrap<T>(r: Result<T, string>): T {
   if (r.status === "error") throw new BackendError(r.error);
@@ -153,6 +153,9 @@ export class TauriBackend implements Backend {
   }
   async saveState(snapshot: Snapshot) {
     unwrap(await commands.saveState(snapshot));
+  }
+  async runShellCommand(cwd: string, command: string): Promise<ShellResultDto> {
+    return unwrap(await commands.runShellCommand(cwd, command));
   }
   async quitApp() {
     await commands.quitApp();

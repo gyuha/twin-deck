@@ -1221,6 +1221,37 @@ pub fn reset_state(app: tauri::AppHandle, config: State<'_, ConfigState>) -> Ser
     Ok(())
 }
 
+/// 셸 한 줄을 실행한 결과 (`core.run_command`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct ShellResultDto {
+    /// 종료 코드. 시간 초과로 죽였으면 없다.
+    pub exit_code: Option<i32>,
+    /// 표준 출력 뒤에 표준 오류를 붙인 글(끝 20KB까지).
+    pub output: String,
+    pub timed_out: bool,
+}
+
+/// `cwd`(로컬 폴더)에서 셸 한 줄을 실행하고 끝나기를 기다린다. 5분이 지나면 죽인다.
+#[tauri::command]
+#[specta::specta]
+pub async fn run_shell_command(cwd: String, command: String) -> ServiceResult<ShellResultDto> {
+    tauri::async_runtime::spawn_blocking(move || {
+        td_launch::run_shell(
+            td_launch::Os::current(),
+            &cwd,
+            &command,
+            std::time::Duration::from_secs(300),
+        )
+        .map(|r| ShellResultDto {
+            exit_code: r.exit_code,
+            output: r.output,
+            timed_out: r.timed_out,
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// 앱을 실제로 끝낸다. 백그라운드 유지(`environment.background_on_close`)를 켜도 설정의 종료 버튼은 이 명령으로 끝낸다.
 #[tauri::command]
 #[specta::specta]
@@ -1662,6 +1693,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             save_state,
             reset_state,
             quit_app,
+            run_shell_command,
             new_window,
             file_info,
             preview_file,

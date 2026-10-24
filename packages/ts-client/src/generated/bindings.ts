@@ -62,6 +62,17 @@ async quitApp() : Promise<void> {
     await TAURI_INVOKE("quit_app");
 },
 /**
+ * `cwd`(로컬 폴더)에서 셸 한 줄을 실행하고 끝나기를 기다린다. 5분이 지나면 죽인다.
+ */
+async runShellCommand(cwd: string, command: string) : Promise<Result<ShellResultDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("run_shell_command", { cwd, command }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * 새 창을 연다 (PANE-03). 새 창의 상태는 창 레이블별로 따로 저장된다. 만든 창의 레이블을 돌려준다.
  */
 async newWindow() : Promise<Result<string, string>> {
@@ -1363,6 +1374,18 @@ export type SelectionConfig = {
  * "invert" | "extend"
  */
 shift_mode: string }
+/**
+ * 셸 한 줄을 실행한 결과 (`core.run_command`).
+ */
+export type ShellResultDto = { 
+/**
+ * 종료 코드. 시간 초과로 죽였으면 없다.
+ */
+exit_code: number | null; 
+/**
+ * 표준 출력 뒤에 표준 오류를 붙인 글(끝 20KB까지).
+ */
+output: string; timed_out: boolean }
 export type SmbConfig = { 
 /**
  * 병합 후 항목별로 검증해서 채운다(host나 share가 빈 항목은 경고와 함께 빠진다).

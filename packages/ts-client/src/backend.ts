@@ -1,5 +1,5 @@
 import type { SyncOptionsDto, SyncComparisonDto, SyncChoiceDto } from "./generated/bindings";
-import type { CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigLocationDto, ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, EpubInfoDto, ExpectedFileDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, NormalizeResultDto, LoadedState, LocationConflict, PreviewDto, RemoteErrorKindDto, RemoteServer, RemoteServerStatus, SmbErrorKindDto, SmbServer, QueueItemDto, OfficePreviewDto, SearchStartDto, SearchSummaryDto, Snapshot, UpdateInfoDto, UserDirsDto, VolumeDto, WriteTextResultDto } from "./generated/bindings";
+import type { ShellResultDto, CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigLocationDto, ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, EpubInfoDto, ExpectedFileDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, NormalizeResultDto, LoadedState, LocationConflict, PreviewDto, RemoteErrorKindDto, RemoteServer, RemoteServerStatus, SmbErrorKindDto, SmbServer, QueueItemDto, OfficePreviewDto, SearchStartDto, SearchSummaryDto, Snapshot, UpdateInfoDto, UserDirsDto, VolumeDto, WriteTextResultDto } from "./generated/bindings";
 
 /** Look Up / Flatten / Disk Usage가 스트리밍으로 보내는 이벤트. 작업마다 마지막은 `done`이다. */
 export type SearchEvent =
@@ -101,6 +101,8 @@ export interface Backend {
   saveState(snapshot: Snapshot): Promise<void>;
   /** 저장된 상태를 모두 지우고 앱을 종료한다. */
   resetState(): Promise<void>;
+  /** 로컬 폴더 `cwd`에서 셸 한 줄을 실행하고 끝날 때까지 기다린다(5분 제한). */
+  runShellCommand(cwd: string, command: string): Promise<ShellResultDto>;
   /** 앱을 실제로 끝낸다. 백그라운드 유지 설정과 상관없다. */
   quitApp(): Promise<void>;
   /** 새 창을 열고 그 창의 레이블을 돌려준다 (PANE-03). */

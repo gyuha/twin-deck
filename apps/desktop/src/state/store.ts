@@ -2245,6 +2245,26 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         fail(e);
       }
     },
+    /** 명령 실행 (이슈 #110): 활성 탭의 로컬 폴더에서 셸 한 줄을 실행한다. 출력이 있거나 실패하면 결과 창을 띄우고, 끝나면 목록을 다시 읽는다. */
+    async runCommand() {
+      const tab = activeTab(get());
+      if (tab.virtual || isArchivePath(tab.path) || isRemotePath(tab.path)) return fail(tr("store.run_command.local_only"));
+      const typed = await ask<string>({ kind: "name", title: tr("store.run_command.title"), value: "", error: null, selectStem: false, label: tr("store.run_command.label"), confirmLabel: tr("store.run_command.confirm"), lines: [tab.path] });
+      const command = typed?.trim();
+      if (!command) return;
+      set({ notice: null });
+      flash(tr("store.run_command.running", { command }));
+      try {
+        const r = await backend.runShellCommand(tab.path, command);
+        await reloadAll();
+        const failed = r.timed_out || r.exit_code !== 0;
+        if (!failed && !r.output) return flash(tr("store.run_command.done", { command }));
+        const status = r.timed_out ? tr("store.run_command.timed_out") : tr("store.run_command.exit_code", { code: String(r.exit_code ?? "?") });
+        await ask<boolean>({ kind: "info", title: tr("store.run_command.result"), lines: [command, status, ...(r.output ? r.output.split("\n") : [])], copyText: r.output || undefined });
+      } catch (e) {
+        fail(e);
+      }
+    },
     /** 새 파일 (OP-02). */
     async newFile() {
       const tab = activeTab(get());

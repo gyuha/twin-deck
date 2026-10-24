@@ -99,6 +99,7 @@ export function fileOpHandlers({ api }: AppStore): Partial<ActionHandlers> {
     "core.rename.prev": () => api.renameCommit(-1),
     "core.rename.next": () => api.renameCommit(1),
     "core.file.new_folder": () => api.newFolder(),
+    "core.run_command": () => api.runCommand(),
     "core.file.new_file": () => api.newFile(),
     "core.trash": () => api.trashTargets(),
     "core.delete": () => api.deleteTargets(),
