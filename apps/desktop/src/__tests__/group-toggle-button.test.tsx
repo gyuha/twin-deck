@@ -21,11 +21,12 @@ function seed(on = false) {
 const groupButton = () => within(bar()).getByRole("button", { name: "수정일로 묶어 보기" });
 
 describe("상태 표시줄 묶어보기 버튼 (이슈 #69)", () => {
-  it("숨김 파일 표시 버튼 바로 다음에 있고 글자는 묶어보기다", async () => {
+  it("숨김 파일 표시 버튼 바로 다음에 있고 글자 대신 아이콘과 툴팁이 있다 (이슈 #129)", async () => {
     await renderApp(seed());
     const hidden = within(bar()).getByRole("button", { name: "숨김 파일 표시" });
     expect(hidden.nextElementSibling).toBe(groupButton());
-    expect(groupButton()).toHaveTextContent("묶어보기");
+    expect(groupButton().querySelector("svg")).not.toBeNull();
+    expect(within(groupButton()).getByRole("tooltip")).toHaveTextContent("수정일로 묶어 보기");
   });
 
   it("누르면 켜지고 설정에 저장되며 구간 제목이 생기고, 다시 누르면 꺼진다", async () => {
@@ -49,13 +50,13 @@ describe("상태 표시줄 묶어보기 버튼 (이슈 #69)", () => {
     expect(headers()).toEqual(["오늘", "이전 30일"]);
   });
 
-  it("영어에서는 Group, 이름은 Group by date modified다", async () => {
+  it("영어에서는 이름과 툴팁이 Group by date modified다", async () => {
     const backend = seed();
     await renderApp(backend);
     await backend.setConfigValue("behavior.language", { kind: "str", value: "en" });
     const status = await screen.findByRole("status", { name: "Status bar" });
     const button = within(status).getByRole("button", { name: "Group by date modified" });
-    expect(button).toHaveTextContent("Group");
+    expect(within(button).getByRole("tooltip")).toHaveTextContent("Group by date modified");
     expect(within(status).getByRole("button", { name: "Show hidden files" }).nextElementSibling).toBe(button);
   });
 });

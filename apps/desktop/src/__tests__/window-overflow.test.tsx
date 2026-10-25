@@ -22,12 +22,12 @@ describe("창 단위 스크롤 방지 (이슈 #127)", () => {
     expect(screen.getByRole("toolbar", { name: "액션 바" })).toHaveClass("overflow-hidden");
   });
 
-  it("상태 줄 오른쪽 토글 버튼과 액션바 버튼은 줄어들거나 줄바꿈하지 않는다", async () => {
+  it("상태 줄 오른쪽 아이콘 버튼은 줄어들지 않고, 액션바 버튼은 줄어들거나 줄바꿈하지 않는다", async () => {
     await renderApp();
     const status = screen.getByRole("status", { name: "상태 표시줄" });
     const buttons = status.querySelectorAll("button[aria-pressed], button[aria-label='설정']");
     expect(buttons.length).toBeGreaterThan(3);
-    for (const b of buttons) expect(b).toHaveClass("shrink-0", "whitespace-nowrap");
+    for (const b of buttons) expect(b).toHaveClass("shrink-0");
     for (const b of screen.getByRole("toolbar", { name: "액션 바" }).querySelectorAll("button")) expect(b).toHaveClass("shrink-0", "whitespace-nowrap");
   });
 });
