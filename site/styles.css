@@ -100,6 +100,7 @@ h3 {
 }
 p {
   word-break: keep-all;
+  text-wrap: pretty;
 }
 h2 {
   font-size: clamp(36px, 5.1vw, 70px);
@@ -125,12 +126,12 @@ p {
 .muted {
   color: var(--muted);
 }
-.eyebrow {
-  font-size: 14px;
+.hero-platforms {
+  margin-top: 22px;
+  font-size: 13px;
   font-weight: 650;
   letter-spacing: -0.02em;
   color: var(--muted);
-  margin-bottom: 22px;
 }
 .text-link {
   color: var(--accent);
@@ -309,7 +310,7 @@ p {
 .section-heading {
   margin-bottom: 55px;
 }
-.section-heading > p:last-child:not(.eyebrow) {
+.section-heading > p:last-child {
   font-size: 19px;
   color: var(--muted);
   margin-top: 25px;
@@ -482,8 +483,22 @@ p {
 }
 .feature-grid {
   display: grid;
-  grid-template-columns: 1.25fr 1fr;
+  grid-template-columns: repeat(12, 1fr);
   gap: 24px;
+}
+@media (min-width: 768px) {
+  .transfer-card {
+    grid-column: 1 / 8;
+  }
+  .archive-card {
+    grid-column: 8 / 13;
+  }
+  .terminal-card {
+    grid-column: 1 / 6;
+  }
+  .remote-card {
+    grid-column: 6 / 13;
+  }
 }
 .feature-card {
   min-width: 0;
@@ -834,7 +849,23 @@ a {
     animation: product-enter 1.3s var(--ease) 0.15s both;
   }
   .reveal.is-visible {
+    animation: fade 0.7s var(--ease) both;
+  }
+  .key-experience.reveal.is-visible,
+  .theme-showcase.reveal.is-visible {
     animation: enter 0.85s var(--ease) both;
+  }
+  .feature-card.reveal.is-visible {
+    animation: enter-soft 0.8s var(--ease) both;
+  }
+  .feature-card.reveal.is-visible:nth-child(2) {
+    animation-delay: 70ms;
+  }
+  .feature-card.reveal.is-visible:nth-child(3) {
+    animation-delay: 140ms;
+  }
+  .feature-card.reveal.is-visible:nth-child(4) {
+    animation-delay: 210ms;
   }
   .gallery-panel:not([hidden]) {
     animation: enter 0.45s var(--ease) both;
@@ -868,6 +899,24 @@ a {
   from {
     opacity: 0;
     transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes enter-soft {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
   }
   to {
     opacity: 1;
@@ -993,7 +1042,7 @@ a {
     gap: 9px;
   }
   .button.small {
-    font-size: 11px;
+    font-size: 12px;
     padding: 9px 13px;
   }
   .hero {
@@ -1001,10 +1050,6 @@ a {
   }
   .hero h1 {
     font-size: clamp(50px, 10.5vw, 78px);
-  }
-  .hero .eyebrow {
-    font-size: 12px;
-    margin-bottom: 22px;
   }
   .hero-description {
     font-size: 15px;
@@ -1021,7 +1066,7 @@ a {
     border-radius: 7px;
   }
   .hero-caption {
-    font-size: 11px;
+    font-size: 12px;
     margin-top: 18px;
   }
   .section {
@@ -1030,13 +1075,9 @@ a {
   .section-heading {
     margin-bottom: 34px;
   }
-  .section-heading > p:last-child:not(.eyebrow) {
+  .section-heading > p:last-child {
     font-size: 16px;
     margin-top: 22px;
-  }
-  .eyebrow {
-    font-size: 12px;
-    margin-bottom: 16px;
   }
   .desktop-break {
     display: none;
@@ -1049,7 +1090,7 @@ a {
     gap: clamp(12px, 4vw, 24px);
   }
   .key-choice {
-    font-size: 11px;
+    font-size: 12px;
     gap: 12px;
   }
   .key-choice kbd {
@@ -1178,14 +1219,14 @@ a {
     gap: 6px;
   }
   .button small {
-    font-size: 11px;
+    font-size: 12px;
   }
   .brew {
     gap: 9px;
     padding: 11px 12px;
   }
   .brew code {
-    font-size: 11px;
+    font-size: 12px;
   }
   .download .install-note {
     font-size: 12px;
