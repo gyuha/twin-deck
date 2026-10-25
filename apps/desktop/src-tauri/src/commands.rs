@@ -1270,6 +1270,7 @@ impl Spawner for TauriSpawner {
         )
         .title("Twin Deck")
         .inner_size(1200.0, 760.0)
+        .min_inner_size(720.0, 420.0) // tauri.conf.json의 첫 창과 같은 최소 크기(이슈 #127)
         .visible(false) // 위치 복원 뒤 화면이 그려지면 on_page_load가 보여 준다
         .build()
         .map(|_| ())

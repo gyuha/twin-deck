@@ -124,7 +124,7 @@ function StatusBar() {
       aria-pressed={on}
       title={key ? `${label} (${formatKey(key, platform)})` : label}
       onClick={() => void toggle()}
-      className={["rounded border border-app-line px-1.5 hover:bg-app-selected", on ? "" : "text-ink-faint"].join(" ")}
+      className={["shrink-0 whitespace-nowrap rounded border border-app-line px-1.5 hover:bg-app-selected", on ? "" : "text-ink-faint"].join(" ")}
     >
       {text}
     </button>
@@ -134,13 +134,13 @@ function StatusBar() {
   const entryButton = (label: string, text: string, actionId: string, open: () => void) => {
     const key = keymap.keysFor(actionId)[0];
     return (
-      <button type="button" tabIndex={-1} aria-label={label} title={key ? `${label} (${formatKey(key, platform)})` : label} onClick={open} className="rounded border border-app-line px-1.5 hover:bg-app-selected">
+      <button type="button" tabIndex={-1} aria-label={label} title={key ? `${label} (${formatKey(key, platform)})` : label} onClick={open} className="shrink-0 whitespace-nowrap rounded border border-app-line px-1.5 hover:bg-app-selected">
         {text}
       </button>
     );
   };
   return (
-    <footer role="status" aria-label={t("status.aria")} className="flex items-center border-t border-app-line px-2 py-0.5 text-xs">
+    <footer role="status" aria-label={t("status.aria")} className="flex min-w-0 items-center justify-end overflow-hidden border-t border-app-line px-2 py-0.5 text-xs">
       {t("status.summary", { selected: summary.bytes.selected === 0 ? "0" : formatSpace(summary.bytes.selected, sizeFormat), total: formatSpace(summary.bytes.total, sizeFormat), filesSelected: summary.files.selected, filesTotal: summary.files.total, dirsSelected: summary.dirs.selected, dirsTotal: summary.dirs.total })}
       {flash && <span className="ml-4 text-status-success">{flash}</span>}
       {warnings > 0 && (
@@ -305,7 +305,7 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
     <StoreContext.Provider value={app}>
       <UiContext.Provider value={{ registry, keymap, platform, theme }}>
       <BarWarnings base={warnings} />
-      <main className="flex h-screen flex-col">
+      <main className="flex h-full min-w-0 flex-col overflow-hidden">
         <div className="flex min-h-0 flex-1">
           <FolderTree />
           <PaneSplit onThemePreview={setThemePreview} />
