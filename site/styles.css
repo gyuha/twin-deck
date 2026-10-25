@@ -12,6 +12,9 @@
   --glass: rgba(247, 248, 250, 0.84);
   --shadow: 0 35px 65px -25px #19263840;
   --radius: 28px;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  accent-color: var(--accent);
+  scrollbar-color: var(--line) transparent;
   font-family:
     -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR",
     "Malgun Gothic", sans-serif;
@@ -97,17 +100,18 @@ h3 {
 }
 p {
   word-break: keep-all;
+  text-wrap: pretty;
 }
 h2 {
   font-size: clamp(36px, 5.1vw, 70px);
   font-weight: 730;
-  letter-spacing: -0.065em;
-  line-height: 1.18;
+  letter-spacing: -0.04em;
+  line-height: 1.2;
 }
 h3 {
   font-size: clamp(25px, 2.6vw, 36px);
   line-height: 1.25;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.03em;
 }
 p {
   line-height: 1.75;
@@ -122,12 +126,12 @@ p {
 .muted {
   color: var(--muted);
 }
-.eyebrow {
-  font-size: 14px;
+.hero-platforms {
+  margin-top: 22px;
+  font-size: 13px;
   font-weight: 650;
   letter-spacing: -0.02em;
   color: var(--muted);
-  margin-bottom: 22px;
 }
 .text-link {
   color: var(--accent);
@@ -138,7 +142,7 @@ p {
   font-weight: 600;
 }
 .text-link span {
-  transition: transform 0.3s;
+  transition: transform 0.4s var(--ease);
 }
 .text-link:hover span {
   transform: translate(3px, -2px);
@@ -159,7 +163,7 @@ p {
   font-weight: 600;
   white-space: nowrap;
   transition:
-    transform 0.25s,
+    transform 0.35s var(--ease),
     background 0.25s;
 }
 .button:hover {
@@ -168,7 +172,7 @@ p {
 }
 .button.small {
   padding: 9px 17px;
-  font-size: 12px;
+  font-size: 13px;
   gap: 10px;
 }
 .skip-link {
@@ -214,7 +218,7 @@ p {
   margin-left: auto;
 }
 .nav-links a {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
 }
 .nav-links a:hover {
@@ -245,9 +249,9 @@ p {
   position: relative;
 }
 .hero h1 {
-  font-size: clamp(58px, 7.3vw, 100px);
-  line-height: 1.09;
-  letter-spacing: -0.075em;
+  font-size: clamp(58px, 7.3vw, 96px);
+  line-height: 1.12;
+  letter-spacing: -0.045em;
   font-weight: 760;
 }
 .hero h1 span {
@@ -299,14 +303,14 @@ p {
   grid-template-columns: 1fr 1fr;
   text-align: center;
   margin-top: 28px;
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 0.02em;
   color: var(--muted);
 }
 .section-heading {
   margin-bottom: 55px;
 }
-.section-heading > p:last-child:not(.eyebrow) {
+.section-heading > p:last-child {
   font-size: 19px;
   color: var(--muted);
   margin-top: 25px;
@@ -333,7 +337,7 @@ p {
   border: 0;
   padding: 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
 }
 .key-choice kbd {
   display: grid;
@@ -351,8 +355,8 @@ p {
   border: 1px solid var(--line);
   color: var(--text);
   transition:
-    transform 0.25s,
-    box-shadow 0.25s,
+    transform 0.35s var(--ease),
+    box-shadow 0.35s var(--ease),
     color 0.25s;
 }
 .key-choice:hover kbd {
@@ -412,7 +416,7 @@ p {
 }
 .caption {
   text-align: center;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
   margin-top: 28px;
 }
@@ -459,7 +463,7 @@ p {
   font-size: 16px;
 }
 .detail {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
   line-height: 1.6;
   display: block;
@@ -479,8 +483,22 @@ p {
 }
 .feature-grid {
   display: grid;
-  grid-template-columns: 1.25fr 1fr;
+  grid-template-columns: repeat(12, 1fr);
   gap: 24px;
+}
+@media (min-width: 768px) {
+  .transfer-card {
+    grid-column: 1 / 8;
+  }
+  .archive-card {
+    grid-column: 8 / 13;
+  }
+  .terminal-card {
+    grid-column: 1 / 6;
+  }
+  .remote-card {
+    grid-column: 6 / 13;
+  }
 }
 .feature-card {
   min-width: 0;
@@ -538,7 +556,7 @@ p {
   font-size: 12px;
 }
 .card-note {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
   margin-top: auto;
 }
@@ -614,7 +632,7 @@ p {
   font-size: clamp(110px, 16vw, 220px);
   font-weight: 750;
   line-height: 0.85;
-  letter-spacing: -0.085em;
+  letter-spacing: -0.05em;
   color: var(--accent);
 }
 .theme-number span {
@@ -737,19 +755,19 @@ p {
 .brew button {
   background: none;
   border: 0;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--accent);
   white-space: nowrap;
   min-width: 40px;
   min-height: 32px;
 }
 .download .copy-status {
-  font-size: 12px;
+  font-size: 13px;
   min-height: 20px;
   margin-top: 8px;
 }
 .download .install-note {
-  font-size: 12px;
+  font-size: 13px;
   margin-top: 20px;
 }
 .install-note a {
@@ -769,30 +787,88 @@ p {
   font-size: 16px;
 }
 .footer > span {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
 }
 .footer > div {
   display: flex;
   gap: 24px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
 }
 [hidden] {
   display: none !important;
 }
+::selection {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  color: var(--text);
+}
+.theme-toggle {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  transition: background 0.25s, color 0.25s;
+}
+.theme-toggle:hover {
+  color: var(--text);
+}
+.theme-toggle svg {
+  width: 20px;
+  height: 20px;
+}
+.key-choice:active kbd {
+  transform: translateY(6px);
+  box-shadow:
+    0 0 0 var(--line),
+    0 2px 6px #0000000a,
+    inset 0 1px 0 #ffffff40;
+}
+.gallery-tabs button:not([aria-selected="true"]):hover,
+.theme-choices button:not(.is-active):hover {
+  background: var(--surface);
+  color: var(--text);
+}
+.brew button:hover,
+.footer > div a:hover,
+.install-note a:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.footer > div a:hover {
+  color: var(--text);
+}
+a {
+  text-decoration-thickness: 1px;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .hero-copy {
-    animation: enter 0.9s both;
+    animation: enter 0.9s var(--ease) both;
   }
   .hero-product {
-    animation: product-enter 1.3s 0.15s both;
+    animation: product-enter 1.3s var(--ease) 0.15s both;
   }
   .reveal.is-visible {
-    animation: enter 0.85s both;
+    animation: fade 0.7s var(--ease) both;
+  }
+  .key-experience.reveal.is-visible,
+  .theme-showcase.reveal.is-visible {
+    animation: enter 0.85s var(--ease) both;
+  }
+  .feature-card.reveal.is-visible {
+    animation: enter-soft 0.8s var(--ease) both;
+  }
+  .feature-card.reveal.is-visible:nth-child(2) {
+    animation-delay: 70ms;
+  }
+  .feature-card.reveal.is-visible:nth-child(3) {
+    animation-delay: 140ms;
+  }
+  .feature-card.reveal.is-visible:nth-child(4) {
+    animation-delay: 210ms;
   }
   .gallery-panel:not([hidden]) {
-    animation: enter 0.45s both;
+    animation: enter 0.45s var(--ease) both;
   }
   .reveal.is-visible .file-sheet {
     animation: transfer 2.4s ease-in-out 2;
@@ -801,7 +877,7 @@ p {
     animation: panel-switch 3.5s ease-in-out 1;
   }
   .theme-showcase.is-changing {
-    animation: enter 0.45s both;
+    animation: enter 0.45s var(--ease) both;
   }
   @supports (animation-timeline: view()) {
     .hero-stage {
@@ -823,6 +899,24 @@ p {
   from {
     opacity: 0;
     transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes enter-soft {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
   }
   to {
     opacity: 1;
@@ -948,7 +1042,7 @@ p {
     gap: 9px;
   }
   .button.small {
-    font-size: 11px;
+    font-size: 12px;
     padding: 9px 13px;
   }
   .hero {
@@ -956,10 +1050,6 @@ p {
   }
   .hero h1 {
     font-size: clamp(50px, 10.5vw, 78px);
-  }
-  .hero .eyebrow {
-    font-size: 12px;
-    margin-bottom: 22px;
   }
   .hero-description {
     font-size: 15px;
@@ -976,7 +1066,7 @@ p {
     border-radius: 7px;
   }
   .hero-caption {
-    font-size: 10px;
+    font-size: 12px;
     margin-top: 18px;
   }
   .section {
@@ -985,13 +1075,9 @@ p {
   .section-heading {
     margin-bottom: 34px;
   }
-  .section-heading > p:last-child:not(.eyebrow) {
+  .section-heading > p:last-child {
     font-size: 16px;
     margin-top: 22px;
-  }
-  .eyebrow {
-    font-size: 12px;
-    margin-bottom: 16px;
   }
   .desktop-break {
     display: none;
@@ -1004,7 +1090,7 @@ p {
     gap: clamp(12px, 4vw, 24px);
   }
   .key-choice {
-    font-size: 10px;
+    font-size: 12px;
     gap: 12px;
   }
   .key-choice kbd {
@@ -1024,7 +1110,7 @@ p {
     font-size: 14px;
   }
   .caption {
-    font-size: 11px;
+    font-size: 12px;
     margin-top: 22px;
   }
   .workflow-screen {
@@ -1054,7 +1140,7 @@ p {
     margin-top: 18px;
   }
   .gallery-copy .detail {
-    font-size: 11px;
+    font-size: 12px;
     margin-top: 12px;
   }
   .gallery-panel > img {
@@ -1111,7 +1197,7 @@ p {
     margin-top: 24px;
   }
   .theme-choices button {
-    font-size: 11px;
+    font-size: 12px;
     padding: 10px 12px;
     gap: 7px;
   }
@@ -1133,17 +1219,17 @@ p {
     gap: 6px;
   }
   .button small {
-    font-size: 11px;
+    font-size: 12px;
   }
   .brew {
     gap: 9px;
     padding: 11px 12px;
   }
   .brew code {
-    font-size: 11px;
+    font-size: 12px;
   }
   .download .install-note {
-    font-size: 11px;
+    font-size: 12px;
   }
   .footer {
     flex-wrap: wrap;
@@ -1154,7 +1240,7 @@ p {
   }
   .footer > div {
     gap: 15px;
-    font-size: 11px;
+    font-size: 12px;
   }
   .footer .brand {
     font-size: 15px;
@@ -1183,7 +1269,7 @@ p {
 }
 
 .language-toggle {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 650;
   white-space: nowrap;
   padding: 10px 2px;
@@ -1194,7 +1280,7 @@ p {
 }
 html[lang="en"] h1,
 html[lang="en"] h2 {
-  letter-spacing: -0.055em;
+  letter-spacing: -0.04em;
 }
 html[lang="en"] .key-story {
   min-height: 125px;
