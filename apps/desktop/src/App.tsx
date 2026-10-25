@@ -92,6 +92,57 @@ function useRandomTheme(b: { random_theme: boolean; random_themes: string }): st
   return picked.current;
 }
 
+/** 상태 표시줄 오른쪽 버튼의 선 아이콘(Lucide 모양, 24×24 격자). */
+const STATUS_ICONS = {
+  settings: (
+    <>
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+      <circle cx="12" cy="12" r="3" />
+    </>
+  ),
+  keyboard: (
+    <>
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10" />
+    </>
+  ),
+  eye: (
+    <>
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+      <circle cx="12" cy="12" r="3" />
+    </>
+  ),
+  calendar: (
+    <>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+    </>
+  ),
+  drive: (
+    <>
+      <path d="M22 12H2M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+      <path d="M6 16h.01M10 16h.01" />
+    </>
+  ),
+  tree: <path d="M21 12h-8M21 6H8M21 18h-8M3 6v4c0 1.1.9 2 2 2h3M3 10v6c0 1.1.9 2 2 2h3" />,
+  terminal: <path d="m4 17 6-6-6-6M12 19h8" />,
+  panelBottom: (
+    <>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M3 15h18" />
+    </>
+  ),
+};
+type StatusIcon = keyof typeof STATUS_ICONS;
+
+function Icon({ name }: { name: StatusIcon }) {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {STATUS_ICONS[name]}
+    </svg>
+  );
+}
+
 function StatusBar() {
   const t = useT();
   const entries = useApp((s) => activeTab(s).entries);
@@ -113,32 +164,36 @@ function StatusBar() {
   const { api } = useAppStore();
   const { keymap, platform } = useUi();
   const warnings = fileWarnings + keymapWarnings;
-  // 메뉴 막대가 없는 Windows에서도 바와 숨김 파일 표시를 켜고 끌 수 있게 오른쪽 끝에 항상 보이는 토글을 둔다.
-  const viewToggle = (label: string, text: string, on: boolean, toggle: () => void | Promise<void>, actionId: string) => {
+  // 마우스를 올리면 바로 뜨는 툴팁(이름과 현재 키). 오른쪽 끝 버튼이라 오른쪽에 맞춰 위로 띄운다(이슈 #129).
+  const tooltip = (label: string, actionId: string) => {
     const key = keymap.keysFor(actionId)[0];
     return (
+      <span role="tooltip" className="pointer-events-none absolute bottom-full right-0 z-30 mb-1 whitespace-nowrap rounded border border-app-line bg-app-box px-2 py-1 text-xs text-ink opacity-0 shadow-lg group-hover:opacity-100">
+        {key ? `${label} (${formatKey(key, platform)})` : label}
+      </span>
+    );
+  };
+  // 메뉴 막대가 없는 Windows에서도 바와 숨김 파일 표시를 켜고 끌 수 있게 오른쪽 끝에 항상 보이는 토글을 둔다. 글자 대신 아이콘으로 보인다(이슈 #129).
+  const viewToggle = (label: string, icon: StatusIcon, on: boolean, toggle: () => void | Promise<void>, actionId: string) => (
     <button
       type="button"
       tabIndex={-1}
       aria-label={label}
       aria-pressed={on}
-      title={key ? `${label} (${formatKey(key, platform)})` : label}
       onClick={() => void toggle()}
-      className={["rounded border border-app-line px-1.5 hover:bg-app-selected", on ? "" : "text-ink-faint"].join(" ")}
+      className={["group relative rounded p-0.5 hover:bg-app-selected", on ? "text-ink" : "text-ink-faint"].join(" ")}
     >
-      {text}
+      <Icon name={icon} />
+      {tooltip(label, actionId)}
     </button>
-    );
-  };
-  // 메뉴바가 없는 Windows·Linux에서 설정 화면과 단축키 목록을 여는 버튼(이슈 #40). 현재 키는 title에 보인다.
-  const entryButton = (label: string, text: string, actionId: string, open: () => void) => {
-    const key = keymap.keysFor(actionId)[0];
-    return (
-      <button type="button" tabIndex={-1} aria-label={label} title={key ? `${label} (${formatKey(key, platform)})` : label} onClick={open} className="rounded border border-app-line px-1.5 hover:bg-app-selected">
-        {text}
-      </button>
-    );
-  };
+  );
+  // 메뉴바가 없는 Windows·Linux에서 설정 화면과 단축키 목록을 여는 버튼(이슈 #40). 현재 키는 툴팁에 보인다.
+  const entryButton = (label: string, icon: StatusIcon, actionId: string, open: () => void) => (
+    <button type="button" tabIndex={-1} aria-label={label} onClick={open} className="group relative rounded p-0.5 text-ink-dull hover:bg-app-selected hover:text-ink">
+      <Icon name={icon} />
+      {tooltip(label, actionId)}
+    </button>
+  );
   return (
     <footer role="status" aria-label={t("status.aria")} className="flex items-center border-t border-app-line px-2 py-0.5 text-xs">
       {t("status.summary", { selected: summary.bytes.selected === 0 ? "0" : formatSpace(summary.bytes.selected, sizeFormat), total: formatSpace(summary.bytes.total, sizeFormat), filesSelected: summary.files.selected, filesTotal: summary.files.total, dirsSelected: summary.dirs.selected, dirsTotal: summary.dirs.total })}
@@ -158,15 +213,15 @@ function StatusBar() {
           {notice}
         </button>
       )}
-      <span className="ml-auto flex shrink-0 gap-1 pl-2">
-        {entryButton(t("settings.aria"), t("settings.aria"), "core.settings.open", () => api.openSettings())}
-        {entryButton(t("menu.help_shortcuts"), t("status.shortcuts"), "core.help", () => api.openHelp())}
-        {viewToggle(t("status.hidden_aria"), t("status.hidden"), showHidden, () => api.toggleHidden(), "core.view.hidden")}
-        {viewToggle(t("status.group_aria"), t("status.group"), groupByModified, () => api.toggleGroupByModified(), "")}
-        {viewToggle(t("menu.view.drive_bar"), t("status.drive_bar"), showDriveBar, () => api.toggleLayoutFlag("show_drive_bar"), "core.view.drive_bar")}
-        {viewToggle(t("menu.view.folder_tree"), t("status.folder_tree"), showFolderTree, () => api.toggleLayoutFlag("show_folder_tree"), "core.view.folder_tree")}
-        {viewToggle(t("menu.view.command_line"), t("status.command_line"), showCommandLine, () => api.toggleLayoutFlag("show_command_line"), "core.view.command_line")}
-        {viewToggle(t("menu.view.action_bar"), t("status.action_bar"), showActionBar, () => api.toggleLayoutFlag("show_action_bar"), "core.view.action_bar")}
+      <span className="ml-auto flex shrink-0 items-center gap-0.5 pl-2">
+        {entryButton(t("settings.aria"), "settings", "core.settings.open", () => api.openSettings())}
+        {entryButton(t("menu.help_shortcuts"), "keyboard", "core.help", () => api.openHelp())}
+        {viewToggle(t("status.hidden_aria"), "eye", showHidden, () => api.toggleHidden(), "core.view.hidden")}
+        {viewToggle(t("status.group_aria"), "calendar", groupByModified, () => api.toggleGroupByModified(), "")}
+        {viewToggle(t("menu.view.drive_bar"), "drive", showDriveBar, () => api.toggleLayoutFlag("show_drive_bar"), "core.view.drive_bar")}
+        {viewToggle(t("menu.view.folder_tree"), "tree", showFolderTree, () => api.toggleLayoutFlag("show_folder_tree"), "core.view.folder_tree")}
+        {viewToggle(t("menu.view.command_line"), "terminal", showCommandLine, () => api.toggleLayoutFlag("show_command_line"), "core.view.command_line")}
+        {viewToggle(t("menu.view.action_bar"), "panelBottom", showActionBar, () => api.toggleLayoutFlag("show_action_bar"), "core.view.action_bar")}
       </span>
     </footer>
   );
