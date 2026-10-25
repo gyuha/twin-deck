@@ -18,7 +18,8 @@ describe("창 단위 스크롤 방지 (이슈 #127)", () => {
     expect(document.querySelector("main")).toHaveClass("overflow-hidden", "min-w-0", "h-full");
     const status = screen.getByRole("status", { name: "상태 표시줄" });
     // 좁아져 넘치면 왼쪽(요약 글자)이 잘리고 오른쪽 토글 버튼 묶음(shrink-0, 이슈 #101)은 남는다.
-    expect(status).toHaveClass("overflow-hidden", "min-w-0", "justify-end");
+    // 가로만 자른다(overflow-x-clip). overflow-hidden이면 위로 뜨는 툴팁도 잘려 보이지 않는다(이슈 #132).
+    expect(status).toHaveClass("overflow-x-clip", "min-w-0", "justify-end");
     expect(screen.getByRole("toolbar", { name: "액션 바" })).toHaveClass("overflow-hidden");
   });
 

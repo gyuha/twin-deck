@@ -195,7 +195,7 @@ function StatusBar() {
     </button>
   );
   return (
-    <footer role="status" aria-label={t("status.aria")} className="flex min-w-0 items-center justify-end overflow-hidden border-t border-app-line px-2 py-0.5 text-xs">
+    <footer role="status" aria-label={t("status.aria")} className="flex min-w-0 items-center justify-end overflow-x-clip border-t border-app-line px-2 py-0.5 text-xs">
       {t("status.summary", { selected: summary.bytes.selected === 0 ? "0" : formatSpace(summary.bytes.selected, sizeFormat), total: formatSpace(summary.bytes.total, sizeFormat), filesSelected: summary.files.selected, filesTotal: summary.files.total, dirsSelected: summary.dirs.selected, dirsTotal: summary.dirs.total })}
       {flash && <span className="ml-4 text-status-success">{flash}</span>}
       {warnings > 0 && (
