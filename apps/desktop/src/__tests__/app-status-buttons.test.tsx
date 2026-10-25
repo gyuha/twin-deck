@@ -6,12 +6,12 @@ import { renderApp } from "./helpers";
 const bar = () => screen.getByRole("status", { name: "상태 표시줄" });
 
 describe("상태 표시줄 설정·단축키 버튼", () => {
-  it.each(["linux", "mac"] as const)("%s: 두 버튼이 보이고 title에 현재 키가 있다", async (platform) => {
+  it.each(["linux", "mac"] as const)("%s: 두 버튼이 보이고 툴팁에 현재 키가 있다", async (platform) => {
     await renderApp(undefined, platform);
     const settings = within(bar()).getByRole("button", { name: "설정" });
     const help = within(bar()).getByRole("button", { name: "단축키 목록" });
-    expect(settings.getAttribute("title")).toMatch(/설정.*\(.+\)/);
-    expect(help.getAttribute("title")).toMatch(/단축키 목록.*\(F1\)/);
+    expect(within(settings).getByRole("tooltip").textContent).toMatch(/설정.*\(.+\)/);
+    expect(within(help).getByRole("tooltip").textContent).toMatch(/단축키 목록.*\(F1\)/);
   });
 
   it("누르면 설정 화면과 도움말 화면이 열린다", async () => {
