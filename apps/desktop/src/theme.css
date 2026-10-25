@@ -16,6 +16,17 @@ html.light {
   color-scheme: light;
 }
 
+/*
+ * 창 단위 스크롤은 없어야 한다(이슈 #127). 줄이 창보다 넓어져 가로 스크롤바가 생기면 그 높이만큼 100vh를 넘어 세로 스크롤바까지 생기고,
+ * 마우스 휠이 파일 목록 대신 창 전체를 스크롤한다. 넘치는 것은 각 줄(상태 줄·액션바)이 안에서 잘라 내고, 창에는 최소 크기를 둔다(tauri.conf.json).
+ */
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   background-color: var(--color-app);
   color: var(--color-ink);

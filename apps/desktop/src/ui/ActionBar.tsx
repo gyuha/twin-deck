@@ -105,7 +105,7 @@ export function ActionBar() {
   // 옵션이 켜져 있으면 누르고 있는 수식키와 같은 조합의 버튼만 보인다(안 누르면 수식키 없는 버튼).
   const visible = (key: string | undefined) => !byModifier || modsOf(key) === held;
   return (
-    <div role="toolbar" aria-label={t("actionbar.aria")} className="flex gap-1 border-t border-app-line bg-app-dark-box px-1 py-0.5 text-xs">
+    <div role="toolbar" aria-label={t("actionbar.aria")} className="flex gap-1 overflow-hidden border-t border-app-line bg-app-dark-box px-1 py-0.5 text-xs">
       {known.map((id) => {
         const action = registry.get(id)!;
         const key = keymap.keysFor(id)[0];
@@ -121,7 +121,7 @@ export function ActionBar() {
             onClick={() => {
               if (enabled) void registry.dispatch(id, ctx);
             }}
-            className={"flex items-center gap-1 rounded border border-app-line px-2 py-0.5 " + (enabled ? "" : "opacity-40")}
+            className={"flex shrink-0 items-center gap-1 whitespace-nowrap rounded border border-app-line px-2 py-0.5 " + (enabled ? "" : "opacity-40")}
           >
             {key && <kbd className="font-mono text-ink-dull">{formatKey(key, platform)}</kbd>}
             <span>{actionShortTitle(id, action.shortTitle ?? action.title)}</span>
@@ -142,7 +142,7 @@ export function ActionBar() {
             onClick={() => {
               if (enabled) void registry.dispatch(it.action, ctx, it.args);
             }}
-            className={"flex items-center gap-1 rounded border border-app-line px-2 py-0.5 " + (enabled ? "" : "opacity-40")}
+            className={"flex shrink-0 items-center gap-1 whitespace-nowrap rounded border border-app-line px-2 py-0.5 " + (enabled ? "" : "opacity-40")}
           >
             <kbd className="font-mono text-ink-dull">{formatKey(it.key, platform)}</kbd>
             <span>{actionShortTitle(it.action, action.shortTitle ?? action.title)}</span>

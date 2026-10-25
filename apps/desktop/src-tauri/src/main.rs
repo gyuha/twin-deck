@@ -441,4 +441,19 @@ mod tests {
         .unwrap();
         assert_eq!(conf["identifier"], APP_IDENTIFIER);
     }
+
+    /// 창이 아주 좁거나 낮아져도 줄(상태 줄·액션바 등)이 창 밖으로 밀려 창 단위 스크롤이 생기지 않도록 최소 크기를 둔다(이슈 #127).
+    #[test]
+    fn first_window_has_a_minimum_size() {
+        let conf: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("tauri.conf.json"))
+                .unwrap(),
+        )
+        .unwrap();
+        let w = &conf["app"]["windows"][0];
+        assert!(w["minWidth"].as_f64().unwrap() >= 640.0, "{w}");
+        assert!(w["minHeight"].as_f64().unwrap() >= 360.0, "{w}");
+        assert!(w["minWidth"].as_f64() < w["width"].as_f64());
+        assert!(w["minHeight"].as_f64() < w["height"].as_f64());
+    }
 }

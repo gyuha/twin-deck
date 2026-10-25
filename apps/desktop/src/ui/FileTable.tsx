@@ -22,15 +22,22 @@ import type { PaneId } from "../state/store";
 
 const ROW_HEIGHT = 24;
 
+/**
+ * 열 폭. 이름 열은 남는 폭을 다 받되 아무리 좁아져도 `NAME_MIN`은 남기고, 나머지 열은 정해진 폭까지 늘어나되 패널이 좁으면
+ * `COLUMN_SHRINK_MIN`까지 줄어든다(이슈 #127). 예전에는 나머지 열이 고정 폭이라 패널이 좁으면 이름 열만 0에 가깝게 눌려 헤더가 한 글자씩 줄바꿈됐다.
+ */
+const NAME_MIN = "6rem";
+const COLUMN_SHRINK_MIN = "3rem";
+const fixedColumn = (width: string) => `minmax(${COLUMN_SHRINK_MIN},${width})`;
 const DEFAULT_WIDTH: Record<ColumnSpec["name"], string> = {
-  name: "minmax(0,1fr)",
-  size: "6rem",
-  created: "8rem",
-  modified: "8rem",
-  added: "6rem",
-  extension: "5rem",
-  permissions: "7rem",
-  permissions_octal: "5rem",
+  name: `minmax(${NAME_MIN},1fr)`,
+  size: fixedColumn("6rem"),
+  created: fixedColumn("8rem"),
+  modified: fixedColumn("8rem"),
+  added: fixedColumn("6rem"),
+  extension: fixedColumn("5rem"),
+  permissions: fixedColumn("7rem"),
+  permissions_octal: fixedColumn("5rem"),
 };
 
 /** 아이콘 칸은 아이콘 크기에 이름과의 간격(6px)을 더한 폭이다. */
@@ -40,7 +47,7 @@ const iconColumn = (iconSize: number) => `${iconSize + 6}px`;
 const MARK_COLUMN = "1.25rem";
 
 const gridTemplate = (cols: ColumnSpec[], iconSize: number, showMarks: boolean) =>
-  `${showMarks ? `${MARK_COLUMN} ` : ""}${iconColumn(iconSize)} ${cols.map((c) => (c.width ? `${c.width}px` : DEFAULT_WIDTH[c.name])).join(" ")}`;
+  `${showMarks ? `${MARK_COLUMN} ` : ""}${iconColumn(iconSize)} ${cols.map((c) => (c.width ? (c.name === "name" ? `${c.width}px` : fixedColumn(`${c.width}px`)) : DEFAULT_WIDTH[c.name])).join(" ")}`;
 
 /** 폴더 이름 장식(`behavior.table.folder_style`)의 앞뒤 글자. 화면 표시만 바꾼다. */
 const FOLDER_DECOR: Record<string, [string, string]> = { brackets: ["[", "]"], parens: ["(", ")"], slash: ["", "/"] };
@@ -414,7 +421,7 @@ export function FileTable({ pane }: { pane: PaneId }) {
                 activate();
                 api.setOrder({ by: c.name as SortKey });
               }}
-              className={(c.name === "name" ? "" : "relative text-right ") + columnEdge(c.name, k, k === columns.length - 1) + (sortable ? " cursor-pointer" : "")}
+              className={"whitespace-nowrap " + (c.name === "name" ? "" : "relative text-right ") + columnEdge(c.name, k, k === columns.length - 1) + (sortable ? " cursor-pointer" : "")}
             >
               {COLUMN_TITLES[c.name]}
               {active ? (sort.dir === "asc" ? " ▲" : " ▼") : ""}

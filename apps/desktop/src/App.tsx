@@ -181,7 +181,7 @@ function StatusBar() {
       aria-label={label}
       aria-pressed={on}
       onClick={() => void toggle()}
-      className={["group relative rounded p-0.5 hover:bg-app-selected", on ? "text-ink" : "text-ink-faint"].join(" ")}
+      className={["group relative shrink-0 rounded p-0.5 hover:bg-app-selected", on ? "text-ink" : "text-ink-faint"].join(" ")}
     >
       <Icon name={icon} />
       {tooltip(label, actionId)}
@@ -189,13 +189,13 @@ function StatusBar() {
   );
   // 메뉴바가 없는 Windows·Linux에서 설정 화면과 단축키 목록을 여는 버튼(이슈 #40). 현재 키는 툴팁에 보인다.
   const entryButton = (label: string, icon: StatusIcon, actionId: string, open: () => void) => (
-    <button type="button" tabIndex={-1} aria-label={label} onClick={open} className="group relative rounded p-0.5 text-ink-dull hover:bg-app-selected hover:text-ink">
+    <button type="button" tabIndex={-1} aria-label={label} onClick={open} className="group relative shrink-0 rounded p-0.5 text-ink-dull hover:bg-app-selected hover:text-ink">
       <Icon name={icon} />
       {tooltip(label, actionId)}
     </button>
   );
   return (
-    <footer role="status" aria-label={t("status.aria")} className="flex items-center border-t border-app-line px-2 py-0.5 text-xs">
+    <footer role="status" aria-label={t("status.aria")} className="flex min-w-0 items-center justify-end overflow-hidden border-t border-app-line px-2 py-0.5 text-xs">
       {t("status.summary", { selected: summary.bytes.selected === 0 ? "0" : formatSpace(summary.bytes.selected, sizeFormat), total: formatSpace(summary.bytes.total, sizeFormat), filesSelected: summary.files.selected, filesTotal: summary.files.total, dirsSelected: summary.dirs.selected, dirsTotal: summary.dirs.total })}
       {flash && <span className="ml-4 text-status-success">{flash}</span>}
       {warnings > 0 && (
@@ -360,7 +360,7 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
     <StoreContext.Provider value={app}>
       <UiContext.Provider value={{ registry, keymap, platform, theme }}>
       <BarWarnings base={warnings} />
-      <main className="flex h-screen flex-col">
+      <main className="flex h-full min-w-0 flex-col overflow-hidden">
         <div className="flex min-h-0 flex-1">
           <FolderTree />
           <PaneSplit onThemePreview={setThemePreview} />
