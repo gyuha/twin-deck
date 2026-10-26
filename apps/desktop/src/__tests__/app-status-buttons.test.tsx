@@ -14,6 +14,13 @@ describe("상태 표시줄 설정·단축키 버튼", () => {
     expect(within(help).getByRole("tooltip").textContent).toMatch(/단축키 목록.*\(F1\)/);
   });
 
+  // 툴팁은 버튼 위로 뜨는 절대 위치 요소라, 푸터가 세로로 넘침을 가리면(overflow-hidden) 배포 화면에서 잘려 보이지 않는다(이슈 #132).
+  it("푸터는 가로 넘침만 가리고 세로로는 툴팁이 나갈 수 있다", async () => {
+    await renderApp();
+    expect(bar().className).toContain("overflow-x-clip");
+    expect(bar().className).not.toMatch(/(^|\s)overflow-(hidden|auto|scroll|clip)(\s|$)/);
+  });
+
   it("누르면 설정 화면과 도움말 화면이 열린다", async () => {
     const { user } = await renderApp();
     await user.click(within(bar()).getByRole("button", { name: "단축키 목록" }));
