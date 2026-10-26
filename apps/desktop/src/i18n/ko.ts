@@ -34,7 +34,7 @@ export const ko = {
   "menu.view.folder_tree": "폴더 트리 표시",
   "action.core.view.folder_tree": "폴더 트리 표시 토글",
   "settings.item.behavior.layout.show_folder_tree.title": "폴더 트리 표시",
-  "settings.item.behavior.layout.show_folder_tree.desc": "왼쪽에 폴더 트리를 보입니다. 좌우 패널의 현재 폴더를 L·R 표시로 보이고, 폴더를 누르면 활성 패널이 그 폴더로 가며, 파일을 폴더에 끌어 놓으면 복사하고 Ctrl을 누르고 놓으면 이동합니다",
+  "settings.item.behavior.layout.show_folder_tree.desc": "왼쪽에 폴더 트리를 보입니다. 활성 패널의 드라이브(SFTP·FTP·SMB 포함)를 뿌리로 그 안의 좌우 패널 현재 폴더를 L·R 표시로 보이고, 폴더를 누르면 활성 패널이 그 폴더로 가며, 파일을 폴더에 끌어 놓으면 복사하고 Ctrl을 누르고 놓으면 이동합니다",
   "foldertree.aria": "폴더 트리",
   "foldertree.resize": "폴더 트리 너비 조절",
   "settings.item.behavior.layout.folder_tree_width.title": "폴더 트리 너비",
