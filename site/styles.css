@@ -634,6 +634,7 @@ p {
   line-height: 0.85;
   letter-spacing: -0.05em;
   color: var(--accent);
+  font-variant-numeric: tabular-nums;
 }
 .theme-number span {
   display: block;
