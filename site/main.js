@@ -58,6 +58,31 @@ if ("IntersectionObserver" in window) {
     .forEach((element) => observer.observe(element));
 }
 
+// 테마 수는 화면에 들어오면 0에서 올라간다. 처음엔 빠르게, 끝으로 갈수록 느리게 가라앉는다.
+const themeCount = document.querySelector(".theme-count");
+if (themeCount && "IntersectionObserver" in window && !reducedMotion.matches) {
+  const target = Number(themeCount.getAttribute("value"));
+  const duration = 2400;
+  themeCount.textContent = "0";
+  const countObserver = new IntersectionObserver(
+    (entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      countObserver.disconnect();
+      const start = performance.now();
+      const step = (now) => {
+        const progress = Math.min((now - start) / duration, 1);
+        themeCount.textContent = String(
+          Math.round(target * (1 - (1 - progress) ** 4)),
+        );
+        if (progress < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    },
+    { threshold: 0.6 },
+  );
+  countObserver.observe(themeCount);
+}
+
 const actions = english
   ? {
       switch: {
