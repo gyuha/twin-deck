@@ -5,6 +5,16 @@ import { access, readFile, readdir } from "node:fs/promises";
 const output = new URL("../dist/site/", import.meta.url);
 for (const page of ["index.html", "en.html"]) {
   const html = await readFile(new URL(page, output), "utf8");
+  assert.match(
+    html,
+    /name="color-scheme" content="dark"/,
+    "사이트는 다크 테마만 제공합니다.",
+  );
+  assert.doesNotMatch(
+    html,
+    /theme-toggle|theme-light\.png/,
+    "밝은 테마 전환을 배포하지 않습니다.",
+  );
   if (page === "en.html") {
     assert.match(html, /<html lang="en">/, "영문 페이지의 문서 언어");
     assert.match(
@@ -51,6 +61,12 @@ for (const page of ["index.html", "en.html"]) {
   }
 }
 const js = await readFile(new URL("main.js", output), "utf8");
+const css = await readFile(new URL("styles.css", output), "utf8");
+for (const [, reference] of css.matchAll(
+  /url\(["']?(assets\/[\w.-]+)["']?\)/g,
+)) {
+  await access(new URL(reference, output));
+}
 for (const [, name] of js.matchAll(/['"`]((?:assets\/)?[\w-]+\.png)['"`]/g)) {
   await access(
     new URL(name.startsWith("assets/") ? name : `assets/${name}`, output),

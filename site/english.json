@@ -8,7 +8,6 @@
   "작업의 흐름": "Workflow",
   "기능": "Features",
   "나만의 공간": "Make it yours",
-  "어두운 화면으로 전환": "Switch to dark mode",
   "다운로드": "Download",
   "macOS와 Windows를 위한 파일 관리자": "A file manager for macOS and Windows",
   "두 개의 패널.": "Two panes.",
@@ -81,10 +80,7 @@
   "가지 테마": "themes",
   "매일 쓰는 공간.": "Your daily space.",
   "내 취향 그대로.": "Your own style.",
-  "밝게, 어둡게, 나답게.": "Light, dark, entirely yours.",
   "112가지 테마에 글꼴과 단축키까지 더해보세요.": "Choose from 112 themes. Make it your own with fonts and shortcuts.",
-  "Catppuccin Latte 밝은 테마의 Twin Deck": "Twin Deck in the light Catppuccin Latte theme",
-  "앱 테마 미리보기": "Preview app themes",
   "한국어와 English 지원. 설정은 TOML로 저장하고, 앱에서 바로 바꿀 수 있습니다.": "Available in English and Korean. Settings are stored in TOML and can be changed right in the app.",
   "파일 정리의": "Find your",
   "새로운 리듬.": "file flow.",
@@ -97,5 +93,10 @@
   "설치 안내 보기": "Installation guide",
   "두 개의 패널. 하나의 흐름.": "Two panes. One flow.",
   "변경 사항 ↗": "Release notes ↗",
-  "피드백 ↗": "Feedback ↗"
+  "피드백 ↗": "Feedback ↗",
+  "키보드로 빠르게,": "Fast on the keys.",
+  "파일 관리는 가볍게.": "Light on your workflow.",
+  "주요 단축키": "Essential shortcuts",
+  "내 손에 맞게, 나답게.": "Made to fit the way you work.",
+  "Dracula 어두운 테마의 Twin Deck": "Twin Deck in the dark Dracula theme"
 }

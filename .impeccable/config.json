@@ -1,0 +1,26 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "dark-glow",
+        "value": "*",
+        "files": [
+          "site/index.html"
+        ],
+        "createdAt": "2026-10-26T11:50:21.766Z",
+        "reason": "User confirmed: explicitly requested the glowing orange folders and curved light trail shown in the attached reference image."
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "site/index.html"
+        ],
+        "createdAt": "2026-10-26T11:52:33.831Z",
+        "reason": "Agent reviewed: gallery text has 24–44px inset; only the real application screenshot intentionally meets the bottom frame edge, matching the existing product showcase."
+      }
+    ]
+  }
+}

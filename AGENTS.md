@@ -131,6 +131,8 @@ flowchart TD
 - Drag & drop is **custom pointer-event drag** (`ui/DragLayer.tsx`, `drag` state in the store), not HTML5 DnD: the webview can't report Ctrl during native drags and the OS draws the cursor badge. When the pointer leaves the window it hands off to `start_native_drag` (the `drag` crate) so files can be dropped on Finder/Explorer. `tauri.conf.json` sets `acceptFirstMouse` so an inactive window receives the first press.
 - Preview (`ui/Preview.tsx`): text/code/markdown/json/image/pdf/audio/video/cbz. Audio uses data-URL→Blob; video streams through the Tauri asset protocol (`Backend.fileUrl`); PDF paging uses `#page=N` because the WKWebView viewer can't be scrolled from JS.
 
+제품 소개 사이트(`site/`)를 수정할 때는 `docs/12-site-design.md`의 확정 컨셉·기준 시안·레이어·모션·검증 순서와 `DESIGN.md`의 현재 디자인 토큰을 먼저 확인한다. 개발·배포 명령은 `site/README.md`에 있다. 임시 시안과 검수 캡처는 저장소에 쌓지 않는다.
+
 ## Platform gotchas
 
 - macOS filenames are NFD on disk/SMB but the UI uses NFC. `td-vfs/src/local.rs` retries failed stat/create/copy/rename/remove with an NFD path (`retry_nfd`); SMB shares return "not found" for NFC paths, which previously broke copy and conflict detection. Keep that when adding new `LocalFs` operations.

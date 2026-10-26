@@ -4,6 +4,8 @@ node_modules/
 dist/
 *.log
 .DS_Store
+output/site-concepts/
+output/site-preview/
 apps/desktop/src-tauri/gen/
 
 .forge/loop.md

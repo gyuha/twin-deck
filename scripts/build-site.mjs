@@ -15,12 +15,23 @@ for (const name of [
   "preview-code",
   "find",
   "treemap",
-  "theme-light",
   "theme-dracula",
 ]) {
   await cp(
     new URL(`docs/screenshots/${name}.png`, root),
     new URL(`assets/${name}.png`, output),
+  );
+}
+// 캐릭터와 배경은 독립된 공개 자산으로 복사한다.
+for (const name of [
+  "courier.webp",
+  "courier-small.webp",
+  "night-city.webp",
+  "night-city-small.webp",
+]) {
+  await cp(
+    new URL(`site/assets/${name}`, root),
+    new URL(`assets/${name}`, output),
   );
 }
 await cp(

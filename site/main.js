@@ -1,46 +1,6 @@
 const english = document.documentElement.lang === "en";
 const message = (ko, en) => (english ? en : ko);
 // 콘텐츠와 다운로드 링크는 JavaScript가 없어도 사용할 수 있다.
-const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
-const themeToggle = document.querySelector(".theme-toggle");
-let selectedTheme;
-try {
-  selectedTheme = localStorage.getItem("twin-deck-site-theme");
-} catch {
-  /* 저장소가 차단되어도 페이지는 동작한다. */
-}
-function applyTheme(theme) {
-  document.documentElement.dataset.theme = theme;
-  themeToggle.setAttribute(
-    "aria-label",
-    theme === "dark"
-      ? message("밝은 화면으로 전환", "Switch to light mode")
-      : message("어두운 화면으로 전환", "Switch to dark mode"),
-  );
-}
-applyTheme(
-  selectedTheme === "dark" || selectedTheme === "light"
-    ? selectedTheme
-    : systemTheme.matches
-      ? "dark"
-      : "light",
-);
-themeToggle.hidden = false;
-themeToggle.addEventListener("click", () => {
-  selectedTheme =
-    document.documentElement.dataset.theme === "dark" ? "light" : "dark";
-  applyTheme(selectedTheme);
-  try {
-    localStorage.setItem("twin-deck-site-theme", selectedTheme);
-  } catch {
-    /* 현재 탭의 선택은 유지한다. */
-  }
-});
-systemTheme.addEventListener("change", () => {
-  if (!selectedTheme) applyTheme(systemTheme.matches ? "dark" : "light");
-});
-
 if ("IntersectionObserver" in window) {
   const observer = new IntersectionObserver(
     (entries) => {
@@ -58,30 +18,56 @@ if ("IntersectionObserver" in window) {
     .forEach((element) => observer.observe(element));
 }
 
-// 테마 수는 화면에 들어오면 0에서 올라간다. 처음엔 빠르게, 끝으로 갈수록 느리게 가라앉는다.
+// 캐릭터와 파일 이동 모션은 첫 화면을 보는 동안에만 실행한다.
+const hero = document.querySelector(".hero");
+let heroVisible = true;
+function syncHeroMotion() {
+  hero.classList.toggle("motion-paused", !heroVisible || document.hidden);
+}
+if ("IntersectionObserver" in window) {
+  const heroObserver = new IntersectionObserver(([entry]) => {
+    heroVisible = entry.isIntersecting;
+    syncHeroMotion();
+  });
+  heroObserver.observe(hero);
+}
+document.addEventListener("visibilitychange", syncHeroMotion);
+syncHeroMotion();
+
+// 테마 수는 처음 화면에 들어올 때만 빠르게 시작해 천천히 마무리한다.
 const themeCount = document.querySelector(".theme-count");
-if (themeCount && "IntersectionObserver" in window && !reducedMotion.matches) {
-  const target = Number(themeCount.getAttribute("value"));
-  const duration = 2400;
+const motionPreference = window.matchMedia("(prefers-reduced-motion: reduce)");
+let countFrame;
+function finishThemeCount() {
+  cancelAnimationFrame(countFrame);
+  themeCount.textContent = themeCount.dataset.countTo;
+}
+if ("IntersectionObserver" in window && !motionPreference.matches) {
   themeCount.textContent = "0";
   const countObserver = new IntersectionObserver(
     (entries) => {
       if (!entries.some((entry) => entry.isIntersecting)) return;
       countObserver.disconnect();
-      const start = performance.now();
-      const step = (now) => {
-        const progress = Math.min((now - start) / duration, 1);
-        themeCount.textContent = String(
-          Math.round(target * (1 - (1 - progress) ** 4)),
-        );
-        if (progress < 1) requestAnimationFrame(step);
-      };
-      requestAnimationFrame(step);
+      if (motionPreference.matches) return finishThemeCount();
+      const target = Number(themeCount.dataset.countTo);
+      const started = performance.now();
+      themeCount.textContent = "0";
+      function tick(now) {
+        const progress = Math.min((now - started) / 2000, 1);
+        const eased = 1 - (1 - progress) ** 3;
+        themeCount.textContent = String(Math.floor(target * eased));
+        if (progress < 1) countFrame = requestAnimationFrame(tick);
+        else finishThemeCount();
+      }
+      countFrame = requestAnimationFrame(tick);
     },
-    { threshold: 0.6 },
+    { threshold: 0.5 },
   );
   countObserver.observe(themeCount);
 }
+motionPreference.addEventListener("change", () => {
+  if (motionPreference.matches) finishThemeCount();
+});
 
 const actions = english
   ? {
@@ -188,29 +174,6 @@ tabs.forEach((tab, index) => {
     }
   });
 });
-
-document.querySelectorAll("[data-theme-preview]").forEach((button) =>
-  button.addEventListener("click", () => {
-    const light = button.dataset.themePreview === "light";
-    document.querySelectorAll("[data-theme-preview]").forEach((item) => {
-      item.setAttribute("aria-pressed", String(item === button));
-      item.classList.toggle("is-active", item === button);
-    });
-    const image = document.querySelector("#theme-image");
-    image.src = light ? "assets/theme-light.png" : "assets/theme-dracula.png";
-    image.alt = light
-      ? message(
-          "Catppuccin Latte 밝은 테마의 Twin Deck",
-          "Twin Deck in the light Catppuccin Latte theme",
-        )
-      : message(
-          "Dracula 어두운 테마의 Twin Deck",
-          "Twin Deck in the dark Dracula theme",
-        );
-    if (!reducedMotion.matches)
-      image.animate([{ opacity: 0.4 }, { opacity: 1 }], { duration: 350 });
-  }),
-);
 
 const copyButton = document.querySelector("#copy-command");
 copyButton.hidden = false;

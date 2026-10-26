@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-26T12:00:30.806833+00:00",
+  "title": "Design System: Twin Deck 소개 페이지",
+  "extensions": {
+    "colorMeta": {
+      "accent": {
+        "role": "primary",
+        "displayName": "쿠리어 주황색",
+        "canonical": "#ff794b"
+      },
+      "background": {
+        "role": "neutral",
+        "displayName": "도시의 검정",
+        "canonical": "#101012"
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "차콜 면",
+        "canonical": "#18181b"
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "따뜻한 흰색",
+        "canonical": "#f5f1ec"
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "첫 화면 제목",
+        "purpose": "한국어·영어 두 줄 제목"
+      },
+      "body": {
+        "displayName": "본문",
+        "purpose": "기능 설명"
+      },
+      "mono": {
+        "displayName": "시스템 고정폭",
+        "purpose": "키캡·명령 표시"
+      }
+    },
+    "shadows": [
+      {
+        "name": "product",
+        "value": "0 35px 80px -25px #000, 0 0 50px -28px #ff794b66",
+        "purpose": "실제 앱 화면의 깊이와 절제된 주황색 반사"
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-standard",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "등장·상태 전환"
+      },
+      {
+        "name": "courier-breathe",
+        "value": "7s ease-in-out infinite",
+        "purpose": "캐릭터의 작은 호흡 모션"
+      },
+      {
+        "name": "folder-flight",
+        "value": "6s linear infinite",
+        "purpose": "요청한 파일 이동 궤적. 화면 밖·비활성 탭에서 중단"
+      },
+      {
+        "name": "theme-count",
+        "value": "2000ms; 1 - (1 - t)^3",
+        "purpose": "첫 진입 때 한 번 감속 카운트업. 모션 줄이기는 최종값"
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "mobile",
+        "value": "767px"
+      },
+      {
+        "name": "tablet",
+        "value": "1023px"
+      },
+      {
+        "name": "small-desktop",
+        "value": "1279px"
+      },
+      {
+        "name": "wide",
+        "value": "1600px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "주 다운로드 버튼",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "주황색 면과 짙은 글자",
+      "html": "<a class=\"ds-primary\" href=\"#download\">macOS 다운로드 ↗</a>",
+      "css": ".ds-primary { display:inline-flex; align-items:center; padding:15px 23px; background:var(--accent,#ff794b); color:#1b100c; border-radius:7px; font:700 15px -apple-system,sans-serif; text-decoration:none; }"
+    },
+    {
+      "name": "보조 다운로드 버튼",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "어두운 면과 얇은 경계",
+      "html": "<a class=\"ds-secondary\" href=\"#download\">Windows 다운로드 ↗</a>",
+      "css": ".ds-secondary { display:inline-flex; padding:15px 23px; background:#121214b3; color:var(--text,#f5f1ec); border:1px solid #7f6e65; border-radius:7px; font:700 15px -apple-system,sans-serif; text-decoration:none; }"
+    },
+    {
+      "name": "활성 키캡",
+      "kind": "custom",
+      "refersTo": "keycap-active",
+      "description": "주황색 활성 표시와 누르는 두께",
+      "html": "<kbd class=\"ds-keycap\">F5</kbd>",
+      "css": ".ds-keycap { display:inline-grid; place-items:center; width:86px; height:72px; font:26px ui-monospace,SFMono-Regular,Consolas,monospace; color:var(--accent,#ff794b); background:linear-gradient(145deg,#29282b,#19191b); border:1px solid var(--accent,#ff794b); border-radius:8px; box-shadow:0 2px 0 #09090a; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "나이트 쿠리어",
+    "overview": "**나이트 쿠리어**. 어두운 도시, 주황색 스카프의 캐릭터, 두 패널 사이의 빛나는 파일 흐름으로 키보드 중심 파일 관리를 표현한다. 사용자가 다섯 시안 중 3번을 선택했고, 기존 로고 유지·다크 전용·이미지 분리·실제 앱 화면 사용을 확정했다.\n\n컨셉의 기준 시안과 구현 구조는 [docs/12-site-design.md](docs/12-site-design.md)에 있다. 이 파일은 현재 사이트의 토큰과 표현 원칙을 기록한다. 이전 파란색 쇼룸·라이트/다크 전환 디자인은 더 이상 기준이 아니다. 앱 내부 테마는 이 문서의 적용 대상이 아니다.",
+    "keyCharacteristics": [
+      "다크 단일 테마와 주황색 파일 흐름",
+      "기존 빨간 로고와 실제 앱 화면 유지",
+      "캐릭터·도시·스크린샷·SVG를 독립 레이어로 구성",
+      "모바일·영어·모션 줄이기·JavaScript 비활성화 지원"
+    ],
+    "rules": [
+      {
+        "name": "주황색 흐름",
+        "body": "`site/styles.css`의 `:root`가 구현 값의 출처다. 검정·차콜 면, 따뜻한 흰색 글자, 주황색 `#ff794b`를 페이지 전체에서 일관되게 쓴다. 하단은 같은 도시를 어둡게 재사용해 끝낸다. 배경의 낮은 채도 변화는 허용하지만 다른 강조색의 섹션으로 전환하지 않는다.\n\n기존 브랜드 아이콘의 빨간색은 공식 이미지 그대로 보존한다. 아이콘을 CSS 색으로 다시 그리지 않는다. 실제 앱 스크린샷 내부의 테마색도 그대로 보존한다.\n\n폴더 효과는 주황색에서 밝은 살구색·크림색으로 이어지는 빛을 쓴다. 사용자가 기준 이미지의 발광 효과를 명시적으로 요청한 경우이므로 이 레이어의 빛을 일반적인 장식 금지 규칙으로 제거하지 않는다.",
+        "section": "colors"
+      },
+      {
+        "name": "시스템 서체",
+        "body": "본문·제목은 운영체제의 한국어 시스템 산세리프를 사용한다. 키캡에는 `ui-monospace, SFMono-Regular, Consolas, monospace`를 사용하며 웹폰트를 새로 내려받지 않는다.\n\n첫 화면 제목은 두 줄, 둘째 줄은 주황색이다. 본문은 보통 15–19px, 짧은 캡션·환경 표시는 최소 12px이다. 모바일에서도 작은 보조 정보를 12px 아래로 줄이지 않는다. 한글은 어절 단위로 줄을 바꾸고 영어에서도 제목·버튼이 넘치지 않게 한다.\n\n테마 수는 숫자와 라벨을 별도 요소로 두고, `.theme-count`에 `tabular-nums`와 `min-width: 3ch`를 적용한다. 라벨용 작은 글자 스타일이 숫자에 상속되지 않게 한다.",
+        "section": "typography"
+      }
+    ],
+    "dos": [
+      "기준 시안과 docs/12-site-design.md를 먼저 확인한다.",
+      "실제 앱 스크린샷의 두 패널과 비율을 보존한다."
+    ],
+    "donts": [
+      "라이트 전환·파란색 강조·새 로고를 되살리지 않는다.",
+      "시안의 가상 UI를 실제 앱 화면으로 쓰지 않는다.",
+      "임시 캡처와 탈락 시안을 계속 쌓지 않는다."
+    ]
+  }
+}

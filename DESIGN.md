@@ -1,225 +1,149 @@
 ---
 name: Twin Deck 소개 페이지
-description: 실제 앱 화면을 제품처럼 진열하는, 파랑 하나로 말하는 조용한 쇼룸.
+description: 어두운 도시의 나이트 쿠리어와 두 패널 사이의 주황색 파일 흐름.
 colors:
-  link-blue: "#0868ce"
-  link-blue-deep: "#075bb5"
-  link-blue-night: "#77b9ff"
-  paper: "#f7f8fa"
-  mist: "#eef0f3"
-  white: "#ffffff"
-  ink: "#202125"
-  slate: "#666a72"
-  hairline: "#d9dde3"
-  night: "#111214"
-  night-mist: "#1b1d20"
-  night-card: "#24262a"
-  night-ink: "#f4f5f7"
-  night-slate: "#a4a8b0"
-  night-hairline: "#373a40"
+  background: "#101012"
+  surface: "#18181b"
+  card: "#202023"
+  text: "#f5f1ec"
+  muted: "#b0aaa5"
+  accent: "#ff794b"
+  accent-hover: "#ff946c"
+  line: "#38312f"
+  trail-light: "#ffcd8d"
+  folder-light: "#ffe7b8"
 typography:
   display:
     fontFamily: "-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif"
-    fontSize: "clamp(58px, 7.3vw, 96px)"
-    fontWeight: 760
-    lineHeight: 1.12
-    letterSpacing: "-0.045em"
+    fontSize: "clamp(58px, 5.6vw, 83px)"
+    fontWeight: 800
+    lineHeight: 1.13
+    letterSpacing: "-0.055em"
   headline:
     fontFamily: "-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif"
-    fontSize: "clamp(36px, 5.1vw, 70px)"
-    fontWeight: 730
-    lineHeight: 1.2
-    letterSpacing: "-0.04em"
+    fontSize: "clamp(36px, 4.8vw, 64px)"
+    fontWeight: 760
+    lineHeight: 1.22
+    letterSpacing: "-0.045em"
   title:
     fontFamily: "-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif"
-    fontSize: "clamp(25px, 2.6vw, 36px)"
-    fontWeight: 700
-    lineHeight: 1.25
-    letterSpacing: "-0.03em"
+    fontSize: "clamp(26px, 2.6vw, 36px)"
+    lineHeight: 1.28
+    letterSpacing: "-0.035em"
   body:
     fontFamily: "-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif"
     fontSize: "16px"
-    fontWeight: 400
-    lineHeight: 1.75
+    lineHeight: 1.8
   label:
     fontFamily: "-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif"
     fontSize: "13px"
-    fontWeight: 650
-    letterSpacing: "-0.02em"
+  mono:
+    fontFamily: "ui-monospace, SFMono-Regular, Consolas, monospace"
+    fontSize: "14px"
 rounded:
-  sm: "10px"
-  md: "16px"
-  card: "28px"
-  pill: "100px"
+  key-small: "5px"
+  tab: "6px"
+  button: "7px"
+  key: "8px"
+  product: "10px"
+  panel: "12px"
 spacing:
-  section: "120px"
-  section-tablet: "90px"
+  section: "112px"
   section-mobile: "72px"
-  gutter: "64px"
-  card-padding: "44px"
+  gutter: "48px"
+  gutter-mobile: "20px"
+  card-padding: "40px"
 components:
   button-primary:
-    backgroundColor: "{colors.link-blue}"
-    textColor: "{colors.white}"
-    rounded: "{rounded.pill}"
-    padding: "16px 24px"
+    backgroundColor: "{colors.accent}"
+    textColor: "#1b100c"
+    rounded: "{rounded.button}"
+    padding: "15px 23px"
   button-primary-hover:
-    backgroundColor: "{colors.link-blue-deep}"
+    backgroundColor: "{colors.accent-hover}"
   button-secondary:
-    backgroundColor: "{colors.mist}"
-    textColor: "{colors.ink}"
-    rounded: "18px"
-    padding: "19px 24px"
+    backgroundColor: "#121214b3"
+    textColor: "{colors.text}"
+    rounded: "{rounded.button}"
+    padding: "15px 23px"
   keycap:
-    backgroundColor: "{colors.white}"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.md}"
-    width: "94px"
-    height: "88px"
+    textColor: "{colors.text}"
+    rounded: "{rounded.key}"
+    width: "86px"
+    height: "72px"
   keycap-active:
-    textColor: "{colors.link-blue}"
+    textColor: "{colors.accent}"
   feature-card:
-    backgroundColor: "{colors.mist}"
-    rounded: "{rounded.card}"
+    backgroundColor: "#171719"
+    rounded: "{rounded.panel}"
     padding: "{spacing.card-padding}"
   tab:
-    textColor: "{colors.slate}"
-    rounded: "{rounded.pill}"
-    padding: "11px 22px"
+    textColor: "{colors.muted}"
+    rounded: "{rounded.tab}"
+    padding: "12px 22px"
   tab-selected:
-    backgroundColor: "{colors.ink}"
-    textColor: "{colors.paper}"
+    backgroundColor: "#ff794b10"
+    textColor: "{colors.accent}"
 ---
 
 # Design System: Twin Deck 소개 페이지
 
 ## Overview
 
-**Creative North Star: "조용한 쇼룸"**
+**나이트 쿠리어**. 어두운 도시, 주황색 스카프의 캐릭터, 두 패널 사이의 빛나는 파일 흐름으로 키보드 중심 파일 관리를 표현한다. 사용자가 다섯 시안 중 3번을 선택했고, 기존 로고 유지·다크 전용·이미지 분리·실제 앱 화면 사용을 확정했다.
 
-소개 페이지는 제품을 설명하기보다 진열한다. 실제 앱 화면이 가장 큰 오브젝트이고, 페이지의 나머지는 그 화면이 잘 보이도록 비켜 서 있다. 큰 여백, 크고 단단한 제목, 차가운 회백 면, 그리고 파랑 하나가 전부다. 장식 일러스트나 사진은 없다. 시선을 끄는 것은 항상 진짜 스크린샷과 키보드 키캡이다.
-
-톤은 Apple 제품 소개에서 영감을 얻은 정적 전시장이다. 차분하고 단정하지만 차갑지 않다. 문장은 짧은 마침표 문장으로 끊고(예: "두 개의 패널. 하나의 흐름."), 제목의 마지막 구절만 색이나 명도를 낮춰 호흡을 만든다. 라이트와 다크 두 화면을 모두 일급으로 지원하며, OS 설정을 따르고 사용자가 직접 고를 수 있다.
-
-기존 구현이 이 체계의 출처이며, 이 문서는 새 세계를 정하지 않고 현재 구현을 기록한다.
-
-**Key Characteristics:**
-- 강조색은 파랑 하나. 링크, 주 버튼, 활성 키캡, 제목의 마지막 구절에만 쓴다.
-- 구분은 선이 아니라 면의 명도 차이(paper / mist / white)로 한다.
-- 그림자는 제품 화면과 키캡에만 있다.
-- 한 화면에 한 가지 일만 한다. 섹션당 제목 하나, 보조 문장 하나, 오브젝트 하나.
-- 제품 화면은 실제 캡처만 쓴다. 가공한 목업을 쓰지 않는다.
+컨셉의 기준 시안과 구현 구조는 [docs/12-site-design.md](docs/12-site-design.md)에 있다. 이 파일은 현재 사이트의 토큰과 표현 원칙을 기록한다. 이전 파란색 쇼룸·라이트/다크 전환 디자인은 더 이상 기준이 아니다. 앱 내부 테마는 이 문서의 적용 대상이 아니다.
 
 ## Colors
 
-차가운 회백 바탕 위에 단 하나의 파랑. 파랑은 클릭할 수 있거나 지금 선택된 것을 뜻하고, 그 밖에는 쓰지 않는다.
+`site/styles.css`의 `:root`가 구현 값의 출처다. 검정·차콜 면, 따뜻한 흰색 글자, 주황색 `#ff794b`를 페이지 전체에서 일관되게 쓴다. 하단은 같은 도시를 어둡게 재사용해 끝낸다. 배경의 낮은 채도 변화는 허용하지만 다른 강조색의 섹션으로 전환하지 않는다.
 
-### Primary
-- **링크 블루** (#0868ce): 주 버튼 바탕, 텍스트 링크, 제목 강조 구절, 활성 키캡, "112" 숫자. 라이트 화면의 유일한 채도 있는 색.
-- **링크 블루 딥** (#075bb5): 주 버튼 hover.
-- **나이트 블루** (#77b9ff): 다크 화면에서 링크 블루를 대신하는 강조색(링크, 제목 강조 구절, 활성 키캡).
+기존 브랜드 아이콘의 빨간색은 공식 이미지 그대로 보존한다. 아이콘을 CSS 색으로 다시 그리지 않는다. 실제 앱 스크린샷 내부의 테마색도 그대로 보존한다.
 
-### Neutral (라이트)
-- **페이퍼** (#f7f8fa): 페이지 바탕.
-- **미스트** (#eef0f3): 교차 섹션 바탕, 기능 카드, 보조 버튼 면.
-- **화이트** (#ffffff): 갤러리 면, 선택된 테마 칩, 키캡 상단.
-- **잉크** (#202125): 본문·제목. 순수 검정을 쓰지 않는다.
-- **슬레이트** (#666a72): 보조 문장, 캡션, 비활성 탭.
-- **헤어라인** (#d9dde3): 1px 경계, 키캡 하단 두께.
-
-### Neutral (다크)
-- **나이트** (#111214), **나이트 미스트** (#1b1d20), **나이트 카드** (#24262a): 라이트의 paper / mist / white에 대응하는 세 면.
-- **나이트 잉크** (#f4f5f7), **나이트 슬레이트** (#a4a8b0), **나이트 헤어라인** (#373a40).
-
-### Named Rules
-**The One Blue Rule.** 파랑 외의 채도 있는 색은 없다. 새 강조가 필요하면 색을 더하지 말고 크기, 굵기, 명도로 해결한다.
-
-**The Surface Ladder Rule.** 깊이는 페이퍼 → 미스트 → 화이트(다크는 나이트 → 나이트 미스트 → 나이트 카드) 세 단계 면으로만 만든다. 면 위에 같은 단계의 면을 다시 얹지 않는다.
+폴더 효과는 주황색에서 밝은 살구색·크림색으로 이어지는 빛을 쓴다. 사용자가 기준 이미지의 발광 효과를 명시적으로 요청한 경우이므로 이 레이어의 빛을 일반적인 장식 금지 규칙으로 제거하지 않는다.
 
 ## Typography
 
-**Display / Body Font:** 시스템 산세리프 — `-apple-system`, `BlinkMacSystemFont`, `Apple SD Gothic Neo`, `Noto Sans KR`, `Malgun Gothic`. 웹폰트를 내려받지 않는다.
+본문·제목은 운영체제의 한국어 시스템 산세리프를 사용한다. 키캡에는 `ui-monospace, SFMono-Regular, Consolas, monospace`를 사용하며 웹폰트를 새로 내려받지 않는다.
 
-**Character:** 플랫폼 본연의 글꼴로 앱과 같은 환경에 있다는 느낌을 준다. 개성은 서체가 아니라 크기 대비와 좁은 자간에서 나온다. 한글은 `word-break: keep-all`과 `text-wrap: balance`로 어절 단위로 끊는다.
+첫 화면 제목은 두 줄, 둘째 줄은 주황색이다. 본문은 보통 15–19px, 짧은 캡션·환경 표시는 최소 12px이다. 모바일에서도 작은 보조 정보를 12px 아래로 줄이지 않는다. 한글은 어절 단위로 줄을 바꾸고 영어에서도 제목·버튼이 넘치지 않게 한다.
 
-### Hierarchy
-- **Display** (760, clamp(58px, 7.3vw, 96px), 1.12, -0.045em): 첫 화면 제목 하나. 두 줄이며 둘째 줄은 파랑.
-- **Headline** (730, clamp(36px, 5.1vw, 70px), 1.2, -0.04em): 섹션 제목. 두 문장으로 끊고 뒤 문장은 `슬레이트`로 낮추기도 한다.
-- **Title** (700, clamp(25px, 2.6vw, 36px), 1.25, -0.03em): 카드와 갤러리 소제목.
-- **Body** (400, 16–19px, 1.75): 섹션 보조 문장은 슬레이트. 짧은 줄로 끊는다.
-- **Label** (650, 13px, -0.02em): 내비와 첫 화면 CTA 아래 한 줄처럼 작은 문구. 보조 정보는 13px을 바닥으로 한다.
-
-### Named Rules
-**The Tight But Legible Rule.** 자간은 -0.03em ~ -0.045em까지만. 한글 글자가 서로 닿으면 너무 좁은 것이다.
-
-**The Thirteen Floor Rule.** 읽는 글자는 13px 아래로 내리지 않는다(모바일은 11px이 바닥이며 캡션류는 12px).
+테마 수는 숫자와 라벨을 별도 요소로 두고, `.theme-count`에 `tabular-nums`와 `min-width: 3ch`를 적용한다. 라벨용 작은 글자 스타일이 숫자에 상속되지 않게 한다.
 
 ## Layout
 
-폭 1120px 컨테이너(`min(1120px, 100% - 64px)`)를 중앙에 두고, 태블릿(≤1024px)은 좌우 24px, 모바일(≤767px)은 20px 여백이다. 섹션 세로 여백은 데스크톱 120px, 태블릿 90px, 모바일 72px로 넉넉하다. 한 섹션은 제목 블록 하나와 오브젝트 하나(키캡 + 화면, 갤러리, 카드 그리드, 테마 쇼케이스)로 구성한다. 섹션 바탕은 페이퍼와 미스트를 번갈아 써서 구분선 없이 리듬을 만든다.
+컨테이너는 최대 1280px, 기본 좌우 여백 48px, 모바일은 20px이다. 내비게이션은 데스크톱 76px, 모바일 64px이며 고정된다. 섹션 간격은 기본 112px, 모바일 72px이다. 상세 분기는 현재 미디어 쿼리를 따른다.
 
-기능 카드 그리드는 12열이다. 1행은 7:5, 2행은 5:7로 좌우를 뒤집은 지그재그이며(768px 이상), 모바일에서 1열로 접힌다. 내비게이션은 66px 높이로 상단에 고정하고 모바일에서는 섹션 링크를 숨긴다.
+데스크톱 첫 화면은 왼쪽 캐릭터·아래 실제 앱 화면과 오른쪽 제목·다운로드로 구성한다. 모바일에서는 문구·다운로드를 앞에 두고 캐릭터·앱 화면을 아래로 연결한다. SVG는 제품 화면을 기준으로 함께 축소하되 다운로드·단축키를 덮지 않도록 검수한다.
+
+기존 앵커·기능 설명·한영 전환·다운로드 흐름을 유지한다. 기능 카드의 12열 그리드는 모바일에서 1열로 접힌다. 갤러리의 앱 화면이 아래 테두리와 맞닿는 것은 의도한 진열 방식이며, 설명 텍스트는 충분한 안쪽 여백을 둔다.
 
 ## Elevation & Depth
 
-면 대비가 기본이다. 카드와 섹션은 그림자 없이 색 면과 1px 헤어라인으로 분리한다. 그림자는 두 곳에만 있다: 앱 스크린샷(제품의 무게)과 키캡(누르는 물체의 두께).
+어두운 면의 미세한 차이와 얇은 경계가 기본이다. 제품 화면은 중립적인 그림자로 떠 있는 느낌을 주고, 키캡은 단단한 하단 두께로 누르는 물체임을 드러낸다.
 
-### Shadow Vocabulary
-- **제품 화면** (`box-shadow: 0 35px 65px -25px #19263840`, 다크 `0 35px 75px -25px #0009`): 스크린샷 아래에만. 큰 오프셋과 음의 퍼짐으로 바닥에 놓인 느낌.
-- **키캡** (`0 6px 0 var(--line), 0 10px 18px #00000012, inset 0 1px 0 #ffffff40`): 키 하단 두께를 단단한 줄로 표현. 활성 상태는 4px 눌려 두께가 2px로 줄어든다.
-
-### Named Rules
-**The Showroom Light Rule.** 그림자는 제품 화면과 키캡의 것이다. 카드, 버튼, 텍스트에 그림자를 더하지 않는다.
+주황색 광원은 캐릭터·도시와 폴더 이동 궤적에 집중한다. 모든 카드·본문·버튼에 발광을 확장하지 않는다. 효과는 이미지에 굽지 않고 독립된 SVG로 유지한다.
 
 ## Shapes
 
-둥근 사각형이 기본 언어이고 반경이 위계를 말한다. 큰 면(카드, 키 영역, 갤러리)은 28px, 키캡은 16px, 버튼과 탭은 알약(100px), 앱 스크린샷은 12–14px로 실제 창 모서리에 가깝게. 모바일에서는 큰 면을 22px로 줄인다. 헤어라인은 1px이며 색 있는 굵은 경계선은 쓰지 않는다. 히어로 뒤의 얇은 타원 궤도선은 유일한 순수 장식이며 매우 옅다.
+패널은 12px, 앱 화면은 10px, 키캡은 8px, 버튼은 7px, 탭은 6px, 작은 키캡은 5px 반경을 사용한다. 네이티브 앱 스크린샷과 공식 로고의 형태는 자산 자체를 따른다.
 
 ## Components
 
-### Buttons
-- **Shape:** 알약(100px). 다운로드 선택 버튼만 18px 둥근 사각형.
-- **Primary:** 링크 블루 바탕 + 흰 글자, 패딩 16px 24px, 굵기 600. 다운로드 버튼은 아래에 작은 부제(Apple Silicon / x64)를 둔다.
-- **Hover / Focus:** hover는 3px 떠오르며 딥 블루로. 포커스는 3px 파랑 링(오프셋 6px).
-- **Secondary:** 미스트 바탕 + 헤어라인 경계, hover에서 헤어라인 색으로.
-
-### Keycap (signature)
-- **Style:** 94×88px, 16px 반경, 흰색에서 미스트로 이어지는 옅은 대각선 면, 하단 6px 두께.
-- **State:** hover는 4px 올라가고, 활성은 4px 눌리며 글자가 파랑, 안쪽 1px 파랑 테두리. `:active`는 더 깊이 눌린다. 라벨은 키 아래 13px.
-
-### Cards / Containers
-- **Corner Style:** 28px.
-- **Background:** 미스트 면(페이퍼 섹션 위) 또는 페이퍼(미스트 섹션 위). 단일 카드 안에 카드를 넣지 않는다.
-- **Shadow Strategy:** 없음.
-- **Border:** 필요할 때만 1px 헤어라인.
-- **Internal Padding:** 44px(태블릿 32px).
-
-### Tabs
-- **Style:** 알약. 비활성은 슬레이트 글자, 선택은 잉크 바탕 + 페이퍼 글자(다크에서 반전).
-- **State:** 비활성 hover는 미스트 면 + 잉크 글자. 방향키와 Home/End로 이동.
-
-### Navigation
-- 66px 고정 헤더, 페이퍼를 84%(다크 88%) 투과해 흐림 처리(스크롤하는 콘텐츠 위에 떠 있기 때문). 링크는 13px 슬레이트, hover에서 잉크. 오른쪽에 언어 전환(EN), 테마 토글(SVG 아이콘), 작은 알약 다운로드 버튼. 모바일에서 섹션 링크는 숨김.
-
-### Theme Showcase
-- 앱의 두 테마(Catppuccin Latte, Dracula)를 스크린샷으로 전환해 보여 주는 칩 둘. 선택된 칩은 흰 면 + 헤어라인.
+- **브랜드:** 공식 빨간 앱 아이콘과 정자체 `Twin Deck`. 새 사선 심벌·이탤릭 워드마크·주황색 아이콘으로 교체하지 않는다.
+- **이미지:** 배경·투명 캐릭터·기존 앱 스크린샷을 각각 분리한다. 작은 WebP는 같은 이미지의 축소본이다.
+- **주 버튼:** 주황색 바탕과 짙은 글자. Windows 버튼은 어두운 면과 경계로 구분한다. 포커스는 주황색 2px, 오프셋 6px이다.
+- **폴더 흐름:** 폴더 네 개, 주황색 빛의 곡선, 도착 화살표. 6초 주기의 CSS 경로 모션이며 클릭·접근성 탐색을 방해하지 않는다.
+- **테마 수:** 첫 진입 때 2초 동안 0 → 112, `1 - (1 - t)^3`으로 감속. 같은 페이지에서 반복하지 않는다.
+- **캐릭터:** 7초 주기의 작은 CSS 호흡 모션이다. 눈·스카프의 개별 애니메이션이 구현된 것으로 설명하지 않는다.
+- **모션 대체:** 화면 밖과 비활성 탭에서는 반복 모션을 멈춘다. 모션 줄이기에서는 폴더·캐릭터는 정지하고 숫자는 최종값을 표시한다. JavaScript 없이도 내용·다운로드·최종 숫자를 읽을 수 있다.
 
 ## Do's and Don'ts
 
-### Do:
-- **Do** 제품 화면은 `docs/screenshots/`의 실제 캡처를 쓴다.
-- **Do** 새 섹션은 제목 블록 하나 + 오브젝트 하나로 만들고, 섹션 바탕은 페이퍼와 미스트를 번갈아 쓴다.
-- **Do** 강조가 필요하면 파랑, 크기, 굵기, 명도 중에서 고른다.
-- **Do** 모든 상호작용에 hover, 포커스, 눌림을 준다. 포커스 링은 3px 파랑.
-- **Do** 등장 모션은 요소의 성격에 따라 달리한다: 섹션 제목은 페이드, 기능 카드는 14px 상승 + 70ms 순차 지연, 키캡·테마 영역은 28px 상승. 모든 섹션에 같은 등장 효과를 붙이지 않는다.
-- **Do** 전환은 지수형 ease-out(`cubic-bezier(0.16, 1, 0.3, 1)`)을 쓰고, OS의 모션 줄이기를 존중한다.
-- **Do** 한국어를 먼저 쓰고 `site/english.json`에 짝 문구를 둔다.
-
-### Don't:
-- **Don't** 파랑 외의 강조색을 더하지 않는다. 그라디언트 글자도 쓰지 않는다.
-- **Don't** 카드·버튼·텍스트에 그림자를 더하지 않는다(제품 화면과 키캡만).
-- **Don't** 구현하지 않은 기능이나 확인하지 못한 동작을 화면·문구로 보여 주지 않는다.
-- **Don't** 읽는 글자를 13px 아래로 내리지 않고, 제목 자간을 -0.045em보다 좁히지 않는다.
-- **Don't** 카드 안에 카드를 넣거나 같은 크기 아이콘 카드 격자를 새 페이지 뼈대로 쓰지 않는다.
-- **Don't** 제목 위에 작은 라벨 문구(eyebrow)를 두지 않는다. 제목이 직접 말하게 한다.
-- **Don't** 유니코드 기호를 아이콘 대신 쓰지 않는다(새 아이콘은 SVG).
+- 컨셉을 수정하기 전에 기준 문서·시안·현재 소스를 함께 확인한다.
+- 실제 기능과 단축키·플랫폼 지원은 제품 문서를 따른다.
+- 스크린샷의 두 패널과 가로세로 비율을 보존하고 새 공개 자산은 빌드 허용 목록에 등록한다.
+- 모바일, 영어, 모션 줄이기, 키보드 조작, 가로 넘침을 검수한다.
+- 시안에 그려진 가상 UI를 실제 제품 화면으로 사용하지 않는다.
+- 라이트 전환·파란색 강조·새 로고를 되살리지 않는다.
+- 임시 검수 캡처와 탈락 시안을 저장소에 계속 쌓지 않는다.

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <script src="language.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="color-scheme" content="light dark" />
+    <meta name="color-scheme" content="dark" />
     <meta
       name="description"
       content="두 개의 패널, 하나의 흐름. Twin Deck은 키보드로 파일을 옮기고, 미리 보고, 정리하는 macOS와 Windows 파일 관리자입니다."
@@ -38,14 +38,27 @@
     />
     <link rel="canonical" href="https://gyuha.com/twin-deck/" />
     <link rel="icon" type="image/png" href="assets/icon.png" />
-    <link rel="preload" as="image" href="assets/main.png" />
+    <link
+      rel="preload"
+      as="image"
+      href="assets/courier.webp"
+      imagesrcset="assets/courier-small.webp 640w, assets/courier.webp 1024w"
+      imagesizes="(max-width: 767px) 500px, 685px"
+    />
+    <link
+      rel="preload"
+      as="image"
+      href="assets/night-city.webp"
+      imagesrcset="assets/night-city-small.webp 768w, assets/night-city.webp 1536w"
+      imagesizes="100vw"
+      fetchpriority="high"
+    />
     <link rel="stylesheet" href="styles.css" />
     <script src="main.js" defer></script>
     <noscript
       ><style>
         .gallery-tabs,
         .key-controls,
-        .theme-choices,
         .key-experience > .caption {
           display: none;
         }
@@ -84,14 +97,7 @@
             aria-label="Read in English"
             >EN</a
           >
-          <button
-            class="theme-toggle"
-            type="button"
-            aria-label="어두운 화면으로 전환"
-            hidden
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" stroke="none"/></svg></button
-          ><a class="button small" href="#download"
+          <a class="button small" href="#download"
             >다운로드 <span aria-hidden="true">↗</span></a
           >
         </div>
@@ -99,31 +105,160 @@
     </header>
     <main id="main">
       <section class="hero" aria-labelledby="hero-title">
-        <div class="hero-copy wrap">
-          <h1 id="hero-title">두 개의 패널.<br /><span>하나의 흐름.</span></h1>
-          <p class="hero-description">
-            찾고, 옮기고, 미리 보고.<br />파일을 다루는 모든 순간이 자연스럽게
-            이어집니다.
-          </p>
-          <a class="text-link" href="#workflow"
-            >Twin Deck 만나보기 <span aria-hidden="true">↘</span></a
-          >
-          <p class="hero-platforms">macOS와 Windows를 위한 파일 관리자</p>
-        </div>
-        <div class="hero-stage wrap">
-          <div class="orbit orbit-one" aria-hidden="true"></div>
-          <div class="orbit orbit-two" aria-hidden="true"></div>
-          <figure class="hero-product">
+        <img
+          class="hero-background"
+          src="assets/night-city.webp"
+          srcset="
+            assets/night-city-small.webp  768w,
+            assets/night-city.webp       1536w
+          "
+          sizes="100vw"
+          fetchpriority="high"
+          width="1536"
+          height="1024"
+          alt=""
+          aria-hidden="true"
+        />
+        <div class="hero-scene wrap">
+          <div class="hero-character" aria-hidden="true">
             <img
-              src="assets/main.png"
-              alt="왼쪽 프로젝트 폴더와 오른쪽 다운로드 폴더를 나란히 보여 주는 Twin Deck 실제 화면"
-              width="1800"
-              height="710"
+              src="assets/courier.webp"
+              srcset="assets/courier-small.webp 640w, assets/courier.webp 1024w"
+              sizes="(max-width: 767px) 500px, 685px"
+              width="1024"
+              height="1536"
+              alt=""
               fetchpriority="high"
             />
-          </figure>
-          <div class="hero-caption">
-            <span>왼쪽에서 고르고.</span><span>오른쪽으로 보내고.</span>
+          </div>
+          <div class="hero-copy">
+            <h1 id="hero-title">
+              두 개의 패널.<br /><span>하나의 흐름.</span>
+            </h1>
+            <p class="hero-description">
+              키보드로 빠르게,<br class="mobile-break" />
+              파일 관리는 가볍게.
+            </p>
+            <div class="hero-downloads">
+              <a
+                class="button"
+                href="https://github.com/gyuha/twin-deck/releases/latest"
+                >macOS 다운로드 <span aria-hidden="true">↗</span></a
+              >
+              <a
+                class="button secondary"
+                href="https://github.com/gyuha/twin-deck/releases/latest"
+                >Windows 다운로드 <span aria-hidden="true">↗</span></a
+              >
+            </div>
+            <p class="hero-platforms">macOS Apple Silicon · Windows x64</p>
+            <div class="hero-keys" aria-label="주요 단축키">
+              <a href="#workflow"><kbd>Tab</kbd><span>패널 전환</span></a>
+              <a href="#workflow"><kbd>F5</kbd><span>복사</span></a>
+              <a href="#workflow"><kbd>F6</kbd><span>이동</span></a>
+            </div>
+          </div>
+          <div class="hero-stage">
+            <svg
+              class="transfer-effect"
+              viewBox="0 0 1000 400"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <defs>
+                <linearGradient
+                  id="transfer-folder-fill"
+                  x1="0"
+                  y1="0"
+                  x2="0.3"
+                  y2="1"
+                >
+                  <stop offset="0" stop-color="#ffe7b8" />
+                  <stop offset="0.3" stop-color="#ffb778" />
+                  <stop offset="1" stop-color="#ff753a" stop-opacity="0.85" />
+                </linearGradient>
+                <filter
+                  id="transfer-glow"
+                  x="-100%"
+                  y="-100%"
+                  width="300%"
+                  height="300%"
+                >
+                  <feGaussianBlur stdDeviation="5" />
+                </filter>
+                <marker
+                  id="transfer-arrow"
+                  viewBox="0 0 20 20"
+                  refX="16"
+                  refY="10"
+                  markerWidth="12"
+                  markerHeight="12"
+                  orient="auto"
+                >
+                  <path d="M 1 1 L 18 10 L 1 19 L 5 10 Z" fill="#ffdc9c" />
+                </marker>
+                <g id="transfer-folder">
+                  <path
+                    d="M -34 -21 L -34 -30 Q -34 -33 -30 -33 L -13 -33 L -5 -24 L 30 -24 Q 34 -24 34 -20 L 34 24 Q 34 28 30 28 L -30 28 Q -34 28 -34 24 Z"
+                    fill="url(#transfer-folder-fill)"
+                    stroke="#ffe5b5"
+                    stroke-width="2"
+                  />
+                  <path
+                    d="M -33 -19 L 33 -19"
+                    fill="none"
+                    stroke="#fff1cf"
+                    stroke-width="2"
+                  />
+                </g>
+              </defs>
+              <g class="transfer-trails" fill="none" stroke-linecap="round">
+                <path
+                  class="transfer-halo"
+                  d="M 65 235 C 200 45 625 -35 755 110 C 805 165 815 215 815 270"
+                />
+                <path
+                  class="transfer-arc"
+                  d="M 65 235 C 200 45 625 -35 755 110 C 805 165 815 215 815 270"
+                  marker-end="url(#transfer-arrow)"
+                />
+                <path
+                  class="transfer-echo"
+                  d="M 30 260 C 205 58 635 -12 770 130 C 807 175 827 230 815 270"
+                />
+                <path
+                  class="transfer-echo transfer-echo-faint"
+                  d="M 100 242 C 235 92 615 14 745 135 C 788 180 797 220 815 270"
+                />
+              </g>
+              <g class="flow-folder" style="--rest: 29%; --delay: -1.74s">
+                <use class="folder-halo" href="#transfer-folder" />
+                <use href="#transfer-folder" />
+              </g>
+              <g class="flow-folder" style="--rest: 43%; --delay: -2.58s">
+                <use class="folder-halo" href="#transfer-folder" />
+                <use href="#transfer-folder" />
+              </g>
+              <g class="flow-folder" style="--rest: 57%; --delay: -3.42s">
+                <use class="folder-halo" href="#transfer-folder" />
+                <use href="#transfer-folder" />
+              </g>
+              <g class="flow-folder" style="--rest: 71%; --delay: -4.26s">
+                <use class="folder-halo" href="#transfer-folder" />
+                <use href="#transfer-folder" />
+              </g>
+            </svg>
+            <figure class="hero-product">
+              <img
+                src="assets/main.png"
+                alt="왼쪽 프로젝트 폴더와 오른쪽 다운로드 폴더를 나란히 보여 주는 Twin Deck 실제 화면"
+                width="1800"
+                height="710"
+              />
+            </figure>
+            <div class="hero-caption">
+              <span>왼쪽에서 고르고.</span><span>오른쪽으로 보내고.</span>
+            </div>
           </div>
         </div>
       </section>
@@ -403,13 +538,13 @@
         <div class="wrap">
           <div class="personal-heading reveal">
             <div class="theme-number" aria-hidden="true">
-              <data class="theme-count" value="112">112</data
-              ><span>가지 테마</span>
+              <span class="theme-count" data-count-to="112">112</span
+              ><span class="theme-label">가지 테마</span>
             </div>
             <div>
               <h2 id="personal-title">매일 쓰는 공간.<br />내 취향 그대로.</h2>
               <p>
-                밝게, 어둡게, 나답게.<br />112가지 테마에 글꼴과 단축키까지
+                내 손에 맞게, 나답게.<br />112가지 테마에 글꼴과 단축키까지
                 더해보세요.
               </p>
             </div>
@@ -417,29 +552,12 @@
           <div class="theme-showcase reveal">
             <img
               id="theme-image"
-              src="assets/theme-light.png"
-              alt="Catppuccin Latte 밝은 테마의 Twin Deck"
+              src="assets/theme-dracula.png"
+              alt="Dracula 어두운 테마의 Twin Deck"
               width="1800"
               height="960"
               loading="lazy"
             />
-          </div>
-          <div class="theme-choices" role="group" aria-label="앱 테마 미리보기">
-            <button
-              type="button"
-              class="is-active"
-              data-theme-preview="light"
-              aria-pressed="true"
-            >
-              <span class="swatch latte" aria-hidden="true"></span>Catppuccin
-              Latte</button
-            ><button
-              type="button"
-              data-theme-preview="dark"
-              aria-pressed="false"
-            >
-              <span class="swatch dracula" aria-hidden="true"></span>Dracula
-            </button>
           </div>
           <p class="caption">
             한국어와 English 지원. 설정은 TOML로 저장하고, 앱에서 바로 바꿀 수
@@ -450,52 +568,55 @@
 
       <section
         id="download"
-        class="download section wrap"
+        class="download section"
         aria-labelledby="download-title"
       >
-        <img
-          class="download-icon reveal"
-          src="assets/icon.png"
-          width="104"
-          height="104"
-          alt=""
-          loading="lazy"
-        />
-        <h2 id="download-title" class="reveal">
-          파일 정리의<br /><span class="muted">새로운 리듬.</span>
-        </h2>
-        <p>이제, Twin Deck으로 시작하세요.</p>
-        <div class="download-options">
-          <a
-            class="button"
-            href="https://github.com/gyuha/twin-deck/releases/latest"
-            >macOS 다운로드 <span aria-hidden="true">↗</span
-            ><small>Apple Silicon</small></a
-          ><a
-            class="button secondary"
-            href="https://github.com/gyuha/twin-deck/releases/latest"
-            >Windows 다운로드 <span aria-hidden="true">↗</span
-            ><small>x64</small></a
-          >
+        <div class="download-inner wrap">
+          <img
+            class="download-icon reveal"
+            src="assets/icon.png"
+            width="104"
+            height="104"
+            alt=""
+            loading="lazy"
+          />
+          <h2 id="download-title" class="reveal">
+            파일 정리의<br /><span class="muted">새로운 리듬.</span>
+          </h2>
+          <p>이제, Twin Deck으로 시작하세요.</p>
+          <div class="download-options">
+            <a
+              class="button"
+              href="https://github.com/gyuha/twin-deck/releases/latest"
+              >macOS 다운로드 <span aria-hidden="true">↗</span
+              ><small>Apple Silicon</small></a
+            ><a
+              class="button secondary"
+              href="https://github.com/gyuha/twin-deck/releases/latest"
+              >Windows 다운로드 <span aria-hidden="true">↗</span
+              ><small>x64</small></a
+            >
+          </div>
+          <div class="brew">
+            <code id="brew-command"
+              >brew install --cask gyuha/tap/twin-deck</code
+            ><button
+              type="button"
+              id="copy-command"
+              aria-label="Homebrew 설치 명령 복사"
+              hidden
+            >
+              복사
+            </button>
+          </div>
+          <p id="copy-status" class="copy-status" role="status"></p>
+          <p class="install-note">
+            서명되지 않은 앱으로 첫 실행 시 OS의 확인이 필요할 수 있습니다.<br /><a
+              href="https://github.com/gyuha/twin-deck#설치"
+              >설치 안내 보기 <span aria-hidden="true">↗</span></a
+            >
+          </p>
         </div>
-        <div class="brew">
-          <code id="brew-command">brew install --cask gyuha/tap/twin-deck</code
-          ><button
-            type="button"
-            id="copy-command"
-            aria-label="Homebrew 설치 명령 복사"
-            hidden
-          >
-            복사
-          </button>
-        </div>
-        <p id="copy-status" class="copy-status" role="status"></p>
-        <p class="install-note">
-          서명되지 않은 앱으로 첫 실행 시 OS의 확인이 필요할 수 있습니다.<br /><a
-            href="https://github.com/gyuha/twin-deck#설치"
-            >설치 안내 보기 <span aria-hidden="true">↗</span></a
-          >
-        </p>
       </section>
     </main>
     <footer class="footer wrap">
