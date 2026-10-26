@@ -392,7 +392,7 @@ p {
   border-radius: 12px;
   overflow: hidden;
   box-shadow: var(--shadow);
-  aspect-ratio: 1800/705;
+  aspect-ratio: 1800/710;
   background: #1e1e2e;
 }
 .workflow-screen img {
@@ -403,10 +403,10 @@ p {
 }
 .panel-focus {
   position: absolute;
-  top: 7%;
+  top: 4.5%;
   left: 0;
   width: 50%;
-  height: 82%;
+  height: 81.5%;
   border: 2px solid #9cc9ff;
   border-radius: 2px;
   pointer-events: none;
