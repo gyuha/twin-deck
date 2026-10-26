@@ -29,20 +29,20 @@ export function DragLayer() {
       e.preventDefault();
       e.stopPropagation();
     };
-    const cancel = () => api.dragCancel();
+    const blur = () => api.dragBlur();
     window.addEventListener("mousemove", move);
     window.addEventListener("mouseup", up);
     window.addEventListener("keydown", key, true);
     window.addEventListener("keyup", key, true);
     window.addEventListener("click", click, true);
-    window.addEventListener("blur", cancel);
+    window.addEventListener("blur", blur);
     return () => {
       window.removeEventListener("mousemove", move);
       window.removeEventListener("mouseup", up);
       window.removeEventListener("keydown", key, true);
       window.removeEventListener("keyup", key, true);
       window.removeEventListener("click", click, true);
-      window.removeEventListener("blur", cancel);
+      window.removeEventListener("blur", blur);
     };
   }, [api]);
 

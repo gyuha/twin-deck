@@ -230,6 +230,24 @@ describe("창 밖으로 끌어 가기(Finder 같은 다른 앱에 놓기)", () =
     up(section("right"));
   });
 
+  it("창 안에서 끌다 Cmd+Tab 등으로 창이 포커스를 잃으면 운영체제 드래그로 넘겨 유지한다", async () => {
+    const { backend } = await renderApp(seed());
+    const src = rowByText("left", "a.txt");
+    down(src);
+    moveTo(src, 40, 40);
+    expect(ghost()).not.toBeNull();
+    fireEvent.blur(window);
+    await waitFor(() => expect(backend.nativeDrags).toEqual([["/home/a/a.txt"]]));
+    expect(ghost()).toBeNull();
+  });
+
+  it("끌지 않을 때 창이 포커스를 잃어도 운영체제 드래그를 시작하지 않는다", async () => {
+    const { backend } = await renderApp(seed());
+    down(rowByText("left", "a.txt")); // 눌렀지만 5px 넘게 움직이지 않았다
+    fireEvent.blur(window);
+    expect(backend.nativeDrags).toEqual([]);
+  });
+
   it("운영체제 드래그를 시작하지 못하면 알림을 보여 준다", async () => {
     const { backend } = await renderApp(seed());
     backend.startNativeDrag = async () => {

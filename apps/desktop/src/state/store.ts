@@ -2596,6 +2596,19 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       justDragged = true;
       setTimeout(() => (justDragged = false), 0);
     },
+    /**
+     * 창이 포커스를 잃었다(Cmd+Tab 등). 앱 안에서 끌던 중이면 취소하지 않고 창 밖으로 나갔을 때처럼 운영체제 드래그로 넘겨,
+     * 전환한 앱에 놓을 수 있게 한다. 다른 앱에서 끌어 오는 중이거나 끌고 있지 않으면 `dragCancel`과 같다.
+     */
+    dragBlur() {
+      const drag = get().drag;
+      if (!drag || drag.external) return api.dragCancel();
+      pendingDrag = null;
+      set({ drag: null });
+      justDragged = true;
+      setTimeout(() => (justDragged = false), 0);
+      void api.dragOutOfWindow(drag.paths);
+    },
     /** 드래그를 막 끝냈으면 그 직후의 click을 무시하라고 알려 준다. */
     consumeDragClick(): boolean {
       return justDragged;
