@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { baseName, isArchivePath, isRemotePath, parentPath } from "@twin-deck/ts-client";
+import type { VolumeDto } from "@twin-deck/ts-client";
+import { volumeOf } from "../lib/volumes";
 import { activeTab, clampTreeWidth, TREE_WIDTH_DEFAULT, TREE_WIDTH_MAX, TREE_WIDTH_MIN } from "../state/store";
 import type { PaneId } from "../state/store";
 import { useApp, useAppStore, useT } from "../state/context";
 import { Chevron } from "./Chevron";
 
-/** 폴더 트리 (이슈 #125, VS Code식): 하나뿐인 왼쪽 트리가 좌우 패널의 현재 폴더를 보인다. `behavior.layout.show_folder_tree`로 켠다. */
+/** 폴더 트리 (이슈 #125, VS Code식): 하나뿐인 왼쪽 트리가 활성 패널의 드라이브를 뿌리로 그 드라이브 안의 좌우 패널 현재 폴더를 보인다(이슈 #134). `behavior.layout.show_folder_tree`로 켠다. */
 
-/** 트리의 뿌리. Windows는 드라이브 루트들, 그 밖은 `/` 하나. */
+/** 활성 패널이 트리를 정하지 못할 때(가상·압축 안 탭이 처음부터 활성)의 뿌리. Windows는 드라이브 루트들, 그 밖은 `/` 하나. */
 function rootsOf(mounts: string[]): string[] {
   const drives = mounts.filter((m) => /^[A-Za-z]:/.test(m));
   return drives.length > 0 ? drives : ["/"];
@@ -20,8 +22,18 @@ function ancestorsOf(path: string): string[] {
   return out;
 }
 
-/** 로컬 폴더가 아니면(가상 탭·압축 안·원격) 트리에 표시하지 않는다. */
-const localPath = (tab: { path: string; virtual?: unknown }): string | null => (tab.virtual || isArchivePath(tab.path) || isRemotePath(tab.path) ? null : tab.path);
+/** 폴더가 아닌 위치(가상 탭·압축 안)는 트리에 표시하지 않는다. 원격(sftp·ftp)과 SMB 마운트는 폴더다. */
+const treePath = (tab: { path: string; virtual?: unknown }): string | null => (tab.virtual || isArchivePath(tab.path) ? null : tab.path);
+
+/**
+ * `path`가 놓인 드라이브의 트리 뿌리. 원격은 `sftp://<id>/`, Windows는 드라이브 문자(`volumes`에 없어도 경로만으로 정한다),
+ * 그 밖은 `path`가 속한 볼륨의 마운트 지점(어느 볼륨에도 안 속하면 `/`). 뿌리는 `path`의 조상 사슬에서 고르므로 트리가 반드시 이어진다.
+ */
+function driveRoot(path: string, volumes: readonly VolumeDto[]): string {
+  const chain = [...ancestorsOf(path), path];
+  const vol = isRemotePath(path) || /^[A-Za-z]:/.test(path) ? null : volumeOf(path, volumes);
+  return (vol && chain.find((p) => volumeOf(p, volumes)?.mountPoint === vol.mountPoint)) || chain[0];
+}
 
 interface Row {
   path: string;
@@ -38,8 +50,8 @@ export function FolderTree() {
   const showHidden = useApp((s) => s.showHidden);
   const mounts = useApp((s) => s.volumes.map((v) => v.mountPoint).join("\n"));
   const activePane = useApp((s) => s.activePane);
-  const leftPath = useApp((s) => localPath(activeTab(s, "left")));
-  const rightPath = useApp((s) => localPath(activeTab(s, "right")));
+  const leftTreePath = useApp((s) => treePath(activeTab(s, "left")));
+  const rightTreePath = useApp((s) => treePath(activeTab(s, "right")));
   // 패널 목록의 하위 폴더 이름들. 패널에서 폴더를 만들거나 지우거나 옮겨 이 값이 바뀌면 트리의 그 폴더도 다시 읽는다.
   const dirSig = (pane: PaneId) => (s: Parameters<typeof activeTab>[0]) => activeTab(s, pane).entries.filter((e) => e.kind === "dir").map((e) => e.name).join("/");
   const leftDirs = useApp(dirSig("left"));
@@ -48,7 +60,17 @@ export function FolderTree() {
   const draftWidth = useApp((s) => s.treeWidthDraft);
   const width = draftWidth ?? clampTreeWidth(configWidth);
   const dropDir = useApp((s) => (s.drag?.target?.tree ? s.drag.target.dir : null));
-  const roots = useMemo(() => rootsOf(mounts ? mounts.split("\n") : []), [mounts]);
+  const volumes = useMemo<VolumeDto[]>(() => (mounts ? mounts.split("\n").map((m) => ({ name: m, mountPoint: m })) : []), [mounts]);
+  // 뿌리는 활성 패널의 드라이브 하나다. 활성 패널이 가상·압축 안 탭이면 마지막 뿌리를 그대로 둔다(처음부터 그렇다면 기본 뿌리).
+  const lastRoot = useRef<string | null>(null);
+  const activeTreePath = activePane === "left" ? leftTreePath : rightTreePath;
+  if (activeTreePath) lastRoot.current = driveRoot(activeTreePath, volumes);
+  const root = lastRoot.current;
+  const roots = useMemo(() => (root ? [root] : rootsOf(mounts ? mounts.split("\n") : [])), [root, mounts]);
+  // 같은 드라이브 안의 패널 위치만 트리에 표시한다.
+  const inRoot = (p: string | null) => (p && root && driveRoot(p, volumes) === root ? p : null);
+  const leftPath = inRoot(leftTreePath);
+  const rightPath = inRoot(rightTreePath);
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   /** 폴더 경로 → 하위 폴더 경로들. 키가 없으면 아직 읽지 않았다. */
   const [children, setChildren] = useState<ReadonlyMap<string, string[]>>(new Map());
@@ -81,7 +103,11 @@ export function FolderTree() {
   useEffect(() => {
     if (!show) return;
     // 조상과 그 폴더 자신을 펼친다(하위 폴더가 보여야 거기에 끌어 놓을 수 있다).
-    const wanted = [leftPath, rightPath].flatMap((p) => (p ? [...ancestorsOf(p), p] : []));
+    const wanted = [leftPath, rightPath].flatMap((p) => {
+      if (!p) return [];
+      const chain = [...ancestorsOf(p), p];
+      return chain.slice(Math.max(root ? chain.indexOf(root) : 0, 0)); // 뿌리 위쪽 조상은 트리에 없다
+    });
     for (const r of roots) load(r);
     if (wanted.length === 0) return;
     setOpen((prev) => (wanted.every((w) => prev.has(w)) ? prev : new Set([...prev, ...wanted])));

@@ -1,6 +1,6 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { FakeBackend } from "@twin-deck/ts-client";
+import { FakeBackend, joinPath } from "@twin-deck/ts-client";
 import { entryNames, list, renderApp } from "./helpers";
 
 // 왼쪽 /home/a: docs(readme.md) other(o.txt) a.txt b.txt / 오른쪽 /home/b: dest(d.txt) x.txt
@@ -17,7 +17,8 @@ const seed = (tree = true) => {
   return b;
 };
 const tree = () => screen.queryByRole("navigation", { name: "폴더 트리" });
-const node = (path: string) => tree()!.querySelector<HTMLElement>(`[data-tree-path="${path}"]`);
+// 속성 선택자는 Windows 경로의 `\`를 CSS 이스케이프로 읽으므로 값을 직접 비교한다.
+const node = (path: string) => [...tree()!.querySelectorAll<HTMLElement>("[data-tree-path]")].find((n) => n.dataset.treePath === path) ?? null;
 const badges = (path: string) => [...(node(path)?.querySelectorAll("[data-pane-badge]") ?? [])].map((b) => b.textContent);
 const rowByText = (name: string) => within(list("left")).getAllByRole("option").find((o) => o.textContent?.includes(name))!;
 
@@ -170,5 +171,87 @@ describe("폴더 트리 너비 조절 (이슈 #125)", () => {
     fireEvent.doubleClick(sep());
     await waitFor(() => expect(width()).toBe(224));
     expect((await backend.getConfig()).config.behavior.layout.folder_tree_width).toBe(224);
+  });
+});
+
+// 왼쪽 로컬 /home/a, 오른쪽 로컬 /home/b + 원격 sftp://kim@nas:22(docs/sub/f.txt, b.txt)·ftp://ftp.example.com:21(pub/p.txt)
+const remoteSeed = () => {
+  const b = new FakeBackend().seed({
+    "/home/a/a.txt": "a",
+    "/home/b/x.txt": "x",
+    "sftp://kim@nas:22/docs/sub/f.txt": "f",
+    "sftp://kim@nas:22/b.txt": "b",
+    "ftp://ftp.example.com:21/pub/inner/p.txt": "p",
+  });
+  b.setConfig((l) => (l.config.behavior.layout.show_folder_tree = true));
+  return b;
+};
+
+describe("폴더 트리가 활성 패널의 드라이브를 따른다 (이슈 #134)", () => {
+  it("sftp 패널이 활성이면 뿌리가 그 연결이고 현재 폴더까지 펼쳐 L로 표시하며 로컬 노드는 없다", async () => {
+    await renderApp(remoteSeed(), "linux", { left: "sftp://kim@nas:22/docs", right: "/home/b" });
+    await waitFor(() => expect(node("sftp://kim@nas:22/docs/sub")).not.toBeNull());
+    expect(node("sftp://kim@nas:22/")).not.toBeNull();
+    expect(node("sftp://kim@nas:22/")).toHaveAttribute("aria-level", "1");
+    expect(badges("sftp://kim@nas:22/docs")).toEqual(["L"]);
+    expect(node("sftp://kim@nas:22/docs")).toHaveAttribute("aria-selected", "true");
+    expect(node("/home")).toBeNull();
+    expect(node("/home/b")).toBeNull(); // 오른쪽은 다른 드라이브(로컬)라 이 트리에 표시되지 않는다
+  });
+
+  it("sftp 노드를 누르면 활성 패널이 그 원격 폴더로 간다", async () => {
+    const { user } = await renderApp(remoteSeed(), "linux", { left: "sftp://kim@nas:22/docs", right: "/home/b" });
+    await waitFor(() => expect(node("sftp://kim@nas:22/docs/sub")).not.toBeNull());
+    await user.click(node("sftp://kim@nas:22/docs/sub")!);
+    await waitFor(() => expect(entryNames("left")).toContain("f.txt"));
+    expect(badges("sftp://kim@nas:22/docs/sub")).toEqual(["L"]);
+    await user.click(node("sftp://kim@nas:22/")!);
+    await waitFor(() => expect(entryNames("left")).toContain("b.txt"));
+  });
+
+  it("ftp:// 패널도 뿌리가 그 연결이고 하위 폴더가 보인다", async () => {
+    await renderApp(remoteSeed(), "linux", { left: "ftp://ftp.example.com:21/pub", right: "/home/b" });
+    await waitFor(() => expect(node("ftp://ftp.example.com:21/pub/inner")).not.toBeNull());
+    expect(node("ftp://ftp.example.com:21/")).toHaveAttribute("aria-level", "1");
+    expect(badges("ftp://ftp.example.com:21/pub")).toEqual(["L"]);
+    expect(node("/home")).toBeNull();
+  });
+
+  it("SMB 마운트(/Volumes/공유) 패널이 활성이면 뿌리가 그 마운트 지점이다", async () => {
+    const b = remoteSeed().seed({ "/Volumes/공유/docs/sub/f.txt": "f" });
+    b.volumes.push({ name: "공유", mountPoint: "/Volumes/공유" });
+    await renderApp(b, "mac", { left: "/Volumes/공유/docs", right: "/home/b" });
+    await waitFor(() => expect(node("/Volumes/공유/docs/sub")).not.toBeNull());
+    expect(node("/Volumes/공유")).toHaveAttribute("aria-level", "1");
+    expect(badges("/Volumes/공유/docs")).toEqual(["L"]);
+    expect(node("/")).toBeNull();
+    expect(node("/home/b")).toBeNull();
+  });
+
+  it("SMB Windows 드라이브(Z:\\)는 volumes 목록에 없어도 경로의 드라이브 문자가 뿌리다", async () => {
+    const b = remoteSeed();
+    b.volumes = [{ name: "C:\\", mountPoint: "C:\\" }];
+    // 가짜 파일시스템은 `/` 경로만 다뤄서 Z: 아래만 이 시험 안에서 따로 응답한다.
+    const fs: Record<string, string[]> = { "Z:\\": ["share"], "Z:\\share": ["docs"], "Z:\\share\\docs": ["sub"], "Z:\\share\\docs\\sub": [] };
+    const orig = b.listDir.bind(b);
+    const tmpl = (await b.listDir("/home", false)).find((e) => e.kind === "dir")!;
+    b.listDir = async (p, h) => (p in fs ? fs[p].map((n) => ({ ...tmpl, name: n, path: joinPath(p, n), kind: "dir" as const })) : orig(p, h));
+    await renderApp(b, "windows", { left: "Z:\\share\\docs", right: "/home/b" });
+    await waitFor(() => expect(node("Z:\\share\\docs\\sub")).not.toBeNull());
+    expect(node("Z:\\")).toHaveAttribute("aria-level", "1");
+    expect(badges("Z:\\share\\docs")).toEqual(["L"]);
+    expect(node("C:\\")).toBeNull();
+  });
+
+  it("활성 패널을 바꾸면 트리 뿌리가 그 패널의 드라이브로 바뀌고 다른 드라이브의 표시는 없다", async () => {
+    const { user } = await renderApp(remoteSeed(), "linux", { left: "/home/a", right: "sftp://kim@nas:22/docs" });
+    await waitFor(() => expect(badges("/home/a")).toEqual(["L"]));
+    expect(node("sftp://kim@nas:22/")).toBeNull();
+    await user.keyboard("{Tab}"); // 오른쪽(sftp)이 활성
+    await waitFor(() => expect(badges("sftp://kim@nas:22/docs")).toEqual(["R"]));
+    expect(node("/home/a")).toBeNull();
+    await user.keyboard("{Tab}"); // 다시 왼쪽(로컬)
+    await waitFor(() => expect(badges("/home/a")).toEqual(["L"]));
+    expect(node("sftp://kim@nas:22/")).toBeNull();
   });
 });

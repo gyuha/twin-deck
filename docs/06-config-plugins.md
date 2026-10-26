@@ -114,7 +114,7 @@ shift_mode = "invert"             # "invert"(Marta 방식) | "extend"
 [behavior.layout]
 show_action_bar = true
 folder_tree_width = 224          # 폴더 트리의 너비(px). 트리 오른쪽 경계를 끌어 바꾸고 더블클릭하면 기본값, 120~600으로 맞춘다
-show_folder_tree = false         # 왼쪽 폴더 트리(이슈 #125). 좌우 패널의 현재 폴더를 보이고 노드로 이동·끌어 놓아 복사/이동한다
+show_folder_tree = false         # 왼쪽 폴더 트리(이슈 #125). 활성 패널의 드라이브(SFTP·FTP·SMB 포함, 이슈 #134)를 뿌리로 그 안의 좌우 패널 현재 폴더를 보이고 노드로 이동·끌어 놓아 복사/이동한다
 show_command_line = true          # 창 아래의 명령어 줄(이슈 #110). 현재 로컬 폴더에서 셸 한 줄을 실행한다
 pane_highlight = true             # 활성 패널의 accent 테두리. false면 두 패널 모두 투명(폭은 그대로)
 tab_style = "underline"           # "underline"(활성 탭 밑줄) | "segments"(폭 균등 분할 + 활성 탭 배경, Marta식)

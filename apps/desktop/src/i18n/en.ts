@@ -36,7 +36,7 @@ export const en: Record<Key, string> = {
   "menu.view.folder_tree": "Show Folder Tree",
   "action.core.view.folder_tree": "Toggle Folder Tree",
   "settings.item.behavior.layout.show_folder_tree.title": "Show Folder Tree",
-  "settings.item.behavior.layout.show_folder_tree.desc": "Shows a folder tree on the left. It marks the current folder of each pane with L and R, clicking a folder takes the active pane there, and dropping files on a folder copies them (hold Ctrl to move)",
+  "settings.item.behavior.layout.show_folder_tree.desc": "Shows a folder tree on the left, rooted at the active pane's drive (SFTP, FTP and SMB included). It marks the current folder of each pane on that drive with L and R, clicking a folder takes the active pane there, and dropping files on a folder copies them (hold Ctrl to move)",
   "foldertree.aria": "Folder tree",
   "foldertree.resize": "Resize folder tree",
   "settings.item.behavior.layout.folder_tree_width.title": "Folder Tree Width",
