@@ -32,6 +32,11 @@ for (const page of ["index.html", "en.html"]) {
       /rel="canonical"\s+href="https:\/\/gyuha.com\/twin-deck\/en.html"/,
       "영문 페이지의 대표 주소",
     );
+    assert.doesNotMatch(
+      html,
+      /assets\/(?:main|drag-copy|preview-code|find|treemap|theme-dracula)\.png/,
+      "영문 페이지는 영어 UI 스크린샷(assets/en/)을 써야 합니다.",
+    );
     const content = html.replace(
       /<a\b[^>]*class="language-toggle"[\s\S]*?<\/a\s*>/,
       "",
@@ -127,6 +132,9 @@ for (const [, name] of js.matchAll(/['"`]((?:assets\/)?[\w-]+\.png)['"`]/g)) {
   await access(
     new URL(name.startsWith("assets/") ? name : `assets/${name}`, output),
   );
+  // 영문 페이지의 기능 안내는 같은 이름을 assets/en/에서 읽는다.
+  if (!name.startsWith("assets/"))
+    await access(new URL(`assets/en/${name}`, output));
 }
 const sitemap = await readFile(new URL("sitemap.xml", output), "utf8");
 for (const loc of [

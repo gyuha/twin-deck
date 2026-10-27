@@ -59,7 +59,8 @@ python3 -m http.server 4173 --directory dist/site
 - 영어 HTML은 `site/index.html`과 `site/english.json`으로 빌드 시 생성한다. 한국어 문구를 추가·변경하면 대응 번역도 갱신해야 하며, 누락되면 빌드가 실패한다.
 - 상호작용 중 표시되는 문구는 `site/main.js`의 양쪽 언어를 함께 갱신한다.
 - 영어 페이지는 JavaScript 없이도 읽을 수 있다. 자동 언어 선택과 선택 기억에는 JavaScript가 필요하다.
-- 스크린샷은 기존 한국어 앱 화면을 공통 사용하며, 영어 안내에 이를 표시한다.
+- 영문 페이지는 영어 UI로 찍은 `docs/screenshots/en/`의 같은 이름 스크린샷을 쓴다(`assets/en/`로 배포). 한국어 스크린샷을 바꾸면 영문판도 같은 구도로 다시 찍는다.
+  - 촬영 조건은 한국어판과 같다: `/tmp/td-demo` 데모 폴더, `catppuccin-mocha` 테마(테마 예시는 `dracula-default`), 명령줄과 업데이트 확인을 끔, 창 폭 1800에 개발 서버에서만 CSS `zoom: 2`, 높이는 이미지 높이와 같게 둔다. 화면 언어만 `behavior.language = "en"`으로 바꾼다.
 
 ## 방문 통계 (Google Analytics 4)
 

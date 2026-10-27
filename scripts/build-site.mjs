@@ -9,17 +9,24 @@ await mkdir(new URL("assets/", output), { recursive: true });
 for (const name of ["styles.css", "main.js", "language.js", "analytics.js", "sitemap.xml"]) {
   await cp(new URL(`site/${name}`, root), new URL(name, output));
 }
-for (const name of [
+// 앱 화면은 언어별로 둔다. 영문 페이지는 영어 UI로 찍은 docs/screenshots/en/의 같은 이름을 쓴다.
+const screenshots = [
   "main",
   "drag-copy",
   "preview-code",
   "find",
   "treemap",
   "theme-dracula",
-]) {
+];
+await mkdir(new URL("assets/en/", output), { recursive: true });
+for (const name of screenshots) {
   await cp(
     new URL(`docs/screenshots/${name}.png`, root),
     new URL(`assets/${name}.png`, output),
+  );
+  await cp(
+    new URL(`docs/screenshots/en/${name}.png`, root),
+    new URL(`assets/en/${name}.png`, output),
   );
 }
 // 캐릭터와 배경은 독립된 공개 자산으로 복사한다.
@@ -64,7 +71,7 @@ function withStructuredData(html, language) {
     name: "Twin Deck",
     applicationCategory: "UtilitiesApplication",
     operatingSystem: "macOS, Windows",
-    image: `${siteUrl}assets/main.png`,
+    image: `${siteUrl}assets/${language === "en" ? "en/" : ""}main.png`,
     downloadUrl: "https://github.com/gyuha/twin-deck/releases",
     sameAs: ["https://github.com/gyuha/twin-deck"],
     ...structuredData[language],
@@ -119,6 +126,10 @@ english = english
           "https://gyuha.com/twin-deck/en.html",
         )
       : tag,
+  )
+  .replace(
+    new RegExp(`assets/(${screenshots.join("|")})\\.png`, "g"),
+    "assets/en/$1.png",
   )
   .replace(
     /<a\b[^>]*\bclass="language-toggle"[\s\S]*?<\/a\s*>/,
