@@ -13,7 +13,7 @@ export function PaneSplit({ onThemePreview }: { onThemePreview?: (theme: string 
     if (r && r.width > 0) api.setSplit((clientX - r.left) / r.width);
   };
   return (
-    <div ref={box} className="flex min-h-0 flex-1">
+    <div ref={box} className="flex min-h-0 min-w-0 flex-1">
       <div className="flex min-h-0 min-w-0" style={{ width: `${split * 100}%` }}>
         <Pane pane="left" onThemePreview={onThemePreview} />
       </div>

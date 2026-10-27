@@ -56,4 +56,10 @@ describe("패널 너비 조절", () => {
     fireEvent.doubleClick(sep());
     await waitFor(() => expect(leftWidth()).toBe("50%"));
   });
+
+  it("두 패널을 감싼 줄은 내용보다 좁아질 수 있다(긴 탭 이름에 밀려 창보다 넓어지지 않게, 이슈 #143)", async () => {
+    await renderApp();
+    // 실제 넘침은 jsdom이 레이아웃을 계산하지 않아 재현할 수 없다. min-w-0가 빠지면 탭 이름 길이의 합이 최소 너비가 되어 창 밖으로 밀린다.
+    expect((sep().parentElement as HTMLElement).className.split(" ")).toContain("min-w-0");
+  });
 });
