@@ -42,6 +42,14 @@ python3 -m http.server 4173 --directory dist/site
 
 검수할 화면: 데스크톱/모바일, 시스템 밝음/어두움에서 다크 유지, 모션 줄이기, JavaScript 비활성화. 단축키 설명 버튼, 기능 탭의 키보드 이동, 설치 명령 복사, 섹션 및 외부 링크를 확인한다.
 
+## 검색·공유 메타 (SEO)
+
+- `<head>`의 `title`·`description`·Open Graph·Twitter 카드·`hreflang`·`canonical`은 `site/index.html`에 한국어로 쓰고, 영어는 `site/english.json`의 번역으로 생성한다. 한국어 페이지는 `https://gyuha.com/twin-deck/`, 영어 페이지는 `https://gyuha.com/twin-deck/en.html`이 대표 주소이며, 두 페이지가 서로를 `hreflang`으로 가리킨다. `x-default`는 언어 자동 선택 주소(기본 주소)다.
+- `og:locale`은 영어 페이지에서 `en_US`(대체 `ko_KR`)로 바뀐다. `title`은 60자 이하, `description`은 70~170자로 쓴다(`check-site.mjs`가 검사한다).
+- 구조화 데이터(JSON-LD `SoftwareApplication`)는 `scripts/build-site.mjs`가 언어별로 만들어 넣는다. 확인되지 않은 가격·라이선스·버전은 넣지 않는다.
+- `sitemap.xml`은 두 언어 주소와 `hreflang`을 담는다. 프로젝트 Pages 하위 경로에서는 `robots.txt`를 크롤러가 읽지 않으므로(도메인 루트만 읽는다) Google Search Console·Bing Webmaster Tools에 `https://gyuha.com/twin-deck/sitemap.xml`을 직접 제출한다.
+- 공유 이미지(`og:image`)는 `main.png`(1800×710, 약 2.5:1)다. 소셜 카드의 권장 비율(약 1.91:1)과 달라 일부 서비스에서 좌우가 잘릴 수 있다.
+
 ## 소개 페이지 언어
 
 기본 주소에서는 브라우저의 첫 번째 선호 언어가 `ko` 또는 `ko-*`이면 한국어, 나머지는 영어로 표시한다. 상단 `EN` / `한국어` 링크로 직접 고른 언어는 가능할 때 브라우저에 저장한다. 저장소 접근이 막혀도 URL의 `?lang=ko` / `?lang=en` 선택은 동작한다.
