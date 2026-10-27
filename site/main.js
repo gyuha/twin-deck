@@ -141,7 +141,7 @@ document.querySelectorAll("[data-action]").forEach((button) =>
     document.querySelector("#key-title").textContent = action.title;
     document.querySelector("#key-description").textContent = action.description;
     const image = document.querySelector("#workflow-image");
-    image.src = `assets/${action.image}`;
+    image.src = `assets/${english ? "en/" : ""}${action.image}`;
     image.alt = action.alt;
     document.querySelector(".workflow-screen").dataset.mode =
       button.dataset.action;
