@@ -17,16 +17,17 @@ function visit({
 } = {}) {
   let redirected;
   let stored = saved;
-  runInNewContext(script, {
-    URL,
-    window: {
-      location: {
-        href: url,
-        replace: (value) => {
-          redirected = value;
-        },
+  const contextWindow = {
+    location: {
+      href: url,
+      replace: (value) => {
+        redirected = value;
       },
     },
+  };
+  runInNewContext(script, {
+    URL,
+    window: contextWindow,
     document: { documentElement: { lang: current } },
     navigator: { languages, language: browser },
     localStorage: {
@@ -40,7 +41,11 @@ function visit({
       },
     },
   });
-  return { redirected, stored };
+  return {
+    redirected,
+    stored,
+    redirecting: Boolean(contextWindow.twinDeckLanguageRedirecting),
+  };
 }
 
 test("한국어 우선 언어는 한국어 페이지에 머문다", () => {
@@ -107,6 +112,8 @@ test("잘못된 저장값을 무시하고 경로와 쿼리와 앵커를 보존�
 });
 test("언어 이동 후에는 다시 이동하지 않는다", () => {
   const first = visit();
+  assert.equal(first.redirecting, true);
+  assert.equal(visit({ browser: "ko" }).redirecting, false);
   assert.equal(
     visit({ url: first.redirected, current: "en" }).redirected,
     undefined,

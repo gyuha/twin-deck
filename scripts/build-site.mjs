@@ -6,7 +6,7 @@ const root = new URL("../", import.meta.url);
 const output = new URL("dist/site/", root);
 await rm(output, { recursive: true, force: true });
 await mkdir(new URL("assets/", output), { recursive: true });
-for (const name of ["styles.css", "main.js", "language.js", "sitemap.xml"]) {
+for (const name of ["styles.css", "main.js", "language.js", "analytics.js", "sitemap.xml"]) {
   await cp(new URL(`site/${name}`, root), new URL(name, output));
 }
 for (const name of [

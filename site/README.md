@@ -60,3 +60,11 @@ python3 -m http.server 4173 --directory dist/site
 - 상호작용 중 표시되는 문구는 `site/main.js`의 양쪽 언어를 함께 갱신한다.
 - 영어 페이지는 JavaScript 없이도 읽을 수 있다. 자동 언어 선택과 선택 기억에는 JavaScript가 필요하다.
 - 스크린샷은 기존 한국어 앱 화면을 공통 사용하며, 영어 안내에 이를 표시한다.
+
+## 방문 통계 (Google Analytics 4)
+
+- `gyuha.com` 계정의 **Twin Deck** 전용 속성, **Twin Deck 웹사이트** 스트림을 사용한다. 측정 ID는 `G-6794E26N14`, 스트림 URL은 `https://gyuha.com/twin-deck/`다. 보고 시간대는 대한민국, 통화는 원화다.
+- `site/analytics.js`를 한국어·영어 페이지에서 공통으로 불러온다. 공개 HTTPS 도메인의 `/twin-deck/` 경로에서만 태그를 로드하며 로컬 미리보기와 언어 자동 이동 전 페이지는 제외한다.
+- GA의 향상된 측정으로 페이지 조회·스크롤·외부 링크 클릭 등을 측정한다. Google 신호와 광고 개인화는 비활성화하고, `twin_deck` 쿠키 접두사와 `/twin-deck/` 경로로 블로그와 쿠키를 분리한다.
+- 측정 ID는 공개 태그 식별자이며 비밀키가 아니다. 별도 사용자 ID나 개인정보를 이벤트로 보내지 않는다. 현재 별도의 동의 배너는 없으며, 지역별 동의 요건에 맞춘 운영 정책은 별도로 관리해야 한다.
+- 검증: `node --test scripts/site-language.test.mjs scripts/site-analytics.test.mjs && node scripts/build-site.mjs && node scripts/check-site.mjs`. 배포 후 GA의 태그 설치 테스트와 실시간 보고서에서 확인한다. 일반 보고서에는 반영 지연이 있을 수 있다.

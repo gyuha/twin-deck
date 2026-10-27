@@ -5,6 +5,11 @@ import { access, readFile, readdir } from "node:fs/promises";
 const output = new URL("../dist/site/", import.meta.url);
 for (const page of ["index.html", "en.html"]) {
   const html = await readFile(new URL(page, output), "utf8");
+  assert.equal(
+    (html.match(/<script src="analytics\.js" defer><\/script>/g) || []).length,
+    1,
+    "각 언어 페이지에 GA 초기화 스크립트가 하나 있어야 합니다.",
+  );
   assert.match(
     html,
     /name="color-scheme" content="dark"/,
@@ -141,6 +146,7 @@ assert.deepEqual(
     "index.html",
     "en.html",
     "language.js",
+    "analytics.js",
     "main.js",
     "sitemap.xml",
     "styles.css",

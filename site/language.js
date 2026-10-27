@@ -26,6 +26,7 @@
     const target = new URL(language === "en" ? "en.html" : "index.html", url);
     target.search = url.search;
     target.hash = url.hash;
+    window.twinDeckLanguageRedirecting = true;
     window.location.replace(target.href);
   }
 })();
