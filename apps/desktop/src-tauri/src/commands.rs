@@ -1357,16 +1357,22 @@ fn unix_secs() -> u64 {
 pub fn start_native_drag(window: tauri::WebviewWindow, paths: Vec<String>) -> ServiceResult<()> {
     #[cfg(any(target_os = "macos", windows))]
     {
-        let files: Vec<std::path::PathBuf> = paths
+        let log_file = tauri::Manager::path(&window).app_log_dir().ok();
+        let (files, missing): (Vec<std::path::PathBuf>, Vec<std::path::PathBuf>) = paths
             .into_iter()
             .map(std::path::PathBuf::from)
-            .filter(|p| p.exists())
-            .collect();
+            .partition(|p| p.exists());
+        if !missing.is_empty() {
+            drag_log(
+                log_file.as_deref(),
+                &format!("끌기 제외(없는 경로): {missing:?}"),
+            );
+        }
         if files.is_empty() {
+            drag_log(log_file.as_deref(), "끌기 중단: 끌어 갈 파일이 없습니다");
             return Err("끌어 갈 파일이 없습니다".to_string());
         }
         let icon = drag::Image::Raw(include_bytes!("../icons/32x32.png").to_vec());
-        let log_file = tauri::Manager::path(&window).app_log_dir().ok();
         drag_log(
             log_file.as_deref(),
             &format!("끌기 시작: {}개 {files:?}", files.len()),
