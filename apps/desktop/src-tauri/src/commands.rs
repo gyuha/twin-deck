@@ -1325,6 +1325,31 @@ pub fn detect_conflict(
     svc.detect_conflict(&src, &dest_dir)
 }
 
+/// 끌어 놓기 진단 기록을 stderr와 로그 폴더의 `drag.log`에 한 줄 남긴다(#137: 놓기가 가끔 안 되는 원인을 다음에 찾을 근거).
+/// Finder로 띄운 앱은 stderr를 볼 수 없어 파일에도 쓴다. 기록 실패는 무시한다.
+#[cfg(any(target_os = "macos", windows))]
+fn drag_log(dir: Option<&std::path::Path>, line: &str) {
+    use std::io::Write;
+    eprintln!("[drag] {line}");
+    let Some(dir) = dir else { return };
+    let _ = std::fs::create_dir_all(dir);
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(dir.join("drag.log"))
+    {
+        let _ = writeln!(f, "{} {line}", unix_secs());
+    }
+}
+
+/// 새 의존성 없이 쓰는 UNIX 초 타임스탬프.
+#[cfg(any(target_os = "macos", windows))]
+fn unix_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs())
+}
+
 /// 파일을 창 밖(Finder, 탐색기, 다른 앱)으로 끌어 간다: 운영체제의 드래그를 시작한다. 놓는 쪽에서 복사된다.
 /// 마우스 단추를 누르고 있는 동안 불러야 한다. macOS와 Windows에서만 지원한다.
 #[tauri::command]
@@ -1341,14 +1366,32 @@ pub fn start_native_drag(window: tauri::WebviewWindow, paths: Vec<String>) -> Se
             return Err("끌어 갈 파일이 없습니다".to_string());
         }
         let icon = drag::Image::Raw(include_bytes!("../icons/32x32.png").to_vec());
+        let log_file = tauri::Manager::path(&window).app_log_dir().ok();
+        drag_log(
+            log_file.as_deref(),
+            &format!("끌기 시작: {}개 {files:?}", files.len()),
+        );
+        let on_drop = {
+            let log_file = log_file.clone();
+            let files = files.clone();
+            move |result: drag::DragResult, _: drag::CursorPosition| {
+                drag_log(
+                    log_file.as_deref(),
+                    &format!("끌기 결과: {result:?} {files:?}"),
+                );
+            }
+        };
         drag::start_drag(
             &window,
             drag::DragItem::Files(files),
             icon,
-            |_, _| {},
+            on_drop,
             drag::Options::default(),
         )
-        .map_err(|e| e.to_string())
+        .map_err(|e| {
+            drag_log(log_file.as_deref(), &format!("끌기 시작 실패: {e}"));
+            e.to_string()
+        })
     }
     #[cfg(not(any(target_os = "macos", windows)))]
     {
