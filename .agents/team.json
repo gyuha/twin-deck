@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "goal": "파일관리 어플리케이션",
+  "orchestrator": {
+    "workspace": "orchestrator",
+    "provider": "claude",
+    "model": "claude-opus-5-5"
+  },
+  "roles": [
+    {
+      "name": "core",
+      "workspace": "core",
+      "provider": "claude",
+      "model": "claude-opus-5-5",
+      "folders": [
+        "crates"
+      ],
+      "instructions": "Rust 코어 crate(td-vfs, td-archive, td-ops, td-queue, td-config, td-search, td-watch, td-smb, td-remote 등)를 구현하고 고친다. 아래 crate는 위 crate를 모르게 하는 계층 구조를 지킨다. 새 LocalFs 연산에는 NFD 재시도(retry_nfd)를 넣는다. `cargo test -p <crate>`와 `cargo clippy -p <crate> -- -D warnings`로 검증한다."
+    },
+    {
+      "name": "bridge",
+      "workspace": "bridge",
+      "provider": "claude",
+      "model": "claude-sonnet-5-5",
+      "folders": [
+        "apps/desktop/src-tauri",
+        "packages/ts-client"
+      ],
+      "instructions": "service.rs/commands.rs의 Tauri 명령을 만들어 코어 기능을 UI에 연결하고, `task gen-types`로 bindings.ts와 default-config.json을 다시 만든다. 그 뒤 backend.ts → tauri.ts → fake.ts를 같은 변경 안에서 맞춘다. tauri.conf.json의 버전은 orchestrator가 지시할 때만 바꾼다."
+    },
+    {
+      "name": "ui",
+      "workspace": "ui",
+      "provider": "claude",
+      "model": "claude-opus-5-5",
+      "folders": [
+        "apps/desktop/src",
+        "packages/actions",
+        "packages/keybinds",
+        "packages/material-icons"
+      ],
+      "instructions": "React 19/zustand UI(듀얼 패널, 다이얼로그, Preview, 사용자 정의 포인터 드래그, Settings)와 액션·키 바인딩을 구현한다. UI 문구와 테스트 이름은 한글로 쓰고, FakeBackend 기반 vitest와 `bunx tsc --noEmit`으로 검증한다. 기본 F키를 바꾸면 fkey-bindings.test.tsx도 함께 고친다."
+    },
+    {
+      "name": "site",
+      "workspace": "site",
+      "provider": "antigravity",
+      "model": "gemini-4-argon-high",
+      "folders": [
+        "site",
+        "docs/site",
+        "docs/screenshots"
+      ],
+      "instructions": "제품 소개 사이트의 비주얼과 카피를 담당한다. 작업 전에 docs/12-site-design.md의 확정 컨셉과 DESIGN.md의 디자인 토큰을 따른다. 임시 시안이나 검수 캡처는 저장소에 남기지 않는다."
+    },
+    {
+      "name": "docs",
+      "workspace": "docs",
+      "provider": "claude",
+      "model": "claude-sonnet-5-5",
+      "folders": [
+        "docs",
+        "scripts",
+        "README.md",
+        "README.en.md",
+        "CHANGELOG.md"
+      ],
+      "instructions": "제품 스펙 문서(docs/00~11, ADR, 05-actions-keybindings.md 카탈로그)와 README.md·README.en.md 쌍, CHANGELOG.md를 사실대로 맞추고, 릴리스 스크립트와 그 테스트를 관리한다. `task deploy`·`task release`·publish 계열은 DRY_RUN 없이 절대 실행하지 않는다."
+    }
+  ]
+}
