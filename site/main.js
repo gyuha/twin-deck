@@ -194,3 +194,103 @@ copyButton.addEventListener("click", async () => {
     );
   }
 });
+
+// 자체 이미지가 먼저 그려진 뒤 카메라 연출만 점진적으로 더한다.
+// CDN 실패는 체험·탭·카운트업·다운로드와 분리한다.
+let cinemaRequested = false;
+function loadCinemaScript(src, integrity) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    const timer = setTimeout(() => {
+      script.remove();
+      reject(new Error("motion timeout"));
+    }, 6000);
+    script.src = src;
+    script.integrity = integrity;
+    script.crossOrigin = "anonymous";
+    script.referrerPolicy = "no-referrer";
+    script.onload = () => { clearTimeout(timer); resolve(); };
+    script.onerror = () => { clearTimeout(timer); script.remove(); reject(new Error("motion unavailable")); };
+    document.head.append(script);
+  });
+}
+async function startCinema() {
+  if (cinemaRequested || motionPreference.matches) return;
+  cinemaRequested = true;
+  let media;
+  try {
+    await loadCinemaScript(
+      "https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js",
+      "sha384-g4NTh/Iv5PPU4xPyhEWqPcwtNXOvdaDI8LLnyYfyNZOjKJeYQyjzQ9X5275eBjpt",
+    );
+    await loadCinemaScript(
+      "https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js",
+      "sha384-Z3REaz79l2IaAZqJsSABtTbhjgOUYyV3p90XNnAPCSHg3EMTz1fouunq9WZRtj3d",
+    );
+    const { gsap, ScrollTrigger } = window;
+    if (!gsap || !ScrollTrigger) return;
+    gsap.registerPlugin(ScrollTrigger);
+    media = gsap.matchMedia();
+    media.add({ desktop: "(min-width: 1024px)", mobile: "(max-width: 1023px)", reduce: "(prefers-reduced-motion: reduce)" }, (context) => {
+      if (context.conditions.reduce) return;
+      const desktop = context.conditions.desktop;
+      document.documentElement.classList.add("cinema-ready");
+      const camera = gsap.timeline({
+        defaults: { ease: "none" },
+        scrollTrigger: { trigger: hero, start: "top top", end: () => `+=${Math.round(hero.offsetHeight * .6)}`, scrub: .65, invalidateOnRefresh: true },
+      });
+      camera.to(".hero-background", { yPercent: 18, scale: 1.12 }, 0)
+        .to(".hero-character", { x: desktop ? -110 : -28, y: desktop ? 130 : 35, rotation: -5, opacity: .35 }, 0)
+        .to(".hero-copy", { y: desktop ? -90 : -25 }, 0)
+        .fromTo(".hero-product", { rotation: desktop ? -5 : 0, rotationY: desktop ? -9 : 0, scale: desktop ? .9 : 1 },
+          { rotation: 0, rotationY: 0, scale: desktop ? 1.12 : 1.02, y: desktop ? -80 : -12 }, 0);
+      // offset-path는 기존 SVG 경로를 사용하며 CTA 쪽으로 이동하지 않는다.
+      document.querySelectorAll(".flow-folder").forEach((folder, index) => {
+        camera.fromTo(folder, { offsetDistance: `${8 + index * 18}%`, opacity: 1 },
+          { offsetDistance: `${38 + index * 18}%`, opacity: 1 }, 0);
+      });
+      const shot = (target, trigger, vars, start = "top 90%") => {
+        gsap.fromTo(target, { y: desktop ? 70 : 28, ...vars }, {
+          y: 0, x: 0, rotation: 0, scale: 1, opacity: 1, duration: 1.05,
+          ease: "power3.out", clearProps: "transform,opacity",
+          scrollTrigger: { trigger, start, toggleActions: "play complete resume complete" },
+        });
+      };
+      document.querySelectorAll(".section-heading").forEach((heading) => {
+        shot(heading.querySelector("h2"), heading, { x: desktop ? -45 : 0, opacity: .65 });
+        const description = heading.querySelector("p");
+        if (description) shot(description, heading, { x: desktop ? 45 : 0, opacity: .65 });
+      });
+      shot(".key-experience", ".key-experience", { scale: .94, opacity: .65 });
+      shot(".gallery", ".gallery", { x: desktop ? 80 : 0, opacity: .65 });
+      document.querySelectorAll(".feature-card").forEach((card, index) => {
+        shot(card, card, { x: desktop ? (index % 2 ? 60 : -60) : 0, opacity: .65 });
+      });
+      gsap.fromTo(".theme-showcase", { rotation: desktop ? 3 : 0, scale: .92 }, {
+        rotation: 0, scale: 1, ease: "none",
+        scrollTrigger: { trigger: ".personal", start: "top 85%", end: "center center", scrub: .7 },
+      });
+      shot(".download-inner", ".download", { scale: .94, opacity: .65 });
+      return () => document.documentElement.classList.remove("cinema-ready");
+    });
+    const syncCinema = () => {
+      // 디스플레이 주사율 루프도 비활성 탭에서 중단한다.
+      if (document.hidden) gsap.ticker.sleep();
+      else { gsap.ticker.wake(); ScrollTrigger.refresh(); }
+    };
+    document.addEventListener("visibilitychange", syncCinema);
+    syncCinema();
+  } catch {
+    media?.revert();
+    document.documentElement.classList.remove("cinema-ready");
+  }
+}
+function scheduleCinema() {
+  if ("requestIdleCallback" in window) requestIdleCallback(startCinema, { timeout: 1500 });
+  else setTimeout(startCinema, 300);
+}
+if (document.readyState === "complete") scheduleCinema();
+else window.addEventListener("load", scheduleCinema, { once: true });
+motionPreference.addEventListener("change", () => {
+  if (!motionPreference.matches) scheduleCinema();
+});
