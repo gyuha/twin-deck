@@ -20,7 +20,15 @@ const selected = () => tabs().findIndex((t) => t.getAttribute("aria-selected") =
 const press = (el: Element, x: number) => fireEvent.mouseDown(el, { button: 0, clientX: x, clientY: 10 });
 const move = (el: Element, x: number) => fireEvent.mouseMove(el, { buttons: 1, clientX: x, clientY: 10 }); // 끄는 동안 왼쪽 버튼이 눌려 있다(buttons: 1)
 const release = (el: Element, x: number) => fireEvent.mouseUp(el, { button: 0, clientX: x, clientY: 10 });
-const setup = () => renderApp(seedBackend(), undefined, undefined, { snapshot });
+// 끌린 탭 버튼 자신의 transform을 보므로, 닫기 버튼(기본 켜짐, 이슈 #148)이 감싸는 칸 없이 탭만 그린다.
+const offBackend = () => {
+  const b = seedBackend();
+  b.setConfig((l) => {
+    l.config.behavior.layout.tab_close_button = false;
+  });
+  return b;
+};
+const setup = () => renderApp(offBackend(), undefined, undefined, { snapshot });
 
 describe("탭 끌어 순서 바꾸기", () => {
   it("탭을 다른 탭 위로 끌어 놓으면 순서가 바뀌고 활성 탭이 따라간다", async () => {

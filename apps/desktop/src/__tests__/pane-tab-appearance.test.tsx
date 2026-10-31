@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { FakeBackend, Snapshot } from "@twin-deck/ts-client";
 import { renderApp, seedBackend } from "./helpers";
 
-type LayoutCfg = { pane_highlight: boolean; tab_style: string };
+type LayoutCfg = { pane_highlight: boolean; tab_style: string; tab_close_button: boolean };
 const withLayout = (change: Partial<LayoutCfg>): FakeBackend => {
   const b = seedBackend();
   b.setConfig((l) => Object.assign(l.config.behavior.layout, change));
@@ -57,7 +57,8 @@ describe("패널 테두리 강조 (behavior.layout.pane_highlight)", () => {
 
 describe("탭 모양 (behavior.layout.tab_style)", () => {
   it("segments: 탭이 폭을 똑같이 나눠 갖고 활성 탭은 밑줄 없이 배경만 다르다", async () => {
-    await renderApp(withLayout({ tab_style: "segments" }), undefined, undefined, { snapshot: snapshotWithTabs(3) });
+    // 탭 버튼 자신의 클래스를 보므로 닫기 버튼(기본 켜짐, 이슈 #148)의 감싸는 칸 없이 그린다.
+    await renderApp(withLayout({ tab_style: "segments", tab_close_button: false }), undefined, undefined, { snapshot: snapshotWithTabs(3) });
     const t = tabs("left");
     expect(t).toHaveLength(3);
     for (const tab of t) {
@@ -106,7 +107,8 @@ describe("기본값에서는 지금 모양 그대로", () => {
     // 이슈 #104: 탭이 많을 때 가로로 스크롤되도록 넘침 처리(`overflow-x-auto`·얇은 스크롤바)와 줄어들지 않는 탭(`shrink-0`)이 더해졌다.
     // 탭이 적을 때 눈에 보이는 모양(높이·간격·색)은 같다. 나머지 클래스는 그대로다.
     expect(tablist("left").className).toBe("td-thin-scroll flex gap-1 overflow-x-auto overflow-y-hidden border-b border-app-line px-1 text-sm");
-    expect(tabs("left")[0].className).toBe("outline-none shrink-0 whitespace-nowrap border-b-2 border-accent px-2 py-1 font-semibold");
-    expect(tabs("left")[1].className).toBe("outline-none shrink-0 whitespace-nowrap px-2 py-1 text-ink-faint");
+    // 이슈 #148: 닫기 버튼이 기본으로 켜져 ✕ 자리만큼 좌우 패딩이 넓다(px-6).
+    expect(tabs("left")[0].className).toBe("outline-none shrink-0 whitespace-nowrap border-b-2 border-accent px-6 py-1 font-semibold");
+    expect(tabs("left")[1].className).toBe("outline-none shrink-0 whitespace-nowrap px-6 py-1 text-ink-faint");
   });
 });

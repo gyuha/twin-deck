@@ -1270,22 +1270,22 @@ host = "ftp.example.com"
 }
 
 #[test]
-fn tab_close_button_defaults_off_and_round_trips() {
+fn tab_close_button_defaults_on_and_round_trips() {
     use td_config::{set_user_value, ConfigValue};
     let none = load("");
     assert!(none.warnings.is_empty(), "{:?}", none.warnings);
-    assert!(!none.config.behavior.layout.tab_close_button);
+    assert!(none.config.behavior.layout.tab_close_button);
 
     let dir = tempfile::tempdir().unwrap();
     set_user_value(
         dir.path(),
         "behavior.layout.tab_close_button",
-        ConfigValue::Bool(true),
+        ConfigValue::Bool(false),
     )
     .unwrap();
     let l = load_dir(dir.path(), Platform::Linux);
     assert!(l.warnings.is_empty(), "{:?}", l.warnings);
-    assert!(l.config.behavior.layout.tab_close_button);
+    assert!(!l.config.behavior.layout.tab_close_button);
 }
 
 #[test]

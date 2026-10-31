@@ -36,7 +36,15 @@ afterEach(() => vi.restoreAllMocks());
 const press = (el: Element, x: number) => fireEvent.mouseDown(el, { button: 0, buttons: 1, clientX: x, clientY: 10 });
 const move = (el: Element, x: number, buttons = 1) => fireEvent.mouseMove(el, { buttons, clientX: x, clientY: 10 });
 const release = (el: Element, x: number) => fireEvent.mouseUp(el, { button: 0, buttons: 0, clientX: x, clientY: 10 });
-const setup = () => renderApp(seedBackend(), undefined, undefined, { snapshot });
+// 끌린 탭 버튼 자신의 transform을 보므로, 닫기 버튼(기본 켜짐, 이슈 #148)이 감싸는 칸 없이 탭만 그린다.
+const offBackend = () => {
+  const b = seedBackend();
+  b.setConfig((l) => {
+    l.config.behavior.layout.tab_close_button = false;
+  });
+  return b;
+};
+const setup = () => renderApp(offBackend(), undefined, undefined, { snapshot });
 
 describe("탭 끌기 경계 처리", () => {
   it("탭 사이 틈(4px)에서 놓으면 가장 가까운 탭 자리로 간다(맨 끝으로 튀지 않는다)", async () => {

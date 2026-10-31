@@ -43,7 +43,7 @@
         "folder_tree_width": 224,
         "pane_highlight": true,
         "tab_style": "underline",
-        "tab_close_button": false,
+        "tab_close_button": true,
         "tab_position": "top",
         "tab_color_terminal": "auto",
         "tab_color_smb": "auto",
