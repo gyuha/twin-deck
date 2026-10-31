@@ -198,7 +198,7 @@ copyButton.addEventListener("click", async () => {
 // 자체 이미지가 먼저 그려진 뒤 카메라 연출만 점진적으로 더한다.
 // CDN 실패는 체험·탭·카운트업·다운로드와 분리한다.
 let cinemaRequested = false;
-function loadCinemaScript(src) {
+function loadCinemaScript(src, integrity) {
   return new Promise((resolve, reject) => {
     const script = document.createElement("script");
     const timer = setTimeout(() => {
@@ -206,7 +206,9 @@ function loadCinemaScript(src) {
       reject(new Error("motion timeout"));
     }, 6000);
     script.src = src;
+    script.integrity = integrity;
     script.crossOrigin = "anonymous";
+    script.referrerPolicy = "no-referrer";
     script.onload = () => { clearTimeout(timer); resolve(); };
     script.onerror = () => { clearTimeout(timer); script.remove(); reject(new Error("motion unavailable")); };
     document.head.append(script);
@@ -217,8 +219,14 @@ async function startCinema() {
   cinemaRequested = true;
   let media;
   try {
-    await loadCinemaScript("https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js");
-    await loadCinemaScript("https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js");
+    await loadCinemaScript(
+      "https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js",
+      "sha384-g4NTh/Iv5PPU4xPyhEWqPcwtNXOvdaDI8LLnyYfyNZOjKJeYQyjzQ9X5275eBjpt",
+    );
+    await loadCinemaScript(
+      "https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js",
+      "sha384-Z3REaz79l2IaAZqJsSABtTbhjgOUYyV3p90XNnAPCSHg3EMTz1fouunq9WZRtj3d",
+    );
     const { gsap, ScrollTrigger } = window;
     if (!gsap || !ScrollTrigger) return;
     gsap.registerPlugin(ScrollTrigger);
