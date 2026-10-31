@@ -1,3 +1,4 @@
+html, body { background: #101012; }
 /* 나이트 쿠리어: 다크 단일 테마, 주황색 강조, 기존 브랜드와 실제 앱 화면.
    레이어: 배경 0, 캐릭터 1, 제품·본문 2, 내비게이션 10, 건너뛰기 20. */
 :root {
@@ -1478,3 +1479,90 @@ html[lang="en"] .key-story {
     -webkit-backdrop-filter: none;
   }
 }
+
+/* 운송 경로: 기존 장면을 압축하고 각 경유지의 리듬을 연결한다. */
+main { counter-reset: route; }
+.section-heading::before,
+.personal-heading::before {
+  counter-increment: route;
+  content: "0" counter(route) " ───";
+  display: block;
+  margin-bottom: 24px;
+  color: var(--accent);
+  font: 600 12px ui-monospace, SFMono-Regular, Consolas, monospace;
+  letter-spacing: .14em;
+}
+.personal-heading::before { grid-column: 1 / -1; margin-bottom: -18px; }
+.key-experience { border-top: 2px solid var(--accent); }
+.gallery { border-radius: 0; border-inline: 0; background: #151517; }
+.gallery-tabs button { min-height: 44px; border-radius: 0; }
+.gallery-tabs button[aria-selected="true"] {
+  background: transparent;
+  border-color: transparent transparent var(--accent);
+}
+.gallery-panel > img { width: calc(100% - 56px); }
+.feature-grid {
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.feature-card { border: 0; border-radius: 0; background: #171719; }
+.theme-number { font-weight: 500; }
+.brew button { min-height: 44px; }
+.button.small { min-height: 44px; }
+@media (min-width: 1280px) {
+  .hero-scene { min-height: clamp(720px, 57vw, 820px); }
+  .hero-character { width: 610px; left: -35px; top: -12px; }
+  .hero-copy { width: 46%; padding-top: 64px; }
+  .hero-stage { top: 420px; width: 74%; }
+}
+@media (min-width: 1280px) and (max-height: 760px) {
+  .hero-scene { min-height: 680px; }
+  .hero-character { width: 520px; }
+  .hero-stage { top: 375px; width: 66%; }
+  .hero-copy { padding-top: 40px; }
+  .hero h1 { font-size: 64px; }
+}
+@media (max-width: 767px) {
+  .hero-scene { min-height: 850px; }
+  .hero-character { width: 430px; margin-left: -245px; top: 355px; }
+  .hero-stage { top: 660px; }
+  .hero-product { transform: none; }
+  .gallery-panel > img { width: calc(100% - 28px); }
+  .feature-grid { gap: 1px; }
+  .personal-heading::before { margin-bottom: -10px; }
+  .gallery-tabs button { padding-inline: 12px; }
+}
+@media (min-width: 500px) and (max-width: 767px) {
+  .hero-scene { min-height: 990px; }
+  .hero-character { width: 540px; margin-left: -310px; }
+  .hero-stage { top: 730px; }
+}
+@media (max-width: 374px) {
+  .hero-scene { min-height: 860px; }
+  .hero-character { top: 390px; }
+  .hero-stage { top: 700px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hero-copy { animation: none; }
+  .hero-copy > * { animation: enter .65s var(--ease) both; }
+  .hero-description { animation-delay: .1s; }
+  .hero-downloads { animation-delay: .18s; }
+  .hero-platforms { animation-delay: .22s; }
+  .hero-keys { animation-delay: .26s; }
+}
+/* 궤적은 왼쪽 미디어 안에서 끝나고 제품은 단축키 아래에 놓인다. */
+@media (min-width: 1280px) {
+  .hero-scene { min-height: 860px; }
+  .hero-copy { padding-top: 32px; }
+  .hero-stage { top: 520px; }
+  .transfer-effect { width: 68%; left: 4%; }
+}
+@media (min-width: 1280px) and (max-height: 760px) {
+  .hero-scene { min-height: 770px; }
+  .hero-copy { padding-top: 16px; }
+  .hero-stage { top: 460px; }
+}
+.motion-paused .hero-copy > * { animation-play-state: paused !important; }
