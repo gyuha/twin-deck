@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "goal": "맥/윈도우용 파일관리 어플리케이션",
+  "orchestrator": {
+    "workspace": "orchestrator",
+    "provider": "claude",
+    "model": "claude-opus-5-5"
+  },
+  "roles": [
+    {
+      "name": "core",
+      "workspace": "core",
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "folders": [
+        "crates"
+      ],
+      "instructions": "Rust 코어 크레이트(td-vfs → td-archive → td-ops → td-queue, td-config·td-search·td-volumes·td-watch·td-smb 등)를 구현하고 `cargo test -p <crate>`와 `cargo clippy -p <crate> -- -D warnings`로 검증한다. 하위 크레이트가 상위 크레이트를 알지 않도록 계층을 지키고, 새 LocalFs 연산에는 macOS NFD 재시도(`retry_nfd`)를 유지하며, Windows 전용 코드는 td-cli 같은 C 의존성 없는 작은 크레이트에 둔다."
+    },
+    {
+      "name": "bridge",
+      "workspace": "",
+      "provider": "claude",
+      "model": "claude-opus-5-5",
+      "folders": [
+        "apps/desktop/src-tauri",
+        "packages/ts-client"
+      ],
+      "instructions": "코어 기능을 Tauri 명령(service.rs, commands.rs)으로 노출하고 Rust 명령 → `task gen-types` → backend.ts → tauri.ts → fake.ts 체인을 한 번에 맞춘다. `up_to_date` 테스트가 통과하도록 바인딩과 default-config.json을 항상 다시 생성한다."
+    },
+    {
+      "name": "ui",
+      "workspace": "ui",
+      "provider": "claude",
+      "model": "claude-sonnet-5-5",
+      "folders": [
+        "apps/desktop/src",
+        "apps/desktop/themes",
+        "packages/actions",
+        "packages/keybinds",
+        "packages/material-icons"
+      ],
+      "instructions": "React 19·zustand 듀얼 패널 UI, 키보드 액션과 바인딩, 대화상자, 커스텀 포인터 드래그, 미리보기, 설정 화면을 구현하고, FakeBackend로 vitest를 돌리며 `bunx tsc --noEmit`으로 확인한다. 기본 키를 추가하거나 바꾸면 fkey-bindings 테스트와 docs/05-actions-keybindings.md도 함께 갱신하고, UI 문구와 테스트 이름은 한글로 쓴다."
+    },
+    {
+      "name": "site",
+      "workspace": "site",
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "folders": [
+        "site",
+        "docs/site",
+        "docs/screenshots"
+      ],
+      "instructions": "제품 소개 사이트의 시각 디자인과 모션을 맡고, 작업 전에 docs/12-site-design.md의 확정 컨셉과 DESIGN.md의 디자인 토큰을 먼저 따른다. 검증은 site/README.md의 명령과 scripts/check-site.mjs로 하고, 임시 시안과 검수 캡처는 저장소에 남기지 않는다."
+    },
+    {
+      "name": "release",
+      "workspace": "",
+      "provider": "antigravity",
+      "model": "gemini-4-argon-medium",
+      "folders": [
+        "scripts",
+        "docs",
+        "CHANGELOG.md",
+        "README.md",
+        "README.en.md",
+        "Taskfile.yml"
+      ],
+      "instructions": "CHANGELOG 항목, 버전 올리기, 릴리스·Homebrew tap 스크립트와 그 테스트, 제품 문서, README 한/영 쌍의 동기화를 관리한다. `task deploy`·`task release`·tap push처럼 되돌릴 수 없는 공개 작업은 사용자가 명시적으로 요청했을 때만 실행하고, 그 밖에는 DRY_RUN으로만 점검한다."
+    },
+    {
+      "name": "review",
+      "workspace": "",
+      "provider": "codex",
+      "model": "gpt-6-sol",
+      "folders": [],
+      "instructions": "다른 역할이 낸 변경을 읽기 전용으로 검토하며, 특히 복사·이동·삭제·압축 경로에서 데이터가 손실되지 않는지, NFC/NFD와 SMB·exFAT·USB 볼륨에서 안전한지, cfg(windows) 경로가 맞는지를 본다. 발견한 문제는 재현 조건과 함께 오케스트레이터에 보고하고 코드를 직접 고치지 않는다."
+    }
+  ]
+}
