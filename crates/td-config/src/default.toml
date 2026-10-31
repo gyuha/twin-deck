@@ -47,7 +47,7 @@ show_folder_tree = false
 folder_tree_width = 224
 pane_highlight = true
 tab_style = "underline"
-tab_close_button = false
+tab_close_button = true
 tab_position = "top" # 탭 막대 위치: top(파일 목록 위), bottom(파일 목록 아래)
 # 특수 탭의 색: auto(테마에서 계산), off(일반 탭과 같게), #rrggbb(직접 지정). 칸형은 탭 배경, 밑줄형은 밑줄과 이름 앞 점에 칠한다.
 tab_color_terminal = "auto" # 터미널 탭

@@ -41,9 +41,18 @@ const press = (el: Element, x: number) => fireEvent.mouseDown(el, { button: 0, b
 const move = (el: Element, x: number, y = 10) => fireEvent.mouseMove(el, { buttons: 1, clientX: x, clientY: y });
 const release = (el: Element, x: number) => fireEvent.mouseUp(el, { button: 0, buttons: 0, clientX: x, clientY: 10 });
 
+// 끌린 탭 버튼 자신의 transform을 보므로, 닫기 버튼(기본 켜짐, 이슈 #148)이 감싸는 칸 없이 탭만 그린다.
+const offBackend = () => {
+  const b = seedBackend();
+  b.setConfig((l) => {
+    l.config.behavior.layout.tab_close_button = false;
+  });
+  return b;
+};
+
 describe("탭 끌기의 복제(ghost) (이슈 #105)", () => {
   it("끄는 동안 화면에 고정된 복제가 커서를 따르고, 끌린 탭은 자리만 지키며 보이지 않는다", async () => {
-    await renderApp(seedBackend(), undefined, undefined, { snapshot });
+    await renderApp(offBackend(), undefined, undefined, { snapshot });
     const [t0] = tabs();
     expect(ghost()).toBeNull();
     press(t0, 30);
@@ -61,7 +70,7 @@ describe("탭 끌기의 복제(ghost) (이슈 #105)", () => {
   });
 
   it("복제는 탭 목록의 탭으로 세지 않는다(탭 수·접근성 트리를 늘리지 않는다)", async () => {
-    await renderApp(seedBackend(), undefined, undefined, { snapshot });
+    await renderApp(offBackend(), undefined, undefined, { snapshot });
     const [t0] = tabs();
     press(t0, 30);
     move(t0, 130);
@@ -71,7 +80,7 @@ describe("탭 끌기의 복제(ghost) (이슈 #105)", () => {
   });
 
   it("탭 줄 밖으로 멀리 끌어도 원래 탭의 이동 거리는 탭 줄 안에 머문다(스크롤 폭이 늘지 않는다)", async () => {
-    await renderApp(seedBackend(), undefined, undefined, { snapshot });
+    await renderApp(offBackend(), undefined, undefined, { snapshot });
     const [t0] = tabs();
     press(t0, 30);
     move(t0, 530); // 오른쪽으로 500: 탭 줄 오른쪽 끝(220)을 넘는다
@@ -83,7 +92,7 @@ describe("탭 끌기의 복제(ghost) (이슈 #105)", () => {
   });
 
   it("Esc로 취소해도 복제가 사라진다", async () => {
-    await renderApp(seedBackend(), undefined, undefined, { snapshot });
+    await renderApp(offBackend(), undefined, undefined, { snapshot });
     const [t0] = tabs();
     press(t0, 30);
     move(t0, 130);

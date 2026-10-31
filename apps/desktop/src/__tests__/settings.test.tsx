@@ -387,9 +387,9 @@ describe("패널·탭 모양 설정 항목", () => {
     await dialog();
     expect(screen.getByRole("group", { name: "탭 모양" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "탭 닫기 버튼" })).toBeInTheDocument();
-    expect(sw("탭 닫기 버튼")).toHaveAttribute("aria-checked", "false");
+    expect(sw("탭 닫기 버튼")).toHaveAttribute("aria-checked", "true");
     await user.click(sw("탭 닫기 버튼"));
-    await waitFor(() => expect((backend as unknown as { loaded: { config: { behavior: { layout: { tab_close_button: boolean } } } } }).loaded.config.behavior.layout.tab_close_button).toBe(true));
+    await waitFor(() => expect((backend as unknown as { loaded: { config: { behavior: { layout: { tab_close_button: boolean } } } } }).loaded.config.behavior.layout.tab_close_button).toBe(false));
     expect(sw("패널 테두리 강조")).toHaveAttribute("aria-checked", "true");
     await user.click(sw("패널 테두리 강조"));
     await waitFor(() => expect((backend as unknown as { loaded: { config: { behavior: { layout: { pane_highlight: boolean } } } } }).loaded.config.behavior.layout.pane_highlight).toBe(false));
