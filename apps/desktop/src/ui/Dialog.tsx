@@ -67,7 +67,7 @@ export function Dialog() {
         role="dialog"
         aria-modal="true"
         aria-label={dialog.title}
-        className={`${dialog.kind === "multirename" ? "w-[56rem]" : "w-96"} flex max-h-full max-w-full flex-col rounded border border-app-line bg-app-box p-4 text-sm shadow-lg`}
+        className={`${dialog.kind === "multirename" ? "w-[56rem]" : dialog.kind === "info" && dialog.commandOutput ? "w-[48rem]" : "w-96"} flex max-h-full max-w-full flex-col rounded border border-app-line bg-app-box p-4 text-sm shadow-lg`}
       >
         <h2 className="mb-2 font-semibold">{dialog.title}</h2>
         {dialog.kind === "hostKey" && (
@@ -211,9 +211,18 @@ export function Dialog() {
           </>
           );
         })()}
+        {dialog.kind === "info" && dialog.commandOutput && (
+          // 명령 출력 창은 명령·종료 코드를 출력 위에 두고 줄어들지 않게 해, 긴 출력이 이 목록을 누르지 못하게 한다(이슈 #151).
+          <ul className="mb-1 shrink-0 list-inside list-disc">
+            {dialog.lines.map((l, i) => (
+              <li key={i}>{l}</li>
+            ))}
+          </ul>
+        )}
         {dialog.kind === "info" && dialog.copyText !== undefined && (
-          <div className="mb-1 flex min-h-0 items-start gap-2">
-            <pre className="td-thin-scroll min-h-0 flex-1 select-text overflow-auto whitespace-pre-wrap break-all font-mono text-xs">{dialog.copyText}</pre>
+          <div className={`mb-1 flex min-h-0 gap-2 ${dialog.commandOutput ? "flex-1 items-stretch" : "items-start"}`}>
+            {/* 명령 출력은 터미널처럼 줄바꿈 없이 가로·세로로 스크롤한다(이슈 #151). 알림 팝업은 줄바꿈해 보인다. */}
+            <pre className={`td-thin-scroll min-h-0 flex-1 select-text overflow-auto font-mono text-xs ${dialog.commandOutput ? "whitespace-pre" : "whitespace-pre-wrap break-all"}`}>{dialog.copyText}</pre>
             <button
               type="button"
               aria-label={t("status.notice_copy")}
@@ -235,10 +244,10 @@ export function Dialog() {
             </button>
           </div>
         )}
-        {(dialog.kind === "confirm" || dialog.kind === "info") && (
+        {(dialog.kind === "confirm" || (dialog.kind === "info" && !dialog.commandOutput)) && (
           <ul className="mb-1 min-h-0 list-inside list-disc overflow-y-auto">
-            {dialog.lines.map((l) => (
-              <li key={l}>{l}</li>
+            {dialog.lines.map((l, i) => (
+              <li key={i}>{l}</li>
             ))}
           </ul>
         )}

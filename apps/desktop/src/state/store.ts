@@ -197,7 +197,8 @@ export type DialogState =
   /** 선택지 중 하나를 고르는 창(확인이면 고른 번호, 취소면 null). */
   | { kind: "choice"; title: string; lines: string[]; choices: string[]; selected: number }
   | { kind: "conflict"; title: string; existing: string; selected: number; remaining: number; all: boolean }
-  | { kind: "info"; title: string; lines: string[]; copyText?: string }
+  /** `commandOutput`이면 `copyText`를 명령 출력으로 보고 넓은 창에 줄바꿈 없이 보인다(이슈 #151). */
+  | { kind: "info"; title: string; lines: string[]; copyText?: string; commandOutput?: boolean }
   /** SMB 비밀번호 입력(가림). 확인이면 `{ value, remember }`, 취소면 null. `error`는 앞서 넣은 비밀번호가 틀렸다는 안내다. */
   | { kind: "password"; title: string; value: string; remember: boolean; error: string | null }
   /** 실행 중인 전송(복사/이동) 작업의 진행 창. */
@@ -2299,7 +2300,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
         const failed = r.timed_out || r.exit_code !== 0;
         if (!failed && !r.output) return flash(tr("store.run_command.done", { command }));
         const status = r.timed_out ? tr("store.run_command.timed_out") : tr("store.run_command.exit_code", { code: String(r.exit_code ?? "?") });
-        await ask<boolean>({ kind: "info", title: tr("store.run_command.result"), lines: [command, status, ...(r.output ? r.output.split("\n") : [])], copyText: r.output || undefined });
+        await ask<boolean>({ kind: "info", title: tr("store.run_command.result"), lines: [command, status], copyText: r.output || undefined, commandOutput: true });
       } catch (e) {
         fail(e);
       }

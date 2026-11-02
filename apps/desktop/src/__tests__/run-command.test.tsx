@@ -53,6 +53,60 @@ describe("명령어 줄 (core.run_command, 이슈 #110)", () => {
     expect(dlg).toHaveTextContent("fatal: repository not found");
   });
 
+  it("출력은 결과 창에 한 번만 보인다", async () => {
+    const output = ["a.txt | 2 +-", "b.txt | 2 +-", "a.txt | 2 +-", "Fast-forward"].join("\n");
+    const b = seedBackend();
+    b.shellResult = { exit_code: 0, output, timed_out: false };
+    const { user, input } = await open(b);
+    await user.type(input, "git pull{Enter}");
+    const dlg = await screen.findByRole("dialog", { name: "실행 결과" });
+    expect(dlg.querySelector("pre")?.textContent).toBe(output);
+    // 출력 줄은 목록(li)으로 다시 그리지 않는다: 명령과 종료 코드만 남는다.
+    expect([...dlg.querySelectorAll("li")].map((li) => li.textContent)).toEqual(["git pull", "종료 코드 0"]);
+  });
+
+  it("명령 출력은 줄바꿈 없이 넓은 창에 보인다", async () => {
+    const b = seedBackend();
+    b.shellResult = { exit_code: 0, output: "x".repeat(200), timed_out: false };
+    const { user, input } = await open(b);
+    await user.type(input, "git pull{Enter}");
+    const dlg = await screen.findByRole("dialog", { name: "실행 결과" });
+    const pre = dlg.querySelector("pre")!;
+    expect(pre.className).toContain("whitespace-pre");
+    expect(pre.className).not.toContain("whitespace-pre-wrap");
+    expect(pre.className).not.toContain("break-all");
+    expect(dlg.className).not.toContain("w-96");
+    expect(dlg.className).toContain("max-w-full");
+  });
+
+  it("명령과 종료 코드는 출력 위에 줄어들지 않게 보인다", async () => {
+    const b = seedBackend();
+    b.shellResult = { exit_code: 0, output: "x\n".repeat(200), timed_out: false };
+    const { user, input } = await open(b);
+    await user.type(input, "cat a.json{Enter}");
+    const dlg = await screen.findByRole("dialog", { name: "실행 결과" });
+    const ul = dlg.querySelector("ul")!;
+    const pre = dlg.querySelector("pre")!;
+    expect(ul.compareDocumentPosition(pre) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(ul.className).toContain("shrink-0");
+    expect(ul.className).not.toContain("overflow");
+  });
+
+  it("하단 알림 팝업의 출력은 계속 줄바꿈된다", async () => {
+    const b = seedBackend();
+    b.runShellCommand = async () => {
+      throw new Error("boom");
+    };
+    const { user, input } = await open(b);
+    await user.type(input, "git pull{Enter}");
+    await user.click(await screen.findByRole("alert"));
+    const dlg = await screen.findByRole("dialog", { name: "오류 메시지" });
+    const pre = dlg.querySelector("pre")!;
+    expect(pre.className).toContain("whitespace-pre-wrap");
+    expect(pre.className).toContain("break-all");
+    expect(dlg.className).toContain("w-96");
+  });
+
   it("시간 초과면 중단했다고 알린다", async () => {
     const b = seedBackend();
     b.shellResult = { exit_code: null, output: "", timed_out: true };
