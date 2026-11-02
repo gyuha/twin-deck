@@ -100,15 +100,31 @@ describe("탭 번호 배지 (이슈 #153)", () => {
     expect(badges("left")).toEqual([null, null, null]);
   });
 
-  it("배지가 보이는 채로 숫자를 누르면 그 탭으로 바뀐다", async () => {
+  it("Cmd를 누른 채 숫자로 탭을 옮겨도 배지가 남고, Cmd를 떼면 사라진다", async () => {
     const { user } = await start(4);
     await user.keyboard("{Meta>}");
     await wait(0);
     expect(badges("left")).toEqual(["1", "2", "3", "4"]);
-    await user.keyboard("3{/Meta}");
+    await user.keyboard("3");
     expect(tabsOf("left")[2].getAttribute("aria-selected")).toBe("true");
-    await user.keyboard("{Meta>}9{/Meta}");
+    expect(badges("left")).toEqual(["1", "2", "3", "4"]);
+    await user.keyboard("9");
     expect(tabsOf("left")[3].getAttribute("aria-selected")).toBe("true");
-    expect(screen.getAllByRole("tab").length).toBe(6);
+    expect(badges("left")).toEqual(["1", "2", "3", "4"]);
+    await user.keyboard("{/Meta}");
+    await wait(0);
+    expect(badges("left")).toEqual([null, null, null, null]);
+  });
+
+  it("Windows: Ctrl+Shift를 누른 채 숫자로 탭을 옮겨도 배지가 남는다", async () => {
+    await start(3, "windows");
+    fireEvent.keyDown(window, { key: "Shift", ctrlKey: true, shiftKey: true });
+    await wait(0);
+    fireEvent.keyDown(window, { key: "@", code: "Digit2", ctrlKey: true, shiftKey: true });
+    await wait(0);
+    expect(badges("left")).toEqual(["1", "2", "3"]);
+    fireEvent.keyDown(window, { key: "A", code: "KeyA", ctrlKey: true, shiftKey: true });
+    await wait(0);
+    expect(badges("left")).toEqual([null, null, null]);
   });
 });

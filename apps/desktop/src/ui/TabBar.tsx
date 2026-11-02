@@ -10,7 +10,7 @@ const DRAG_THRESHOLD = 4;
 
 /**
  * `core.tab.goto`의 수식키(mac은 Cmd, 그 밖은 Ctrl+Shift)만 누르고 있는 동안 true(이슈 #153).
- * 다른 키를 누르거나, 수식키 조합이 달라지거나, 창이 포커스를 잃으면 곧바로 false로 돌아간다.
+ * 숫자 키(탭 이동)는 그대로 두고, 다른 키를 누르거나, 수식키 조합이 달라지거나, 창이 포커스를 잃으면 곧바로 false로 돌아간다.
  */
 function useTabNumberHint(platform: string): boolean {
   const [show, setShow] = useState(false);
@@ -19,6 +19,8 @@ function useTabNumberHint(platform: string): boolean {
     const held = (e: KeyboardEvent) =>
       platform === "mac" ? e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey : e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey;
     const down = (e: KeyboardEvent) => {
+      // 수식키를 누른 채 숫자로 탭을 옮기는 중에는 배지를 그대로 둔다(Windows는 Shift 때문에 key가 "!" 등이라 code로 본다).
+      if (held(e) && /^Digit[1-9]$/.test(e.code)) return;
       if (!["Meta", "Control", "Shift", "Alt"].includes(e.key) || !held(e)) return reset();
       setShow(true);
     };
