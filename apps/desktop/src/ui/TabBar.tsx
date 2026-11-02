@@ -3,9 +3,44 @@ import { baseName } from "@twin-deck/ts-client";
 import { useApp, useAppStore, useT } from "../state/context";
 import type { PaneId } from "../state/store";
 import { tabConnection, withIcon } from "../lib/connections";
+import { useUi } from "./uiContext";
 
 /** 이 거리(px)보다 적게 움직이면 끌기가 아니라 클릭이다. */
 const DRAG_THRESHOLD = 4;
+
+/**
+ * `core.tab.goto`의 수식키(mac은 Cmd, 그 밖은 Ctrl+Shift)만 누르고 있는 동안 true(이슈 #153).
+ * 숫자 키(탭 이동)는 그대로 두고, 다른 키를 누르거나, 수식키 조합이 달라지거나, 창이 포커스를 잃으면 곧바로 false로 돌아간다.
+ */
+function useTabNumberHint(platform: string): boolean {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const reset = () => setShow(false);
+    const held = (e: KeyboardEvent) =>
+      platform === "mac" ? e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey : e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey;
+    const down = (e: KeyboardEvent) => {
+      // 수식키를 누른 채 숫자로 탭을 옮기는 중에는 배지를 그대로 둔다(Windows는 Shift 때문에 key가 "!" 등이라 code로 본다).
+      if (held(e) && /^Digit[1-9]$/.test(e.code)) return;
+      if (!["Meta", "Control", "Shift", "Alt"].includes(e.key) || !held(e)) return reset();
+      setShow(true);
+    };
+    const up = (e: KeyboardEvent) => {
+      if (!held(e)) reset();
+    };
+    window.addEventListener("keydown", down, true);
+    window.addEventListener("keyup", up, true);
+    window.addEventListener("blur", reset);
+    return () => {
+      window.removeEventListener("keydown", down, true);
+      window.removeEventListener("keyup", up, true);
+      window.removeEventListener("blur", reset);
+    };
+  }, [platform]);
+  return show;
+}
+
+/** `core.tab.goto`가 i번째 탭으로 가는 번호: 1~8번째는 그 번호, 9번째 이후는 마지막 탭에만 9, 나머지는 없음. */
+const gotoNumber = (i: number, count: number) => (i < 8 ? i + 1 : i === count - 1 ? 9 : null);
 
 /** 탭을 눌러 끌어 같은 패널 안에서 순서를 바꾼다(마우스 이벤트로 직접 처리 — 파일 끌기와 같은 방식). */
 export function TabBar({ pane }: { pane: PaneId }) {
@@ -18,6 +53,10 @@ export function TabBar({ pane }: { pane: PaneId }) {
   const layout = useApp((s) => s.loaded.config.behavior.layout);
   const config = useApp((s) => s.loaded.config);
   const smbMounts = useApp((s) => s.smbMounts);
+  const { platform } = useUi();
+  // 탭 번호 배지는 키가 실제로 움직이는 활성 패널에만, 탭이 둘 이상일 때 보인다. 다이얼로그 등이 열려 있으면 띄우지 않는다.
+  const hint = useTabNumberHint(platform);
+  const numbered = useApp((s) => s.activePane === pane && !s.menu && !s.dialog && !s.preview && !s.settingsOpen) && hint && tabs.length > 1;
   const [hover, setHover] = useState<number | null>(null); // 호버한 탭(닫기 버튼이 켜졌을 때 ✕를 보일 탭)
   const dropTarget = useApp((s) => s.tabDropTarget === pane);
   // 끌기 중: 끌린 탭(from)은 커서를 따라 dx만큼 움직이고, 지나는 탭들은 shift만큼 비켜 놓일 자리(to)를 보여 준다.
@@ -218,6 +257,11 @@ export function TabBar({ pane }: { pane: PaneId }) {
                     : `${pad} py-1 text-ink-faint`))
             }
           >
+            {numbered && gotoNumber(i, tabs.length) !== null && (
+              <kbd data-tab-number aria-hidden className="mr-1 inline-flex size-4 items-center justify-center rounded border border-current align-middle font-sans text-[10px] leading-none">
+                {gotoNumber(i, tabs.length)}
+              </kbd>
+            )}
             {kind && !segments && <span data-tab-dot className="mr-1.5 inline-block size-1.5 rounded-full align-middle" style={{ backgroundColor: `var(--tab-${kind}-mark)` }} />}
             {name}
           </button>
