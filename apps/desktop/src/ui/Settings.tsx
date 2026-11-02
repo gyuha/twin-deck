@@ -1681,7 +1681,7 @@ function UpdatePanel() {
     : update.kind === "error" ? t("settings.update.error", { message: update.message })
     : update.kind === "installing" ? t("settings.update.installing")
     : t("settings.update.available", { version: update.info.version });
-  const notes = update.kind === "available" || update.kind === "installing" ? (update.info.notes ?? "").split("\n").filter((l) => l.trim()) : [];
+  const notes = update.kind === "available" || update.kind === "installing" ? (update.info.notes ?? "").trim() : "";
   const busy = update.kind === "checking" || update.kind === "installing";
   return (
     <div className="flex flex-col gap-3 pt-1">
@@ -1706,8 +1706,10 @@ function UpdatePanel() {
         </div>
         {(update.kind === "available" || update.kind === "installing") && (
           <div className="flex flex-col gap-2 border-t border-app-line py-2.5 text-sm">
-            {notes.length > 0 && (
-              <div className="td-thin-scroll max-h-48 overflow-auto whitespace-pre-wrap text-ink-dull">{notes.join("\n")}</div>
+            {notes && (
+              <div className="td-thin-scroll max-h-48 overflow-auto text-ink-dull">
+                <MarkdownView text={notes} />
+              </div>
             )}
             <div className="flex justify-end">
               <Button size="sm" variant="accent" disabled={update.kind === "installing"} onClick={() => setConfirming(true)}>
