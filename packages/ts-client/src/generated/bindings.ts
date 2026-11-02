@@ -1448,7 +1448,11 @@ previewRect?: PreviewRect | null;
 /**
  * 최근 위치(두 패널 공용, 오래된 것부터). 옛 파일에는 없어서 빈 목록으로 읽는다.
  */
-recent?: string[]; left: PaneSnap; right: PaneSnap }
+recent?: string[]; 
+/**
+ * 명령어 줄에서 실행한 명령(오래된 것부터). 옛 파일에는 없어서 빈 목록으로 읽는다.
+ */
+commandHistory?: string[]; left: PaneSnap; right: PaneSnap }
 export type SortSnap = { key: string; dir: string }
 export type SyncChoiceDto = { relativePath: string; direction: SyncDirectionDto }
 export type SyncComparisonDto = { id: number; rows: SyncRowDto[] }

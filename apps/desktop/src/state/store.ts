@@ -204,6 +204,8 @@ export type DialogState =
   /** 실행 중인 전송(복사/이동) 작업의 진행 창. */
   | { kind: "progress"; title: string; jobId: number };
 
+/** 명령어 줄 기록을 몇 개까지 기억할지. */
+export const COMMAND_HISTORY_LIMIT = 100;
 /** 최근 위치 개수 설정(1 이상). */
 export const recentLimit = (c: { behavior: { layout: { recent_limit: number } } }) => Math.max(1, Math.floor(c.behavior.layout.recent_limit) || 20);
 
@@ -374,6 +376,8 @@ export interface AppState {
   previewRect: PreviewRect | null;
   /** 최근 위치(두 패널 공용, 오래된 것부터). 저장하고 다시 열 때 복원한다. */
   recent: string[];
+  /** 명령어 줄에서 실행한 명령(오래된 것부터, 최대 `COMMAND_HISTORY_LIMIT`개). 저장하고 다시 열 때 복원한다. */
+  commandHistory: string[];
   showHidden: boolean;
   /** 선택해서 계산한 폴더의 하위 용량(바이트). null은 계산 중·대기 중이고, 없으면 계산하지 않은 폴더다. */
   dirSizes: Record<string, number | null>;
@@ -618,6 +622,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     split: clampSplit((snapshot?.split ?? 500) / 1000),
     previewRect: snapshot?.previewRect ?? null,
     recent: snapshot?.recent ?? [],
+    commandHistory: snapshot?.commandHistory ?? [],
     showHidden: snapshot?.showHidden ?? false,
     dirSizes: {},
     dialog: null,
@@ -1249,6 +1254,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       split: Math.round(s.split * 1000),
       previewRect: s.previewRect,
       recent: s.recent,
+      commandHistory: s.commandHistory,
       left: pane(s.panes.left),
       right: pane(s.panes.right),
     };
@@ -2292,6 +2298,8 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       if (tab.virtual || isArchivePath(tab.path) || isRemotePath(tab.path)) return fail(tr("store.run_command.local_only"));
       command = command.trim();
       if (!command) return;
+      // 실행 결과와 상관없이 기록하되, 바로 앞 항목과 같으면 넣지 않는다.
+      if (get().commandHistory.at(-1) !== command) set({ commandHistory: [...get().commandHistory, command].slice(-COMMAND_HISTORY_LIMIT) });
       set({ notice: null });
       flash(tr("store.run_command.running", { command }));
       try {

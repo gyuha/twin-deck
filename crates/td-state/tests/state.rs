@@ -28,6 +28,7 @@ fn sample() -> Snapshot {
         split: 500,
         preview_rect: None,
         recent: vec![],
+        command_history: vec![],
         left: PaneSnap {
             tabs: vec![tab("/home/a"), tab("/home/a/docs")],
             active: 1,
@@ -37,6 +38,34 @@ fn sample() -> Snapshot {
             active: 0,
         },
     }
+}
+
+#[test]
+fn 명령어_기록이_없는_옛_파일은_빈_목록으로_읽는다() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut json = serde_json::to_value(sample()).unwrap();
+    assert!(json
+        .as_object_mut()
+        .unwrap()
+        .remove("commandHistory")
+        .is_some());
+    fs::write(tmp.path().join("state.json"), json.to_string()).unwrap();
+
+    let got = load(tmp.path(), "main");
+    assert!(got.warning.is_none(), "{:?}", got.warning);
+    assert!(got.snapshot.unwrap().command_history.is_empty());
+}
+
+#[test]
+fn 명령어_기록은_저장하고_읽어도_순서를_유지한다() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut s = sample();
+    s.command_history = vec!["pwd".into(), "echo 한글".into(), "pwd".into()];
+    save(tmp.path(), "main", &s).unwrap();
+
+    let got = load(tmp.path(), "main");
+    assert!(got.warning.is_none(), "{:?}", got.warning);
+    assert_eq!(got.snapshot.unwrap().command_history, s.command_history);
 }
 
 #[test]
