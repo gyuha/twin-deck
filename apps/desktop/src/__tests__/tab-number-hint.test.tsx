@@ -1,0 +1,111 @@
+import { act, fireEvent, screen, within } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+import type { Snapshot } from "@twin-deck/ts-client";
+import { TAB_NUMBER_HINT_DELAY } from "../ui/TabBar";
+import { renderApp, seedBackend } from "./helpers";
+
+const tab = (path: string) => ({ path, cursorName: null, selection: [], sort: null, view: { mode: "table" as const, count: 1 as const } });
+const snap = (left: number, right = 2): Snapshot => ({
+  version: 1,
+  activePane: "left",
+  showHidden: false,
+  paletteQuery: "",
+  split: 500,
+  left: { tabs: Array.from({ length: left }, () => tab("/home/a")), active: 0 },
+  right: { tabs: Array.from({ length: right }, () => tab("/home/b")), active: 0 },
+});
+const start = (left: number, platform: "mac" | "windows" = "mac", right = 2) => renderApp(seedBackend(), platform, undefined, { snapshot: snap(left, right) });
+const tabsOf = (pane: "left" | "right") => within(document.querySelector(`[role="tablist"][data-pane="${pane}"]`) as HTMLElement).getAllByRole("tab");
+/** 각 탭의 번호 배지(없으면 null). */
+const badges = (pane: "left" | "right") => tabsOf(pane).map((t) => t.querySelector("[data-tab-number]")?.textContent ?? null);
+const wait = (ms: number) => act(() => new Promise((r) => setTimeout(r, ms)));
+
+const META = { key: "Meta", metaKey: true };
+const pressMeta = () => fireEvent.keyDown(window, META);
+const releaseMeta = () => fireEvent.keyUp(window, { key: "Meta" });
+
+describe("탭 번호 배지 (이슈 #153)", () => {
+  it("mac: Cmd를 잠시 누르고 있으면 활성 패널 탭에 1~8, 마지막 탭에 9가 붙는다", async () => {
+    await start(4);
+    pressMeta();
+    await wait(TAB_NUMBER_HINT_DELAY + 50);
+    expect(badges("left")).toEqual(["1", "2", "3", "9"]);
+  });
+
+  it("누른 직후(지연 전)에는 배지가 없고, 다른 키가 눌리면 나오지 않는다", async () => {
+    await start(3);
+    pressMeta();
+    await wait(TAB_NUMBER_HINT_DELAY / 2);
+    expect(badges("left")).toEqual([null, null, null]);
+    fireEvent.keyDown(window, { key: "c", metaKey: true }); // Cmd+C처럼 짧은 단축키
+    await wait(TAB_NUMBER_HINT_DELAY);
+    expect(badges("left")).toEqual([null, null, null]);
+  });
+
+  it("배지가 보이는 중에 다른 키를 누르면 사라진다", async () => {
+    await start(3);
+    pressMeta();
+    await wait(TAB_NUMBER_HINT_DELAY + 50);
+    expect(badges("left")).toEqual(["1", "2", "9"]);
+    fireEvent.keyDown(window, { key: "c", metaKey: true });
+    await wait(0);
+    expect(badges("left")).toEqual([null, null, null]);
+  });
+
+  it("Cmd를 떼거나 창이 포커스를 잃으면 사라진다", async () => {
+    await start(3);
+    pressMeta();
+    await wait(TAB_NUMBER_HINT_DELAY + 50);
+    expect(badges("left")).toEqual(["1", "2", "9"]);
+    releaseMeta();
+    await wait(0);
+    expect(badges("left")).toEqual([null, null, null]);
+
+    pressMeta();
+    await wait(TAB_NUMBER_HINT_DELAY + 50);
+    expect(badges("left")).toEqual(["1", "2", "9"]);
+    fireEvent.blur(window);
+    await wait(0);
+    expect(badges("left")).toEqual([null, null, null]);
+  });
+
+  it("비활성 패널에는 붙지 않고, 탭이 하나뿐인 활성 패널에도 붙지 않는다", async () => {
+    await start(1, "mac", 3);
+    pressMeta();
+    await wait(TAB_NUMBER_HINT_DELAY + 50);
+    expect(badges("left")).toEqual([null]);
+    expect(badges("right")).toEqual([null, null, null]);
+  });
+
+  it("탭이 12개면 1~8번째와 마지막 탭에만 번호가 붙는다", async () => {
+    await start(12);
+    pressMeta();
+    await wait(TAB_NUMBER_HINT_DELAY + 50);
+    expect(badges("left")).toEqual(["1", "2", "3", "4", "5", "6", "7", "8", null, null, null, "9"]);
+  });
+
+  it("Windows: Ctrl+Shift를 누르고 있으면 붙고, Ctrl만 누르면 붙지 않는다", async () => {
+    await start(3, "windows");
+    fireEvent.keyDown(window, { key: "Control", ctrlKey: true });
+    await wait(TAB_NUMBER_HINT_DELAY + 50);
+    expect(badges("left")).toEqual([null, null, null]);
+    fireEvent.keyDown(window, { key: "Shift", ctrlKey: true, shiftKey: true });
+    await wait(TAB_NUMBER_HINT_DELAY + 50);
+    expect(badges("left")).toEqual(["1", "2", "9"]);
+    fireEvent.keyUp(window, { key: "Shift", ctrlKey: true });
+    await wait(0);
+    expect(badges("left")).toEqual([null, null, null]);
+  });
+
+  it("배지가 보이는 채로 숫자를 누르면 그 탭으로 바뀐다", async () => {
+    const { user } = await start(4);
+    await user.keyboard("{Meta>}");
+    await wait(TAB_NUMBER_HINT_DELAY + 50);
+    expect(badges("left")).toEqual(["1", "2", "3", "9"]);
+    await user.keyboard("3{/Meta}");
+    expect(tabsOf("left")[2].getAttribute("aria-selected")).toBe("true");
+    await user.keyboard("{Meta>}9{/Meta}");
+    expect(tabsOf("left")[3].getAttribute("aria-selected")).toBe("true");
+    expect(screen.getAllByRole("tab").length).toBe(6);
+  });
+});
