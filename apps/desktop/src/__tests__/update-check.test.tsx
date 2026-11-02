@@ -43,6 +43,30 @@ describe("업데이트 확인 액션", () => {
     expect(b.updateCalls).toEqual({ check: 1, install: 0 });
   });
 
+  /** 업데이트 노트를 그린 영역(높이 상한이 있는 스크롤 칸). */
+  const notesArea = async (notes: string) => {
+    const b = setup({ info: { version: "9.9.9", notes, date: null } });
+    const { user } = await renderApp(b);
+    await user.keyboard("{F9}");
+    await waitFor(async () => expect(await status()).toHaveTextContent("새 버전 9.9.9이 있습니다"));
+    return (await settings()).querySelector<HTMLElement>(".max-h-48")!;
+  };
+
+  it("업데이트 변경 사항은 마크다운으로 보인다", async () => {
+    const area = await notesArea("수정\n- **긴 탭 이름 때문에 닫기 버튼이 밀린다**: 고쳤다 (`behavior.layout.tab_close_button`) (#143)");
+    expect(area.querySelector("li")).not.toBeNull();
+    expect(area.querySelector("strong")).toHaveTextContent("긴 탭 이름 때문에 닫기 버튼이 밀린다");
+    expect(area.querySelector("code")).toHaveTextContent("behavior.layout.tab_close_button");
+    expect(area.textContent).not.toMatch(/\*\*|`/);
+  });
+
+  it("업데이트 변경 사항의 HTML은 요소로 그리지 않는다", async () => {
+    const area = await notesArea("수정\n\n<img src=x onerror=alert(1)>");
+    expect(area.querySelector("img")).toBeNull();
+    expect(area.className).toContain("max-h-48");
+    expect(area.className).toContain("overflow-auto");
+  });
+
   it("확인이 끝나기 전에 다시 실행해도 확인은 한 번만 한다", async () => {
     const b = setup({ info: null });
     let release: () => void = () => {};
