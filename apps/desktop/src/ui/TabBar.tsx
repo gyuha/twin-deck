@@ -8,27 +8,19 @@ import { useUi } from "./uiContext";
 /** 이 거리(px)보다 적게 움직이면 끌기가 아니라 클릭이다. */
 const DRAG_THRESHOLD = 4;
 
-/** 탭 번호 배지를 띄우기 전에 수식키를 누르고 있어야 하는 시간(ms). 짧게 누르는 단축키(Cmd+C 등)에서 배지가 깜빡이지 않게 한다. */
-export const TAB_NUMBER_HINT_DELAY = 400;
-
 /**
- * `core.tab.goto`의 수식키(mac은 Cmd, 그 밖은 Ctrl+Shift)만 누르고 있으면 잠시 뒤 true(이슈 #153).
+ * `core.tab.goto`의 수식키(mac은 Cmd, 그 밖은 Ctrl+Shift)만 누르고 있는 동안 true(이슈 #153).
  * 다른 키를 누르거나, 수식키 조합이 달라지거나, 창이 포커스를 잃으면 곧바로 false로 돌아간다.
  */
 function useTabNumberHint(platform: string): boolean {
   const [show, setShow] = useState(false);
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const reset = () => {
-      clearTimeout(timer);
-      timer = undefined;
-      setShow(false);
-    };
+    const reset = () => setShow(false);
     const held = (e: KeyboardEvent) =>
       platform === "mac" ? e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey : e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey;
     const down = (e: KeyboardEvent) => {
       if (!["Meta", "Control", "Shift", "Alt"].includes(e.key) || !held(e)) return reset();
-      timer ??= setTimeout(() => setShow(true), TAB_NUMBER_HINT_DELAY);
+      setShow(true);
     };
     const up = (e: KeyboardEvent) => {
       if (!held(e)) reset();
@@ -37,7 +29,6 @@ function useTabNumberHint(platform: string): boolean {
     window.addEventListener("keyup", up, true);
     window.addEventListener("blur", reset);
     return () => {
-      clearTimeout(timer);
       window.removeEventListener("keydown", down, true);
       window.removeEventListener("keyup", up, true);
       window.removeEventListener("blur", reset);
@@ -46,8 +37,8 @@ function useTabNumberHint(platform: string): boolean {
   return show;
 }
 
-/** `core.tab.goto`가 i번째 탭으로 가는 번호: 1~8번째는 그 번호, 마지막 탭은 9, 나머지는 없음. */
-const gotoNumber = (i: number, count: number) => (i === count - 1 ? 9 : i < 8 ? i + 1 : null);
+/** `core.tab.goto`가 i번째 탭으로 가는 번호: 1~8번째는 그 번호, 9번째 이후는 마지막 탭에만 9, 나머지는 없음. */
+const gotoNumber = (i: number, count: number) => (i < 8 ? i + 1 : i === count - 1 ? 9 : null);
 
 /** 탭을 눌러 끌어 같은 패널 안에서 순서를 바꾼다(마우스 이벤트로 직접 처리 — 파일 끌기와 같은 방식). */
 export function TabBar({ pane }: { pane: PaneId }) {
