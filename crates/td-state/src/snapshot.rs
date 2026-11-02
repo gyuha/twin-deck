@@ -70,6 +70,9 @@ pub struct Snapshot {
     /// 최근 위치(두 패널 공용, 오래된 것부터). 옛 파일에는 없어서 빈 목록으로 읽는다.
     #[serde(default)]
     pub recent: Vec<String>,
+    /// 명령어 줄에서 실행한 명령(오래된 것부터). 옛 파일에는 없어서 빈 목록으로 읽는다.
+    #[serde(default)]
+    pub command_history: Vec<String>,
     pub left: PaneSnap,
     pub right: PaneSnap,
 }

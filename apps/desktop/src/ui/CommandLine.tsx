@@ -12,7 +12,11 @@ export function CommandLine() {
   const show = useApp((s) => s.loaded.config.behavior.layout.show_command_line);
   const focusTick = useApp((s) => s.commandLineFocus);
   const tab = useApp((s) => activeTab(s));
+  const history = useApp((s) => s.commandHistory);
   const [value, setValue] = useState("");
+  // ↑/↓ 기록 탐색 위치(0이 가장 최근, null이면 탐색 중이 아님)와 탐색을 시작하기 전에 치던 글자.
+  const [pos, setPos] = useState<number | null>(null);
+  const draft = useRef("");
   const input = useRef<HTMLInputElement>(null);
   const local = !tab.virtual && !isArchivePath(tab.path) && !isRemotePath(tab.path);
   // 키로 옮기라는 요청이 올 때마다 포커스를 준다. 줄이 방금 켜졌다면 그려진 뒤에 준다.
@@ -20,6 +24,12 @@ export function CommandLine() {
     if (focusTick > 0) input.current?.focus();
   }, [focusTick, show]);
   if (!show) return null;
+  // 기록의 pos번째(최근부터)를 입력칸에 채우고 커서를 끝으로 보낸다.
+  const recall = (next: number | null, text: string) => {
+    setPos(next);
+    setValue(text);
+    requestAnimationFrame(() => input.current?.setSelectionRange(text.length, text.length));
+  };
   const prompt = local ? `[${tab.path}]${platform === "windows" ? ">" : "$"}` : t("commandline.unavailable");
   return (
     <div className="flex items-center gap-2 border-t border-app-line px-2 py-0.5 text-xs">
@@ -35,13 +45,27 @@ export function CommandLine() {
         disabled={!local}
         spellCheck={false}
         autoComplete="off"
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => {
+          setValue(e.target.value);
+          setPos(null);
+        }}
         onKeyDown={(e) => {
           if (e.nativeEvent.isComposing) return;
           if (e.key === "Enter" && value.trim()) {
             e.preventDefault();
             void api.runCommand(value);
             setValue("");
+            setPos(null);
+          } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+            e.preventDefault();
+            if (history.length === 0) return;
+            if (e.key === "ArrowUp") {
+              if (pos === null) draft.current = value;
+              const next = Math.min((pos ?? -1) + 1, history.length - 1);
+              recall(next, history[history.length - 1 - next]);
+            } else if (pos !== null) {
+              recall(pos === 0 ? null : pos - 1, pos === 0 ? draft.current : history[history.length - pos]);
+            }
           } else if (e.key === "Escape") {
             e.preventDefault();
             input.current?.blur();
