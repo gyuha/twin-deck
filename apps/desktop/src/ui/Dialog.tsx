@@ -213,7 +213,7 @@ export function Dialog() {
         })()}
         {dialog.kind === "info" && dialog.commandOutput && (
           // 명령 출력 창은 명령·종료 코드를 출력 위에 두고 줄어들지 않게 해, 긴 출력이 이 목록을 누르지 못하게 한다(이슈 #151).
-          <ul className="mb-1 shrink-0 list-inside list-disc">
+          <ul className="mb-1 max-h-24 shrink-0 list-inside list-disc overflow-y-auto break-all">
             {dialog.lines.map((l, i) => (
               <li key={i}>{l}</li>
             ))}

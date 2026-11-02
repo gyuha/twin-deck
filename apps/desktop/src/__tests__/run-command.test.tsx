@@ -89,7 +89,10 @@ describe("명령어 줄 (core.run_command, 이슈 #110)", () => {
     const pre = dlg.querySelector("pre")!;
     expect(ul.compareDocumentPosition(pre) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(ul.className).toContain("shrink-0");
-    expect(ul.className).not.toContain("overflow");
+    // 아주 긴 명령이 접혀도 목록이 창 높이를 넘지 않도록 상한과 자체 스크롤, 단어 중간 줄바꿈을 준다.
+    expect(ul.className).toContain("max-h-24");
+    expect(ul.className).toContain("overflow-y-auto");
+    expect(ul.className).toContain("break-all");
   });
 
   it("하단 알림 팝업의 출력은 계속 줄바꿈된다", async () => {
