@@ -5,6 +5,8 @@ mod commands;
 mod epub;
 mod global_hotkey;
 mod office;
+#[cfg(any(target_os = "macos", test))]
+mod relaunch;
 mod service;
 
 use tauri_specta::Event;
