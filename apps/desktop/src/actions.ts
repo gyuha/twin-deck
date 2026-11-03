@@ -100,7 +100,7 @@ export function fileOpHandlers({ api }: AppStore): Partial<ActionHandlers> {
     "core.rename.next": () => api.renameCommit(1),
     "core.file.new_folder": () => api.newFolder(),
     "core.run_command": () => api.focusCommandLine(),
-    "core.view.command_line": () => api.toggleLayoutFlag("show_command_line"),
+    "core.view.command_line": () => api.toggleCommandLine(),
     "core.view.folder_tree": () => api.toggleLayoutFlag("show_folder_tree"),
     "core.file.new_file": () => api.newFile(),
     "core.trash": () => api.trashTargets(),

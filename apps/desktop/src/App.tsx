@@ -221,7 +221,7 @@ function StatusBar() {
         {viewToggle(t("status.group_aria"), "calendar", groupByModified, () => api.toggleGroupByModified(), "")}
         {viewToggle(t("menu.view.drive_bar"), "drive", showDriveBar, () => api.toggleLayoutFlag("show_drive_bar"), "core.view.drive_bar")}
         {viewToggle(t("menu.view.folder_tree"), "tree", showFolderTree, () => api.toggleLayoutFlag("show_folder_tree"), "core.view.folder_tree")}
-        {viewToggle(t("menu.view.command_line"), "terminal", showCommandLine, () => api.toggleLayoutFlag("show_command_line"), "core.view.command_line")}
+        {viewToggle(t("menu.view.command_line"), "terminal", showCommandLine, () => api.toggleCommandLine(), "core.view.command_line")}
         {viewToggle(t("menu.view.action_bar"), "panelBottom", showActionBar, () => api.toggleLayoutFlag("show_action_bar"), "core.view.action_bar")}
       </span>
     </footer>

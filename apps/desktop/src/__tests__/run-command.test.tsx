@@ -156,6 +156,28 @@ describe("명령어 줄 (core.run_command, 이슈 #110)", () => {
   });
 });
 
+describe("명령어 줄을 켜면 입력칸으로 포커스가 간다 (이슈 #157)", () => {
+  const off = () => {
+    const b = seedBackend();
+    b.setConfig((l) => (l.config.behavior.layout.show_command_line = false));
+    return b;
+  };
+
+  it("꺼진 상태에서 Ctrl+Shift+L로 켜면 입력칸이 포커스를 받는다", async () => {
+    const { user } = await renderApp(off());
+    await user.keyboard("{Control>}{Shift>}l{/Shift}{/Control}");
+    const input = await screen.findByRole("textbox", { name: "명령어 줄" });
+    await waitFor(() => expect(document.activeElement).toBe(input));
+  });
+
+  it("상태 줄 토글 버튼으로 켜도 입력칸이 포커스를 받는다", async () => {
+    const { user } = await renderApp(off());
+    await user.click(screen.getByRole("button", { name: "명령어 줄 표시" }));
+    const input = await screen.findByRole("textbox", { name: "명령어 줄" });
+    await waitFor(() => expect(document.activeElement).toBe(input));
+  });
+});
+
 describe("명령어 줄 입력칸에 포커스가 있을 때의 키 (이슈 #119)", () => {
   const focused = async () => {
     const r = await renderApp();

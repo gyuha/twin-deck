@@ -3884,6 +3884,12 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     async toggleGroupByModified() {
       await api.setConfigValue("behavior.table.group_by_modified", { kind: "bool", value: !get().loaded.config.behavior.table.group_by_modified });
     },
+    /** 명령어 줄을 켜고 끈다. 꺼져 있던 것을 켜면 입력칸으로 포커스를 준다(이슈 #157). 입력칸이 비활성인 탭에서는 알림 없이 켜기만 한다. */
+    async toggleCommandLine() {
+      const wasOn = get().loaded.config.behavior.layout.show_command_line;
+      await api.toggleLayoutFlag("show_command_line");
+      if (!wasOn) set({ commandLineFocus: get().commandLineFocus + 1 });
+    },
     async toggleLayoutFlag(flag: "show_action_bar" | "show_drive_bar" | "show_command_line" | "show_folder_tree") {
       await api.setConfigValue(`behavior.layout.${flag}`, { kind: "bool", value: !get().loaded.config.behavior.layout[flag] });
     },
