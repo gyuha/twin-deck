@@ -259,7 +259,7 @@ td 메모.txt   # 그 파일이 든 폴더를 열고 커서를 파일에 둡니�
 - [go-task](https://taskfile.dev/) (선택. 없으면 `Taskfile.yml`의 명령을 직접 실행)
 
 ```sh
-task setup      # 의존성 설치와 툴체인 확인
+task setup      # 의존성 설치와 툴체인 확인 (Windows는 NASM도 설치)
 task dev        # 개발 모드 실행
 task test       # Rust와 TS 테스트
 task check      # fmt, clippy, 타입 검사

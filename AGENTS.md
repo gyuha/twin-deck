@@ -9,7 +9,7 @@ Twin Deck is a keyboard-driven dual-pane file manager (Tauri 2 + Rust core + Rea
 Task runner is go-task (`Taskfile.yml`; `justfile` is an older mirror). Plain commands work too.
 
 ```sh
-task setup            # bun install + rustup show
+task setup            # bun install + rustup show (Windows: NASM 설치 확인)
 task dev              # tauri dev (Vite on :1420 strictPort + Rust)
 task test             # cargo test --workspace && bun run test
 task check            # fmt --check, clippy --all-targets -D warnings, typecheck

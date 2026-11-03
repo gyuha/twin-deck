@@ -259,7 +259,7 @@ Requirements:
 - [go-task](https://taskfile.dev/) (optional; without it run the commands in `Taskfile.yml` directly)
 
 ```sh
-task setup      # install dependencies and check the toolchain
+task setup      # install dependencies and check the toolchain (installs NASM on Windows)
 task dev        # run in development mode
 task test       # Rust and TS tests
 task check      # fmt, clippy, type check
