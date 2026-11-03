@@ -115,6 +115,9 @@ export class TauriBackend implements Backend {
   async terminalOpen(cwd: string, cols: number, rows: number) {
     return unwrap(await commands.terminalOpen(cwd, cols, rows));
   }
+  async terminalOpenLine(cwd: string, line: string, cols: number, rows: number) {
+    return unwrap(await commands.terminalOpenLine(cwd, line, cols, rows));
+  }
   async terminalOpenRemote(connectionId: string, cols: number, rows: number) {
     return unwrap(await commands.terminalOpenRemote(connectionId, cols, rows));
   }

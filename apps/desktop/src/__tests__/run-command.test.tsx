@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { renderApp, seedBackend, selectedNames } from "./helpers";
 
@@ -179,5 +179,34 @@ describe("명령어 줄 입력칸에 포커스가 있을 때의 키 (이슈 #119
     expect(selectedNames("left")).toEqual([]);
     expect(input).toHaveValue("abc");
     expect(input).toHaveFocus();
+  });
+});
+
+describe("명령어 줄 결과 창의 ANSI 색 (이슈 #157)", () => {
+  const E = "\x1b";
+  const show = async () => {
+    const b = seedBackend();
+    b.shellResult = { exit_code: 0, output: `${E}[32m+added${E}[0m\n${E}[31m-removed${E}[0m\nplain\n`, timed_out: false };
+    const r = await renderApp(b);
+    const input = await screen.findByRole("textbox", { name: "명령어 줄" });
+    await r.user.type(input, "git diff{Enter}");
+    const dlg = await screen.findByRole("dialog", { name: "실행 결과" });
+    return { ...r, backend: b, dlg, pre: dlg.querySelector("pre")! };
+  };
+
+  it("색 코드는 색 span으로 그리고 화면 글자에 ESC가 없다", async () => {
+    const { pre } = await show();
+    expect(pre.textContent).toBe("+added\n-removed\nplain\n");
+    expect(pre.textContent).not.toContain(E);
+    const spans = [...pre.querySelectorAll<HTMLElement>("span[style]")];
+    expect(spans.map((s) => s.textContent)).toEqual(["+added", "-removed"]);
+    expect(spans[0].style.color).not.toBe("");
+    expect(spans[0].style.color).not.toBe(spans[1].style.color);
+  });
+
+  it("복사하면 ANSI를 지운 글자가 클립보드로 간다", async () => {
+    const { user, dlg, backend } = await show();
+    await user.click(within(dlg).getByRole("button", { name: "메시지 복사" }));
+    await waitFor(() => expect(backend.clipboard).toEqual(["+added\n-removed\nplain\n"]));
   });
 });

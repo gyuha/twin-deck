@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { isArchivePath, isRemotePath } from "@twin-deck/ts-client";
+import { highlightCommandLine } from "../lib/highlight";
 import { activeTab } from "../state/store";
 import { useApp, useAppStore, useT } from "../state/context";
 import { useUi } from "./uiContext";
@@ -18,6 +19,7 @@ export function CommandLine() {
   const [pos, setPos] = useState<number | null>(null);
   const draft = useRef("");
   const input = useRef<HTMLInputElement>(null);
+  const layer = useRef<HTMLDivElement>(null);
   const local = !tab.virtual && !isArchivePath(tab.path) && !isRemotePath(tab.path);
   // 키로 옮기라는 요청이 올 때마다 포커스를 준다. 줄이 방금 켜졌다면 그려진 뒤에 준다.
   useEffect(() => {
@@ -28,7 +30,14 @@ export function CommandLine() {
   const recall = (next: number | null, text: string) => {
     setPos(next);
     setValue(text);
-    requestAnimationFrame(() => input.current?.setSelectionRange(text.length, text.length));
+    requestAnimationFrame(() => {
+      input.current?.setSelectionRange(text.length, text.length);
+      syncScroll();
+    });
+  };
+  // 글자가 투명한 입력칸 아래 색칠 레이어를 입력칸의 가로 스크롤에 맞춘다.
+  const syncScroll = () => {
+    if (layer.current && input.current) layer.current.scrollLeft = input.current.scrollLeft;
   };
   const prompt = local ? `[${tab.path}]${platform === "windows" ? ">" : "$"}` : t("commandline.unavailable");
   return (
@@ -36,6 +45,16 @@ export function CommandLine() {
       <label htmlFor="command-line-input" className="max-w-[50%] shrink-0 truncate" title={local ? tab.path : undefined}>
         {prompt}
       </label>
+      <div className="relative min-w-0 flex-1">
+      <div
+        ref={layer}
+        data-command-line-highlight
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre border border-transparent px-1 py-0.5"
+      >
+        {/* highlight.js가 입력을 escape한 결과만 넣는다. */}
+        <span dangerouslySetInnerHTML={{ __html: highlightCommandLine(value) }} />
+      </div>
       <input
         id="command-line-input"
         ref={input}
@@ -48,7 +67,11 @@ export function CommandLine() {
         onChange={(e) => {
           setValue(e.target.value);
           setPos(null);
+          syncScroll();
         }}
+        onKeyUp={syncScroll}
+        onSelect={syncScroll}
+        onScroll={syncScroll}
         onKeyDown={(e) => {
           if (e.nativeEvent.isComposing) return;
           if (e.key === "Enter" && value.trim()) {
@@ -71,8 +94,9 @@ export function CommandLine() {
             input.current?.blur();
           }
         }}
-        className="min-w-0 flex-1 border border-app-line bg-transparent px-1 py-0.5"
+        className="relative w-full border border-app-line bg-transparent px-1 py-0.5 text-transparent caret-ink"
       />
+      </div>
     </div>
   );
 }

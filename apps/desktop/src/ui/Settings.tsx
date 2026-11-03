@@ -197,6 +197,7 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
       { key: "behavior.layout.show_folder_tree", get title() { return translate("settings.item.behavior.layout.show_folder_tree.title"); }, get desc() { return translate("settings.item.behavior.layout.show_folder_tree.desc"); }, control: { type: "switch" } },
       { key: "behavior.layout.folder_tree_width", get title() { return translate("settings.item.behavior.layout.folder_tree_width.title"); }, get desc() { return translate("settings.item.behavior.layout.folder_tree_width.desc"); }, control: { type: "int" } },
       { key: "behavior.layout.show_command_line", get title() { return translate("settings.item.behavior.layout.show_command_line.title"); }, get desc() { return translate("settings.item.behavior.layout.show_command_line.desc"); }, control: { type: "switch" } },
+      { key: "behavior.command_line_terminal", get title() { return translate("settings.item.behavior.command_line_terminal.title"); }, get desc() { return translate("settings.item.behavior.command_line_terminal.desc"); }, control: { type: "switch" } },
       { key: "behavior.layout.show_drive_bar", get title() { return translate("settings.item.behavior.layout.show_drive_bar.title"); }, get desc() { return translate("settings.item.behavior.layout.show_drive_bar.desc"); }, control: { type: "switch" } },
     ],
   },

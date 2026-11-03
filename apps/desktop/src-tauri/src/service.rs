@@ -1191,6 +1191,25 @@ impl<T: Trasher + Clone + Send + 'static> Service<T> {
             .map_err(|e| e.to_string())
     }
 
+    /// 셸 `shell`(설정 `environment.terminal`)에서 명령 한 줄 `line`을 `cwd`에서 pty로 실행하고 세션 번호를 돌려준다.
+    /// 출력·종료는 `terminal_open`과 같은 터미널 이벤트로 나간다. 시간 제한은 없다.
+    pub fn terminal_open_line(
+        &self,
+        shell: &str,
+        cwd: &str,
+        line: &str,
+        cols: u32,
+        rows: u32,
+    ) -> ServiceResult<u32> {
+        let (cols, rows) = (
+            cols.min(u16::MAX as u32) as u16,
+            rows.min(u16::MAX as u32) as u16,
+        );
+        self.terminals
+            .open_line(shell, Path::new(cwd), line, cols, rows)
+            .map_err(|e| e.to_string())
+    }
+
     /// 테스트용: 셸 대신 지정한 프로그램을 연다.
     #[cfg(test)]
     pub fn terminal_open_command(
@@ -3739,6 +3758,34 @@ mod tests {
         assert!(out.contains("root") && out.contains("ping"), "{out:?}");
         svc.terminal_close(id).unwrap();
         assert!(svc.terminal_resize(9999, 10, 10).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn terminal_line_runs_command_in_folder_and_reports_exit_code() {
+        use std::time::Duration;
+        let (_t, svc, ch, root) = setup();
+        let id = svc
+            .terminal_open_line("default", &root, "pwd; exit 3", 80, 24)
+            .unwrap();
+        let mut out = String::new();
+        loop {
+            match ch
+                .terminal_events
+                .recv_timeout(Duration::from_secs(10))
+                .expect("종료 이벤트가 오지 않았다")
+            {
+                td_terminal::TermEvent::Output { id: i, data } if i == id => {
+                    out.push_str(&String::from_utf8_lossy(&data))
+                }
+                td_terminal::TermEvent::Exit { id: i, code } if i == id => {
+                    assert_eq!(code, Some(3));
+                    break;
+                }
+                _ => {}
+            }
+        }
+        assert!(out.contains("root"), "{out:?}");
     }
 
     #[test]

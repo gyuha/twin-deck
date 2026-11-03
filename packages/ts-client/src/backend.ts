@@ -266,6 +266,8 @@ export interface Backend {
   onOpenPaths(callback: (request: OpenPathsDto) => void): () => void;
   /** `cwd` 폴더에서 셸을 pty로 열고 세션 번호를 돌려준다. */
   terminalOpen(cwd: string, cols: number, rows: number): Promise<number>;
+  /** 명령 한 줄 `line`을 설정 `environment.terminal`의 셸로 `cwd`에서 pty 실행하고 세션 번호를 돌려준다. 출력·종료는 `onTerminalEvent`로 오고, 입력·크기·닫기는 `terminalWrite/Resize/Close`를 쓴다. */
+  terminalOpenLine(cwd: string, line: string, cols: number, rows: number): Promise<number>;
   /** SFTP 연결 `connectionId`(경로 `sftp://<id>/..`의 id)의 서버에 원격 셸을 열고 세션 번호를 돌려준다. 입출력·종료는 로컬 터미널과 같은 `terminalWrite/Resize/Close`·`onTerminalEvent`다. */
   terminalOpenRemote(connectionId: string, cols: number, rows: number): Promise<number>;
   /** 세션에 입력(키 입력을 글로 바꾼 것)을 쓴다. */

@@ -35,6 +35,8 @@ pub struct Config {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct Behavior {
+    /// 켜면 명령어 줄의 Enter가 결과 창 대신 터미널 팝업에서 명령을 실행한다.
+    pub command_line_terminal: bool,
     pub theme: String,
     /// 화면 언어(`ko`, `en`). 기본은 한국어다.
     pub language: String,

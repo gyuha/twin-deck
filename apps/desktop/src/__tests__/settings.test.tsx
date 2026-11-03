@@ -365,6 +365,17 @@ describe("키 설정", () => {
   });
 });
 
+describe("명령어 줄 터미널 설정 항목 (이슈 #157)", () => {
+  it("모양 탭에 '명령어 줄 실행 시 터미널 띄우기'가 있고 켜면 저장된다", async () => {
+    const { user, backend } = await renderApp();
+    await open(user);
+    await dialog();
+    expect(sw("명령어 줄 실행 시 터미널 띄우기")).toHaveAttribute("aria-checked", "false");
+    await user.click(sw("명령어 줄 실행 시 터미널 띄우기"));
+    await waitFor(async () => expect((await backend.getConfig()).config.behavior.command_line_terminal).toBe(true));
+  });
+});
+
 describe("파일 목록 모양 설정 항목", () => {
   it("목록과 선택 탭에 줄무늬·표시 칸·폴더 모양·커서 행 꽉 채움이 있고 바꾸면 저장된다", async () => {
     const { user, backend } = await renderApp();

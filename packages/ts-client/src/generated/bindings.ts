@@ -754,6 +754,18 @@ async terminalOpen(cwd: string, cols: number, rows: number) : Promise<Result<num
 }
 },
 /**
+ * 명령 한 줄 `line`을 설정 `environment.terminal`의 셸로 `cwd`에서 pty 실행한다(명령어 줄의 터미널 팝업).
+ * 돌려주는 세션 번호는 `terminal_write/resize/close`와 `terminal` 이벤트가 그대로 쓴다.
+ */
+async terminalOpenLine(cwd: string, line: string, cols: number, rows: number) : Promise<Result<number, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("terminal_open_line", { cwd, line, cols, rows }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * 연결 `connection_id`(SFTP)의 서버에 원격 셸을 연다. 돌려주는 세션 번호는 `terminal_write/resize/close`와 `terminal` 이벤트가 로컬 터미널처럼 쓴다.
  * 접속은 블로킹이라 UI 스레드를 막지 않게 따로 돌린다.
  */
@@ -889,7 +901,11 @@ usageUpdate: "usage-update"
 
 /** user-defined types **/
 
-export type Behavior = { theme: string; 
+export type Behavior = { 
+/**
+ * 켜면 명령어 줄의 Enter가 결과 창 대신 터미널 팝업에서 명령을 실행한다.
+ */
+command_line_terminal: boolean; theme: string; 
 /**
  * 화면 언어(`ko`, `en`). 기본은 한국어다.
  */

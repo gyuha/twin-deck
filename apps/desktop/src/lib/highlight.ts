@@ -60,3 +60,76 @@ export function languageFor(fileName: string): keyof typeof LANGUAGES | null {
 export function highlight(text: string, language: keyof typeof LANGUAGES): string {
   return hljs.highlight(text, { language, ignoreIllegals: true }).value;
 }
+
+const SHELL_KEYWORDS = new Set(["if", "then", "else", "elif", "fi", "do", "done", "while", "until", "for", "case", "esac", "in", "function", "time"]);
+const WORD = /[^\s|&;()<>'"`$#\\]+/y;
+const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
+
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/** 따옴표가 시작하는 위치에서 닫는 따옴표 바로 다음 위치를 돌려준다(닫히지 않으면 끝). */
+function skipQuote(text: string, start: number): number {
+  const q = text[start];
+  for (let i = start + 1; i < text.length; i++) {
+    if (text[i] === "\\" && q !== "'") i++;
+    else if (text[i] === q) return i + 1;
+  }
+  return text.length;
+}
+
+/** 셸 한 줄에서 명령 자리 단어(줄 첫머리와 따옴표·주석 밖의 `|` `&` `;` `(` 뒤, `VAR=값` 대입 뒤)의 [시작, 끝) 범위. */
+function commandWordRanges(text: string): Array<[number, number]> {
+  const ranges: Array<[number, number]> = [];
+  let expect = true;
+  let i = 0;
+  while (i < text.length) {
+    const c = text[i];
+    if (/\s/.test(c)) {
+      i++;
+    } else if (c === "#") {
+      break;
+    } else if (expect && /[^\s|&;()<>'"`$\\]/.test(c)) {
+      WORD.lastIndex = i;
+      const word = WORD.exec(text)![0];
+      const end = i + word.length;
+      if (ASSIGNMENT.test(word)) {
+        // 대입의 값(따옴표 포함)을 건너뛰고 계속 명령 자리를 기다린다.
+        i = end;
+        while (i < text.length && !/[\s|&;()<>]/.test(text[i])) i = /['"`]/.test(text[i]) ? skipQuote(text, i) : i + 1;
+      } else {
+        if (!SHELL_KEYWORDS.has(word)) {
+          ranges.push([i, end]);
+          expect = false;
+        }
+        i = end;
+      }
+    } else if (c === "'" || c === '"' || c === "`") {
+      expect = false;
+      i = skipQuote(text, i);
+    } else if (c === "\\") {
+      expect = false;
+      i += 2;
+    } else if (c === "|" || c === ";" || c === "(" || (c === "&" && !/[<>]/.test(text[i - 1] ?? ""))) {
+      expect = true;
+      i++;
+    } else {
+      expect = false;
+      i++;
+    }
+  }
+  return ranges;
+}
+
+/** 명령어 줄용 bash 하이라이트: highlight.js가 칠하지 않는 외부 명령 이름도 명령 자리면 `hljs-built_in`으로 칠한다. 모든 조각이 escape되어 있다. */
+export function highlightCommandLine(text: string): string {
+  let html = "";
+  let at = 0;
+  for (const [start, end] of commandWordRanges(text)) {
+    if (start > at) html += highlight(text.slice(at, start), "bash");
+    html += `<span class="hljs-built_in">${escapeHtml(text.slice(start, end))}</span>`;
+    at = end;
+  }
+  return html + (at < text.length ? highlight(text.slice(at), "bash") : "");
+}

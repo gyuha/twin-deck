@@ -55,8 +55,8 @@ function notify(s: Session, patch: Partial<TerminalState>) {
   s.watchers.forEach((w) => w(s.state));
 }
 
-function open(backend: Backend, id: number, font: string, colors?: TerminalColors): Session {
-  const s: Session = { id, engine: null, colors, state: { ready: false, error: null }, pending: [], host: null, refs: 0, disposed: false, off: () => {}, watchers: new Set() };
+function open(backend: Backend, id: number, font: string, colors?: TerminalColors, initial: Uint8Array[] = []): Session {
+  const s: Session = { id, engine: null, colors, state: { ready: false, error: null }, pending: [...initial], host: null, refs: 0, disposed: false, off: () => {}, watchers: new Set() };
   s.off = backend.onTerminalEvent((e) => {
     if (e.type !== "output" || e.id !== s.id) return;
     if (s.engine) s.engine.write(e.data);
@@ -111,11 +111,11 @@ export function rebindTerminal(backend: Backend, from: number, to: number) {
 
 /**
  * 세션 `id`의 화면을 쓰기 시작한다. 이미 있으면(다른 패널의 뷰가 쓰던 것) 같은 엔진을 이어 받는다.
- * `watch`는 준비·오류 상태가 바뀔 때 불린다(지금 상태로도 한 번 불린다).
+ * `watch`는 준비·오류 상태가 바뀔 때 불린다(지금 상태로도 한 번 불린다). `initial`은 화면을 열기 전에 이미 온 출력으로, 새 세션의 맨 앞에 쓴다.
  */
-export function acquireTerminal(backend: Backend, id: number, font: string, watch: (s: TerminalState) => void, colors?: TerminalColors): TerminalHandle {
+export function acquireTerminal(backend: Backend, id: number, font: string, watch: (s: TerminalState) => void, colors?: TerminalColors, initial?: Uint8Array[]): TerminalHandle {
   const sessions = sessionsOf(backend);
-  const s = sessions.get(id) ?? open(backend, id, font, colors);
+  const s = sessions.get(id) ?? open(backend, id, font, colors, initial);
   sessions.set(id, s);
   s.refs++;
   s.watchers.add(watch);

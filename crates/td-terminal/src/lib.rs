@@ -165,6 +165,26 @@ impl Terminals {
         self.open_command(&program, &args, cwd, cols, rows)
     }
 
+    /// 선택한 셸에서 명령 한 줄을 pty로 실행한다. 종료까지 시간 제한을 두지 않는다.
+    pub fn open_line(
+        &self,
+        shell_choice: &str,
+        cwd: &Path,
+        line: &str,
+        cols: u16,
+        rows: u16,
+    ) -> Result<u32> {
+        let (program, args) = resolve_shell_line(
+            shell_choice,
+            cfg!(windows),
+            line,
+            &|key| std::env::var(key).ok(),
+            &|path| path.is_file(),
+        )?;
+        let args: Vec<&str> = args.iter().map(String::as_str).collect();
+        self.open_command(&program, &args, cwd, cols, rows)
+    }
+
     /// 지정한 프로그램을 pty로 연다(테스트와 셸 지정용).
     pub fn open_command(
         &self,
@@ -327,6 +347,31 @@ pub fn resolve_shell(
     }
 }
 
+/// 셸 선택을 명령 한 줄 실행용 프로그램과 인수로 푼다. 명령 문자열은 인수 하나로 보존한다.
+pub fn resolve_shell_line(
+    choice: &str,
+    windows: bool,
+    line: &str,
+    env: &dyn Fn(&str) -> Option<String>,
+    exists: &dyn Fn(&Path) -> bool,
+) -> Result<(String, Vec<String>)> {
+    let (program, mut args) = resolve_shell(choice, windows, env, exists)?;
+    let command_flag = if !windows {
+        "-c"
+    } else {
+        match choice {
+            "powershell" => "-Command",
+            "gitbash" => {
+                args.retain(|arg| arg != "-i");
+                "-c"
+            }
+            _ => "/C",
+        }
+    };
+    args.extend([command_flag.into(), line.into()]);
+    Ok((program, args))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -358,6 +403,76 @@ mod tests {
                 .find(|(n, _)| *n == k)
                 .map(|(_, v)| v.to_string())
         }
+    }
+
+    #[test]
+    fn 한_줄_실행은_운영체제와_셸에_맞는_인수를_쓴다() {
+        let env = env_of(&[
+            ("SHELL", "/bin/zsh"),
+            ("COMSPEC", "custom-cmd.exe"),
+            ("ProgramFiles", "/programs"),
+        ]);
+        let line = "echo '안녕'; exit 3";
+        for choice in ["default", "cmd", "powershell", "gitbash"] {
+            assert_eq!(
+                resolve_shell_line(choice, false, line, &env, &|_| true).unwrap(),
+                (
+                    "/bin/zsh".into(),
+                    vec!["-l".into(), "-c".into(), line.into()]
+                )
+            );
+        }
+        for choice in ["default", "cmd", "unknown"] {
+            assert_eq!(
+                resolve_shell_line(choice, true, line, &env, &|_| true).unwrap(),
+                ("custom-cmd.exe".into(), vec!["/C".into(), line.into()])
+            );
+        }
+        assert_eq!(
+            resolve_shell_line("powershell", true, line, &env, &|_| true).unwrap(),
+            (
+                "powershell.exe".into(),
+                vec!["-NoLogo".into(), "-Command".into(), line.into()]
+            )
+        );
+        let (program, args) = resolve_shell_line("gitbash", true, line, &env, &|_| true).unwrap();
+        assert_eq!(
+            Path::new(&program),
+            Path::new("/programs").join("Git/bin/bash.exe")
+        );
+        assert_eq!(args, vec!["--login", "-c", line]);
+        assert!(resolve_shell_line("gitbash", true, line, &env, &|_| false).is_err());
+        assert_eq!(
+            resolve_shell_line("default", false, line, &env_of(&[]), &|_| true)
+                .unwrap()
+                .0,
+            "/bin/sh"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn 한_줄_실행은_한글_출력과_종료_코드를_이벤트로_보낸다() {
+        let dir = tempfile::tempdir().unwrap();
+        let (t, rx) = Terminals::new();
+        let id = t
+            .open_line("default", dir.path(), "echo 안녕; exit 3", 80, 24)
+            .unwrap();
+        let mut output = Vec::new();
+        loop {
+            match rx
+                .recv_timeout(Duration::from_secs(10))
+                .expect("종료 이벤트가 오지 않았다")
+            {
+                TermEvent::Output { id: event_id, data } if event_id == id => output.extend(data),
+                TermEvent::Exit { id: event_id, code } if event_id == id => {
+                    assert_eq!(code, Some(3));
+                    break;
+                }
+                _ => {}
+            }
+        }
+        assert!(String::from_utf8_lossy(&output).contains("안녕"));
     }
 
     #[test]

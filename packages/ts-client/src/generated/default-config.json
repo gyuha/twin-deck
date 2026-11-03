@@ -1,6 +1,7 @@
 {
   "config": {
     "behavior": {
+      "command_line_terminal": false,
       "theme": "system",
       "language": "ko",
       "random_theme": false,

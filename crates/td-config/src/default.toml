@@ -4,6 +4,7 @@
 favorites = []
 
 [behavior]
+command_line_terminal = false # 켜면 명령어 줄의 Enter가 결과 창 대신 터미널 팝업에서 명령을 실행한다
 theme = "system"
 language = "ko" # 화면 언어: ko(한국어), en(English)
 random_theme = false

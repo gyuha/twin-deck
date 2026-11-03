@@ -44,6 +44,9 @@
 .hljs-title, .hljs-title.function_, .hljs-title.class_, .hljs-built_in, .hljs-type, .hljs-attr, .hljs-attribute, .hljs-selector-class, .hljs-selector-id { color: var(--color-status-warning); }
 .hljs-comment, .hljs-quote, .hljs-meta { color: var(--color-ink-faint); font-style: italic; }
 .hljs-deletion { color: var(--color-status-error); }
+.hljs-variable { color: var(--color-status-info); }
+/* 명령어 줄 색칠 레이어는 투명 입력칸과 글자 폭이 같아야 하므로 기울임·굵게를 끈다. */
+[data-command-line-highlight] * { font-style: normal; font-weight: inherit; }
 .hljs-emphasis { font-style: italic; }
 .hljs-strong { font-weight: 600; }
 

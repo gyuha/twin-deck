@@ -1631,6 +1631,22 @@ pub fn terminal_open(
     svc.terminal_open(&shell, &cwd, cols, rows)
 }
 
+/// 명령 한 줄 `line`을 설정 `environment.terminal`의 셸로 `cwd`에서 pty 실행한다(명령어 줄의 터미널 팝업).
+/// 돌려주는 세션 번호는 `terminal_write/resize/close`와 `terminal` 이벤트가 그대로 쓴다.
+#[tauri::command]
+#[specta::specta]
+pub fn terminal_open_line(
+    svc: State<'_, AppService>,
+    config: State<'_, ConfigState>,
+    cwd: String,
+    line: String,
+    cols: u32,
+    rows: u32,
+) -> ServiceResult<u32> {
+    let shell = config.current().config.environment.terminal;
+    svc.terminal_open_line(&shell, &cwd, &line, cols, rows)
+}
+
 /// 연결 `connection_id`(SFTP)의 서버에 원격 셸을 연다. 돌려주는 세션 번호는 `terminal_write/resize/close`와 `terminal` 이벤트가 로컬 터미널처럼 쓴다.
 /// 접속은 블로킹이라 UI 스레드를 막지 않게 따로 돌린다.
 #[tauri::command]
@@ -1818,6 +1834,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             cli_install,
             cli_uninstall,
             terminal_open,
+            terminal_open_line,
             terminal_open_remote,
             terminal_write,
             terminal_resize,

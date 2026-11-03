@@ -6,6 +6,7 @@ import type { DialogState } from "../state/store";
 import { buildNewNames, validateNames } from "../lib/multiRename";
 import { MultiRename } from "./MultiRename";
 import { formatSpace } from "../lib/format";
+import { AnsiText } from "./AnsiText";
 
 const choiceLabel = (c: "overwrite" | "skip" | "rename") => translate(`dialog.choice.${c}` as const);
 
@@ -222,7 +223,7 @@ export function Dialog() {
         {dialog.kind === "info" && dialog.copyText !== undefined && (
           <div className={`mb-1 flex min-h-0 gap-2 ${dialog.commandOutput ? "flex-1 items-stretch" : "items-start"}`}>
             {/* 명령 출력은 터미널처럼 줄바꿈 없이 가로·세로로 스크롤한다(이슈 #151). 알림 팝업은 줄바꿈해 보인다. */}
-            <pre className={`td-thin-scroll min-h-0 flex-1 select-text overflow-auto font-mono text-xs ${dialog.commandOutput ? "whitespace-pre" : "whitespace-pre-wrap break-all"}`}>{dialog.copyText}</pre>
+            <pre className={`td-thin-scroll min-h-0 flex-1 select-text overflow-auto font-mono text-xs ${dialog.commandOutput ? "whitespace-pre" : "whitespace-pre-wrap break-all"}`}>{dialog.commandOutput ? <AnsiText text={dialog.copyText} /> : dialog.copyText}</pre>
             <button
               type="button"
               aria-label={t("status.notice_copy")}

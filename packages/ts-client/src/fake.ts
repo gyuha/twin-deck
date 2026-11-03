@@ -1565,7 +1565,9 @@ export class FakeBackend implements Backend {
   }
 
   /** 열린 터미널 세션: 세션 번호 → 연 위치. */
-  terminals = new Map<number, { cwd: string; cols: number; rows: number; remote?: string }>();
+  terminals = new Map<number, { cwd: string; cols: number; rows: number; remote?: string; line?: string }>();
+  /** `terminalOpenLine`으로 실행한 명령 기록(세션이 닫혀도 남는다). 출력·종료는 `emitTerminalOutput`·`emitTerminalExit`로 흉내 낸다. */
+  terminalLines: { id: number; cwd: string; line: string; cols: number; rows: number }[] = [];
   /** `terminalWrite`로 쓴 입력 기록. */
   terminalWrites: { id: number; data: string }[] = [];
   private nextTerminal = 1;
@@ -1630,6 +1632,14 @@ export class FakeBackend implements Backend {
   async terminalOpen(cwd: string, cols: number, rows: number) {
     const id = this.nextTerminal++;
     this.terminals.set(id, { cwd, cols, rows });
+    return id;
+  }
+
+  /** 명령 한 줄 실행을 기록만 한다. 출력·종료는 테스트가 `emitTerminalOutput`·`emitTerminalExit`로 보낸다. */
+  async terminalOpenLine(cwd: string, line: string, cols: number, rows: number) {
+    const id = this.nextTerminal++;
+    this.terminals.set(id, { cwd, cols, rows, line });
+    this.terminalLines.push({ id, cwd, line, cols, rows });
     return id;
   }
 

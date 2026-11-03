@@ -1886,3 +1886,13 @@ fn 원격_서버_설정은_사용자_설정_저장과_다시_읽기가_된다() 
     assert_eq!(c.root, "/tmp/share");
     assert_eq!(c.bind, "0.0.0.0");
 }
+
+#[test]
+fn 명령어_줄_터미널은_기본으로_끄고_사용자가_켤_수_있다() {
+    let defaults = load_from_strs(None, None, Platform::Linux);
+    assert!(defaults.warnings.is_empty());
+    assert!(!defaults.config.behavior.command_line_terminal);
+    let enabled = load("[behavior]\ncommand_line_terminal = true\n");
+    assert!(enabled.warnings.is_empty(), "{:?}", enabled.warnings);
+    assert!(enabled.config.behavior.command_line_terminal);
+}

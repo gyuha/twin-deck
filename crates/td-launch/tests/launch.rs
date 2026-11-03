@@ -417,3 +417,69 @@ fn macos_open_failure_on_app_named_folder_is_reported() {
     std::fs::remove_dir_all(&dir).ok();
     assert!(!err.is_empty());
 }
+
+#[test]
+fn 리다이렉트한_출력에는_색_코드가_섞이지_않는다() {
+    use std::process::Command;
+    use std::time::Duration;
+
+    // 이슈 #157·#211 되돌림: 색 강제로 리다이렉트한 패치 파일에 ANSI가 섞이지 않게 한다.
+    if Command::new("git").arg("--version").output().is_err() {
+        eprintln!("건너뜀: git을 실행할 수 없다");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("gitconfig"),
+        "[color]\nui = auto\ndiff = auto\n",
+    )
+    .unwrap();
+    let git = |args: &[&str]| {
+        let output = Command::new("git")
+            .current_dir(dir.path())
+            .env("GIT_CONFIG_GLOBAL", dir.path().join("gitconfig"))
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env_remove("GIT_CONFIG_COUNT")
+            .env_remove("GIT_CONFIG_PARAMETERS")
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    };
+    git(&["-c", "init.defaultBranch=main", "init"]);
+    std::fs::write(dir.path().join("sample.txt"), "before\n").unwrap();
+    git(&["add", "sample.txt"]);
+    git(&[
+        "-c",
+        "user.name=테스트",
+        "-c",
+        "user.email=test@example.com",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-m",
+        "초기 파일",
+    ]);
+    std::fs::write(dir.path().join("sample.txt"), "after\n").unwrap();
+    let line = if cfg!(windows) {
+        "set GIT_CONFIG_GLOBAL=gitconfig&& set GIT_CONFIG_NOSYSTEM=1&& git diff > out.patch"
+    } else {
+        "GIT_CONFIG_GLOBAL=gitconfig GIT_CONFIG_NOSYSTEM=1 git diff > out.patch"
+    };
+    let output = td_launch::run_shell(
+        Os::current(),
+        dir.path().to_str().unwrap(),
+        line,
+        Duration::from_secs(10),
+    )
+    .unwrap();
+    assert_eq!(output.exit_code, Some(0), "{}", output.output);
+    assert!(!output.timed_out);
+    let patch = std::fs::read(dir.path().join("out.patch")).unwrap();
+    assert!(!patch.is_empty(), "패치가 비어 있다");
+    assert!(!patch.contains(&0x1b), "패치에 ANSI 이스케이프가 섞였다");
+}

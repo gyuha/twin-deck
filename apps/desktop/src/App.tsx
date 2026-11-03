@@ -20,6 +20,7 @@ import { UPDATE_SECTION } from "./ui/Settings";
 import { textColorFor, useTabColors, useTextColor, useUiFont } from "./ui/fonts";
 import { ActionsPalette } from "./ui/ActionsPalette";
 import { Dialog } from "./ui/Dialog";
+import { LineTerminal } from "./ui/LineTerminal";
 import { DragLayer } from "./ui/DragLayer";
 import { Preview } from "./ui/Preview";
 import { fkeyBindings } from "./lib/fkeys";
@@ -379,6 +380,7 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
         <FindDialog />
         <DirectorySync />
         <Dialog />
+        <LineTerminal />
       </main>
       </UiContext.Provider>
     </StoreContext.Provider>

@@ -1,4 +1,5 @@
 import { rustText, setLanguage, t as tr } from "../i18n";
+import { stripAnsi } from "../lib/ansi";
 import { detectEol, editBlockReason, toDisk, toEditor } from "../lib/previewEdit";
 import type { Eol } from "../lib/previewEdit";
 import { buildNewNames, DEFAULT_RENAME_OPTIONS, needsTempStep, validateNames } from "../lib/multiRename";
@@ -49,6 +50,7 @@ import type {
   SmbServer,
   RemoteServer,
   UpdateInfoDto,
+  TerminalEvent,
 } from "@twin-deck/ts-client";
 import type { ActionContext } from "@twin-deck/actions";
 import type { Scope } from "@twin-deck/keybinds";
@@ -444,6 +446,8 @@ export interface AppState {
   treeWidthDraft: number | null;
   /** 명령어 줄로 포커스를 옮기라는 요청 횟수. 늘어날 때마다 줄이 입력칸에 포커스를 준다. */
   commandLineFocus: number;
+  /** 명령어 줄을 터미널 팝업으로 실행 중이면 그 세션(이슈 #157). `exit`는 명령이 끝났을 때의 종료 코드(끝나기 전엔 undefined). */
+  lineTerminal: { id: number; command: string; exit?: { code: number | null } } | null;
   /** 마지막 작업 오류. 다음 작업이 시작되면 지워진다. */
   notice: string | null;
 }
@@ -584,6 +588,12 @@ export function scopeStack(s: AppState): Scope[] {
 
 export function createAppStore(backend: Backend, leftPath: string, rightPath: string, snapshot?: Snapshot | null) {
   let nextTabId = 1;
+  // 터미널 팝업 세션이 열리는 동안(번호를 받기 전~팝업이 마운트될 때까지) 온 출력을 모아 둔다. 바로 끝나는 명령의 출력·종료를 잃지 않으려는 것이다(이슈 #157).
+  let lineBuffer: { off: () => void; events: TerminalEvent[] } | null = null;
+  const stopLineBuffer = () => {
+    lineBuffer?.off();
+    lineBuffer = null;
+  };
   const newTab = (path: string): TabState => ({
     id: nextTabId++,
     sort: null,
@@ -661,6 +671,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     flash: null,
     treeWidthDraft: null,
     commandLineFocus: 0,
+    lineTerminal: null,
     notice: null,
   }));
   const { getState: get, setState: set } = store;
@@ -1051,6 +1062,7 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
   // 실행 중인 앱에 `td` 명령이 경로를 넘기면 같은 규칙으로 연다(이슈 #45).
   subscribe(() => backend.onOpenPaths((request) => void api.openPaths(request)));
   subscribe(() => backend.onTerminalEvent((e) => e.type === "exit" && void api.terminalExited(e.id, e.code)));
+  subscribe(() => backend.onTerminalEvent((e) => e.type === "exit" && void api.lineTerminalExited(e.id, e.code)));
   subscribe(() => backend.onDirChanged((path) => {
     for (const pane of ["left", "right"] as const) {
       for (const t of get().panes[pane].tabs) if (t.path === path) void reload(pane, t.id);
@@ -1551,6 +1563,10 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
     },
 
     dispose() {
+      // 열린 터미널 팝업의 자식 프로세스를 정리한다.
+      const lt = get().lineTerminal;
+      if (lt) void backend.terminalClose(lt.id).catch(() => {});
+      stopLineBuffer();
       clearTimeout(flashTimer);
       clearTimeout(saveTimer);
       for (const sub of subscriptions) {
@@ -2301,6 +2317,24 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       // 실행 결과와 상관없이 기록하되, 바로 앞 항목과 같으면 넣지 않는다.
       if (get().commandHistory.at(-1) !== command) set({ commandHistory: [...get().commandHistory, command].slice(-COMMAND_HISTORY_LIMIT) });
       set({ notice: null });
+      if (get().loaded.config.behavior.command_line_terminal) {
+        // 터미널 팝업으로 실행한다: 출력·종료는 팝업이 받고, 명령이 끝나면 목록을 다시 읽는다(`lineTerminalExited`).
+        try {
+          stopLineBuffer();
+          const events: TerminalEvent[] = [];
+          lineBuffer = { off: backend.onTerminalEvent((e) => events.push(e)), events };
+          const id = await backend.terminalOpenLine(tab.path, command, 80, 24);
+          // 번호를 받기 전에 끝난 명령도 종료 코드를 안고 열린다.
+          const exited = events.find((e): e is Extract<TerminalEvent, { type: "exit" }> => e.type === "exit" && e.id === id);
+          lineBuffer.events = events.filter((e) => e.id === id && e.type === "output");
+          set({ lineTerminal: { id, command, ...(exited && { exit: { code: exited.code } }) } });
+          if (exited) await reloadAll();
+        } catch (e) {
+          stopLineBuffer();
+          fail(e);
+        }
+        return;
+      }
       flash(tr("store.run_command.running", { command }));
       try {
         const r = await backend.runShellCommand(tab.path, command);
@@ -2875,12 +2909,33 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       const d = get().dialog;
       if (d?.kind !== "info" || d.copyText === undefined) return false;
       try {
-        await backend.copyText(d.copyText);
+        await backend.copyText(stripAnsi(d.copyText));
         return true;
       } catch (e) {
         fail(e);
         return false;
       }
+    },
+    /** 터미널 팝업의 명령이 끝났다. 종료 안내를 보이게 하고 목록을 다시 읽는다. */
+    async lineTerminalExited(id: number, code: number | null) {
+      if (get().lineTerminal?.id !== id) return;
+      set((s) => ({ lineTerminal: s.lineTerminal && { ...s.lineTerminal, exit: { code } } }));
+      await reloadAll();
+    },
+    /** 팝업이 마운트될 때 부른다: 그때까지 모인 출력을 돌려주고 모으기를 멈춘다(이후 출력은 팝업의 세션이 직접 받는다). */
+    takeLineTerminalOutput(): Uint8Array[] {
+      const out = (lineBuffer?.events ?? []).flatMap((e) => (e.type === "output" ? [e.data] : []));
+      stopLineBuffer();
+      return out;
+    },
+    /** 터미널 팝업을 닫고(세션 정리) 명령어 줄로 포커스를 돌려준다. */
+    async closeLineTerminal() {
+      const lt = get().lineTerminal;
+      if (!lt) return;
+      stopLineBuffer();
+      set({ lineTerminal: null, commandLineFocus: get().commandLineFocus + 1 });
+      await backend.terminalClose(lt.id).catch(() => {});
+      if (!lt.exit) await reloadAll(); // 중단한 명령이 바꿔 둔 목록을 다시 읽는다
     },
     /** 미리보기 중인 텍스트의 원문(보이는 부분)을 클립보드로 복사한다. 아직 읽는 중이거나 텍스트가 아니면 아무것도 하지 않는다. */
     async previewCopyText() {
