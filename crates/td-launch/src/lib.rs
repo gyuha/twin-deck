@@ -396,9 +396,51 @@ pub fn run_shell(
     }
     Ok(ShellOutput {
         exit_code: status.and_then(|s| s.code()),
-        output: String::from_utf8_lossy(&bytes).trim().to_string(),
+        output: decode_output(&bytes).trim().to_string(),
         timed_out,
     })
+}
+
+/// 셸 출력 바이트를 글로 바꾼다. Windows의 `cmd`와 많은 명령은 UTF-8이 아니라 OEM 코드 페이지
+/// (한국어 Windows는 CP949)로 내보내므로, UTF-8이 아니면 OEM 코드 페이지로 읽는다.
+fn decode_output(bytes: &[u8]) -> String {
+    if let Ok(s) = std::str::from_utf8(bytes) {
+        return s.to_string();
+    }
+    #[cfg(windows)]
+    if let Some(s) = decode_oem(bytes) {
+        return s;
+    }
+    String::from_utf8_lossy(bytes).into_owned()
+}
+
+#[cfg(windows)]
+fn decode_oem(bytes: &[u8]) -> Option<String> {
+    extern "system" {
+        fn MultiByteToWideChar(
+            code_page: u32,
+            flags: u32,
+            src: *const u8,
+            src_len: i32,
+            dst: *mut u16,
+            dst_len: i32,
+        ) -> i32;
+    }
+    const CP_OEMCP: u32 = 1;
+    let len = i32::try_from(bytes.len()).ok()?;
+    // SAFETY: 입력은 `bytes`의 유효한 구간이고, 출력 버퍼는 먼저 물어본 길이만큼 잡는다.
+    unsafe {
+        let n = MultiByteToWideChar(CP_OEMCP, 0, bytes.as_ptr(), len, std::ptr::null_mut(), 0);
+        if n <= 0 {
+            return None;
+        }
+        let mut wide = vec![0u16; n as usize];
+        let n = MultiByteToWideChar(CP_OEMCP, 0, bytes.as_ptr(), len, wide.as_mut_ptr(), n);
+        if n <= 0 {
+            return None;
+        }
+        Some(String::from_utf16_lossy(&wide[..n as usize]))
+    }
 }
 
 #[cfg(test)]
@@ -436,6 +478,20 @@ mod shell_tests {
         assert!(!r.timed_out);
         assert!(r.output.starts_with(dir.to_str().unwrap()), "{}", r.output);
         assert!(r.output.ends_with("err"), "{}", r.output);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn 한글_출력이_깨지지_않는다() {
+        let dir = std::env::temp_dir();
+        let r = run_shell(
+            Os::current(),
+            dir.to_str().unwrap(),
+            "echo 한글 출력",
+            Duration::from_secs(10),
+        )
+        .unwrap();
+        assert_eq!(r.output, "한글 출력");
     }
 
     #[cfg(unix)]
