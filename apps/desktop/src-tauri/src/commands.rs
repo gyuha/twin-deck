@@ -1748,13 +1748,12 @@ pub async fn install_update(app: tauri::AppHandle) -> ServiceResult<()> {
     // macOS 번들이면 LaunchServices(`open`)로 다시 띄운다. 자식으로 바로 띄우면 접근 권한 확인과
     // 다른 앱으로의 드롭이 깨지는 경우가 있다(이슈 #137). 띄우지 못하면 기존 재시작으로 돌아간다.
     #[cfg(target_os = "macos")]
-    if let Some(bundle) = std::env::current_exe()
+    if let Some((exe, bundle)) = std::env::current_exe()
         .ok()
-        .as_deref()
-        .and_then(crate::relaunch::app_bundle_of)
+        .and_then(|exe| crate::relaunch::app_bundle_of(&exe).map(|bundle| (exe, bundle)))
     {
         use std::process::{Command, Stdio};
-        let (program, args) = crate::relaunch::relaunch_command(std::process::id(), &bundle);
+        let (program, args) = crate::relaunch::relaunch_command(std::process::id(), &bundle, &exe);
         let spawned = Command::new(program)
             .args(args)
             .stdin(Stdio::null())
