@@ -7,7 +7,7 @@ import { Button, Input, Select, SelectOption } from "@spacedrive/primitives";
 import { defaultBindingsFor } from "@twin-deck/actions";
 import type { Platform } from "@twin-deck/keybinds";
 import { defaultLoaded } from "@twin-deck/ts-client";
-import type { RemoteServer, RemoteServerStatus, SmbServer } from "@twin-deck/ts-client";
+import type { Config, RemoteServer, RemoteServerStatus, SmbServer } from "@twin-deck/ts-client";
 import { APP_ACTIONS, APP_LAUNCH_ACTION, APP_OPEN_FOLDER_ACTION } from "../lib/fkeys";
 import { THEMES } from "../lib/themes.generated";
 import { parseThemeList } from "../lib/themeColors";
@@ -56,6 +56,9 @@ interface Item {
   hideOn?: readonly Platform[];
   /** 값이 비어 있으면 설정 화면에 보이지 않는다. 남아 있는 이전 설정을 지울 수 있게만 보여 줄 때 쓴다. */
   hideWhenEmpty?: boolean;
+  /** 이 조건이 참이면 스위치를 비활성(흐리게·누를 수 없음)으로 보이고 `disabledNote`를 제목 아래에 보인다. 저장된 값은 건드리지 않는다. */
+  disabledWhen?: (config: Config) => boolean;
+  disabledNote?: string;
 }
 
 /** 긴 설명을 ⓘ 아이콘에 숨기고, 마우스를 올리거나 포커스하면 말풍선으로 보인다(글자는 DOM에 있어 보조 기기에도 읽힌다). */
@@ -242,7 +245,7 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
       { key: "preview.audio_max_mb", get title() { return translate("settings.item.preview.audio_max_mb.title"); }, get desc() { return translate("settings.item.preview.audio_max_mb.desc"); }, control: { type: "int" } },
       { key: "preview.pdf_direct", get title() { return translate("settings.item.preview.pdf_direct.title"); }, get desc() { return translate("settings.item.preview.pdf_direct.desc"); }, control: { type: "switch" } },
       { key: "preview.separate_window", get title() { return translate("settings.item.preview.separate_window.title"); }, get desc() { return translate("settings.item.preview.separate_window.desc"); }, control: { type: "switch" } },
-      { key: "preview.close_on_outside_click", get title() { return translate("settings.item.preview.close_on_outside_click.title"); }, get desc() { return translate("settings.item.preview.close_on_outside_click.desc"); }, control: { type: "switch" } },
+      { key: "preview.close_on_outside_click", disabledWhen: (c) => c.preview.separate_window, get disabledNote() { return translate("settings.item.preview.close_on_outside_click.disabled_note"); }, get title() { return translate("settings.item.preview.close_on_outside_click.title"); }, get desc() { return translate("settings.item.preview.close_on_outside_click.desc"); }, control: { type: "switch" } },
     ],
   },
   {
@@ -1477,6 +1480,7 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
               const extensionColumn = item.control.type === "extension-column";
               // `확장자 유지`는 확장자 컬럼이 보일 때만 켜고 끌 수 있다(컬럼이 없으면 원래 확장자가 이름에 보인다, 이슈 #86).
               const keepExtensionOff = item.key === "behavior.table.keep_extension" && !config.view.table.columns.some((c) => parseColumn(c)?.name === "extension");
+              const gated = item.disabledWhen?.(config) ?? false;
               const value = (extensionColumn ? config.view.table.columns.some((s) => parseColumn(s)?.name === "extension") : valueAt(config, item.key) ?? (item.control.type === "fkey" ? "" : undefined)) as string | number | boolean;
               const isDefault = extensionColumn ? !value : value === (valueAt(defaults, item.key) ?? (item.control.type === "fkey" ? "" : undefined));
               const wide = item.control.type === "text" || item.control.type === "fkey" || item.control.type === "tags" || item.control.type === "hotkey";
@@ -1489,6 +1493,7 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
                       {item.title}
                       {item.desc && <InfoTip text={item.desc} />}
                     </div>
+                    {gated && item.disabledNote && <p className="mt-0.5 text-xs text-ink-faint">{item.disabledNote}</p>}
                   </div>
                   <div className={item.control.type === "fkey" ? "contents" : "flex items-center gap-3 " + (stacked ? "w-full min-w-0" : wide ? "min-w-0 flex-1 justify-end" : "shrink-0")}>
                     {!broken && !combo && (
@@ -1534,7 +1539,7 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
                       <Switch
                         aria-label={item.title}
                         checked={value as boolean}
-                        disabled={!!broken || keepExtensionOff}
+                        disabled={!!broken || keepExtensionOff || gated}
                         onCheckedChange={(v) => void api.setConfigValue(item.key, extensionColumn ? { kind: "strList", value: withExtensionColumn(config.view.table.columns, v) } : { kind: "bool", value: v })}
                       />
                     )}

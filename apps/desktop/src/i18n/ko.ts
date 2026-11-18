@@ -492,6 +492,7 @@ export const ko = {
   "settings.item.preview.separate_window.title": "별도 창에 보기",
   "settings.item.preview.separate_window.desc": "미리보기를 앱 안 패널 대신 Twin Deck 창들 위에 뜨는 별도 창에 보입니다. 키보드 포커스는 메인 창에 남습니다. 이 모드에서는 텍스트 편집과 시트 이동 키(Ctrl+Tab)를 지원하지 않습니다",
   "settings.item.preview.close_on_outside_click.title": "바깥 클릭으로 닫기",
+  "settings.item.preview.close_on_outside_click.disabled_note": "별도 창에 보기를 켜면 쓰지 않습니다",
   "settings.item.preview.close_on_outside_click.desc": "미리보기 창 바깥을 클릭하면 미리보기를 닫습니다",
   "settings.section.confirm.title": "확인",
   "settings.item.core.confirm.delete.title": "영구 삭제 전에 확인",

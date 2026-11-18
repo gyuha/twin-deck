@@ -494,6 +494,7 @@ export const en: Record<Key, string> = {
   "settings.item.preview.separate_window.title": "Show in a separate window",
   "settings.item.preview.separate_window.desc": "Show the preview in a separate window that floats above Twin Deck windows instead of an in-app panel. Keyboard focus stays in the main window. Text editing and the sheet-switch key (Ctrl+Tab) are not supported in this mode",
   "settings.item.preview.close_on_outside_click.title": "Close on outside click",
+  "settings.item.preview.close_on_outside_click.disabled_note": "Not used while \"Show in a separate window\" is on",
   "settings.item.preview.close_on_outside_click.desc": "Clicking outside the preview window closes the preview",
   "settings.section.confirm.title": "Confirmations",
   "settings.item.core.confirm.delete.title": "Confirm before permanent delete",
