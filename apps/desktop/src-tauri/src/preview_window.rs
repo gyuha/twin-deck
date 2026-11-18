@@ -147,6 +147,25 @@ impl PreviewWindowState {
         self.recreating = false;
     }
 
+    /// 보이기 한 번의 판단: 상태를 바꾸고(`show`), 지금 있는 창을 새 소유자로 다시 만들지 정한다.
+    /// `owner_per_window`는 owner를 창을 만들 때만 정할 수 있는 OS(Windows)인지다.
+    /// 다시 만들기로 했으면 `recreating`을 켜서, 그 창의 Destroyed를 닫힘으로 보지 않게 한다.
+    /// `preview_window_show`가 직렬화된 구간 안에서 부르므로, 앞 호출의 `created()`가 반영된 뒤에 판단한다.
+    pub fn plan_show(
+        &mut self,
+        caller: &str,
+        target: PreviewTargetDto,
+        window_exists: bool,
+        owner_per_window: bool,
+    ) -> ShowPlan {
+        let previous = self.show(caller, target);
+        let recreate = owner_per_window && window_exists && self.needs_recreate(caller);
+        if recreate {
+            self.begin_recreate();
+        }
+        ShowPlan { previous, recreate }
+    }
+
     /// 미리보기 창이 없어졌다. 다시 만드는 중이면 상태를 그대로 두고, 아니면(Windows에서 owner와 함께 없어짐 등)
     /// 창 없음·안 보임으로 되돌리고, 보이던 중이었으면 닫혔다고 알릴 소유자를 돌려준다.
     pub fn destroyed(&mut self) -> Option<String> {
@@ -189,14 +208,29 @@ impl PreviewWindowState {
     }
 }
 
+/// 보이기 한 번에 할 일.
+#[derive(Debug, PartialEq, Eq)]
+pub struct ShowPlan {
+    /// 미리보기를 빼앗긴 이전 소유자(닫혔다고 알릴 곳).
+    pub previous: Option<String>,
+    /// 지금 있는 창을 없애고 새 소유자를 owner로 다시 만든다.
+    pub recreate: bool,
+}
+
 /// 앱이 들고 있는 미리보기 창 상태.
 #[derive(Default)]
-pub struct PreviewWindow(pub Mutex<PreviewWindowState>);
+pub struct PreviewWindow {
+    pub state: Mutex<PreviewWindowState>,
+    /// `preview_window_show`(확인→다시 만들기→만들기→대상 전달→보이기)를 한 번에 하나만 돌린다.
+    /// 소유권 이전 직후 대상이 연달아 오면 두 호출이 모두 다시 만들기로 가서 한쪽이 같은 레이블로 만들다 실패하던 경쟁을 막는다.
+    /// async 뮤텍스라 기다리는 동안 메인 스레드(창 이벤트 처리)를 막지 않는다.
+    show_lock: tauri::async_runtime::Mutex<()>,
+}
 
 fn state(app: &AppHandle) -> std::sync::MutexGuard<'_, PreviewWindowState> {
     app.state::<PreviewWindow>()
         .inner()
-        .0
+        .state
         .lock()
         .unwrap_or_else(|e| e.into_inner())
 }
@@ -363,17 +397,13 @@ pub async fn preview_window_show(
     window: WebviewWindow,
     target: PreviewTargetDto,
 ) -> ServiceResult<()> {
+    let preview_window = app.state::<PreviewWindow>();
+    let _serial = preview_window.show_lock.lock().await;
     let caller = window.label().to_string();
+    // 창이 있는지와 다시 만들지는 직렬화된 구간 안에서 본다(앞 호출이 만든 창과 owner가 반영된 뒤).
     let exists = app.get_webview_window(PREVIEW_LABEL).is_some();
-    let (previous, recreate) = {
-        let mut s = state(&app);
-        let previous = s.show(&caller, target.clone());
-        let recreate = cfg!(windows) && exists && s.needs_recreate(&caller);
-        if recreate {
-            s.begin_recreate();
-        }
-        (previous, recreate)
-    };
+    let ShowPlan { previous, recreate } =
+        state(&app).plan_show(&caller, target.clone(), exists, cfg!(windows));
     if let Some(previous) = previous {
         notify_closed(&app, &previous);
     }
@@ -435,7 +465,7 @@ pub fn preview_window_close(app: AppHandle) {
 #[specta::specta]
 pub fn preview_window_target(state: State<'_, PreviewWindow>) -> Option<PreviewTargetDto> {
     state
-        .0
+        .state
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .target()
@@ -666,6 +696,60 @@ mod tests {
         s.created(Some("main"));
         s.hide("main");
         assert_eq!(s.destroyed(), None);
+    }
+
+    #[test]
+    fn 소유권_이전_직후_연달아_온_보이기는_한_번만_다시_만든다() {
+        // Windows: main이 owner인 창이 있는데 win-2가 대상을 두 번 연달아 보인다.
+        let mut s = PreviewWindowState::default();
+        s.plan_show("main", t("/a.txt"), false, true);
+        s.created(Some("main"));
+        let first = s.plan_show("win-2", t("/b.txt"), true, true);
+        assert_eq!(
+            first,
+            ShowPlan {
+                previous: Some("main".to_string()),
+                recreate: true
+            }
+        );
+        // 직렬화된 첫 호출이 창을 없애고(다시 만드는 중의 Destroyed) 새 owner로 만든 뒤에야 두 번째 호출이 판단한다.
+        assert_eq!(s.destroyed(), None);
+        s.created(Some("win-2"));
+        let second = s.plan_show("win-2", t("/c.txt"), true, true);
+        assert_eq!(
+            second,
+            ShowPlan {
+                previous: None,
+                recreate: false
+            },
+            "이미 win-2를 owner로 만든 창이므로 다시 만들지 않는다"
+        );
+        assert_eq!(s.target(), Some(&t("/c.txt")));
+        assert!(s.visible());
+    }
+
+    #[test]
+    fn 직렬화가_없으면_두_번째_보이기도_다시_만들기로_판단한다() {
+        // 직렬화가 왜 필요한지 고정한다: 첫 호출의 created()가 반영되기 전에 판단하면 두 호출 모두 다시 만든다.
+        let mut s = PreviewWindowState::default();
+        s.plan_show("main", t("/a.txt"), false, true);
+        s.created(Some("main"));
+        assert!(s.plan_show("win-2", t("/b.txt"), true, true).recreate);
+        assert!(s.plan_show("win-2", t("/c.txt"), true, true).recreate);
+    }
+
+    #[test]
+    fn owner를_창마다_정하지_않는_os는_다시_만들지_않는다() {
+        let mut s = PreviewWindowState::default();
+        s.plan_show("main", t("/a.txt"), false, false);
+        s.created(Some("main"));
+        let plan = s.plan_show("win-2", t("/b.txt"), true, false);
+        assert_eq!(plan.previous, Some("main".to_string()));
+        assert!(!plan.recreate);
+        assert!(!s.recreating());
+        // 창이 없으면 다시 만들 것도 없다(그냥 만든다).
+        let mut s = PreviewWindowState::default();
+        assert!(!s.plan_show("win-2", t("/b.txt"), false, true).recreate);
     }
 
     #[test]
