@@ -167,6 +167,8 @@ pub struct PreviewConfig {
     pub video_autoplay: bool,
     /// 미리보기 창 바깥을 클릭하면 미리보기를 닫는다.
     pub close_on_outside_click: bool,
+    /// 미리보기를 앱 안 패널 대신 별도 창에 보인다. 창은 Twin Deck 창들 위에만 뜨고, 키보드 포커스는 메인 창에 남는다(이슈 #160).
+    pub separate_window: bool,
     /// 이미지 미리보기를 싣는 최대 파일 크기(MB). 이보다 크면 "너무 커서 미리 볼 수 없습니다"가 보인다. 0은 제한 없음.
     pub image_max_mb: u32,
     /// PDF 미리보기의 최대 파일 크기(MB). 0은 제한 없음.

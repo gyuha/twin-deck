@@ -1340,6 +1340,15 @@ fn preview_pdf_direct_defaults_off_and_validates() {
 }
 
 #[test]
+fn preview_separate_window_defaults_off_and_can_be_turned_on() {
+    let none = load_from_strs(None, None, Platform::Linux);
+    assert!(!none.config.preview.separate_window);
+    let on = load("[preview]\nseparate_window = true\n");
+    assert!(on.warnings.is_empty(), "{:?}", on.warnings);
+    assert!(on.config.preview.separate_window);
+}
+
+#[test]
 fn behavior_table_system_icons_defaults_off_and_validates() {
     let none = load_from_strs(None, None, Platform::Linux);
     assert!(!none.config.behavior.table.system_icons);

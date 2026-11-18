@@ -80,6 +80,7 @@ trash = false
 audio_autoplay = false
 video_autoplay = false
 close_on_outside_click = false
+separate_window = false # 미리보기를 앱 안 패널 대신 Twin Deck 위에 뜨는 별도 창에 보인다
 image_max_mb = 10 # 이미지·PDF·사운드 미리보기의 최대 파일 크기(MB). 0은 제한 없음
 pdf_max_mb = 10
 audio_max_mb = 20
