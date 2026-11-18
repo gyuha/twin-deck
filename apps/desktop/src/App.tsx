@@ -23,7 +23,7 @@ import { Dialog } from "./ui/Dialog";
 import { LineTerminal } from "./ui/LineTerminal";
 import { DragLayer } from "./ui/DragLayer";
 import { Preview } from "./ui/Preview";
-import { fkeyBindings } from "./lib/fkeys";
+import { withAppArgs } from "./lib/fkeys";
 import { parseThemeList, resolveTheme, themeVars } from "./lib/themeColors";
 import type { WarpTheme } from "./lib/themes.generated";
 import { DirectorySync } from "./ui/DirectorySync";
@@ -295,7 +295,7 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
   const { keymap, warnings } = useMemo(() => {
     const merged = mergeUserBindings(
       defaultBindingsFor(platform),
-      [...fkeyBindings(loaded.config), ...loaded.bindings], // F키 설정 → keybindings.toml 순서라 파일이 이긴다
+      withAppArgs(loaded.bindings, loaded.config.fkey_apps), // F키 앱 실행은 fkey_apps의 앱 경로를 인수로 싣는다
       (id) => registry.get(id)?.scopes,
       platform,
     );

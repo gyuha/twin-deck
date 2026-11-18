@@ -51,6 +51,7 @@ import type {
   RemoteServer,
   UpdateInfoDto,
   TerminalEvent,
+  BindingSpec,
 } from "@twin-deck/ts-client";
 import type { ActionContext } from "@twin-deck/actions";
 import type { Scope } from "@twin-deck/keybinds";
@@ -3950,6 +3951,22 @@ export function createAppStore(backend: Backend, leftPath: string, rightPath: st
       try {
         set({ loaded: await backend.resetConfigValue(key), settingsError: null });
         void reloadAll();
+      } catch (e) {
+        set({ settingsError: String(e instanceof Error ? e.message : e) });
+      }
+    },
+    /** 단축키 하나를 keybindings.toml의 현재 OS 섹션에 쓴다(`action`이 null이면 해제). */
+    async setKeybinding(binding: BindingSpec) {
+      try {
+        set({ loaded: await backend.setKeybinding(binding), settingsError: null });
+      } catch (e) {
+        set({ settingsError: String(e instanceof Error ? e.message : e) });
+      }
+    },
+    /** 단축키 하나를 내장 기본 바인딩으로 되돌린다. */
+    async resetKeybinding(key: string) {
+      try {
+        set({ loaded: await backend.resetKeybinding(key), settingsError: null });
       } catch (e) {
         set({ settingsError: String(e instanceof Error ? e.message : e) });
       }

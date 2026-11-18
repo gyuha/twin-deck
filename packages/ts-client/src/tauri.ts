@@ -1,4 +1,4 @@
-import type { SyncOptionsDto, SyncComparisonDto, SyncChoiceDto } from "./generated/bindings";
+import type { BindingSpec, SyncOptionsDto, SyncComparisonDto, SyncChoiceDto } from "./generated/bindings";
 import { getVersion } from "@tauri-apps/api/app";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -318,6 +318,12 @@ export class TauriBackend implements Backend {
   }
   async resetConfigValue(key: string) {
     return unwrap(await commands.resetConfigValue(key));
+  }
+  async setKeybinding(binding: BindingSpec) {
+    return unwrap(await commands.setKeybinding(binding));
+  }
+  async resetKeybinding(key: string) {
+    return unwrap(await commands.resetKeybinding(key));
   }
   async setSmbServers(servers: SmbServer[]) {
     return unwrap(await commands.setSmbServers(servers));

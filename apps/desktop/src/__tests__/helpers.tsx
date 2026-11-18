@@ -2,7 +2,8 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect } from "vitest";
 import { FakeBackend } from "@twin-deck/ts-client";
-import type { Snapshot } from "@twin-deck/ts-client";
+import type { Loaded, Snapshot } from "@twin-deck/ts-client";
+import { fkeyValues } from "../lib/fkeys";
 import { App } from "../App";
 
 export const NFD = (s: string) => s.normalize("NFD");
@@ -94,4 +95,14 @@ export async function backgroundProgress(user: { keyboard(keys: string): Promise
   await screen.findByRole("dialog", { name: /복사 중|이동 중/ });
   await user.keyboard("{Enter}");
   await waitFor(() => expect(screen.queryByRole("dialog", { name: /복사 중|이동 중/ })).toBeNull());
+}
+
+/** F키 줄 동작을 keybindings.toml 사용자 바인딩으로 심는다(값 "none"은 해제). */
+export function bindFKeys(l: Loaded, fkeys: Record<string, string>) {
+  for (const [key, v] of Object.entries(fkeys)) l.bindings.push({ key, action: v === "none" ? null : v, args: {}, scope: null });
+}
+
+/** 저장된 F키 줄 동작. 지정이 없으면 ""(기본값). */
+export async function fkeyOf(backend: FakeBackend, key: string) {
+  return fkeyValues((await backend.getConfig()).bindings)[key] ?? "";
 }

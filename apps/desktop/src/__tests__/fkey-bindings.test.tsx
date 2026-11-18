@@ -2,8 +2,8 @@ import { act, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { FakeBackend } from "@twin-deck/ts-client";
 import { defaultBindingsFor } from "@twin-deck/actions";
-import { cursorName, renderApp, seedBackend } from "./helpers";
-import { fkeyBindings } from "../lib/fkeys";
+import { bindFKeys, cursorName, fkeyOf, renderApp, seedBackend } from "./helpers";
+import { fkeyValues, withAppArgs } from "../lib/fkeys";
 
 const openSettings = (user: Awaited<ReturnType<typeof renderApp>>["user"]) => user.keyboard("{Control>},{/Control}");
 
@@ -11,7 +11,7 @@ const settle = () => act(() => new Promise<void>((r) => setTimeout(r, 50)));
 const nameBox = () => screen.findByRole("textbox", { name: "새 이름" });
 const setFKeys = (backend: FakeBackend, fkeys: Record<string, string>, apps: Record<string, string> = {}) =>
   backend.setConfig((l) => {
-    Object.assign(l.config.fkeys, fkeys);
+    bindFKeys(l, fkeys);
     Object.assign(l.config.fkey_apps, apps);
   });
 // seedBackend 이름순: docs, src, a.txt, b.txt, 한글.txt (.hidden은 숨김)
@@ -162,7 +162,7 @@ describe("설정 화면의 F키 섹션", () => {
   const openFKeys = async (user: Awaited<ReturnType<typeof renderApp>>["user"]) => {
     await openSettings(user);
     await screen.findByRole("dialog", { name: "설정" });
-    await user.click(screen.getByRole("tab", { name: "F키" }));
+    await user.click(screen.getByRole("tab", { name: "단축키" }));
   };
 
   it("설정 화면 F키 섹션에 F1~F12와 애플리케이션 실행 메뉴가 있다", async () => {
@@ -188,7 +188,7 @@ describe("설정 화면의 F키 섹션", () => {
     await user.type(path, "/Applications/Foo.app{Enter}");
     await waitFor(async () => {
       const c = (await backend.getConfig()).config;
-      expect(c.fkeys.F3).toBe("core.app.launch");
+      expect(await fkeyOf(backend, "F3")).toBe("core.app.launch");
       expect(c.fkey_apps.F3).toBe("/Applications/Foo.app");
     });
     // 화면에서 고른 값이 실제 키 입력까지 이어진다
@@ -201,7 +201,7 @@ describe("설정 화면의 F키 섹션", () => {
     await user.click(within(screen.getByRole("group", { name: "F3" })).getByRole("button", { name: "기본값으로" }));
     await waitFor(async () => {
       const c = (await backend.getConfig()).config;
-      expect(c.fkeys.F3).toBe("");
+      expect(await fkeyOf(backend, "F3")).toBe("");
       expect(c.fkey_apps.F3).toBe("");
     });
   });
@@ -209,15 +209,17 @@ describe("설정 화면의 F키 섹션", () => {
 
 describe("F키 조합키 설정", () => {
   it("같은 F키의 단독·조합 설정이 각각 바인딩이 된다", () => {
-    const b = fkeyBindings({ fkeys: { "Ctrl+F5": "core.copy", F5: "core.move" }, fkey_apps: {} });
-    expect(b.map((x) => [x.key, x.action])).toEqual([
-      ["Ctrl+F5", "core.copy"],
-      ["F5", "core.move"],
+    const v = fkeyValues([
+      { key: "Ctrl+F5", action: "core.copy", args: {}, scope: null },
+      { key: "F5", action: "core.move", args: {}, scope: null },
+      { key: "F8", action: null, args: {}, scope: null },
+      { key: "Ctrl+K", action: "core.copy", args: {}, scope: null },
     ]);
+    expect(v).toEqual({ "Ctrl+F5": "core.copy", F5: "core.move", F8: "none" });
   });
 
   it("앱 실행 조합키는 그 키의 앱 경로를 인수로 싣는다", () => {
-    const b = fkeyBindings({ fkeys: { "Mod+Shift+F2": "core.app.launch" }, fkey_apps: { "Mod+Shift+F2": "/Applications/Foo.app" } });
+    const b = withAppArgs([{ key: "Mod+Shift+F2", action: "core.app.launch", args: {}, scope: null }], { "Mod+Shift+F2": "/Applications/Foo.app" });
     expect(b).toEqual([{ key: "Mod+Shift+F2", action: "core.app.launch", args: { app: "/Applications/Foo.app", key: "Mod+Shift+F2" }, scope: null }]);
   });
 

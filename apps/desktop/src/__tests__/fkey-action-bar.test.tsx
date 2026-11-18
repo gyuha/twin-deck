@@ -1,14 +1,14 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { FakeBackend } from "@twin-deck/ts-client";
-import { cursorName, renderApp, seedBackend } from "./helpers";
+import { bindFKeys, cursorName, renderApp, seedBackend } from "./helpers";
 
 const buttons = () => within(screen.getByRole("toolbar", { name: "액션 바" })).getAllByRole("button").map((b) => b.textContent);
 const BASE = ["F4편집", "F5복사", "F6이동", "F7새 폴더", "F8휴지통", "Shift+F8삭제"];
 const seed = (fkeys: Record<string, string>, bar: Record<string, boolean>, apps: Record<string, string> = {}) => {
   const b = seedBackend();
   b.setConfig((l) => {
-    Object.assign(l.config.fkeys, fkeys);
+    bindFKeys(l, fkeys);
     Object.assign(l.config.fkey_bar, bar);
     Object.assign(l.config.fkey_apps, apps);
   });
@@ -20,7 +20,7 @@ describe("F키 설정의 Action Bar 노출", () => {
     const { user } = await renderApp(new FakeBackend().seed({ "/home/a/a.txt": "a", "/home/b/x.txt": "x" }));
     expect(buttons()).toEqual(["F1도움말 (단축키 목록)", "F2이름 변경", "F4편집", "F5복사", "F6이동", "F7새 폴더", "F8휴지통", "Shift+F8삭제"]);
     await user.keyboard("{Control>},{/Control}");
-    await user.click(await screen.findByRole("tab", { name: "F키" }));
+    await user.click(await screen.findByRole("tab", { name: "단축키" }));
     for (const k of ["Mod+F12", "Shift+F4", "Shift+F6", "Shift+F7", "Shift+F8"]) expect(await screen.findByRole("group", { name: k })).toBeTruthy();
   });
 
@@ -83,7 +83,7 @@ describe("F키 설정의 Action Bar 노출", () => {
     const backend = seedBackend();
     const { user } = await renderApp(backend);
     await user.keyboard("{Control>},{/Control}");
-    await user.click(await screen.findByRole("tab", { name: "F키" }));
+    await user.click(await screen.findByRole("tab", { name: "단축키" }));
     await user.click(await screen.findByRole("switch", { name: "F2 액션바에 표시" }));
     await waitFor(async () => expect((await backend.getConfig()).config.fkey_bar.F2).toBe(true));
     await user.keyboard("{Escape}");

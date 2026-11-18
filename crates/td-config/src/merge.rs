@@ -59,7 +59,7 @@ pub fn merge_user(
         };
         let Some(dv) = defaults.get(key) else {
             let fits = match path {
-                "fkeys" | "fkey_apps" => uv.is_str(),
+                "fkey_apps" => uv.is_str(),
                 "fkey_bar" => uv.is_bool(),
                 _ => false,
             };

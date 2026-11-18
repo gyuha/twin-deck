@@ -1,4 +1,4 @@
-import type { SyncOptionsDto, SyncComparisonDto, SyncChoiceDto, SyncRowDto } from "./generated/bindings";
+import type { BindingSpec, SyncOptionsDto, SyncComparisonDto, SyncChoiceDto, SyncRowDto } from "./generated/bindings";
 import { archiveRoot, isArchivePath } from "./archive";
 import { BackendError, RemoteConnectError, SmbConnectError, baseName, joinPath, parentPath, remoteServerId, remoteUrl, splitRemote } from "./backend";
 import type { Backend, FileDropEvent, SearchEvent, TerminalEvent } from "./backend";
@@ -918,6 +918,24 @@ export class FakeBackend implements Backend {
   async resetConfigValue(key: string) {
     const fallback = getPath(defaultLoaded().config as unknown as Record<string, unknown>, key);
     this.setConfig((l) => setPath(l.config as unknown as Record<string, unknown>, key, fallback));
+    return structuredClone(this.loaded);
+  }
+
+  /** keybindings.toml 쓰기를 흉내 낸다: 같은 키(대소문자 무시)를 바꾸거나 뒤에 붙인다. OS 섹션 구분은 하지 않는다. */
+  async setKeybinding(binding: BindingSpec) {
+    this.setConfig((l) => {
+      const i = l.bindings.findIndex((b) => b.key.toLowerCase() === binding.key.toLowerCase());
+      if (i >= 0) l.bindings[i] = structuredClone(binding);
+      else l.bindings.push(structuredClone(binding));
+    });
+    return structuredClone(this.loaded);
+  }
+
+  /** 그 키의 사용자 바인딩을 지워 기본 바인딩으로 되돌린다. */
+  async resetKeybinding(key: string) {
+    this.setConfig((l) => {
+      l.bindings = l.bindings.filter((b) => b.key.toLowerCase() !== key.toLowerCase());
+    });
     return structuredClone(this.loaded);
   }
 

@@ -64,6 +64,8 @@ impl ConfigStore {
         fs::create_dir_all(dir)?;
         // 옮기지 못해도(권한 등) 설정을 여는 데는 지장이 없다. 이때는 `config.toml`의 즐겨찾기가 계속 읽힌다.
         let _ = crate::favorites::migrate(dir, local);
+        // 옛 `[fkeys]`를 `keybindings.toml`로 옮긴다. 실패하면(문법 오류 등) `[fkeys]`가 남아 "알 수 없는 키" 경고로 보인다.
+        let _ = crate::binding_edit::migrate_fkeys(dir);
         // 기준 서명은 처음 읽기 전에 구한다. 그 사이에 파일이 바뀌어도 다음 확인에서 서명이 달라 다시 읽는다.
         let initial = signature(dir, local);
         let current = Arc::new(Mutex::new(load_dir_with_local(dir, local, platform)));
@@ -154,7 +156,7 @@ pub enum ConfigValue {
 }
 
 /// 사용자 `config.toml`을 읽어 편집 가능한 문서로 만든다. 없으면 빈 문서. 문법 오류면 파일을 건드리지 않도록 오류.
-fn read_user_doc(dir: &Path) -> Result<toml_edit::DocumentMut, String> {
+pub(crate) fn read_user_doc(dir: &Path) -> Result<toml_edit::DocumentMut, String> {
     let text = match fs::read_to_string(dir.join("config.toml")) {
         Ok(s) => s,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
@@ -164,7 +166,7 @@ fn read_user_doc(dir: &Path) -> Result<toml_edit::DocumentMut, String> {
         .map_err(|_| "config.toml에 문법 오류가 있어 설정을 바꾸지 않았습니다".to_string())
 }
 
-fn write_user_doc(dir: &Path, doc: &toml_edit::DocumentMut) -> Result<(), String> {
+pub(crate) fn write_user_doc(dir: &Path, doc: &toml_edit::DocumentMut) -> Result<(), String> {
     write_doc(dir, "config.toml", doc)
 }
 
@@ -179,7 +181,11 @@ fn read_favorites_doc(dir: &Path) -> Result<toml_edit::DocumentMut, String> {
         .map_err(|_| "favorites.toml에 문법 오류가 있어 즐겨찾기를 바꾸지 않았습니다".to_string())
 }
 
-fn write_doc(dir: &Path, file: &str, doc: &toml_edit::DocumentMut) -> Result<(), String> {
+pub(crate) fn write_doc(
+    dir: &Path,
+    file: &str,
+    doc: &toml_edit::DocumentMut,
+) -> Result<(), String> {
     fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     let tmp = dir.join(format!("{file}.tmp"));
     fs::write(&tmp, doc.to_string()).map_err(|e| e.to_string())?;

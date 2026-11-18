@@ -1,4 +1,4 @@
-import type { SyncOptionsDto, SyncComparisonDto, SyncChoiceDto } from "./generated/bindings";
+import type { BindingSpec, SyncOptionsDto, SyncComparisonDto, SyncChoiceDto } from "./generated/bindings";
 import type { ShellResultDto, CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigLocationDto, ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, EpubInfoDto, ExpectedFileDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, NormalizeResultDto, LoadedState, LocationConflict, PreviewDto, RemoteErrorKindDto, RemoteServer, RemoteServerStatus, SmbErrorKindDto, SmbServer, QueueItemDto, OfficePreviewDto, PreviewKeyDto, PreviewTargetDto, SearchStartDto, SearchSummaryDto, Snapshot, UpdateInfoDto, UserDirsDto, VolumeDto, WriteTextResultDto } from "./generated/bindings";
 
 /** Look Up / Flatten / Disk Usage가 스트리밍으로 보내는 이벤트. 작업마다 마지막은 `done`이다. */
@@ -178,6 +178,10 @@ export interface Backend {
   setConfigValue(key: string, value: ConfigValue): Promise<Loaded>;
   /** 설정 화면: 사용자 config.toml에서 키를 지워 기본값으로 되돌리고, 새로 병합된 설정을 돌려준다. */
   resetConfigValue(key: string): Promise<Loaded>;
+  /** 단축키 설정: keybindings.toml의 현재 OS 섹션에 키 하나를 쓴다(`action`이 null이면 해제). 새로 병합된 설정을 돌려준다. */
+  setKeybinding(binding: BindingSpec): Promise<Loaded>;
+  /** 단축키 설정: 키 하나를 현재 OS 섹션과 공통 섹션에서 지워 내장 기본 바인딩으로 되돌린다. */
+  resetKeybinding(key: string): Promise<Loaded>;
   /** 저장된 SMB 서버 목록 전체를 바꾸고 새로 병합된 설정을 돌려준다. 목록은 `Loaded`의 `config.smb.servers`로 읽는다. host나 share가 빈 항목이 있으면 거부된다. */
   setSmbServers(servers: SmbServer[]): Promise<Loaded>;
   /**

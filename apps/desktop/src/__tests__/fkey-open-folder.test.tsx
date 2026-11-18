@@ -1,14 +1,14 @@
 import { act, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { FakeBackend } from "@twin-deck/ts-client";
-import { renderApp, seedBackend } from "./helpers";
+import { bindFKeys, fkeyOf, renderApp, seedBackend } from "./helpers";
 
 const CODE = "/opt/homebrew/bin/code";
 const settle = () => act(() => new Promise<void>((r) => setTimeout(r, 50)));
 const setup = (apps: Record<string, string> = { F6: CODE }) => {
   const backend = seedBackend();
   backend.setConfig((l) => {
-    l.config.fkeys.F6 = "core.app.open_folder";
+    bindFKeys(l, { F6: "core.app.open_folder" });
     Object.assign(l.config.fkey_apps, apps);
   });
   return backend;
@@ -61,7 +61,7 @@ describe("애플리케이션으로 폴더 열기 F키", () => {
     const { user, backend } = await renderApp();
     await user.keyboard("{Control>},{/Control}");
     await screen.findByRole("dialog", { name: "설정" });
-    await user.click(screen.getByRole("tab", { name: "F키" }));
+    await user.click(screen.getByRole("tab", { name: "단축키" }));
     await user.click(within(screen.getByRole("group", { name: "F9" })).getByRole("combobox"));
     await user.type(screen.getByRole("searchbox", { name: "F9 동작 검색" }), "애플리케이션으로 폴더 열기");
     await user.keyboard("{Enter}");
@@ -69,7 +69,7 @@ describe("애플리케이션으로 폴더 열기 F키", () => {
     await user.type(path, `${CODE}{Enter}`);
     await waitFor(async () => {
       const c = (await backend.getConfig()).config;
-      expect(c.fkeys.F9).toBe("core.app.open_folder");
+      expect(await fkeyOf(backend, "F9")).toBe("core.app.open_folder");
       expect(c.fkey_apps.F9).toBe(CODE);
     });
     await user.keyboard("{Escape}{F9}");

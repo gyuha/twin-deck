@@ -4,7 +4,7 @@ import { defaultBindingsFor } from "@twin-deck/actions";
 import { formatKey } from "@twin-deck/keybinds";
 import type { ActionContext } from "@twin-deck/actions";
 import { parentPath } from "@twin-deck/ts-client";
-import { fkeyBarItems } from "../lib/fkeys";
+import { fkeyBarItems, fkeyValues } from "../lib/fkeys";
 import { useApp, useT } from "../state/context";
 import { actionContext, activeTab, cursorEntry } from "../state/store";
 import { useUi } from "./uiContext";
@@ -41,16 +41,16 @@ export function useBarIds(): { known: string[]; unknown: string[] } {
 
 /** 설정 `fkey_bar`로 켠 F키 줄 중 쓸 수 있는 것. 같은 인수 없는 액션이 기본 구성에 이미 있으면 중복이라 뺀다. */
 function useFKeyBarItems(known: string[]) {
-  const fkeys = useApp((s) => s.loaded.config.fkeys);
+  const bindings = useApp((s) => s.loaded.bindings);
   const fkeyApps = useApp((s) => s.loaded.config.fkey_apps);
   const fkeyBar = useApp((s) => s.loaded.config.fkey_bar);
   const { registry, platform } = useUi();
   return useMemo(() => {
     const builtin = (key: string) => defaultBindingsFor(platform).find((b) => b.scope === "pane" && b.keys.includes(key))?.actionId;
-    return fkeyBarItems({ fkeys, fkey_apps: fkeyApps, fkey_bar: fkeyBar }, builtin).filter(
+    return fkeyBarItems({ fkeys: fkeyValues(bindings), fkey_apps: fkeyApps, fkey_bar: fkeyBar }, builtin).filter(
       (it) => registry.has(it.action) && !(known.includes(it.action) && Object.keys(it.args).length === 0),
     );
-  }, [fkeys, fkeyApps, fkeyBar, platform, registry, known]);
+  }, [bindings, fkeyApps, fkeyBar, platform, registry, known]);
 }
 
 /** 지금 누르고 있는 수식키를 "Alt+Ctrl+Shift+Mod" 같은 정규 문자열로(없으면 ""). 창이 포커스를 잃으면 비운다. */

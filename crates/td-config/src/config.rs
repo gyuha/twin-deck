@@ -16,9 +16,7 @@ pub struct Config {
     pub file_systems: FileSystemsConfig,
     /// 폴더 단축키. 키는 "0"~"9", 값은 경로(`~`, `${user.*}` 허용). 빈 문자열이면 미지정.
     pub shortcuts: BTreeMap<String, String>,
-    /// F1~F12의 동작. 빈 문자열이면 기본 바인딩 유지, "none"이면 해제, 그 밖에는 액션 ID.
-    pub fkeys: BTreeMap<String, String>,
-    /// `fkeys`가 "core.app.launch"인 키가 실행할 애플리케이션. 빈 문자열이면 미지정.
+    /// 앱 실행 액션(`core.app.launch` 등)이 걸린 키가 실행할 애플리케이션. 빈 문자열이면 미지정. 키의 동작은 `keybindings.toml`에 있다.
     pub fkey_apps: BTreeMap<String, String>,
     /// F키 줄(`F5`, `Ctrl+F5` …)마다 그 동작을 Action Bar에 보일지. 켠 줄은 `layout.action_bar` 뒤에 이어 붙는다.
     pub fkey_bar: BTreeMap<String, bool>,

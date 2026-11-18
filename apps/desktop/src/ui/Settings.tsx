@@ -8,7 +8,7 @@ import { defaultBindingsFor } from "@twin-deck/actions";
 import type { Platform } from "@twin-deck/keybinds";
 import { defaultLoaded } from "@twin-deck/ts-client";
 import type { Config, RemoteServer, RemoteServerStatus, SmbServer } from "@twin-deck/ts-client";
-import { APP_ACTIONS, APP_LAUNCH_ACTION, APP_OPEN_FOLDER_ACTION } from "../lib/fkeys";
+import { APP_ACTIONS, APP_LAUNCH_ACTION, APP_OPEN_FOLDER_ACTION, fkeyValues } from "../lib/fkeys";
 import { THEMES } from "../lib/themes.generated";
 import { parseThemeList } from "../lib/themeColors";
 import { withIcon } from "../lib/connections";
@@ -22,6 +22,7 @@ import { parseColumn, withExtensionColumn } from "../lib/columns";
 import { useUi } from "./uiContext";
 import licensesText from "../generated/licenses.md?raw";
 import { MarkdownView } from "./MarkdownView";
+import { KeymapEditor } from "./KeymapEditor";
 
 type Control =
   | { type: "switch" }
@@ -172,6 +173,20 @@ const updateSection: { title: string; desc?: string; items: Item[] } = {
   ],
 };
 
+/**
+ * 단축키 탭: 전역 단축키(OS에 등록, config.toml) → F키 줄(하단 액션바·앱 실행) → 모든 단축키 편집기(keybindings.toml).
+ * 예전의 "폴더 단축키"·"F키" 탭과 환경 탭의 전역 단축키를 여기로 모았다. 폴더 경로는 편집기의 폴더 단축키 줄에서 고친다.
+ */
+const shortcutsSection: { title: string; desc?: string; items: Item[] } = {
+  get title() { return translate("settings.section.shortcuts.title"); },
+  get desc() { return translate("settings.section.shortcuts.desc"); },
+  items: [
+    { key: "environment.global_hotkey_enabled", get title() { return translate("settings.item.environment.global_hotkey_enabled.title"); }, get desc() { return translate("settings.item.environment.global_hotkey_enabled.desc"); }, control: { type: "switch" } },
+    { key: "environment.global_hotkey", get title() { return translate("settings.item.environment.global_hotkey.title"); }, get desc() { return translate("settings.item.environment.global_hotkey.desc"); }, control: { type: "hotkey" } },
+    ...Array.from({ length: 12 }, (_, i) => ({ key: `fkeys.F${i + 1}`, title: `F${i + 1}`, control: { type: "fkey" } as const })),
+  ],
+};
+
 const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
   {
     get title() { return translate("settings.section.appearance.title"); },
@@ -255,20 +270,7 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
       { key: "core.confirm.trash", get title() { return translate("settings.item.core.confirm.trash.title"); }, control: { type: "switch" } },
     ],
   },
-  {
-    get title() { return translate("settings.section.folder_shortcuts.title"); },
-    get desc() { return translate("settings.section.folder_shortcuts.desc"); },
-    items: Array.from({ length: 10 }, (_, n) => ({
-      key: `shortcuts.${n}`,
-      title: `Ctrl+${n}`,
-      control: { type: "text" } as const,
-    })),
-  },
-  {
-    get title() { return translate("settings.section.fkeys.title"); },
-    get desc() { return translate("settings.section.fkeys.desc"); },
-    items: Array.from({ length: 12 }, (_, i) => ({ key: `fkeys.F${i + 1}`, title: `F${i + 1}`, control: { type: "fkey" } as const })),
-  },
+  shortcutsSection,
   {
     get title() { return translate("settings.section.environment.title"); },
     items: [
@@ -276,8 +278,6 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
       { key: "environment.terminal", get title() { return translate("settings.item.environment.terminal.title"); }, get desc() { return translate("settings.item.environment.terminal.desc"); }, control: { type: "select", options: TERMINAL_SHELLS } , hideOn: ["mac", "linux"] }, // Windows에서만 쓰는 설정이다
       { key: "environment.single_instance", get title() { return translate("settings.item.environment.single_instance.title"); }, get desc() { return translate("settings.item.environment.single_instance.desc"); }, control: { type: "switch" } },
       { key: "environment.background_on_close", get title() { return translate("settings.item.environment.background_on_close.title"); }, get desc() { return translate("settings.item.environment.background_on_close.desc"); }, control: { type: "switch" }, hideOn: ["windows", "linux"] }, // Dock이 있는 macOS에서만 쓴다
-      { key: "environment.global_hotkey_enabled", get title() { return translate("settings.item.environment.global_hotkey_enabled.title"); }, get desc() { return translate("settings.item.environment.global_hotkey_enabled.desc"); }, control: { type: "switch" } },
-      { key: "environment.global_hotkey", get title() { return translate("settings.item.environment.global_hotkey.title"); }, get desc() { return translate("settings.item.environment.global_hotkey.desc"); }, control: { type: "hotkey" } },
       { key: "behavior.layout.recent_limit", get title() { return translate("settings.item.behavior.layout.recent_limit.title"); }, get desc() { return translate("settings.item.behavior.layout.recent_limit.desc"); }, control: { type: "int" } },
     ],
   },
@@ -293,7 +293,7 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
  */
 export const SECTION_GROUPS: { titleKey: Key; count: number }[] = [
   { titleKey: "settings.group.view", count: 4 },
-  { titleKey: "settings.group.behavior", count: 3 },
+  { titleKey: "settings.group.behavior", count: 2 },
   { titleKey: "settings.group.system", count: 2 },
   { titleKey: "settings.group.connection", count: 3 },
 ];
@@ -438,7 +438,7 @@ function FKeyControl({ name, value, disabled }: { name: string; value: string; d
     .filter((a) => a.scopes.includes("pane") && (APP_ACTIONS.includes(a.id) || !/\(\S+:/.test(a.title)))
     .map((a) => ({ id: a.id, label: a.id === APP_LAUNCH_ACTION ? t("settings.fkey.launch") : a.id === APP_OPEN_FOLDER_ACTION ? t("settings.fkey.open_folder") : actionTitle(a.id, a.title) }))
     .sort((a, b) => a.label.localeCompare(b.label, currentLanguage()));
-  const choose = (v: string) => (v === "default" ? api.resetConfigValue(`fkeys.${name}`) : api.setConfigValue(`fkeys.${name}`, { kind: "str", value: v }));
+  const choose = (v: string) => (v === "default" ? api.resetKeybinding(name) : api.setKeybinding({ key: name, action: v === "none" ? null : v, args: {}, scope: null }));
   return (
     // F키 줄의 둘째 줄: 동작 상자와 (앱 실행 동작이면) 앱 경로 입력이 나란히 남는 폭을 반씩 쓴다. 첫 줄은 제목·되돌리기·액션바 스위치다.
     <div className="col-span-full row-start-2 flex min-w-0 items-center gap-2">
@@ -473,12 +473,14 @@ const modifierLabel = (m: string, platform: Platform) => (m === "Mod" && platfor
 /** Windows·Linux에서는 `Mod`가 `Ctrl`과 같은 키라 `Mod` 체크는 숨긴다. */
 const modifiersFor = (platform: Platform) => (platform === "mac" ? MODIFIERS : MODIFIERS.filter((m) => m !== "Mod"));
 
-/** 조합키 F키 항목 추가: F키 + 수식키(Mod/Ctrl/Alt/Shift)를 골라 `fkeys`에 빈 항목으로 만든다. 같은 조합은 한 번만. */
+/** 조합키 F키 항목 추가: F키 + 수식키(Mod/Ctrl/Alt/Shift)를 골라 `fkey_bar`에 꺼진 줄로 만든다. 같은 조합은 한 번만. */
 function FKeyAdder({ disabled }: { disabled: boolean }) {
   const t = useT();
   const { platform } = useUi();
   const { api } = useAppStore();
-  const existing = useApp((s) => s.loaded.config.fkeys);
+  const bar = useApp((s) => s.loaded.config.fkey_bar);
+  const bindings = useApp((s) => s.loaded.bindings);
+  const existing = { ...bar, ...fkeyValues(bindings) };
   const [f, setF] = useState("F1");
   const [mods, setMods] = useState<string[]>([]);
   const key = [...MODIFIERS.filter((m) => mods.includes(m)), f].join("+");
@@ -504,7 +506,7 @@ function FKeyAdder({ disabled }: { disabled: boolean }) {
           {modifierLabel(m, platform)}
         </label>
       ))}
-      <Button type="button" variant="gray" size="sm" disabled={disabled || mods.length === 0 || duplicate} onClick={() => void api.setConfigValue(`fkeys.${key}`, { kind: "str", value: "" })}>
+      <Button type="button" variant="gray" size="sm" disabled={disabled || mods.length === 0 || duplicate} onClick={() => void api.setConfigValue(`fkey_bar.${key}`, { kind: "bool", value: false })}>
         {t("settings.fkey.add")}
       </Button>
       {duplicate && mods.length > 0 && <span className="text-xs text-status-error">{t("settings.fkey.duplicate")}</span>}
@@ -1386,12 +1388,14 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
   const t = useT();
   const section = useApp((s) => s.settingsSection);
   const config = useApp((s) => s.loaded.config);
+  const userBindings = useApp((s) => s.loaded.bindings);
+  const fkeys = fkeyValues(userBindings);
   // F키 탭은 고정 F1~F12 뒤에 설정 파일의 조합키 항목이 이어진다.
   // 내장 기본 바인딩의 조합키(Shift+F8, Mod+F12 등)도 설정 파일에 없어도 같이 보인다.
-  const { platform } = useUi();
+  const { platform, registry } = useUi();
   const comboKeys = [
     ...new Set([
-      ...Object.keys(config.fkeys).filter((k) => k.includes("+")),
+      ...[...Object.keys(fkeys), ...Object.keys(config.fkey_bar)].filter((k) => k.includes("+")),
       ...defaultBindingsFor(platform)
         .filter((b) => b.scope === "pane")
         .flatMap((b) => b.keys)
@@ -1411,8 +1415,20 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
   const randomTheme = config.behavior.random_theme;
   const hotkeyOff = !config.environment.global_hotkey_enabled;
   const current = SECTIONS[section];
-  const sectionItems: Item[] = current.title === t("settings.section.fkeys.title") ? [...current.items, ...comboKeys.map((k): Item => ({ key: `fkeys.${k}`, title: k, control: { type: "fkey" } }))] : current.items;
-  const items = sectionItems.filter((it) => !it.hideOn?.includes(platform) && !(it.hideWhenEmpty && !valueAt(config, it.key)));
+  const sectionItems: Item[] = current === shortcutsSection ? [...current.items, ...comboKeys.map((k): Item => ({ key: `fkeys.${k}`, title: k, control: { type: "fkey" } }))] : current.items;
+  const [shortcutQuery, setShortcutQuery] = useState("");
+  // 단축키 탭의 검색: 줄 제목과, F키 줄은 지정한 동작·내장 동작 이름으로도 찾는다.
+  const sq = current === shortcutsSection ? shortcutQuery.trim().toLowerCase() : "";
+  const matches = (it: Item) => {
+    if (!sq) return true;
+    const texts = [it.title, it.key];
+    if (it.control.type === "fkey") {
+      const builtin = defaultBindingsFor(platform).find((b) => b.scope === "pane" && b.keys.includes(it.title))?.actionId;
+      for (const id of [fkeys[it.title], builtin]) if (id) texts.push(id, actionTitle(id, registry.get(id)?.title ?? id));
+    }
+    return texts.some((x) => x.toLowerCase().includes(sq));
+  };
+  const items = sectionItems.filter((it) => !it.hideOn?.includes(platform) && !(it.hideWhenEmpty && !valueAt(config, it.key)) && matches(it));
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-app text-ink">
       <div role="dialog" aria-label={t("settings.aria")} className="flex min-h-0 flex-1 flex-col">
@@ -1469,20 +1485,23 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
           <section role="tabpanel" aria-label={current.title} className={"min-w-0 flex-1 overflow-auto px-6 py-3" + (items.some((i) => i.control.type === "smb-servers" || i.control.type === "remote-servers" || i.control.type === "twindeck-servers") ? " flex flex-col" : "")}>
             <h3 className="text-sm font-semibold">{current.title}</h3>
             {current.desc ? <p className="mb-2 text-xs text-ink-faint">{current.desc}</p> : <div className="mb-2" />}
+            {current === shortcutsSection && (
+              <Input aria-label={t("settings.keymap.search")} placeholder={t("settings.keymap.search_placeholder")} value={shortcutQuery} size="sm" className="mb-2 w-full" onChange={(e) => setShortcutQuery(e.target.value)} />
+            )}
             {items.map((item) => {
               // SMB 서버 목록은 한 줄짜리 항목이 아니라 탭 전체를 쓰는 편집기다(기본값으로 버튼도 없다).
               if (item.control.type === "smb-servers") return <SmbServersControl key={item.key} label={item.title} disabled={!!broken} />;
               if (item.control.type === "remote-servers") return <RemoteServersControl key={item.key} label={item.title} disabled={!!broken} />;
               if (item.control.type === "twindeck-server") return <TwinDeckServerControl key={item.key} label={item.title} disabled={!!broken} />;
               if (item.control.type === "twindeck-servers") return <RemoteServersControl key={item.key} label={item.title} disabled={!!broken} protocols={["twindeck"]} addProtocol="twindeck" />;
-              const combo = item.key.startsWith("fkeys.") && item.title.includes("+") && item.title in config.fkeys;
+              const combo = item.key.startsWith("fkeys.") && item.title.includes("+") && (item.title in fkeys || item.title in config.fkey_bar);
               // 설정 파일에 없는 내장 조합키는 값이 없다 → 기본값("")으로 본다.
               const extensionColumn = item.control.type === "extension-column";
               // `확장자 유지`는 확장자 컬럼이 보일 때만 켜고 끌 수 있다(컬럼이 없으면 원래 확장자가 이름에 보인다, 이슈 #86).
               const keepExtensionOff = item.key === "behavior.table.keep_extension" && !config.view.table.columns.some((c) => parseColumn(c)?.name === "extension");
               const gated = item.disabledWhen?.(config) ?? false;
-              const value = (extensionColumn ? config.view.table.columns.some((s) => parseColumn(s)?.name === "extension") : valueAt(config, item.key) ?? (item.control.type === "fkey" ? "" : undefined)) as string | number | boolean;
-              const isDefault = extensionColumn ? !value : value === (valueAt(defaults, item.key) ?? (item.control.type === "fkey" ? "" : undefined));
+              const value = (extensionColumn ? config.view.table.columns.some((s) => parseColumn(s)?.name === "extension") : item.control.type === "fkey" ? (fkeys[item.title] ?? "") : valueAt(config, item.key)) as string | number | boolean;
+              const isDefault = extensionColumn ? !value : item.control.type === "fkey" ? value === "" : value === valueAt(defaults, item.key);
               const wide = item.control.type === "text" || item.control.type === "fkey" || item.control.type === "tags" || item.control.type === "hotkey";
               // 태그 목록은 칩이 여러 줄로 쌓이는 넓은 입력이라, 제목 오른쪽 좁은 칸에 두면 왼쪽이 크게 빈다. 제목 아래 전체 폭을 쓴다.
               const stacked = item.control.type === "tags";
@@ -1504,6 +1523,8 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
                           void (async () => {
                               if (extensionColumn) {
                                 await api.setConfigValue(item.key, { kind: "strList", value: withExtensionColumn(config.view.table.columns, false) });
+                              } else if (item.control.type === "fkey") {
+                                await api.resetKeybinding(item.title);
                               } else {
                                 await api.resetConfigValue(item.key);
                               }
@@ -1521,6 +1542,8 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
                           void (async () => {
                             if (extensionColumn) {
                               await api.setConfigValue(item.key, { kind: "strList", value: withExtensionColumn(config.view.table.columns, false) });
+                            } else if (item.control.type === "fkey") {
+                              await api.resetKeybinding(item.title);
                             } else {
                               await api.resetConfigValue(item.key);
                             }
@@ -1607,7 +1630,8 @@ export function Settings({ onThemePreview }: { onThemePreview?: (theme: string |
                 </div>
               );
             })}
-            {current.title === t("settings.section.fkeys.title") && <FKeyAdder disabled={!!broken} />}
+            {current === shortcutsSection && <FKeyAdder disabled={!!broken} />}
+            {current === shortcutsSection && <KeymapEditor disabled={!!broken} query={shortcutQuery} />}
             {current.title === t("settings.section.environment.title") && (
               <div role="group" aria-label={t("settings.config_location.label")} className="flex items-center justify-between gap-4 border-b border-app-line py-2.5">
                 <div className="w-48 shrink-0">

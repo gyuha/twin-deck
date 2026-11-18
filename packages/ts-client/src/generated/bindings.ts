@@ -350,6 +350,28 @@ async resetConfigValue(key: string) : Promise<Result<Loaded, string>> {
 }
 },
 /**
+ * 단축키 설정: `keybindings.toml`의 현재 OS 섹션에 키 하나를 쓴다. `action`이 null이면 그 키를 해제한다.
+ */
+async setKeybinding(binding: BindingSpec) : Promise<Result<Loaded, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_keybinding", { binding }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 단축키 설정: 키 하나를 현재 OS 섹션과 공통 섹션에서 지워 내장 기본 바인딩으로 되돌린다.
+ */
+async resetKeybinding(key: string) : Promise<Result<Loaded, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("reset_keybinding", { key }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * 설정 화면: 설정 폴더를 파일 관리자로 연다.
  */
 async revealConfigDir() : Promise<Result<null, string>> {
@@ -1114,11 +1136,7 @@ preview: PreviewConfig; layout: LayoutConfig; view: ViewConfig; file_systems: Fi
  */
 shortcuts: Partial<{ [key in string]: string }>; 
 /**
- * F1~F12의 동작. 빈 문자열이면 기본 바인딩 유지, "none"이면 해제, 그 밖에는 액션 ID.
- */
-fkeys: Partial<{ [key in string]: string }>; 
-/**
- * `fkeys`가 "core.app.launch"인 키가 실행할 애플리케이션. 빈 문자열이면 미지정.
+ * 앱 실행 액션(`core.app.launch` 등)이 걸린 키가 실행할 애플리케이션. 빈 문자열이면 미지정. 키의 동작은 `keybindings.toml`에 있다.
  */
 fkey_apps: Partial<{ [key in string]: string }>; 
 /**

@@ -1,9 +1,26 @@
 import type { UserBinding } from "@twin-deck/actions";
 
-/** `config.fkeys`/`config.fkey_apps`에서 읽는 부분. specta가 맵을 `Partial<Record>`로 내보낸다. */
+/** F키 줄의 동작(키 → 액션 ID 또는 "none")과 `config.fkey_apps`. specta가 맵을 `Partial<Record>`로 내보낸다. */
 export interface FKeyConfig {
   fkeys: Partial<Record<string, string>>;
   fkey_apps: Partial<Record<string, string>>;
+}
+
+/** F키 줄 이름(`F5`, `Ctrl+F5`, `Mod+Shift+F2` …). */
+export const FKEY_NAME = /^((Mod|Ctrl|Alt|Shift)\+)*F([1-9]|1[0-2])$/i;
+
+/**
+ * keybindings.toml의 사용자 바인딩 중 F키 줄을 "키 → 액션 ID(해제는 none)"로 모은다. 같은 키가 여러 번이면 나중 것이 이긴다.
+ * 스코프를 강제한 줄은 F키 줄(pane)로 보지 않는다.
+ */
+export function fkeyValues(bindings: readonly UserBinding[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const b of bindings) {
+    if (!FKEY_NAME.test(b.key) || (b.scope && b.scope !== "pane")) continue;
+    const name = Object.keys(out).find((k) => k.toLowerCase() === b.key.toLowerCase()) ?? b.key;
+    out[name] = b.action ?? "none";
+  }
+  return out;
 }
 
 /** Action Bar에 이어 붙는 F키 버튼 하나. */
@@ -41,18 +58,13 @@ export const APP_OPEN_FOLDER_ACTION = "core.app.open_folder";
 export const APP_ACTIONS: readonly string[] = [APP_LAUNCH_ACTION, APP_OPEN_FOLDER_ACTION];
 
 /**
- * F1~F12와 조합키(`Ctrl+F5`, `Mod+Shift+F2` 등) 설정을 사용자 바인딩으로 바꾼다. 빈 값은 기본 바인딩 유지라 건너뛰고,
- * `none`은 그 키 해제, 앱 실행은 `app`(경로)과 `key`(안내 메시지용)를 인수로 싣는다.
- * `keybindings.toml`보다 먼저 병합되도록 호출하는 쪽에서 앞에 붙인다(파일이 이긴다).
+ * 앱 실행 액션(`core.app.launch`·`core.app.open_folder`)이 걸린 사용자 바인딩에 `fkey_apps`의 앱 경로(`app`)와 키 이름(`key`, 안내 메시지용)을 싣는다.
+ * 인수를 직접 적은 줄은 그대로 둔다.
  */
-export function fkeyBindings(config: FKeyConfig): UserBinding[] {
-  const out: UserBinding[] = [];
-  for (const key of Object.keys(config.fkeys)) {
-    const value = (config.fkeys[key] ?? "").trim();
-    if (!value) continue;
-    if (value === "none") out.push({ key, action: null, args: {}, scope: null });
-    else if (APP_ACTIONS.includes(value)) out.push({ key, action: value, args: { app: (config.fkey_apps[key] ?? "").trim(), key }, scope: null });
-    else out.push({ key, action: value, args: {}, scope: null });
-  }
-  return out;
+export function withAppArgs(bindings: readonly UserBinding[], fkeyApps: Partial<Record<string, string>>): UserBinding[] {
+  return bindings.map((b) => {
+    if (!b.action || !APP_ACTIONS.includes(b.action) || b.args.app !== undefined) return b;
+    const app = Object.entries(fkeyApps).find(([k]) => k.toLowerCase() === b.key.toLowerCase())?.[1] ?? "";
+    return { ...b, args: { ...b.args, app: app.trim(), key: b.key } };
+  });
 }

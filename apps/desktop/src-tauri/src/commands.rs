@@ -532,6 +532,34 @@ pub fn reset_config_value(
     Ok(loaded)
 }
 
+/// 단축키 설정: `keybindings.toml`의 현재 OS 섹션에 키 하나를 쓴다. `action`이 null이면 그 키를 해제한다.
+#[tauri::command]
+#[specta::specta]
+pub fn set_keybinding(
+    svc: State<'_, AppService>,
+    config: State<'_, ConfigState>,
+    binding: td_config::BindingSpec,
+) -> ServiceResult<Loaded> {
+    let loaded = config
+        .update(|dir| td_config::set_user_binding(dir, td_config::Platform::current(), &binding))?;
+    crate::apply_config(&svc, &loaded);
+    Ok(loaded)
+}
+
+/// 단축키 설정: 키 하나를 현재 OS 섹션과 공통 섹션에서 지워 내장 기본 바인딩으로 되돌린다.
+#[tauri::command]
+#[specta::specta]
+pub fn reset_keybinding(
+    svc: State<'_, AppService>,
+    config: State<'_, ConfigState>,
+    key: String,
+) -> ServiceResult<Loaded> {
+    let loaded = config
+        .update(|dir| td_config::remove_user_binding(dir, td_config::Platform::current(), &key))?;
+    crate::apply_config(&svc, &loaded);
+    Ok(loaded)
+}
+
 /// 저장된 SMB 서버 목록(`[[smb.servers]]`) 전체를 바꾸고, 새로 병합된 설정을 바로 돌려준다.
 /// 목록은 설정(`Loaded`)의 `smb.servers`로 읽는다. host나 share가 빈 항목이 있으면 쓰지 않고 거부한다.
 #[tauri::command]
@@ -1817,6 +1845,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             remove_favorite,
             set_config_value,
             reset_config_value,
+            set_keybinding,
+            reset_keybinding,
             reveal_config_dir,
             get_config_location,
             set_smb_servers,

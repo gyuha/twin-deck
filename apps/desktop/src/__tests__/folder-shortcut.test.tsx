@@ -46,8 +46,8 @@ describe("폴더 단축키 (Ctrl+0~9)", () => {
   it("설정 화면에서 경로를 지정하면 바로 쓸 수 있다", async () => {
     const { user } = await renderApp(seed());
     await user.keyboard("{Control>},{/Control}");
-    await user.click(await screen.findByRole("tab", { name: "폴더 단축키" }));
-    const input = screen.getByRole("textbox", { name: "Ctrl+2" });
+    await user.click(await screen.findByRole("tab", { name: "단축키" }));
+    const input = screen.getByRole("textbox", { name: "폴더 단축키 2 경로" });
     await user.type(input, "/home/b/b1{Enter}");
     await user.keyboard("{Escape}");
     await user.keyboard("{Control>}2{/Control}");

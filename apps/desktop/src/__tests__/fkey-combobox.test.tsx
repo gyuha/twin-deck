@@ -1,12 +1,12 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { renderApp } from "./helpers";
+import { fkeyOf, renderApp } from "./helpers";
 
 type User = Awaited<ReturnType<typeof renderApp>>["user"];
 const openRow = async (user: User, fkey: string) => {
   await user.keyboard("{Control>},{/Control}");
   await screen.findByRole("dialog", { name: "설정" });
-  await user.click(screen.getByRole("tab", { name: "F키" }));
+  await user.click(screen.getByRole("tab", { name: "단축키" }));
   const trigger = within(screen.getByRole("group", { name: fkey })).getByRole("combobox");
   await user.click(trigger);
   return trigger;
@@ -45,7 +45,7 @@ describe("F키 동작 선택: 검색되는 콤보박스", () => {
     const trigger = await openRow(user, "F2");
     await user.type(search("F2"), "이름 변경");
     await user.keyboard("{Enter}");
-    await waitFor(async () => expect((await backend.getConfig()).config.fkeys.F2).toBe("core.rename"));
+    await waitFor(async () => expect(await fkeyOf(backend, "F2")).toBe("core.rename"));
     expect(list("F2")).toBeNull();
     expect(trigger).toHaveTextContent("이름 변경");
     expect(trigger).toHaveFocus();
@@ -54,7 +54,7 @@ describe("F키 동작 선택: 검색되는 콤보박스", () => {
     await user.click(trigger);
     await user.keyboard("{ArrowDown}");
     await user.keyboard("{Enter}");
-    await waitFor(async () => expect((await backend.getConfig()).config.fkeys.F2).toBe("none"));
+    await waitFor(async () => expect(await fkeyOf(backend, "F2")).toBe("none"));
   });
 
   it("Esc는 목록만 닫고 설정 화면은 그대로 둔다", async () => {
@@ -77,6 +77,6 @@ describe("F키 동작 선택: 검색되는 콤보박스", () => {
     // jsdom은 클릭 위치를 계산하지 않아서, 화면 전체를 덮는 배경 레이어(목록의 두 단계 위)를 직접 누른다
     fireEvent.mouseDown((list("F5") as HTMLElement).parentElement?.parentElement as HTMLElement);
     expect(list("F5")).toBeNull();
-    expect((await backend.getConfig()).config.fkeys.F5).toBe("");
+    expect(await fkeyOf(backend, "F5")).toBe("");
   });
 });

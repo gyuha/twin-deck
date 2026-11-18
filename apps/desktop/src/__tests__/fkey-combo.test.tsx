@@ -1,13 +1,14 @@
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { FakeBackend } from "@twin-deck/ts-client";
-import { renderApp, seedBackend } from "./helpers";
+import { bindFKeys, fkeyOf, renderApp, seedBackend } from "./helpers";
+import { fkeyValues } from "../lib/fkeys";
 
 type User = Awaited<ReturnType<typeof renderApp>>["user"];
 
 const openFKeys = async (user: User) => {
   await user.keyboard("{Control>},{/Control}");
-  await user.click(await screen.findByRole("tab", { name: "F키" }));
+  await user.click(await screen.findByRole("tab", { name: "단축키" }));
 };
 const adder = () => screen.getByRole("group", { name: "조합키 추가" });
 const addCombo = async (user: User, f: string, mods: string[]) => {
@@ -15,17 +16,22 @@ const addCombo = async (user: User, f: string, mods: string[]) => {
   for (const m of mods) await user.click(within(adder()).getByRole("checkbox", { name: m }));
   await user.click(within(adder()).getByRole("button", { name: "추가" }));
 };
-const fkeysOf = async (b: FakeBackend) => (await b.getConfig()).config.fkeys;
+// 조합키 줄은 fkey_bar 항목(추가하면 꺼진 줄로 생긴다)과 keybindings의 F키 바인딩에서 나온다.
+const fkeysOf = async (b: FakeBackend) => {
+  const l = await b.getConfig();
+  const rows = Object.fromEntries(Object.entries(l.config.fkey_bar).filter(([, v]) => v !== undefined).map(([k]) => [k, ""]));
+  return { ...rows, ...fkeyValues(l.bindings) } as Record<string, string>;
+};
 
 describe("F키 설정의 조합키 항목", () => {
-  it("F키와 수식키를 골라 추가하면 fkeys에 조합 항목이 저장되고 줄로 보인다", async () => {
+  it("F키와 수식키를 골라 추가하면 fkeys에 조합 항목이 fkey_bar에 꺼진 줄로 저장되고 줄로 보인다", async () => {
     const backend = seedBackend();
     const { user } = await renderApp(backend);
     await openFKeys(user);
     await addCombo(user, "F5", ["Ctrl", "Shift"]);
     await waitFor(async () => expect(await fkeysOf(backend)).toHaveProperty("Ctrl+Shift+F5", ""));
     expect(await screen.findByRole("group", { name: "Ctrl+Shift+F5" })).toBeInTheDocument();
-    expect((await fkeysOf(backend)).F5).toBe(""); // 단독 F5는 그대로
+    expect(await fkeyOf(backend, "F5")).toBe(""); // 단독 F5는 그대로
   });
 
   it("같은 F키에 서로 다른 조합을 둘 만들 수 있고, 이미 있는 조합은 막는다", async () => {
@@ -46,7 +52,7 @@ describe("F키 설정의 조합키 항목", () => {
   it("macOS에서는 Mod 체크가 Cmd로 보이고, Windows·Linux에서는 Mod 체크 없이 Ctrl·Alt·Shift만 보인다", async () => {
     const mac = await renderApp(seedBackend(), "mac");
     await mac.user.keyboard("{Meta>},{/Meta}");
-    await mac.user.click(await screen.findByRole("tab", { name: "F키" }));
+    await mac.user.click(await screen.findByRole("tab", { name: "단축키" }));
     expect(within(adder()).getByRole("checkbox", { name: "Cmd" })).toBeInTheDocument();
     expect(within(adder()).queryByRole("checkbox", { name: "Mod" })).not.toBeInTheDocument();
     cleanup();
@@ -66,7 +72,7 @@ describe("F키 설정의 조합키 항목", () => {
   it("삭제하면 조합 항목과 그 앱 경로가 함께 사라진다", async () => {
     const backend = seedBackend();
     backend.setConfig((l) => {
-      l.config.fkeys["Ctrl+F5"] = "core.app.launch";
+      bindFKeys(l, { "Ctrl+F5": "core.app.launch" });
       l.config.fkey_apps["Ctrl+F5"] = "/Applications/Foo.app";
     });
     const { user } = await renderApp(backend);
@@ -81,7 +87,7 @@ describe("F키 설정의 조합키 항목", () => {
   it("설정에 저장된 조합 항목은 다시 열어도 줄로 복원된다", async () => {
     const backend = seedBackend();
     backend.setConfig((l) => {
-      l.config.fkeys["Mod+Shift+F2"] = "core.rename";
+      bindFKeys(l, { "Mod+Shift+F2": "core.rename" });
     });
     const { user } = await renderApp(backend);
     await openFKeys(user);

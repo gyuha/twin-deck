@@ -20,6 +20,8 @@ export function useKeyboard({ app, keymap, registry }: Options) {
     const onKeyDown = (e: KeyboardEvent) => {
       // IME 조합 중 입력은 건드리지 않는다.
       if (e.isComposing) return;
+      // 단축키 설정에서 새 키를 녹화하는 칸: 누른 키는 칸이 받는다.
+      if (e.target instanceof Element && e.target.closest("[data-key-record]")) return;
       // 경로 표시줄의 직접 입력 중에는 글자·방향키가 단축키로 가지 않게 한다(입력창이 처리한다).
       if (e.target instanceof Element && e.target.closest("[data-path-edit]")) return;
       // 명령어 줄의 입력은 줄이 직접 처리한다(글자가 Quick Select나 단축키로 가지 않게). 줄을 켜고 끄는 키만 키맵으로 넘긴다(이슈 #119).

@@ -1,7 +1,7 @@
 import { SECTION_GROUPS } from "../ui/Settings";
 import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { cursorName, renderApp, seedBackend } from "./helpers";
+import { bindFKeys, cursorName, renderApp, seedBackend } from "./helpers";
 
 const open = (user: Awaited<ReturnType<typeof renderApp>>["user"]) => user.keyboard("{Control>},{/Control}");
 const dialog = () => screen.findByRole("dialog", { name: "설정" });
@@ -35,12 +35,12 @@ describe("설정 화면 열기와 닫기", () => {
     expect(cursorName("left")).toBe("docs");
   });
 
-  it("섹션 12개가 왼쪽에 있고 처음에는 모양이 열린다", async () => {
+  it("섹션 11개가 왼쪽에 있고 처음에는 모양이 열린다", async () => {
     const { user } = await renderApp();
     await open(user);
     await dialog();
     const tabs = within(screen.getByRole("tablist", { name: "설정 섹션" })).getAllByRole("tab").map((t) => t.textContent);
-    expect(tabs).toEqual(["모양", "목록과 선택", "표시 형식", "미리보기", "확인", "폴더 단축키", "F키", "환경", "업데이트", "SMB 서버", "SFTP·FTP 서버", "Twin Deck Remote"]);
+    expect(tabs).toEqual(["모양", "목록과 선택", "표시 형식", "미리보기", "확인", "단축키", "환경", "업데이트", "SMB 서버", "SFTP·FTP 서버", "Twin Deck Remote"]);
     expect(screen.getByRole("tab", { name: "모양" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("switch", { name: "액션바 표시" })).toBeInTheDocument();
   });
@@ -54,14 +54,14 @@ describe("설정 화면 열기와 닫기", () => {
     const groups = within(list).getAllByRole("group").map((g) => [g.getAttribute("aria-label"), within(g).getAllByRole("tab").map((t) => t.textContent)]);
     expect(groups).toEqual([
       ["화면", ["모양", "목록과 선택", "표시 형식", "미리보기"]],
-      ["동작", ["확인", "폴더 단축키", "F키"]],
+      ["동작", ["확인", "단축키"]],
       ["시스템", ["환경", "업데이트"]],
       ["연결", ["SMB 서버", "SFTP·FTP 서버", "Twin Deck Remote"]],
     ]);
     // 그룹을 건너도 탭 번호(settingsSection)는 SECTIONS 순서 그대로라 다른 그룹의 탭도 열린다.
     await user.click(screen.getByRole("tab", { name: "SMB 서버" }));
     expect(screen.getByRole("tab", { name: "SMB 서버" })).toHaveAttribute("aria-selected", "true");
-    expect(SECTION_GROUPS.reduce((n, g) => n + g.count, 0)).toBe(12);
+    expect(SECTION_GROUPS.reduce((n, g) => n + g.count, 0)).toBe(11);
   });
 });
 
@@ -282,23 +282,22 @@ describe("기본값으로", () => {
     expect(slot()!.className).toBe(before); // 같은 자리·같은 크기
   });
 
-  it("폴더 단축키의 경로 입력은 줄의 남는 폭을 모두 쓴다(제목과 입력 사이가 비지 않게)", async () => {
+  it("폴더 단축키의 경로 입력은 단축키 탭의 폴더 단축키 줄 아래에 전체 폭으로 있다", async () => {
     const { user } = await renderApp();
     await open(user);
     await dialog();
-    await user.click(screen.getByRole("tab", { name: "폴더 단축키" }));
-    const input = within(screen.getByRole("group", { name: "Ctrl+1" })).getByRole("textbox");
-    expect(input.closest("div.flex-1")).not.toBeNull();
-    expect(screen.getByRole("group", { name: "Ctrl+1" }).firstElementChild!.className).toContain("w-12"); // 제목 칸은 키 이름만큼
+    await user.click(screen.getByRole("tab", { name: "단축키" }));
+    const row = screen.getByRole("group", { name: "폴더 단축키 1" });
+    expect(within(row).getByRole("textbox", { name: "폴더 단축키 1 경로" })).toBeInTheDocument();
   });
 
   it("F키 줄은 두 줄이다: 첫 줄은 제목·되돌리기·액션바 스위치, 둘째 줄은 동작 상자(와 앱 경로 입력)", async () => {
     const backend = seedBackend();
-    backend.setConfig((l) => (l.config.fkeys.F9 = "core.app.open_folder"));
+    backend.setConfig((l) => bindFKeys(l, { F9: "core.app.open_folder" }));
     const { user } = await renderApp(backend);
     await open(user);
     await dialog();
-    await user.click(screen.getByRole("tab", { name: "F키" }));
+    await user.click(screen.getByRole("tab", { name: "단축키" }));
     const row = screen.getByRole("group", { name: "F1" });
     expect(row.className).toContain("grid");
     const second = within(row).getByRole("combobox", { name: /F1/ }).parentElement!;

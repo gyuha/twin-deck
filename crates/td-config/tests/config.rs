@@ -618,44 +618,33 @@ fn user_value_syntax_error_is_refused_and_file_untouched() {
 }
 
 #[test]
-fn fkeys_defaults_merge_and_unknown_key_warning() {
-    // 기본값: F1~F12가 모두 빈 문자열(= 기본 바인딩 유지), 앱도 모두 미지정
+fn fkey_apps_defaults_merge_and_unknown_key_warning() {
+    // 기본값: F1~F12의 앱이 모두 미지정. F키 동작은 keybindings.toml로 옮겨 config에는 없다.
     let none = load_from_strs(None, None, Platform::Linux);
     assert!(none.warnings.is_empty(), "{:?}", none.warnings);
     for n in 1..=12 {
         let key = format!("F{n}");
-        assert_eq!(none.config.fkeys.get(&key).map(String::as_str), Some(""));
         assert_eq!(
             none.config.fkey_apps.get(&key).map(String::as_str),
             Some("")
         );
     }
-    assert_eq!(none.config.fkeys.len(), 12);
 
-    // 옛 config.toml(fkeys 없음)은 그대로 읽힌다
-    let old = load("[core.confirm]\ntrash = true\n");
-    assert!(old.warnings.is_empty(), "{:?}", old.warnings);
-    assert_eq!(old.config.fkeys.len(), 12);
-
-    // 사용자 값은 그 키만 덮고 나머지는 기본값을 유지한다
-    let l = load(
-        "[fkeys]\nF2 = \"core.rename\"\nF3 = \"core.app.launch\"\nF5 = \"none\"\n[fkey_apps]\nF3 = \"/Applications/Foo.app\"\n",
-    );
+    let l = load("[fkey_apps]\nF3 = \"/Applications/Foo.app\"\n");
     assert!(l.warnings.is_empty(), "{:?}", l.warnings);
-    assert_eq!(l.config.fkeys["F2"], "core.rename");
-    assert_eq!(l.config.fkeys["F3"], "core.app.launch");
-    assert_eq!(l.config.fkeys["F5"], "none");
-    assert_eq!(l.config.fkeys["F4"], "", "건드리지 않은 키는 기본값");
     assert_eq!(l.config.fkey_apps["F3"], "/Applications/Foo.app");
+    assert_eq!(l.config.fkey_apps["F4"], "", "건드리지 않은 키는 기본값");
 
     // F1~F12 밖의 이름은 경고하고 무시한다
-    let l = load("[fkeys]\nF13 = \"core.rename\"\n");
+    let l = load("[fkey_apps]\nF13 = \"Foo\"\n");
     assert!(
-        l.warnings.iter().any(|w| w.message.contains("fkeys.F13")),
+        l.warnings
+            .iter()
+            .any(|w| w.message.contains("fkey_apps.F13")),
         "{:?}",
         l.warnings
     );
-    assert!(!l.config.fkeys.contains_key("F13"));
+    assert!(!l.config.fkey_apps.contains_key("F13"));
 }
 
 #[test]
@@ -831,15 +820,10 @@ fn folder_size_on_select_defaults_to_true_and_can_be_turned_off() {
 
 #[test]
 fn fkey_combo_keys_are_accepted_and_invalid_ones_warn() {
-    let l = load(
-        "[fkeys]\n\"Ctrl+F5\" = \"core.copy\"\n\"Mod+Shift+F2\" = \"core.app.launch\"\nF5 = \"core.move\"\n[fkey_apps]\n\"Mod+Shift+F2\" = \"/Applications/Foo.app\"\n",
-    );
+    let l = load("[fkey_apps]\n\"Mod+Shift+F2\" = \"/Applications/Foo.app\"\n");
     assert!(l.warnings.is_empty(), "{:?}", l.warnings);
-    assert_eq!(l.config.fkeys["Ctrl+F5"], "core.copy");
-    assert_eq!(l.config.fkeys["Mod+Shift+F2"], "core.app.launch");
-    assert_eq!(l.config.fkeys["F5"], "core.move");
     assert_eq!(l.config.fkey_apps["Mod+Shift+F2"], "/Applications/Foo.app");
-    assert_eq!(l.config.fkeys.len(), 14, "기본 12개 + 조합 2개");
+    assert_eq!(l.config.fkey_apps.len(), 13, "기본 12개 + 조합 1개");
 
     for bad in [
         "Ctrl+A",
@@ -849,39 +833,32 @@ fn fkey_combo_keys_are_accepted_and_invalid_ones_warn() {
         "Ctrl+Ctrl+F1",
         "Ctrl+F0",
     ] {
-        let l = load(&format!("[fkeys]\n\"{bad}\" = \"core.copy\"\n"));
+        let l = load(&format!("[fkey_apps]\n\"{bad}\" = \"Foo\"\n"));
         assert!(
             l.warnings
                 .iter()
-                .any(|w| w.message.contains(&format!("fkeys.{bad}"))),
+                .any(|w| w.message.contains(&format!("fkey_apps.{bad}"))),
             "{bad}: {:?}",
             l.warnings
         );
-        assert!(!l.config.fkeys.contains_key(bad), "{bad}");
+        assert!(!l.config.fkey_apps.contains_key(bad), "{bad}");
     }
 }
 
 #[test]
-fn fkey_combo_round_trips_through_user_config() {
-    use td_config::{reset_user_value, set_user_value, ConfigValue};
+fn old_fkeys_section_moves_to_keybindings_on_store_start() {
     let dir = tempfile::tempdir().unwrap();
-    set_user_value(dir.path(), "fkeys.Ctrl+F5", ConfigValue::Str(String::new())).unwrap();
-    let l = load_dir(dir.path(), Platform::Linux);
-    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
-    assert_eq!(l.config.fkeys["Ctrl+F5"], "");
-    set_user_value(
-        dir.path(),
-        "fkeys.Ctrl+F5",
-        ConfigValue::Str("core.copy".into()),
+    fs::write(
+        dir.path().join("config.toml"),
+        "[fkeys]\n\"Ctrl+F5\" = \"core.copy\"\nF5 = \"\"\n",
     )
     .unwrap();
-    assert_eq!(
-        load_dir(dir.path(), Platform::Linux).config.fkeys["Ctrl+F5"],
-        "core.copy"
-    );
-    reset_user_value(dir.path(), "fkeys.Ctrl+F5").unwrap();
-    let l = load_dir(dir.path(), Platform::Linux);
-    assert!(!l.config.fkeys.contains_key("Ctrl+F5"));
+    let (store, _rx) = td_config::ConfigStore::start(dir.path(), Platform::Linux).unwrap();
+    let l = store.current();
+    assert!(l.warnings.is_empty(), "{:?}", l.warnings);
+    assert_eq!(l.bindings.len(), 1);
+    assert_eq!(l.bindings[0].key, "Ctrl+F5");
+    assert_eq!(l.bindings[0].action.as_deref(), Some("core.copy"));
 }
 
 #[test]
