@@ -85,6 +85,7 @@ async newWindow() : Promise<Result<string, string>> {
 },
 /**
  * 미리보기 창에 `target`을 보인다. 창이 없으면 만들고, 포커스는 부른 메인 창에 남긴다. 부른 창을 소유자로 기억한다.
+ * 다른 메인 창이 보이던 미리보기면 그 창에 `PreviewWindowClosed`를 보낸다(포커스는 건드리지 않는다).
  */
 async previewWindowShow(target: PreviewTargetDto) : Promise<Result<null, string>> {
     try {
@@ -95,7 +96,8 @@ async previewWindowShow(target: PreviewTargetDto) : Promise<Result<null, string>
 }
 },
 /**
- * 미리보기 창을 숨긴다(메인 창이 미리보기를 끝냈을 때). 소유자에게 알리지 않는다.
+ * 미리보기 창을 숨긴다(메인 창이 미리보기를 끝냈을 때). 부른 창이 소유자가 아니면(다른 창이 가져갔다) 아무것도 하지 않는다.
+ * 소유자에게 알리지 않는다.
  */
 async previewWindowHide() : Promise<void> {
     await TAURI_INVOKE("preview_window_hide");
@@ -111,6 +113,13 @@ async previewWindowClose() : Promise<void> {
  */
 async previewWindowTarget() : Promise<PreviewTargetDto | null> {
     return await TAURI_INVOKE("preview_window_target");
+},
+/**
+ * 미리보기 창에서 눌린 키를 소유자 메인 창에 넘긴다: 그 창에 포커스를 돌려준 뒤 그 창에만 `PreviewWindowKey`를 보낸다.
+ * 미리보기가 보이는 중이 아니면 아무것도 하지 않는다.
+ */
+async previewWindowForwardKey(key: PreviewKeyDto) : Promise<void> {
+    await TAURI_INVOKE("preview_window_forward_key", { key });
 },
 async fileInfo(path: string) : Promise<Result<FileInfoDto, string>> {
     try {
@@ -907,6 +916,7 @@ configChanged: ConfigChanged,
 dirChanged: DirChanged,
 openPaths: OpenPaths,
 previewWindowClosed: PreviewWindowClosed,
+previewWindowKey: PreviewWindowKey,
 previewWindowTarget: PreviewWindowTarget,
 queueChanged: QueueChanged,
 searchChunk: SearchChunk,
@@ -919,6 +929,7 @@ configChanged: "config-changed",
 dirChanged: "dir-changed",
 openPaths: "open-paths",
 previewWindowClosed: "preview-window-closed",
+previewWindowKey: "preview-window-key",
 previewWindowTarget: "preview-window-target",
 queueChanged: "queue-changed",
 searchChunk: "search-chunk",
@@ -1361,6 +1372,18 @@ pdf_direct: boolean }
  * 미리보기 (VIEW-01). 텍스트는 앞부분, 이미지는 data URL.
  */
 export type PreviewDto = { kind: PreviewKindDto; text: string | null; truncated: boolean; size: number; dataUrl: string | null }
+/**
+ * 미리보기 창에서 눌린 키. 미리보기 창이 포커스를 가진 동안 탐색 키를 소유자 메인 창에 넘길 때 쓴다(KeyboardEvent 값).
+ */
+export type PreviewKeyDto = { 
+/**
+ * `KeyboardEvent.key` (예: `ArrowDown`, `Enter`, `a`).
+ */
+key: string; 
+/**
+ * `KeyboardEvent.code` (예: `ArrowDown`, `KeyA`).
+ */
+code: string; meta: boolean; ctrl: boolean; alt: boolean; shift: boolean }
 export type PreviewKindDto = "text" | "image" | "audio" | "video" | "pdf" | "directory" | "other"
 /**
  * 미리보기 창의 위치와 크기(화면 안 픽셀). 왼쪽 위 모서리 `x`, `y`와 너비·높이 `w`, `h`다.
@@ -1391,6 +1414,10 @@ export type PreviewWindowClosed = {
  * 받는 창(소유자)의 레이블.
  */
 owner: string }
+/**
+ * 미리보기 창에서 넘겨받은 키. 소유자 메인 창에만 보낸다(그 창에 포커스를 돌려준 뒤).
+ */
+export type PreviewWindowKey = { key: PreviewKeyDto }
 /**
  * 미리보기 창에 보일 대상이 바뀌었다. 미리보기 창에만 보낸다.
  */

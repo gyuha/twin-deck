@@ -249,10 +249,15 @@ fn main() {
         .on_window_event(|window, event| {
             let app = window.app_handle();
             // 미리보기 창의 닫기 버튼은 창을 없애지 않고 숨기며, 소유자 메인 창에 알리고 포커스를 돌려준다.
+            // Windows에서 owner 창과 함께 없어지면 상태를 '창 없음·안 보임'으로 되돌린다.
             if window.label() == preview_window::PREVIEW_LABEL {
-                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                    api.prevent_close();
-                    preview_window::close(app);
+                match event {
+                    tauri::WindowEvent::CloseRequested { api, .. } => {
+                        api.prevent_close();
+                        preview_window::close(app);
+                    }
+                    tauri::WindowEvent::Destroyed => preview_window::preview_destroyed(app),
+                    _ => {}
                 }
                 return;
             }

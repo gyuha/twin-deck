@@ -7,7 +7,7 @@ import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { HostKeyError, BackendError, RemoteConnectError, SmbConnectError } from "./backend";
 import type { Backend, FileDropEvent, SearchEvent, TerminalEvent } from "./backend";
 import { commands, events } from "./generated/bindings";
-import type { ShellResultDto, CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigValue, ConflictDto, LocationConflict, ExpectedFileDto, FileInfoDto, FindSpecDto, JobDto, LoadedState, PreviewDto, PreviewTargetDto, OfficePreviewDto, EpubInfoDto, Snapshot, JobKindDto, Loaded, QueueItemDto, RemoteServer, Result, SmbServer, WriteTextResultDto } from "./generated/bindings";
+import type { ShellResultDto, CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigValue, ConflictDto, LocationConflict, ExpectedFileDto, FileInfoDto, FindSpecDto, JobDto, LoadedState, PreviewDto, PreviewKeyDto, PreviewTargetDto, OfficePreviewDto, EpubInfoDto, Snapshot, JobKindDto, Loaded, QueueItemDto, RemoteServer, Result, SmbServer, WriteTextResultDto } from "./generated/bindings";
 
 function unwrap<T>(r: Result<T, string>): T {
   if (r.status === "error") throw new BackendError(r.error);
@@ -131,6 +131,15 @@ export class TauriBackend implements Backend {
   }
   onPreviewWindowClosed(callback: () => void) {
     const unlisten = events.previewWindowClosed(getCurrentWebviewWindow()).listen(() => callback());
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
+  }
+  async previewWindowForwardKey(key: PreviewKeyDto) {
+    await commands.previewWindowForwardKey(key);
+  }
+  onPreviewWindowKey(callback: (key: PreviewKeyDto) => void) {
+    const unlisten = events.previewWindowKey(getCurrentWebviewWindow()).listen((e) => callback(e.payload.key));
     return () => {
       void unlisten.then((fn) => fn());
     };

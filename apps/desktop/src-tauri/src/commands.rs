@@ -1792,6 +1792,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             crate::preview_window::preview_window_hide,
             crate::preview_window::preview_window_close,
             crate::preview_window::preview_window_target,
+            crate::preview_window::preview_window_forward_key,
             file_info,
             preview_file,
             office_preview,
@@ -1891,7 +1892,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             TerminalExit,
             OpenPaths,
             crate::preview_window::PreviewWindowTarget,
-            crate::preview_window::PreviewWindowClosed
+            crate::preview_window::PreviewWindowClosed,
+            crate::preview_window::PreviewWindowKey
         ])
 }
 

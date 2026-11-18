@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FakeBackend } from "./fake";
-import type { PreviewTargetDto } from "./generated/bindings";
+import type { PreviewKeyDto, PreviewTargetDto } from "./generated/bindings";
 
 const target = (path: string): PreviewTargetDto => ({ path, name: path.slice(path.lastIndexOf("/") + 1), is_dir: false, sheet: null });
 
@@ -40,6 +40,35 @@ describe("FakeBackend 미리보기 별도 창 (이슈 #160)", () => {
     await b.previewWindowShow(target("/b.txt"));
     await b.previewWindowClose();
     expect(closed).toBe(1);
+  });
+
+  it("소유자가 없으면 숨기기는 기록만 한다", async () => {
+    const b = new FakeBackend();
+    await b.previewWindowHide();
+    expect(b.previewWindowCalls).toEqual([{ type: "hide" }]);
+    await b.previewWindowShow(target("/a.txt"));
+    await b.previewWindowClose();
+    b.previewWindowCurrent = target("/x.txt"); // 닫힘 뒤의 숨기기는 상태를 건드리지 않는다
+    await b.previewWindowHide();
+    expect(b.previewWindowCurrent).toEqual(target("/x.txt"));
+  });
+
+  it("넘긴 키는 보이는 중일 때만 메인 쪽 구독자에게 전달된다", async () => {
+    const b = new FakeBackend();
+    const key: PreviewKeyDto = { key: "ArrowDown", code: "ArrowDown", meta: false, ctrl: false, alt: false, shift: false };
+    const got: PreviewKeyDto[] = [];
+    b.onPreviewWindowKey((k) => got.push(k));
+    await b.previewWindowForwardKey(key);
+    expect(got).toEqual([]);
+    await b.previewWindowShow(target("/a.txt"));
+    await b.previewWindowForwardKey(key);
+    expect(got).toEqual([key]);
+    await b.previewWindowHide();
+    await b.previewWindowForwardKey(key);
+    expect(got).toEqual([key]);
+    expect(b.previewWindowCalls.filter((c) => c.type === "forwardKey")).toHaveLength(3);
+    b.emitPreviewWindowKey({ ...key, key: "Enter", code: "Enter" });
+    expect(got.map((k) => k.key)).toEqual(["ArrowDown", "Enter"]);
   });
 
   it("미리보기 창인지는 previewWindowMode를 따른다", () => {

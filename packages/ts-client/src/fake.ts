@@ -15,6 +15,7 @@ import type {
   Loaded,
   LoadedState,
   PreviewDto,
+  PreviewKeyDto,
   PreviewTargetDto,
   QueueItemDto,
   OfficePreviewDto,
@@ -1703,11 +1704,13 @@ export class FakeBackend implements Backend {
 
   // 미리보기 별도 창(이슈 #160). 한 FakeBackend가 메인 창과 미리보기 창을 함께 흉내 낸다:
   // 메인 쪽 `previewWindowShow`가 미리보기 쪽 `onPreviewWindowTarget` 구독자에게 대상을 바로 전달하고,
-  // 미리보기 쪽 `previewWindowClose`가 메인 쪽 `onPreviewWindowClosed` 구독자에게 알린다.
+  // 미리보기 쪽 `previewWindowClose`가 메인 쪽 `onPreviewWindowClosed` 구독자에게 알리고,
+  // 미리보기 쪽 `previewWindowForwardKey`가 메인 쪽 `onPreviewWindowKey` 구독자에게 키를 바로 전달한다.
+  // 메인 창은 하나로 보므로 소유권 이전(다른 메인 창이 가져감)은 `emitPreviewWindowClosed`로 흉내 낸다.
   /** 테스트용: 이 백엔드를 미리보기 창의 것으로 볼지(`isPreviewWindow`). */
   previewWindowMode = false;
   /** 테스트용: 미리보기 창 명령 호출 기록. */
-  readonly previewWindowCalls: ({ type: "show"; target: PreviewTargetDto } | { type: "hide" } | { type: "close" })[] = [];
+  readonly previewWindowCalls: ({ type: "show"; target: PreviewTargetDto } | { type: "hide" } | { type: "close" } | { type: "forwardKey"; key: PreviewKeyDto })[] = [];
   /** 미리보기 창이 보이는지와 지금 대상(Rust `PreviewWindowState`와 같은 규칙). */
   previewWindowVisible = false;
   previewWindowCurrent: PreviewTargetDto | null = null;
@@ -1715,6 +1718,7 @@ export class FakeBackend implements Backend {
   private previewWindowOwned = false;
   private previewTargetListeners = new Set<(target: PreviewTargetDto) => void>();
   private previewClosedListeners = new Set<() => void>();
+  private previewKeyListeners = new Set<(key: PreviewKeyDto) => void>();
 
   isPreviewWindow() {
     return this.previewWindowMode;
@@ -1728,8 +1732,10 @@ export class FakeBackend implements Backend {
     this.emitPreviewWindowTarget(target);
   }
 
+  /** Rust와 같이 소유자가 없으면(보인 적이 없거나 닫힘 뒤) 기록만 하고 아무것도 바꾸지 않는다. */
   async previewWindowHide() {
     this.previewWindowCalls.push({ type: "hide" });
+    if (!this.previewWindowOwned) return;
     this.previewWindowVisible = false;
     this.previewWindowCurrent = null;
   }
@@ -1757,12 +1763,28 @@ export class FakeBackend implements Backend {
     return () => void this.previewClosedListeners.delete(callback);
   }
 
+  /** Rust와 같이 미리보기가 보이는 중(소유자가 있음)일 때만 메인 쪽 구독자에게 전달한다. */
+  async previewWindowForwardKey(key: PreviewKeyDto) {
+    this.previewWindowCalls.push({ type: "forwardKey", key: structuredClone(key) });
+    if (this.previewWindowOwned && this.previewWindowVisible) this.emitPreviewWindowKey(key);
+  }
+
+  onPreviewWindowKey(callback: (key: PreviewKeyDto) => void) {
+    this.previewKeyListeners.add(callback);
+    return () => void this.previewKeyListeners.delete(callback);
+  }
+
+  /** 미리보기 창이 키를 넘긴 것처럼 만든다(테스트용). */
+  emitPreviewWindowKey(key: PreviewKeyDto): void {
+    for (const l of [...this.previewKeyListeners]) l(structuredClone(key));
+  }
+
   /** 미리보기 창이 대상을 받은 것처럼 만든다(테스트용). */
   emitPreviewWindowTarget(target: PreviewTargetDto): void {
     for (const l of [...this.previewTargetListeners]) l(structuredClone(target));
   }
 
-  /** 미리보기 창이 닫힌 것처럼 만든다(테스트용: 닫기 버튼, 소유자 창이 숨음). */
+  /** 미리보기 창이 닫힌 것처럼 만든다(테스트용: 닫기 버튼, 소유자 창이 숨음, 다른 메인 창이 미리보기를 가져감). */
   emitPreviewWindowClosed(): void {
     for (const l of [...this.previewClosedListeners]) l();
   }

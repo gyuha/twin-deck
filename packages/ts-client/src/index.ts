@@ -30,6 +30,7 @@ export type {
   ViewSnap,
   PreviewDto,
   PreviewTargetDto,
+  PreviewKeyDto,
   PreviewKindDto,
   Warning,
   FavoriteDto,
