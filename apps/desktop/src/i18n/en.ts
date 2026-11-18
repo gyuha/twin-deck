@@ -696,6 +696,8 @@ export const en: Record<Key, string> = {
   "preview.unsupported": "This format cannot be previewed",
   "preview.hint_editing": "Mod+S save · Esc finish editing",
   "preview.hint": "↑↓ previous/next item · PageUp/PageDown scroll · Enter {enter} · Delete delete · Space/Esc close · double-click the body to edit",
+  "preview.hint_window": "Esc to close · navigation keys such as ↑↓ go to the main window",
+  "preview.window_failed": "Cannot open the preview window: {error}",
   "preview.hint_extract": "extract",
   "preview.hint_open": "open",
   "dialog.choice.overwrite": "Overwrite (O)",

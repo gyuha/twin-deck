@@ -1,7 +1,8 @@
 import { act, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { FakeBackend } from "@twin-deck/ts-client";
-import type { PreviewTargetDto } from "@twin-deck/ts-client";
+import type { PreviewKeyDto, PreviewTargetDto } from "@twin-deck/ts-client";
+import userEvent from "@testing-library/user-event";
 import { start } from "../bootstrap";
 import { renderApp } from "./helpers";
 
@@ -96,5 +97,78 @@ describe("미리보기 별도 창: 미리보기 창 화면 (이슈 #160)", () =>
       await gate;
     });
     expect(screen.getByLabelText("텍스트 미리보기")).toHaveTextContent("둘째 파일");
+  });
+});
+
+const key = (k: string, extra: Partial<PreviewKeyDto> = {}): PreviewKeyDto => ({ key: k, code: k, meta: false, ctrl: false, alt: false, shift: false, ...extra });
+
+describe("미리보기 별도 창: 보완 (이슈 #160 리뷰)", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+  const boot = async (b: FakeBackend) => {
+    const el = document.createElement("div");
+    document.body.appendChild(el);
+    await start(el, { backend: b, platform: "linux", getHome: async () => "/home/a" });
+  };
+  const windowBackend = (files: Record<string, string>, current: string) => {
+    const b = new FakeBackend().seed({ ...files, "/home/a": null });
+    b.previewWindowMode = true;
+    b.previewWindowCurrent = target(current);
+    return b;
+  };
+
+  it("별도 창의 Markdown 경로 링크는 이동하지 않는다(메인 창과 대상이 어긋나지 않게)", async () => {
+    const b = windowBackend({ "/home/a/readme.md": "[둘째](b.txt)", "/home/a/b.txt": "둘째 파일" }, "readme.md");
+    const info = vi.spyOn(b, "fileInfo");
+    await boot(b);
+    await userEvent.click(await screen.findByText("둘째"));
+    await new Promise((r) => setTimeout(r, 30));
+    expect(info).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: /readme\.md/ })).toBeInTheDocument();
+  });
+
+  it("미리보기 창에서 탐색 키는 메인 창으로 넘기고, 복사 키는 가로채지 않는다", async () => {
+    const b = windowBackend({ "/home/a/a.txt": "첫째 파일" }, "a.txt");
+    await boot(b);
+    await screen.findByLabelText("텍스트 미리보기");
+    const down = new KeyboardEvent("keydown", { key: "ArrowDown", code: "ArrowDown", bubbles: true, cancelable: true });
+    act(() => void window.dispatchEvent(down));
+    expect(down.defaultPrevented).toBe(true);
+    expect(b.previewWindowCalls).toContainEqual({ type: "forwardKey", key: key("ArrowDown") });
+    const copy = new KeyboardEvent("keydown", { key: "c", code: "KeyC", ctrlKey: true, bubbles: true, cancelable: true });
+    act(() => void window.dispatchEvent(copy));
+    expect(copy.defaultPrevented).toBe(false);
+    expect(b.previewWindowCalls.filter((c) => c.type === "forwardKey")).toHaveLength(1);
+  });
+
+  it("미리보기 창 하단 안내는 이 창에서 되는 것만 말한다", async () => {
+    const b = windowBackend({ "/home/a/a.txt": "첫째 파일" }, "a.txt");
+    await boot(b);
+    await screen.findByLabelText("텍스트 미리보기");
+    expect(screen.getByText(/Esc 닫기/)).toBeInTheDocument();
+    expect(screen.queryByText(/Delete 삭제|더블클릭 편집/)).not.toBeInTheDocument();
+  });
+
+  it("메인 창은 넘겨받은 Down을 기존 키 처리로 실행해 다음 항목을 보인다", async () => {
+    const b = seed(true);
+    const { user } = await renderApp(b);
+    await user.keyboard("{ArrowRight}");
+    await waitFor(() => expect(b.previewWindowVisible).toBe(true));
+    act(() => b.emitPreviewWindowKey(key("ArrowDown")));
+    await waitFor(() => expect(b.previewWindowCalls.at(-1)).toEqual({ type: "show", target: target("b.txt") }));
+  });
+
+  it("창 보이기가 실패하면 알리고 메인 미리보기를 닫는다", async () => {
+    const b = seed(true);
+    b.previewWindowShow = async () => {
+      throw new Error("창 만들기 실패");
+    };
+    const { user } = await renderApp(b);
+    await user.keyboard("{ArrowRight}");
+    expect(await screen.findByText(/창 만들기 실패/)).toBeInTheDocument();
+    // 닫혔다면 다시 열 수 있다(열린 채면 같은 키가 다음 항목으로 넘어가 알림이 달라진다).
+    await user.keyboard("{ArrowRight}");
+    await waitFor(() => expect(b.previewWindowCalls.filter((c) => c.type === "hide")).toHaveLength(0));
   });
 });

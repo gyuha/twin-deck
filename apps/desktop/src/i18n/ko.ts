@@ -694,6 +694,8 @@ export const ko = {
   "preview.unsupported": "미리 볼 수 없는 형식입니다",
   "preview.hint_editing": "Mod+S 저장 · Esc 편집 종료",
   "preview.hint": "↑↓ 이전/다음 항목 · PageUp/PageDown 스크롤 · Enter {enter} · Delete 삭제 · Space/Esc 닫기 · 본문 더블클릭 편집",
+  "preview.hint_window": "Esc 닫기 · ↑↓ 등 탐색 키는 메인 창으로 넘어갑니다",
+  "preview.window_failed": "미리보기 창을 열 수 없습니다: {error}",
   "preview.hint_extract": "압축 풀기",
   "preview.hint_open": "열기",
   "dialog.choice.overwrite": "덮어쓰기 (O)",

@@ -124,7 +124,7 @@ export function Preview({ windowed = false, onClose }: { windowed?: boolean; onC
   const textBody = d?.kind === "text" ? (
     <>
               {isMarkdown(p.name) ? (
-                <MarkdownView text={d.text ?? ""} docPath={p.path} resolveImage={(src) => resolveMarkdownImage(src, p.path, api.fileUrl)} />
+                <MarkdownView text={d.text ?? ""} docPath={p.path} resolveImage={(src) => resolveMarkdownImage(src, p.path, api.fileUrl)} pathLinks={!windowed} />
               ) : isJson(p.name) ? (
                 <JsonView text={d.text ?? ""} />
               ) : languageFor(p.name) ? (
@@ -272,7 +272,7 @@ export function Preview({ windowed = false, onClose }: { windowed?: boolean; onC
           )}
         </div>
         <p className="shrink-0 border-t border-app-line bg-app-dark-box px-3 py-2 text-xs text-ink-faint">
-          {editing ? t("preview.hint_editing") : t("preview.hint", { enter: isArchiveName(p.name, zipExts) ? t("preview.hint_extract") : t("preview.hint_open") })}
+          {windowed ? t("preview.hint_window") : editing ? t("preview.hint_editing") : t("preview.hint", { enter: isArchiveName(p.name, zipExts) ? t("preview.hint_extract") : t("preview.hint_open") })}
         </p>
       </div>
     </div>
