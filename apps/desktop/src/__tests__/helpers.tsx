@@ -29,9 +29,16 @@ export async function renderApp(
   backend = seedBackend(),
   platform: "linux" | "mac" | "windows" = "linux",
   paths: { left: string; right: string } = { left: "/home/a", right: "/home/b" },
-  opts: { emptyLeft?: boolean; snapshot?: Snapshot | null; stateWarning?: string | null } = {},
+  opts: { emptyLeft?: boolean; snapshot?: Snapshot | null; stateWarning?: string | null; separatePreview?: boolean | null } = {},
 ) {
   const user = userEvent.setup();
+  // 미리보기 별도 창(이슈 #160)이 기본이라, 앱 안 패널을 시험하는 쪽은 꺼 둔다. 별도 창 시험은 `separatePreview: true`로 켠다.
+  // `null`이면 기본 설정 그대로 둔다.
+  if (opts.separatePreview !== null) {
+    backend.setConfig((l) => {
+      l.config.preview.separate_window = opts.separatePreview ?? false;
+    });
+  }
   render(<App
       backend={backend}
       platform={platform}

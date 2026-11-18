@@ -19,7 +19,7 @@ const target = (name: string): PreviewTargetDto => ({ path: `/home/a/${name}`, n
 describe("미리보기 별도 창: 메인 창 (이슈 #160)", () => {
   it("설정이 켜져 있으면 앱 안 패널 없이 창을 보이고, 항목을 넘기면 새 대상으로, 닫으면 숨긴다", async () => {
     const b = seed(true);
-    const { user } = await renderApp(b);
+    const { user } = await renderApp(b, undefined, undefined, { separatePreview: true });
     await user.keyboard("{ArrowRight}");
     await waitFor(() => expect(b.previewWindowCalls).toEqual([{ type: "show", target: target("a.txt") }]));
     expect(screen.queryByRole("dialog", { name: /미리보기/ })).not.toBeInTheDocument();
@@ -32,7 +32,7 @@ describe("미리보기 별도 창: 메인 창 (이슈 #160)", () => {
 
   it("미리보기 창이 닫혔다고 오면 메인의 미리보기 상태를 풀고 다시 숨기지 않는다", async () => {
     const b = seed(true);
-    const { user } = await renderApp(b);
+    const { user } = await renderApp(b, undefined, undefined, { separatePreview: true });
     await user.keyboard("{ArrowRight}");
     await waitFor(() => expect(b.previewWindowVisible).toBe(true));
     act(() => b.emitPreviewWindowClosed());
@@ -44,12 +44,23 @@ describe("미리보기 별도 창: 메인 창 (이슈 #160)", () => {
 
   it("설정이 꺼져 있으면 창 명령을 부르지 않고 앱 안 패널을 그대로 쓴다", async () => {
     const b = seed(false);
-    const { user } = await renderApp(b);
+    const { user } = await renderApp(b, undefined, undefined, { separatePreview: false });
     await user.keyboard("{ArrowRight}");
     expect(await screen.findByRole("dialog", { name: /미리보기/ })).toBeInTheDocument();
     await user.keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByRole("dialog", { name: /미리보기/ })).not.toBeInTheDocument());
     expect(b.previewWindowCalls).toEqual([]);
+  });
+});
+
+describe("미리보기 별도 창: 기본 설정 (이슈 #160)", () => {
+  it("기본 설정 그대로 미리보기를 열면 별도 창을 보이고 앱 안 패널은 없다", async () => {
+    const b = new FakeBackend().seed({ "/home/a/a.txt": "첫째 파일", "/home/b": null });
+    expect((await b.getConfig()).config.preview.separate_window).toBe(true);
+    const { user } = await renderApp(b, undefined, undefined, { separatePreview: null });
+    await user.keyboard("{ArrowRight}");
+    await waitFor(() => expect(b.previewWindowCalls).toEqual([{ type: "show", target: target("a.txt") }]));
+    expect(screen.queryByRole("dialog", { name: /미리보기/ })).not.toBeInTheDocument();
   });
 });
 
@@ -152,7 +163,7 @@ describe("미리보기 별도 창: 보완 (이슈 #160 리뷰)", () => {
 
   it("메인 창은 넘겨받은 Down을 기존 키 처리로 실행해 다음 항목을 보인다", async () => {
     const b = seed(true);
-    const { user } = await renderApp(b);
+    const { user } = await renderApp(b, undefined, undefined, { separatePreview: true });
     await user.keyboard("{ArrowRight}");
     await waitFor(() => expect(b.previewWindowVisible).toBe(true));
     act(() => b.emitPreviewWindowKey(key("ArrowDown")));
@@ -164,7 +175,7 @@ describe("미리보기 별도 창: 보완 (이슈 #160 리뷰)", () => {
     b.previewWindowShow = async () => {
       throw new Error("창 만들기 실패");
     };
-    const { user } = await renderApp(b);
+    const { user } = await renderApp(b, undefined, undefined, { separatePreview: true });
     await user.keyboard("{ArrowRight}");
     expect(await screen.findByText(/창 만들기 실패/)).toBeInTheDocument();
     // 닫혔다면 다시 열 수 있다(열린 채면 같은 키가 다음 항목으로 넘어가 알림이 달라진다).

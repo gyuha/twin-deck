@@ -1,4 +1,4 @@
-import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
+import { clearMocks, mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { defaultLoaded } from "@twin-deck/ts-client";
@@ -29,6 +29,7 @@ function mount() {
 describe("앱 부팅 (Tauri IPC 모킹)", () => {
   it("홈 폴더를 조회해 두 패널에 목록을 렌더한다", async () => {
     const calls: string[] = [];
+    mockWindows("main"); // 별도 미리보기 창이 기본이라 앱이 현재 창 정보(이벤트 구독)를 읽는다
     mockIPC(
       (cmd) => {
         calls.push(cmd);
