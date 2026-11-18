@@ -23,7 +23,7 @@ function isForwardedKey(e: KeyboardEvent): boolean {
 
 /**
  * 별도 미리보기 창의 화면 (이슈 #160). 메인 창 흐름(상태 저장·패널·전역 키·메뉴)을 타지 않고, 메인 창이 보낸 대상의 경로를
- * `backend.preview`로 읽어 앱 안 패널과 같은 내용 렌더러(`Preview`)로 창 전체에 그린다. 키는 Esc(닫기)만 받는다.
+ * `backend.preview`로 읽어 앱 안 패널과 같은 내용 렌더러(`Preview`)로 창 전체에 그린다. 키는 Esc(닫기)와, 메인 창으로 넘기는 탐색·조작 키(`isForwardedKey`)만 받는다.
  */
 export function PreviewWindow({ backend }: { backend: Backend }) {
   // `init()`을 부르지 않으므로 폴더 목록·감시·상태 저장은 시작하지 않는다. 스토어가 만들면서 건 백엔드 구독(경로 열기·드롭·폴더 변경 등

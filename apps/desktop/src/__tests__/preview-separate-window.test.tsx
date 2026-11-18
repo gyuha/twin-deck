@@ -182,4 +182,44 @@ describe("미리보기 별도 창: 보완 (이슈 #160 리뷰)", () => {
     await user.keyboard("{ArrowRight}");
     await waitFor(() => expect(b.previewWindowCalls.filter((c) => c.type === "hide")).toHaveLength(0));
   });
+
+  it("대화상자가 열려 있으면 넘어온 키는 버린다(Enter가 확인을 누르지 않는다)", async () => {
+    const b = seed(true);
+    const { user } = await renderApp(b, undefined, undefined, { separatePreview: true });
+    await user.keyboard("{ArrowRight}");
+    await waitFor(() => expect(b.previewWindowVisible).toBe(true));
+    act(() => b.emitPreviewWindowKey(key("Delete")));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument(); // 삭제 확인
+    act(() => b.emitPreviewWindowKey(key("Enter")));
+    act(() => b.emitPreviewWindowKey(key("Delete")));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.getByRole("dialog")).toBeInTheDocument(); // 확인되지 않고 그대로
+    await expect(b.fileInfo("/home/a/a.txt")).resolves.toBeTruthy();
+  });
+
+  it("늦게 실패한 이전 show가 그 사이 성공한 새 대상의 미리보기를 닫지 않는다", async () => {
+    const b = seed(true);
+    const orig = b.previewWindowShow.bind(b);
+    let fail!: () => void;
+    const gate = new Promise<void>((_, rej) => (fail = () => rej(new Error("늦은 실패"))));
+    const shows: string[] = [];
+    b.previewWindowShow = async (t) => {
+      shows.push(t.name);
+      if (t.name === "a.txt") return gate;
+      return orig(t);
+    };
+    const { user } = await renderApp(b, undefined, undefined, { separatePreview: true });
+    await user.keyboard("{ArrowRight}"); // a.txt: 응답 대기
+    await user.keyboard("{ArrowDown}"); // b.txt: 성공
+    await waitFor(() => expect(b.previewWindowVisible).toBe(true));
+    await act(async () => {
+      fail();
+      await gate.catch(() => {});
+    });
+    await new Promise((r) => setTimeout(r, 30));
+    expect(b.previewWindowVisible).toBe(true);
+    expect(screen.queryByText(/늦은 실패/)).not.toBeInTheDocument();
+    act(() => b.emitPreviewWindowKey(key("ArrowUp")));
+    await waitFor(() => expect(shows.at(-1)).toBe("a.txt")); // 미리보기가 닫히지 않았으니 키가 먹는다
+  });
 });

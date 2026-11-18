@@ -267,17 +267,21 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
   // 미리보기 창에서 넘어온 키는 이 창의 키보드와 같은 경로(useKeyboard)로 실행한다.
   useEffect(() => {
     if (!separatePreview) return;
-    return backend.onPreviewWindowKey((k) =>
-      window.dispatchEvent(new KeyboardEvent("keydown", { key: k.key, code: k.code, metaKey: k.meta, ctrlKey: k.ctrl, altKey: k.alt, shiftKey: k.shift, bubbles: true, cancelable: true })),
-    );
-  }, [backend, separatePreview]);
+    return backend.onPreviewWindowKey((k) => {
+      // 미리보기만 열려 있을 때만 실행한다. 대화상자·설정·찾기 등이 위에 있으면 넘어온 키는 버린다(Delete·Enter가 엉뚱한 곳에 먹지 않게).
+      const s = app.store.getState();
+      if (!s.preview || scopeStack(s)[0] !== "preview") return;
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: k.key, code: k.code, metaKey: k.meta, ctrlKey: k.ctrl, altKey: k.alt, shiftKey: k.shift, bubbles: true, cancelable: true }));
+    });
+  }, [app, backend, separatePreview]);
   useEffect(() => {
     if (separatePreview && previewTarget !== null) {
       previewWindowShown.current = true;
       backend
         .previewWindowShow({ path: previewTarget.slice(1), name: previewName, is_dir: previewTarget.startsWith("d"), sheet: null })
         .catch((e) => {
-          // 창을 못 열면 보이지 않는 미리보기가 남아 키만 먹지 않게 닫고 알린다.
+          // 창을 못 열면 보이지 않는 미리보기가 남아 키만 먹지 않게 닫고 알린다. 그 사이 다른 대상으로 넘어갔다면(늦은 실패) 건드리지 않는다.
+          if (app.store.getState().preview?.path !== previewTarget.slice(1)) return;
           previewWindowShown.current = false;
           app.store.setState({ notice: translate("preview.window_failed", { error: String(e instanceof Error ? e.message : e) }) });
           app.api.previewClose();
