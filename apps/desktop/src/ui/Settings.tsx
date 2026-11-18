@@ -241,6 +241,7 @@ const SECTIONS: { title: string; desc?: string; items: Item[] }[] = [
       { key: "preview.pdf_max_mb", get title() { return translate("settings.item.preview.pdf_max_mb.title"); }, get desc() { return translate("settings.item.preview.pdf_max_mb.desc"); }, control: { type: "int" } },
       { key: "preview.audio_max_mb", get title() { return translate("settings.item.preview.audio_max_mb.title"); }, get desc() { return translate("settings.item.preview.audio_max_mb.desc"); }, control: { type: "int" } },
       { key: "preview.pdf_direct", get title() { return translate("settings.item.preview.pdf_direct.title"); }, get desc() { return translate("settings.item.preview.pdf_direct.desc"); }, control: { type: "switch" } },
+      { key: "preview.separate_window", get title() { return translate("settings.item.preview.separate_window.title"); }, get desc() { return translate("settings.item.preview.separate_window.desc"); }, control: { type: "switch" } },
       { key: "preview.close_on_outside_click", get title() { return translate("settings.item.preview.close_on_outside_click.title"); }, get desc() { return translate("settings.item.preview.close_on_outside_click.desc"); }, control: { type: "switch" } },
     ],
   },
