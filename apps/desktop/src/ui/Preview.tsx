@@ -43,8 +43,11 @@ function size(n: number): string {
   return n < 1024 ? `${n} B` : n < 1024 ** 2 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1024 ** 2).toFixed(1)} MB`;
 }
 
-/** 미리보기 (VIEW-01): 텍스트는 앞부분, 이미지는 그림, 그 밖은 종류와 크기. 키 조작은 `preview` 스코프가 처리한다. */
-export function Preview() {
+/**
+ * 미리보기 (VIEW-01): 텍스트는 앞부분, 이미지는 그림, 그 밖은 종류와 크기. 키 조작은 `preview` 스코프가 처리한다.
+ * `windowed`는 별도 미리보기 창(이슈 #160)에서 창 전체에 그리는 모드다: 이동·크기 조절·편집은 없고 닫기는 `onClose`다.
+ */
+export function Preview({ windowed = false, onClose }: { windowed?: boolean; onClose?: () => void } = {}) {
   const t = useT();
   const p = useApp((s) => s.preview);
   const previewConfig = useApp((s) => s.loaded.config.preview);
@@ -117,11 +120,11 @@ export function Preview() {
   const showCopy = fresh && d?.kind === "text" && !model && !office;
   // 이미지가 실제로 보일 때만(너무 커서 표시하지 못한 이미지는 제외) 이미지 복사 버튼을 보인다.
   const showCopyImage = fresh && d?.kind === "image" && !!d.dataUrl && !model && !office;
-  const editing = !!edit && edit.path === p.path && d?.kind === "text" && !model && !office;
+  const editing = !windowed && !!edit && edit.path === p.path && d?.kind === "text" && !model && !office;
   const textBody = d?.kind === "text" ? (
     <>
               {isMarkdown(p.name) ? (
-                <MarkdownView text={d.text ?? ""} docPath={p.path} resolveImage={(src) => resolveMarkdownImage(src, p.path, api.fileUrl)} />
+                <MarkdownView text={d.text ?? ""} docPath={p.path} resolveImage={(src) => resolveMarkdownImage(src, p.path, api.fileUrl)} pathLinks={!windowed} />
               ) : isJson(p.name) ? (
                 <JsonView text={d.text ?? ""} />
               ) : languageFor(p.name) ? (
@@ -134,29 +137,30 @@ export function Preview() {
               {d.truncated && <p className="mt-1 text-xs text-ink-faint">{t("preview.truncated", { size: size(d.size) })}</p>}
             </>
   ) : null;
+  const close = () => (windowed ? onClose?.() : api.previewClose());
   return (
     <div
       onMouseDown={(e) => {
-        if (previewConfig.close_on_outside_click && e.button === 0 && e.target === e.currentTarget) api.previewClose();
+        if (!windowed && previewConfig.close_on_outside_click && e.button === 0 && e.target === e.currentTarget) api.previewClose();
       }}
-      className={["fixed inset-0 bg-black/30", rect ? "" : "flex items-center justify-center"].join(" ")}
+      className={windowed ? "h-full" : ["fixed inset-0 bg-black/30", rect ? "" : "flex items-center justify-center"].join(" ")}
     >
       <div
         role="dialog"
         aria-label={t("preview.aria", { name: p.name })}
-        style={rect ? { position: "absolute", left: rect.x, top: rect.y, width: rect.w, height: rect.h } : undefined}
-        className={["relative flex flex-col overflow-hidden rounded border border-app-line bg-app-box text-sm shadow-lg", rect ? "" : "h-[80vh] w-[44rem] max-w-full"].join(" ")}
+        style={!windowed && rect ? { position: "absolute", left: rect.x, top: rect.y, width: rect.w, height: rect.h } : undefined}
+        className={windowed ? "relative flex h-full flex-col overflow-hidden bg-app-box text-sm" : ["relative flex flex-col overflow-hidden rounded border border-app-line bg-app-box text-sm shadow-lg", rect ? "" : "h-[80vh] w-[44rem] max-w-full"].join(" ")}
       >
-        {HANDLES.map((h) => (
+        {!windowed && HANDLES.map((h) => (
           <div key={h.edge} data-resize={h.edge} aria-hidden="true" onMouseDown={(e) => startDrag(e, h.edge)} className={`absolute z-10 ${h.className}`} />
         ))}
         <div className="flex shrink-0 items-center border-b border-app-line bg-app-dark-box">
           <h2
           data-preview-title
-          title={t("preview.drag_hint")}
-          onMouseDown={(e) => startDrag(e, null)}
-          onDoubleClick={() => api.setPreviewRect(null)}
-          className="min-w-0 flex-1 shrink-0 cursor-move select-none break-all py-2 pl-3 font-semibold"
+          title={windowed ? undefined : t("preview.drag_hint")}
+          onMouseDown={windowed ? undefined : (e) => startDrag(e, null)}
+          onDoubleClick={windowed ? undefined : () => api.setPreviewRect(null)}
+          className={["min-w-0 flex-1 shrink-0 select-none break-all py-2 pl-3 font-semibold", windowed ? "" : "cursor-move"].join(" ")}
         >
           {p.name}
         </h2>
@@ -198,7 +202,7 @@ export function Preview() {
               </svg>
             </button>
           )}
-          <button type="button" aria-label={t("common.close")} title={t("preview.close_title")} onClick={() => api.previewClose()} className="mx-2 flex size-6 shrink-0 items-center justify-center rounded text-ink-dull hover:bg-app-selected hover:text-ink">
+          <button type="button" aria-label={t("common.close")} title={t("preview.close_title")} onClick={close} className="mx-2 flex size-6 shrink-0 items-center justify-center rounded text-ink-dull hover:bg-app-selected hover:text-ink">
             ✕
           </button>
         </div>
@@ -235,7 +239,7 @@ export function Preview() {
                 className="block h-full min-h-48 w-full resize-none bg-transparent font-mono text-xs outline-none"
               />
             ) : (
-              <div onDoubleClick={() => void api.previewEditStart()}>{textBody}</div>
+              <div onDoubleClick={windowed ? undefined : () => void api.previewEditStart()}>{textBody}</div>
             ))}
           {d?.kind === "image" && !model && !office &&
             (d.dataUrl ? (
@@ -268,7 +272,7 @@ export function Preview() {
           )}
         </div>
         <p className="shrink-0 border-t border-app-line bg-app-dark-box px-3 py-2 text-xs text-ink-faint">
-          {editing ? t("preview.hint_editing") : t("preview.hint", { enter: isArchiveName(p.name, zipExts) ? t("preview.hint_extract") : t("preview.hint_open") })}
+          {windowed ? t("preview.hint_window") : editing ? t("preview.hint_editing") : t("preview.hint", { enter: isArchiveName(p.name, zipExts) ? t("preview.hint_extract") : t("preview.hint_open") })}
         </p>
       </div>
     </div>

@@ -59,7 +59,7 @@ export function detectPlatform(): Platform {
  * 클래스(dark/light, `color-scheme`용)를 정한다. system은 OS가 다크인지에 따라 Mocha/Latte이고 OS 설정이 바뀌면 따라간다.
  * 모든 테마가 같은 토큰 묶음을 덮어쓰므로 이전 테마의 값이 남지 않는다. 지금 적용된 테마를 돌려준다(테마별 글자색 이슈 #58, 특수 탭 색 이슈 #92).
  */
-function useTheme(setting: string): WarpTheme | null {
+export function useTheme(setting: string): WarpTheme | null {
   const [theme, setTheme] = useState<WarpTheme | null>(null);
   useEffect(() => {
     const media = typeof window.matchMedia === "function" ? window.matchMedia("(prefers-color-scheme: dark)") : null;
@@ -251,6 +251,46 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
     return createDefaultRegistry(handlers);
   }, [app, platform]);
   const loaded = useStore(app.store, (s) => s.loaded);
+  // 별도 미리보기 창(이슈 #160, `preview.separate_window`): 켜져 있으면 앱 안 패널 대신 store의 preview 상태를 창에 보낸다.
+  // 키(↑↓·Esc 등)는 그대로 이 창의 store가 처리하고, 창이 스스로 닫히면(닫기·Esc) 상태를 비운다.
+  const separatePreview = loaded.config.preview.separate_window;
+  const previewTarget = useStore(app.store, (s) => (s.preview ? `${s.preview.isDir ? "d" : "f"}${s.preview.path}` : null));
+  const previewName = useStore(app.store, (s) => s.preview?.name ?? "");
+  const previewWindowShown = useRef(false);
+  useEffect(() => {
+    if (!separatePreview) return;
+    return backend.onPreviewWindowClosed(() => {
+      previewWindowShown.current = false; // 이미 닫혔으니 다시 숨기라고 하지 않는다
+      app.api.previewClose();
+    });
+  }, [app, backend, separatePreview]);
+  // 미리보기 창에서 넘어온 키는 이 창의 키보드와 같은 경로(useKeyboard)로 실행한다.
+  useEffect(() => {
+    if (!separatePreview) return;
+    return backend.onPreviewWindowKey((k) => {
+      // 미리보기만 열려 있을 때만 실행한다. 대화상자·설정·찾기 등이 위에 있으면 넘어온 키는 버린다(Delete·Enter가 엉뚱한 곳에 먹지 않게).
+      const s = app.store.getState();
+      if (!s.preview || scopeStack(s)[0] !== "preview") return;
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: k.key, code: k.code, metaKey: k.meta, ctrlKey: k.ctrl, altKey: k.alt, shiftKey: k.shift, bubbles: true, cancelable: true }));
+    });
+  }, [app, backend, separatePreview]);
+  useEffect(() => {
+    if (separatePreview && previewTarget !== null) {
+      previewWindowShown.current = true;
+      backend
+        .previewWindowShow({ path: previewTarget.slice(1), name: previewName, is_dir: previewTarget.startsWith("d"), sheet: null })
+        .catch((e) => {
+          // 창을 못 열면 보이지 않는 미리보기가 남아 키만 먹지 않게 닫고 알린다. 그 사이 다른 대상으로 넘어갔다면(늦은 실패) 건드리지 않는다.
+          if (app.store.getState().preview?.path !== previewTarget.slice(1)) return;
+          previewWindowShown.current = false;
+          app.store.setState({ notice: translate("preview.window_failed", { error: String(e instanceof Error ? e.message : e) }) });
+          app.api.previewClose();
+        });
+    } else if (previewWindowShown.current) {
+      previewWindowShown.current = false;
+      backend.previewWindowHide().catch(() => {}); // 숨기기 실패는 사용자가 할 일이 없다
+    }
+  }, [app, backend, separatePreview, previewTarget, previewName]);
   // 기본 키맵 위에 사용자 바인딩을 병합한다. 설정이 바뀌면 다시 만든다.
   const { keymap, warnings } = useMemo(() => {
     const merged = mergeUserBindings(
@@ -370,7 +410,7 @@ export function App({ backend, platform, leftPath, rightPath, snapshot, stateWar
         <CommandLine />
         <ActionBar />
         <ActionsPalette />
-        <Preview />
+        {!separatePreview && <Preview />}
         <DragLayer />
         <PopupMenu />
         <ContextMenu />

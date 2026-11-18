@@ -29,6 +29,8 @@ export type {
   TabSnap,
   ViewSnap,
   PreviewDto,
+  PreviewTargetDto,
+  PreviewKeyDto,
   PreviewKindDto,
   Warning,
   FavoriteDto,

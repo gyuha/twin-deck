@@ -1193,9 +1193,13 @@ fn state_dir(config: &ConfigState) -> ServiceResult<&std::path::Path> {
 #[tauri::command]
 #[specta::specta]
 pub fn load_state(window: tauri::Window, config: State<'_, ConfigState>) -> LoadedState {
-    match state_dir(&config) {
-        Ok(dir) => td_state::load(dir, window.label()),
-        Err(_) => LoadedState {
+    // 미리보기 창은 메인 창 상태를 쓰지 않는다(이슈 #160).
+    let dir = state_dir(&config)
+        .ok()
+        .filter(|_| crate::preview_window::is_main_window(window.label()));
+    match dir {
+        Some(dir) => td_state::load(dir, window.label()),
+        None => LoadedState {
             snapshot: None,
             warning: None,
         },
@@ -1209,6 +1213,9 @@ pub fn save_state(
     config: State<'_, ConfigState>,
     snapshot: Snapshot,
 ) -> ServiceResult<()> {
+    if !crate::preview_window::is_main_window(window.label()) {
+        return Ok(()); // 미리보기 창은 상태를 저장하지 않는다(이슈 #160)
+    }
     td_state::save(state_dir(&config)?, window.label(), &snapshot).map_err(|e| e.to_string())
 }
 
@@ -1781,6 +1788,11 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             quit_app,
             run_shell_command,
             new_window,
+            crate::preview_window::preview_window_show,
+            crate::preview_window::preview_window_hide,
+            crate::preview_window::preview_window_close,
+            crate::preview_window::preview_window_target,
+            crate::preview_window::preview_window_forward_key,
             file_info,
             preview_file,
             office_preview,
@@ -1878,7 +1890,10 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             SearchDone,
             TerminalOutput,
             TerminalExit,
-            OpenPaths
+            OpenPaths,
+            crate::preview_window::PreviewWindowTarget,
+            crate::preview_window::PreviewWindowClosed,
+            crate::preview_window::PreviewWindowKey
         ])
 }
 

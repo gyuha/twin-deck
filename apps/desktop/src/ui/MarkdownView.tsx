@@ -76,7 +76,7 @@ function textOf(node: ReactNode): string {
 }
 
 /** 마크다운 미리보기. 원시 HTML은 렌더링하지 않고, 링크는 이동하지 않는다. 이미지는 `resolveImage`가 주소를 주면 그리고, 아니면 대체 텍스트만 보여 준다. */
-export function MarkdownView({ text, resolveImage, docPath }: { text: string; resolveImage?: (src: string | undefined) => string | null; docPath?: string }) {
+export function MarkdownView({ text, resolveImage, docPath, pathLinks = true }: { text: string; resolveImage?: (src: string | undefined) => string | null; docPath?: string; pathLinks?: boolean }) {
   const t = useT();
   const { api } = useAppStore();
   const previewFont = usePreviewFont();
@@ -84,7 +84,9 @@ export function MarkdownView({ text, resolveImage, docPath }: { text: string; re
   const follow = (href: string | undefined) => {
     const link = classifyLink(href, docPath);
     if (link.kind === "external") void api.openExternalUrl(link.url);
-    else if (link.kind === "path") void api.previewLink(link.path);
+    else if (link.kind === "path") {
+      if (pathLinks) void api.previewLink(link.path); // 별도 미리보기 창에서는 이동하지 않는다(메인 창의 미리보기 대상과 어긋나 엉뚱한 파일이 지워질 수 있다)
+    }
     else if (link.kind === "anchor") {
       const wanted = link.id.toLowerCase();
       const target = Array.from(root.current?.querySelectorAll<HTMLElement>("[id]") ?? []).find((e) => e.id.toLowerCase() === wanted);

@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "preview",
+  "description": "미리보기 창(preview, 이슈 #160)의 최소 권한: 이벤트 수신·창 정보(core:default), 텍스트 복사 버튼(클립보드 쓰기). 앱 명령(미리보기 읽기 등)은 capability와 상관없이 허용되고, 비디오·3D·HWP가 읽는 파일 주소(asset 프로토콜)는 tauri.conf.json의 assetProtocol.scope가 정한다.",
+  "windows": ["preview"],
+  "permissions": ["core:default", "clipboard-manager:allow-write-text"]
+}

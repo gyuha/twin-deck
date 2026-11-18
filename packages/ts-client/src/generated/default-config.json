@@ -78,6 +78,7 @@
       "audio_autoplay": false,
       "video_autoplay": false,
       "close_on_outside_click": false,
+      "separate_window": true,
       "image_max_mb": 10,
       "pdf_max_mb": 10,
       "audio_max_mb": 20,

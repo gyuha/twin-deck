@@ -5,6 +5,7 @@ mod commands;
 mod epub;
 mod global_hotkey;
 mod office;
+mod preview_window;
 #[cfg(any(target_os = "macos", test))]
 mod relaunch;
 mod service;
@@ -60,10 +61,7 @@ fn handle_second_instance(app: &tauri::AppHandle, argv: Vec<String>, cwd: String
         std::path::Path::new(&cwd),
     ));
     let _ = OpenPaths { request }.emit(app);
-    let window = app
-        .get_webview_window("main")
-        .or_else(|| app.webview_windows().into_values().next());
-    if let Some(w) = window {
+    if let Some(w) = preview_window::any_main_window(app) {
         let _ = w.unminimize();
         let _ = w.show();
         let _ = w.set_focus();
@@ -134,7 +132,14 @@ fn main() {
         // 기본 위치에 보였다가 옮겨지는 깜빡임을 막는다.
         .on_page_load(|webview, payload| {
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
-                let _ = webview.window().show();
+                // 미리보기 창은 `show()`(macOS에서 key 창이 됨)로 보이면 메인 창의 포커스를 뺏으므로 따로 보인다.
+                if webview.label() == preview_window::PREVIEW_LABEL {
+                    if let Some(w) = webview.app_handle().get_webview_window(webview.label()) {
+                        preview_window::on_page_load(webview.app_handle(), &w);
+                    }
+                } else {
+                    let _ = webview.window().show();
+                }
             }
         })
         .invoke_handler(builder.invoke_handler())
@@ -160,6 +165,7 @@ fn main() {
             td_launch::Os::current(),
         ))
         .manage(AppVolumes::new(td_volumes::SystemUnmounter))
+        .manage(preview_window::PreviewWindow::default())
         .setup(move |app| {
             #[cfg(target_os = "macos")]
             set_dock_icon();
@@ -241,12 +247,34 @@ fn main() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            // 백그라운드 유지: 닫기 버튼이 앱을 끝내지 않고 창만 숨긴다. 마지막 창이 닫히면 앱이 끝나므로 닫기 자체를 막는다.
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                if background_on_close(window.app_handle()) {
-                    api.prevent_close();
-                    let _ = window.hide();
+            let app = window.app_handle();
+            // 미리보기 창의 닫기 버튼은 창을 없애지 않고 숨기며, 소유자 메인 창에 알리고 포커스를 돌려준다.
+            // Windows에서 owner 창과 함께 없어지면 상태를 '창 없음·안 보임'으로 되돌린다.
+            if window.label() == preview_window::PREVIEW_LABEL {
+                match event {
+                    tauri::WindowEvent::CloseRequested { api, .. } => {
+                        api.prevent_close();
+                        preview_window::close(app);
+                    }
+                    tauri::WindowEvent::Destroyed => preview_window::preview_destroyed(app),
+                    _ => {}
                 }
+                return;
+            }
+            match event {
+                // 백그라운드 유지: 닫기 버튼이 앱을 끝내지 않고 창만 숨긴다. 마지막 창이 닫히면 앱이 끝나므로 닫기 자체를 막는다.
+                tauri::WindowEvent::CloseRequested { api, .. } => {
+                    preview_window::owner_gone(app, window.label());
+                    if background_on_close(app) {
+                        api.prevent_close();
+                        let _ = window.hide();
+                    }
+                }
+                // 남은 메인 창이 없으면 미리보기 창도 없애 앱이 끝나게 한다.
+                tauri::WindowEvent::Destroyed => {
+                    preview_window::main_window_destroyed(app, window.label());
+                }
+                _ => {}
             }
         })
         .on_menu_event(|app, event| {
@@ -254,6 +282,7 @@ fn main() {
                 // 메뉴의 종료(Mod+Q)는 백그라운드 유지가 켜져 있으면 창만 숨긴다. Dock의 종료는 이 메뉴를 거치지 않아 앱을 끝낸다.
                 if background_on_close(app) {
                     for w in app.webview_windows().into_values() {
+                        preview_window::owner_gone(app, w.label());
                         let _ = w.hide();
                     }
                 } else {
@@ -271,9 +300,12 @@ fn main() {
                 ..
             } = event
             {
-                for w in app.webview_windows().into_values() {
-                    let _ = w.show();
-                    let _ = w.set_focus();
+                // 미리보기 창은 다시 보이지 않는다(숨길 때 메인 창의 미리보기 상태도 비웠다).
+                for (label, w) in app.webview_windows() {
+                    if preview_window::is_main_window(&label) {
+                        let _ = w.show();
+                        let _ = w.set_focus();
+                    }
                 }
             }
             #[cfg(not(target_os = "macos"))]

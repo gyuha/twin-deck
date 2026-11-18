@@ -2,11 +2,12 @@ import type { SyncOptionsDto, SyncComparisonDto, SyncChoiceDto } from "./generat
 import { getVersion } from "@tauri-apps/api/app";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { HostKeyError, BackendError, RemoteConnectError, SmbConnectError } from "./backend";
 import type { Backend, FileDropEvent, SearchEvent, TerminalEvent } from "./backend";
 import { commands, events } from "./generated/bindings";
-import type { ShellResultDto, CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigValue, ConflictDto, LocationConflict, ExpectedFileDto, FileInfoDto, FindSpecDto, JobDto, LoadedState, PreviewDto, OfficePreviewDto, EpubInfoDto, Snapshot, JobKindDto, Loaded, QueueItemDto, RemoteServer, Result, SmbServer, WriteTextResultDto } from "./generated/bindings";
+import type { ShellResultDto, CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigValue, ConflictDto, LocationConflict, ExpectedFileDto, FileInfoDto, FindSpecDto, JobDto, LoadedState, PreviewDto, PreviewKeyDto, PreviewTargetDto, OfficePreviewDto, EpubInfoDto, Snapshot, JobKindDto, Loaded, QueueItemDto, RemoteServer, Result, SmbServer, WriteTextResultDto } from "./generated/bindings";
 
 function unwrap<T>(r: Result<T, string>): T {
   if (r.status === "error") throw new BackendError(r.error);
@@ -105,6 +106,43 @@ export class TauriBackend implements Backend {
   }
   async takeLaunchPaths() {
     return commands.takeLaunchPaths();
+  }
+  isPreviewWindow() {
+    return getCurrentWebviewWindow().label === "preview";
+  }
+  async previewWindowShow(target: PreviewTargetDto) {
+    unwrap(await commands.previewWindowShow(target));
+  }
+  async previewWindowHide() {
+    await commands.previewWindowHide();
+  }
+  async previewWindowClose() {
+    await commands.previewWindowClose();
+  }
+  previewWindowTarget() {
+    return commands.previewWindowTarget();
+  }
+  // 두 이벤트는 Rust가 한 창으로만 보낸다. 전역 `listen`은 대상과 상관없이 모든 창이 받으므로 이 창 기준으로 듣는다.
+  onPreviewWindowTarget(callback: (target: PreviewTargetDto) => void) {
+    const unlisten = events.previewWindowTarget(getCurrentWebviewWindow()).listen((e) => callback(e.payload.target));
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
+  }
+  onPreviewWindowClosed(callback: () => void) {
+    const unlisten = events.previewWindowClosed(getCurrentWebviewWindow()).listen(() => callback());
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
+  }
+  async previewWindowForwardKey(key: PreviewKeyDto) {
+    await commands.previewWindowForwardKey(key);
+  }
+  onPreviewWindowKey(callback: (key: PreviewKeyDto) => void) {
+    const unlisten = events.previewWindowKey(getCurrentWebviewWindow()).listen((e) => callback(e.payload.key));
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
   }
   onOpenPaths(callback: (request: OpenPathsDto) => void) {
     const unlisten = events.openPaths.listen((e) => callback(e.payload.request));
