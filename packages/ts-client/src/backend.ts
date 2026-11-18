@@ -1,5 +1,5 @@
 import type { SyncOptionsDto, SyncComparisonDto, SyncChoiceDto } from "./generated/bindings";
-import type { ShellResultDto, CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigLocationDto, ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, EpubInfoDto, ExpectedFileDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, NormalizeResultDto, LoadedState, LocationConflict, PreviewDto, RemoteErrorKindDto, RemoteServer, RemoteServerStatus, SmbErrorKindDto, SmbServer, QueueItemDto, OfficePreviewDto, SearchStartDto, SearchSummaryDto, Snapshot, UpdateInfoDto, UserDirsDto, VolumeDto, WriteTextResultDto } from "./generated/bindings";
+import type { ShellResultDto, CliOutcomeDto, CliStatusDto, OpenPathsDto, ConfigLocationDto, ConfigValue, ConflictDto, DiskSpaceDto, EntryDto, EpubInfoDto, ExpectedFileDto, FindSpecDto, FileInfoDto, JobDto, JobKindDto, Loaded, NormalizeResultDto, LoadedState, LocationConflict, PreviewDto, RemoteErrorKindDto, RemoteServer, RemoteServerStatus, SmbErrorKindDto, SmbServer, QueueItemDto, OfficePreviewDto, PreviewTargetDto, SearchStartDto, SearchSummaryDto, Snapshot, UpdateInfoDto, UserDirsDto, VolumeDto, WriteTextResultDto } from "./generated/bindings";
 
 /** Look Up / Flatten / Disk Usage가 스트리밍으로 보내는 이벤트. 작업마다 마지막은 `done`이다. */
 export type SearchEvent =
@@ -278,6 +278,23 @@ export interface Backend {
   onTerminalEvent(callback: (e: TerminalEvent) => void): () => void;
   /** 다른 앱(Finder 등)에서 끌어 온 파일 이벤트를 받는다. 구독 해제 함수를 돌려준다. */
   onFileDrop(callback: (e: FileDropEvent) => void): () => void;
+
+  // 미리보기 별도 창(이슈 #160, 설정 `preview.separate_window`). 미리보기 창은 레이블 `preview`, 주소 `index.html#preview`다.
+  // 키보드 포커스는 메인 창에 남고, 미리보기 창은 받은 대상의 경로로 `preview()`를 직접 불러 그리기만 한다.
+  /** 이 창이 미리보기 창인가. */
+  isPreviewWindow(): boolean;
+  /** 메인 창에서: 미리보기 창에 `target`을 보인다. 창이 없으면 만들고, 포커스는 이 창에 남는다. 이 창이 소유자가 된다. */
+  previewWindowShow(target: PreviewTargetDto): Promise<void>;
+  /** 메인 창에서: 미리보기 창을 숨긴다(미리보기를 끝냈을 때). `onPreviewWindowClosed`는 오지 않는다. */
+  previewWindowHide(): Promise<void>;
+  /** 미리보기 창에서: 닫는다(Esc 등). 소유자 메인 창에 `onPreviewWindowClosed`가 오고 포커스가 그 창으로 돌아간다. */
+  previewWindowClose(): Promise<void>;
+  /** 미리보기 창에서: 지금 보일 대상. 처음 그릴 때 한 번 부른다(창이 뜨기 전에 보낸 대상은 이벤트로 오지 않는다). 없으면 null. */
+  previewWindowTarget(): Promise<PreviewTargetDto | null>;
+  /** 미리보기 창에서: 보일 대상이 바뀌면 호출된다. 이 창으로 보낸 것만 받는다. 구독 해제 함수를 돌려준다. */
+  onPreviewWindowTarget(callback: (target: PreviewTargetDto) => void): () => void;
+  /** 메인 창에서: 이 창이 소유한 미리보기 창이 닫혔다(닫기 버튼·Esc, 또는 이 창이 닫히거나 숨음). 미리보기 상태를 비운다. 이 창으로 보낸 것만 받는다. */
+  onPreviewWindowClosed(callback: () => void): () => void;
 }
 
 /** 마지막 경로 구분자(`/` 또는 `\`)의 위치. 없으면 -1. */

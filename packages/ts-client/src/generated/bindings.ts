@@ -83,6 +83,35 @@ async newWindow() : Promise<Result<string, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * 미리보기 창에 `target`을 보인다. 창이 없으면 만들고, 포커스는 부른 메인 창에 남긴다. 부른 창을 소유자로 기억한다.
+ */
+async previewWindowShow(target: PreviewTargetDto) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("preview_window_show", { target }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 미리보기 창을 숨긴다(메인 창이 미리보기를 끝냈을 때). 소유자에게 알리지 않는다.
+ */
+async previewWindowHide() : Promise<void> {
+    await TAURI_INVOKE("preview_window_hide");
+},
+/**
+ * 미리보기 창 안에서 닫기를 요청했다(Esc 등). 창을 숨기고, 소유자 메인 창에 `PreviewWindowClosed`를 보내고 포커스를 돌려준다.
+ */
+async previewWindowClose() : Promise<void> {
+    await TAURI_INVOKE("preview_window_close");
+},
+/**
+ * 지금 미리보기 창에 보일 대상. 미리보기 창이 처음 그려질 때(이벤트를 놓쳤을 수 있다) 가져간다. 없으면 null.
+ */
+async previewWindowTarget() : Promise<PreviewTargetDto | null> {
+    return await TAURI_INVOKE("preview_window_target");
+},
 async fileInfo(path: string) : Promise<Result<FileInfoDto, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("file_info", { path }) };
@@ -877,6 +906,8 @@ export const events = __makeEvents__<{
 configChanged: ConfigChanged,
 dirChanged: DirChanged,
 openPaths: OpenPaths,
+previewWindowClosed: PreviewWindowClosed,
+previewWindowTarget: PreviewWindowTarget,
 queueChanged: QueueChanged,
 searchChunk: SearchChunk,
 searchDone: SearchDone,
@@ -887,6 +918,8 @@ usageUpdate: UsageUpdate
 configChanged: "config-changed",
 dirChanged: "dir-changed",
 openPaths: "open-paths",
+previewWindowClosed: "preview-window-closed",
+previewWindowTarget: "preview-window-target",
 queueChanged: "queue-changed",
 searchChunk: "search-chunk",
 searchDone: "search-done",
@@ -1304,6 +1337,10 @@ video_autoplay: boolean;
  */
 close_on_outside_click: boolean; 
 /**
+ * 미리보기를 앱 안 패널 대신 별도 창에 보인다. 창은 Twin Deck 창들 위에만 뜨고, 키보드 포커스는 메인 창에 남는다(이슈 #160).
+ */
+separate_window: boolean; 
+/**
  * 이미지 미리보기를 싣는 최대 파일 크기(MB). 이보다 크면 "너무 커서 미리 볼 수 없습니다"가 보인다. 0은 제한 없음.
  */
 image_max_mb: number; 
@@ -1329,6 +1366,35 @@ export type PreviewKindDto = "text" | "image" | "audio" | "video" | "pdf" | "dir
  * 미리보기 창의 위치와 크기(화면 안 픽셀). 왼쪽 위 모서리 `x`, `y`와 너비·높이 `w`, `h`다.
  */
 export type PreviewRect = { x: number; y: number; w: number; h: number }
+/**
+ * 미리보기 창에 보일 대상. 미리보기 데이터(이미지 data URL 등)는 크므로 보내지 않고, 미리보기 창이 경로로 직접 읽는다.
+ */
+export type PreviewTargetDto = { path: string; 
+/**
+ * 화면에 보일 이름.
+ */
+name: string; 
+/**
+ * 폴더 미리보기(하위 항목 트리)인지.
+ */
+is_dir: boolean; 
+/**
+ * 시트가 여러 개인 파일(xlsx 등)에서 보일 시트 번호(0부터). 없으면 첫 시트다.
+ */
+sheet: number | null }
+/**
+ * 사용자가 미리보기 창을 닫았다(닫기 버튼·Esc) 또는 소유자 창이 닫히거나 숨어 미리보기 창도 숨겼다.
+ * 소유자 메인 창에만 보낸다. 메인 창은 미리보기 상태를 비운다.
+ */
+export type PreviewWindowClosed = { 
+/**
+ * 받는 창(소유자)의 레이블.
+ */
+owner: string }
+/**
+ * 미리보기 창에 보일 대상이 바뀌었다. 미리보기 창에만 보낸다.
+ */
+export type PreviewWindowTarget = { target: PreviewTargetDto }
 /**
  * 작업 큐의 상태가 바뀔 때마다 전체 스냅샷을 보낸다.
  */

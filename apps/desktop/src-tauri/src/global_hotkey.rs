@@ -2,7 +2,7 @@
 
 use std::str::FromStr;
 
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 /// 설정 문자열(`Mod+Alt+O`)을 단축키로 바꾼다. `Mod`는 macOS에서 ⌘, 그 밖은 Ctrl이다. 빈 문자열이면 `None`(끔).
@@ -36,10 +36,9 @@ fn window_position(monitor: (i32, i32, u32, u32), window: (u32, u32)) -> (i32, i
 
 /// 창을 앞으로 가져온다. 마우스 커서가 창과 다른 모니터에 있으면 그 모니터 가운데로 옮긴다.
 pub fn reveal(app: &AppHandle) {
-    let window = app
-        .get_webview_window("main")
-        .or_else(|| app.webview_windows().into_values().next());
-    let Some(w) = window else { return };
+    let Some(w) = crate::preview_window::any_main_window(app) else {
+        return;
+    };
     let _ = w.unminimize();
     let target = app
         .cursor_position()

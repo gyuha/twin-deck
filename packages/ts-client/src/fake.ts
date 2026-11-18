@@ -15,6 +15,7 @@ import type {
   Loaded,
   LoadedState,
   PreviewDto,
+  PreviewTargetDto,
   QueueItemDto,
   OfficePreviewDto,
   EpubInfoDto,
@@ -1698,5 +1699,71 @@ export class FakeBackend implements Backend {
   /** 다른 앱(Finder)에서 파일을 끌어 오는 이벤트를 흉내 낸다. */
   emitFileDrop(e: FileDropEvent): void {
     for (const l of [...this.fileDropListeners]) l(e);
+  }
+
+  // 미리보기 별도 창(이슈 #160). 한 FakeBackend가 메인 창과 미리보기 창을 함께 흉내 낸다:
+  // 메인 쪽 `previewWindowShow`가 미리보기 쪽 `onPreviewWindowTarget` 구독자에게 대상을 바로 전달하고,
+  // 미리보기 쪽 `previewWindowClose`가 메인 쪽 `onPreviewWindowClosed` 구독자에게 알린다.
+  /** 테스트용: 이 백엔드를 미리보기 창의 것으로 볼지(`isPreviewWindow`). */
+  previewWindowMode = false;
+  /** 테스트용: 미리보기 창 명령 호출 기록. */
+  readonly previewWindowCalls: ({ type: "show"; target: PreviewTargetDto } | { type: "hide" } | { type: "close" })[] = [];
+  /** 미리보기 창이 보이는지와 지금 대상(Rust `PreviewWindowState`와 같은 규칙). */
+  previewWindowVisible = false;
+  previewWindowCurrent: PreviewTargetDto | null = null;
+  /** 보이기를 부른 메인 창이 있어 닫힘을 알릴 곳이 있는지. */
+  private previewWindowOwned = false;
+  private previewTargetListeners = new Set<(target: PreviewTargetDto) => void>();
+  private previewClosedListeners = new Set<() => void>();
+
+  isPreviewWindow() {
+    return this.previewWindowMode;
+  }
+
+  async previewWindowShow(target: PreviewTargetDto) {
+    this.previewWindowCalls.push({ type: "show", target: structuredClone(target) });
+    if (!this.previewWindowMode) this.previewWindowOwned = true;
+    this.previewWindowVisible = true;
+    this.previewWindowCurrent = structuredClone(target);
+    this.emitPreviewWindowTarget(target);
+  }
+
+  async previewWindowHide() {
+    this.previewWindowCalls.push({ type: "hide" });
+    this.previewWindowVisible = false;
+    this.previewWindowCurrent = null;
+  }
+
+  async previewWindowClose() {
+    this.previewWindowCalls.push({ type: "close" });
+    this.previewWindowVisible = false;
+    this.previewWindowCurrent = null;
+    if (!this.previewWindowOwned) return;
+    this.previewWindowOwned = false;
+    this.emitPreviewWindowClosed();
+  }
+
+  async previewWindowTarget() {
+    return this.previewWindowCurrent ? structuredClone(this.previewWindowCurrent) : null;
+  }
+
+  onPreviewWindowTarget(callback: (target: PreviewTargetDto) => void) {
+    this.previewTargetListeners.add(callback);
+    return () => void this.previewTargetListeners.delete(callback);
+  }
+
+  onPreviewWindowClosed(callback: () => void) {
+    this.previewClosedListeners.add(callback);
+    return () => void this.previewClosedListeners.delete(callback);
+  }
+
+  /** 미리보기 창이 대상을 받은 것처럼 만든다(테스트용). */
+  emitPreviewWindowTarget(target: PreviewTargetDto): void {
+    for (const l of [...this.previewTargetListeners]) l(structuredClone(target));
+  }
+
+  /** 미리보기 창이 닫힌 것처럼 만든다(테스트용: 닫기 버튼, 소유자 창이 숨음). */
+  emitPreviewWindowClosed(): void {
+    for (const l of [...this.previewClosedListeners]) l();
   }
 }
