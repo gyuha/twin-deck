@@ -37,6 +37,42 @@ describe("폴더 트리 (이슈 #125)", () => {
     expect(node("/home/a")).toHaveAttribute("aria-selected", "true");
   });
 
+  it("노드마다 폴더 아이콘이 보이고, 폴더 이름에 맞는 아이콘을 쓴다(파일 목록과 같다)", async () => {
+    const b = new FakeBackend().seed({ "/home/a/src/x.ts": "x", "/home/a/docs/r.md": "r", "/home/a/a.txt": "a", "/home/b/y.txt": "y" });
+    b.setConfig((l) => (l.config.behavior.layout.show_folder_tree = true));
+    await renderApp(b);
+    await waitFor(() => expect(node("/home/a/src")).not.toBeNull());
+    const src = (path: string) => node(path)!.querySelector("img")!.getAttribute("src")!;
+    expect(src("/home/a/src")).toMatch(/folder-src.*\.svg$/);
+    expect(src("/home/a/src")).not.toBe(src("/home/a/docs")); // docs 폴더는 다른 아이콘
+    expect(node("/home/a/src")!.querySelector("[aria-hidden='true']")).not.toBeNull();
+  });
+
+  it("아이콘 크기는 설정 behavior.table.icon_size를 따른다", async () => {
+    const b = seed(true);
+    b.setConfig((l) => (l.config.behavior.table.icon_size = 24));
+    await renderApp(b);
+    await waitFor(() => expect(node("/home/a/docs")).not.toBeNull());
+    const img = node("/home/a/docs")!.querySelector("img")!;
+    expect([img.getAttribute("width"), img.getAttribute("height")]).toEqual(["24", "24"]);
+  });
+
+  it("시스템 아이콘(behavior.table.system_icons)을 켜면 트리의 폴더도 운영체제 아이콘이고, 꺼져 있으면 백엔드에 묻지 않는다", async () => {
+    const off = seed(true);
+    await renderApp(off);
+    await waitFor(() => expect(node("/home/a/docs")).not.toBeNull());
+    await new Promise((r) => setTimeout(r, 30));
+    expect(off.systemIconCalls).toEqual([]);
+  });
+
+  it("시스템 아이콘이 켜지면 트리 노드의 img가 백엔드의 PNG가 된다", async () => {
+    const on = seed(true);
+    on.setConfig((l) => (l.config.behavior.table.system_icons = true));
+    on.systemIconResponder = async () => "data:image/png;base64,AAAA";
+    await renderApp(on);
+    await waitFor(() => expect(node("/home/a/docs")!.querySelector("img")!.getAttribute("src")).toBe("data:image/png;base64,AAAA"));
+  });
+
   it("패널이 다른 폴더로 가면 트리의 표시와 펼침이 따라 움직인다", async () => {
     const { user } = await renderApp(seed());
     await waitFor(() => expect(badges("/home/a")).toEqual(["L"]));

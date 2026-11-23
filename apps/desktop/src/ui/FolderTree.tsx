@@ -6,6 +6,7 @@ import { activeTab, clampTreeWidth, TREE_WIDTH_DEFAULT, TREE_WIDTH_MAX, TREE_WID
 import type { PaneId } from "../state/store";
 import { useApp, useAppStore, useT } from "../state/context";
 import { Chevron } from "./Chevron";
+import { FileIcon } from "./FileIcon";
 
 /** 폴더 트리 (이슈 #125, VS Code식): 하나뿐인 왼쪽 트리가 활성 패널의 드라이브를 뿌리로 그 드라이브 안의 좌우 패널 현재 폴더를 보인다(이슈 #134). `behavior.layout.show_folder_tree`로 켠다. */
 
@@ -56,6 +57,9 @@ export function FolderTree() {
   const dirSig = (pane: PaneId) => (s: Parameters<typeof activeTab>[0]) => activeTab(s, pane).entries.filter((e) => e.kind === "dir").map((e) => e.name).join("/");
   const leftDirs = useApp(dirSig("left"));
   const rightDirs = useApp(dirSig("right"));
+  // 폴더 아이콘은 파일 목록과 같이 설정의 아이콘 크기(`behavior.table.icon_size`)와 시스템 아이콘(`system_icons`)을 따른다.
+  const iconSize = useApp((s) => s.loaded.config.behavior.table.icon_size);
+  const systemIcons = useApp((s) => s.loaded.config.behavior.table.system_icons);
   const configWidth = useApp((s) => s.loaded.config.behavior.layout.folder_tree_width);
   const draftWidth = useApp((s) => s.treeWidthDraft);
   const width = draftWidth ?? clampTreeWidth(configWidth);
@@ -202,6 +206,7 @@ export function FolderTree() {
             >
               <Chevron open={r.open} />
             </button>
+            <FileIcon name={baseName(r.path) || r.path} kind="dir" size={iconSize} path={r.path} systemIcons={systemIcons} />
             <span className="min-w-0 flex-1 truncate">{baseName(r.path) || r.path}</span>
             {here.map((p) => (
               <span key={p} data-pane-badge={p} className="shrink-0 rounded bg-accent px-1 text-[10px] leading-4 text-accent-ink">
